@@ -10,6 +10,7 @@
 import { useAppStore } from '@/stores/useAppStore'
 import { useGenerate } from '@/hooks/useGenerate'
 import { ImagePlaceholderIcon, CheckIcon } from './icons'
+import ImageViewer from './ImageViewer'
 
 /** 백엔드 이미지 서버 기본 URL */
 const IMAGE_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
@@ -30,6 +31,7 @@ export default function ImageGrid() {
   const batchSize = useAppStore((s) => s.batchSize)
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
   const setSeed = useAppStore((s) => s.setSeed)
+  const setViewerIndex = useAppStore((s) => s.setViewerIndex)
 
   const { generate } = useGenerate()
 
@@ -91,9 +93,13 @@ export default function ImageGrid() {
           <div
             key={i}
             role="button"
-            tabIndex={0}
+            tabIndex={image ? 0 : -1}
+            aria-pressed={isSelected}
             onClick={() => handleSelect(i)}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelect(i) }}
+            onDoubleClick={() => { if (image) setViewerIndex(i) }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(i) }
+            }}
             className={`relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 ${
               isSelected
                 ? 'ring-2 ring-accent-bright ring-offset-2 ring-offset-void scale-[0.99]'
@@ -145,49 +151,27 @@ export default function ImageGrid() {
               <div
                 className="absolute bottom-0 left-0 right-0 p-2 flex items-center justify-center gap-2"
                 onClick={(e) => e.stopPropagation()}
+                onKeyDown={(e) => e.stopPropagation()}
               >
                 <div className="glass rounded-xl px-3 py-2 flex items-center gap-1.5 border border-edge">
-                  {/* 다시 생성 */}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={handleRegenerate}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleRegenerate() }}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
-                    title="같은 설정, 새 시드로 다시 생성"
-                  >
-                    다시 생성
-                  </span>
-                  {/* 영상 만들기 */}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={handleVideo}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleVideo() }}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
-                  >
-                    영상 만들기
-                  </span>
-                  {/* 저장 */}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={handleSave}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
-                  >
-                    저장
-                  </span>
-                  {/* 변형 */}
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    onClick={handleVariation}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleVariation() }}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
-                  >
-                    변형
-                  </span>
+                  {[
+                    { label: '다시 생성', handler: handleRegenerate, title: '같은 설정, 새 시드로 다시 생성' },
+                    { label: '영상 만들기', handler: handleVideo },
+                    { label: '저장', handler: handleSave },
+                    { label: '변형', handler: handleVariation },
+                  ].map(({ label, handler, title }) => (
+                    <span
+                      key={label}
+                      role="button"
+                      tabIndex={0}
+                      onClick={handler}
+                      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handler() } }}
+                      className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
+                      title={title}
+                    >
+                      {label}
+                    </span>
+                  ))}
                 </div>
               </div>
             )}
@@ -237,10 +221,13 @@ export default function ImageGrid() {
       {isCompleted && hasImages && selectedImageIndex === null && (
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 pointer-events-none">
           <p className="text-[11px] text-text-ghost/70 bg-surface/60 backdrop-blur-sm rounded-lg px-3 py-1.5 border border-edge/50">
-            이미지를 클릭하여 옵션을 확인하세요
+            클릭: 옵션 · 더블클릭: 크게 보기
           </p>
         </div>
       )}
+
+      {/* 풀스크린 이미지 뷰어 */}
+      <ImageViewer />
     </div>
   )
 }

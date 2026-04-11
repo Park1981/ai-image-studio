@@ -117,6 +117,10 @@ interface AppState {
   selectedImageIndex: number | null
   setSelectedImageIndex: (index: number | null) => void
 
+  // ── 풀스크린 뷰어 ──
+  viewerIndex: number | null
+  setViewerIndex: (index: number | null) => void
+
   // ── 사이드바 토글 상태 ──
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
@@ -207,6 +211,10 @@ export const useAppStore = create<AppState>((set) => ({
   // ── UI 선택 상태 ──
   selectedImageIndex: null,
   setSelectedImageIndex: (index) => set({ selectedImageIndex: index }),
+
+  // ── 풀스크린 뷰어 ──
+  viewerIndex: null,
+  setViewerIndex: (index) => set({ viewerIndex: index }),
 
   // ── 사이드바 토글 상태 ──
   sidebarOpen: false,
