@@ -1,6 +1,7 @@
 /**
  * 이미지 생성 오케스트레이션 훅
- * 생성 요청 → 즉시 task_id 수신 → WebSocket으로 전체 라이프사이클 추적
+ * 2단계 플로우: AI보강 → 사용자 확인 → 이미지 생성
+ * autoEnhance OFF면 바로 생성
  */
 
 'use client'
@@ -17,6 +18,9 @@ export function useGenerate() {
   const prompt = useAppStore((s) => s.prompt)
   const negativePrompt = useAppStore((s) => s.negativePrompt)
   const autoEnhance = useAppStore((s) => s.autoEnhance)
+  const enhancedPrompt = useAppStore((s) => s.enhancedPrompt)
+  const enhancedNegative = useAppStore((s) => s.enhancedNegative)
+  const enhancePending = useAppStore((s) => s.enhancePending)
   const checkpoint = useAppStore((s) => s.checkpoint)
   const loras = useAppStore((s) => s.loras)
   const vae = useAppStore((s) => s.vae)
@@ -35,28 +39,59 @@ export function useGenerate() {
   const setCurrentTaskId = useAppStore((s) => s.setCurrentTaskId)
   const setProgress = useAppStore((s) => s.setProgress)
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
+  const setEnhancedPrompt = useAppStore((s) => s.setEnhancedPrompt)
+  const setEnhancedNegative = useAppStore((s) => s.setEnhancedNegative)
+  const setEnhancePending = useAppStore((s) => s.setEnhancePending)
+  const setNegativePrompt = useAppStore((s) => s.setNegativePrompt)
 
-  /** 이미지 생성 시작 */
-  const generate = useCallback(async () => {
+  /** 1단계: AI 프롬프트 보강 (autoEnhance ON일 때) */
+  const enhance = useCallback(async () => {
     if (!prompt.trim()) {
       setErrorMessage('프롬프트를 입력해주세요.')
       return
     }
 
+    try {
+      setGenerationStatus('enhancing')
+      setProgress(0)
+      setErrorMessage(null)
+
+      const response = await api.enhancePrompt(prompt.trim())
+
+      if (response.success && response.data) {
+        setEnhancedPrompt(response.data.enhanced)
+        setEnhancedNegative(response.data.negative || '')
+        setEnhancePending(true)
+        setGenerationStatus('idle')
+      } else {
+        setGenerationStatus('idle')
+        setErrorMessage(response.error || '프롬프트 보강에 실패했습니다.')
+      }
+    } catch {
+      setGenerationStatus('idle')
+      setErrorMessage('프롬프트 보강 중 오류가 발생했습니다.')
+    }
+  }, [
+    prompt, setGenerationStatus, setProgress, setErrorMessage,
+    setEnhancedPrompt, setEnhancedNegative, setEnhancePending,
+  ])
+
+  /** 2단계: 이미지 생성 실행 (보강 확인 후 또는 autoEnhance OFF) */
+  const startGeneration = useCallback(async (finalPrompt: string, finalNegative: string) => {
     if (generationStatus === 'generating' || generationStatus === 'warming_up') {
       return
     }
 
     try {
-      // 상태 초기화
       setGenerationStatus('warming_up')
       setProgress(0)
       setErrorMessage(null)
+      setEnhancePending(false)
 
-      // 생성 요청 — 즉시 task_id 반환됨
+      // auto_enhance=false — 이미 보강된 프롬프트를 직접 전달
       const response = await api.generate({
-        prompt: prompt.trim(),
-        negative_prompt: negativePrompt.trim() || undefined,
+        prompt: finalPrompt,
+        negative_prompt: finalNegative || undefined,
         checkpoint: checkpoint || undefined,
         loras: loras.length > 0
           ? loras.map((l) => ({
@@ -74,7 +109,7 @@ export function useGenerate() {
         cfg,
         seed,
         batch_size: batchSize,
-        auto_enhance: autoEnhance,
+        auto_enhance: false, // 프론트에서 이미 보강 완료
       })
 
       if (!response.success) {
@@ -83,7 +118,6 @@ export function useGenerate() {
         return
       }
 
-      // task_id 수신 → 즉시 WebSocket 연결하여 전체 라이프사이클 추적
       const { task_id } = response.data
       setCurrentTaskId(task_id)
       connect(task_id)
@@ -92,11 +126,42 @@ export function useGenerate() {
       setErrorMessage('이미지 생성 중 예상치 못한 오류가 발생했습니다.')
     }
   }, [
-    prompt, negativePrompt, autoEnhance, checkpoint, loras, vae,
+    generationStatus, checkpoint, loras, vae,
     sampler, scheduler, width, height, steps, cfg, seed, batchSize,
-    generationStatus, setGenerationStatus, setCurrentTaskId, setProgress,
-    setErrorMessage, connect,
+    setGenerationStatus, setCurrentTaskId, setProgress,
+    setErrorMessage, setEnhancePending, connect,
   ])
+
+  /** 통합 생성 버튼 핸들러 */
+  const generate = useCallback(async () => {
+    if (!prompt.trim()) {
+      setErrorMessage('프롬프트를 입력해주세요.')
+      return
+    }
+
+    if (autoEnhance) {
+      // 2단계 플로우: 먼저 보강
+      await enhance()
+    } else {
+      // 보강 없이 바로 생성
+      await startGeneration(prompt.trim(), negativePrompt.trim())
+    }
+  }, [prompt, negativePrompt, autoEnhance, enhance, startGeneration, setErrorMessage])
+
+  /** 보강 결과 확인 → 이미지 생성 */
+  const confirmEnhance = useCallback(async () => {
+    const finalPrompt = enhancedPrompt || prompt.trim()
+    const finalNegative = enhancedNegative || negativePrompt.trim()
+    await startGeneration(finalPrompt, finalNegative)
+  }, [enhancedPrompt, enhancedNegative, prompt, negativePrompt, startGeneration])
+
+  /** 보강 취소 (원래 프롬프트로 복귀) */
+  const cancelEnhance = useCallback(() => {
+    setEnhancePending(false)
+    setEnhancedPrompt('')
+    setEnhancedNegative('')
+    setGenerationStatus('idle')
+  }, [setEnhancePending, setEnhancedPrompt, setEnhancedNegative, setGenerationStatus])
 
   /** 이미지 생성 취소 */
   const cancel = useCallback(async () => {
@@ -121,5 +186,13 @@ export function useGenerate() {
     generationStatus === 'warming_up' ||
     generationStatus === 'enhancing'
 
-  return { generate, cancel, isGenerating }
+  return {
+    generate,
+    enhance,
+    confirmEnhance,
+    cancelEnhance,
+    cancel,
+    isGenerating,
+    enhancePending,
+  }
 }

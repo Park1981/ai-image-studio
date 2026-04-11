@@ -75,6 +75,12 @@ interface AppState {
   autoEnhance: boolean
   setAutoEnhance: (autoEnhance: boolean) => void
 
+  // ── AI 보강 2단계 플로우 ──
+  enhancePending: boolean  // 보강 결과 확인 대기 중
+  setEnhancePending: (pending: boolean) => void
+  enhancedNegative: string  // 보강된 네거티브 프롬프트 (확인 전)
+  setEnhancedNegative: (neg: string) => void
+
   // ── 모델 설정 ──
   checkpoint: string
   setCheckpoint: (checkpoint: string) => void
@@ -154,6 +160,10 @@ export const useAppStore = create<AppState>((set) => ({
   setEnhancedPrompt: (enhancedPrompt) => set({ enhancedPrompt }),
   autoEnhance: true,
   setAutoEnhance: (autoEnhance) => set({ autoEnhance }),
+  enhancePending: false,
+  setEnhancePending: (pending) => set({ enhancePending: pending }),
+  enhancedNegative: '',
+  setEnhancedNegative: (neg) => set({ enhancedNegative: neg }),
 
   // ── 모델 설정 ──
   checkpoint: '',
