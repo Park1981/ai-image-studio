@@ -7,30 +7,28 @@
 
 ## 현재 진행 단계
 
-**Phase 0: 프로젝트 초기화 ✅ 완료**
-**Phase 0.5: 디자인 시스템 확정 ✅ 완료**
-**Phase 1: MVP 백엔드 + 프론트엔드 연동 ✅ 완료**
-**Phase 1.5: Qwen 모델 연동 + E2E 생성 테스트 ✅ 완료**
-**Phase 2: AI보강 2단계 + 풀스크린 뷰어 + 접근성 + 단축키 ✅ 완료**
-**Phase 3: 히스토리 시스템 (DB + 패널 + 설정 복원) ✅ 완료**
-**Phase 4: 프리셋 + 뷰어 줌 + 설정 페이지 ✅ 완료**
-**Phase 5: 미착수 (영상 생성 / img2img)**
+**Phase 0: 프로젝트 초기화 ✅**
+**Phase 0.5: 디자인 시스템 확정 ✅**
+**Phase 1: MVP 백엔드 + 프론트엔드 연동 ✅**
+**Phase 1.5: Qwen 모델 연동 + E2E + 버그 수정 6건 ✅**
+**Phase 2: AI보강 2단계 + 풀스크린 뷰어 + 접근성 + 단축키 ✅**
+**Phase 3: 히스토리 시스템 (DB + 패널 + 설정 복원) ✅**
+**Phase 4: 프리셋 + 뷰어 줌 + 설정 페이지 + 프리셋→AI보강 연동 ✅**
+**Phase 5: 미착수**
 
 ---
 
-## 🟢 Phase 1.5 버그 수정 완료 (2026-04-11)
+## 🔴 다음 세션에서 할 것
 
-### 수정된 버그 6개
-1. **WS 이미지 표시 버그** — `generate.py`에서 async generator 정리 중 예외가 except에 잡혀 다운로드 스킵 → `execution_done` 플래그로 해결
-2. **ComfyUI 히스토리 prompt 파싱** — ComfyUI `/history` 응답의 `prompt` 필드가 list인데 dict로 가정 → isinstance 분기 추가
-3. **ComfyUI 자동 실행** — `subprocess.PIPE`가 Electron 앱 출력 버퍼 차서 멈춤 → `DEVNULL` + Windows 플래그
-4. **사이즈 드롭다운 값 불일치** — `"1328x1328"` vs `"1:1"` 매칭 안 됨 → `SIZE_PRESETS.find()` 매칭
-5. **스케줄러 "simple" 누락** — Qwen 기본값인데 옵션에 없었음 → 추가
-6. **모델 드롭다운** — `UNETLoader` 기반 모델 미표시 + 불필요한 자동 선택 → `diffusion_models` 추가, 자동선택 제거
+### Phase 5 후보 (우선순위 미정)
+- img2img (참조 이미지 기반 생성 — 워크플로우 JSON 필요)
+- 영상 생성 연동 (WAN 2.2 / HunyuanVideo)
+- 프리셋 삭제 UI (현재 커스텀 프리셋 삭제 기능 없음)
+- 뷰어 `prefers-reduced-motion` 대응
 
-### 다음 세션에서 할 것
-- Phase 2: img2img, 풀스크린 뷰어, 단축키
-- .env.example 업데이트
+### 미적용 피드백 (메모리에 저장됨)
+- Codex: localStorage JSON 구조 검증 필요
+- Codex: 모달 `role="dialog"` / `aria-modal` / 포커스 관리 미흡
 
 ---
 
@@ -44,8 +42,8 @@ ComfyUI Desktop: http://127.0.0.1:8000  # ← 기본 8188이 아님!
 Ollama: http://127.0.0.1:11434
 
 # 실행 순서
-1. ComfyUI Desktop 직접 실행 (바탕화면 아이콘)
-2. cd backend && ../.venv/Scripts/uvicorn main:app --host 127.0.0.1 --port 8001
+1. ComfyUI Desktop 직접 실행 (바탕화면 아이콘) 또는 백엔드가 자동 시작
+2. cd backend && ../.venv/Scripts/uvicorn main:app --host 127.0.0.1 --port 8001 --reload
 3. cd frontend && npm run dev
 
 # Ollama는 자동 시작됨 (ollama list 실행하면 서비스 자동 기동)
@@ -61,8 +59,6 @@ Ollama: http://127.0.0.1:11434
 | LLM (프롬프트 보강) | gemma4:26b (Ollama) |
 | 워크플로우 | workflows/qwen_image.json |
 | 기본 파라미터 | euler, simple, 50 steps, cfg=4, 1328×1328 |
-| ComfyUI 모델 경로 | C:/ComfyUI/models/ |
-| ComfyUI 워크플로우 | C:/ComfyUI/user/default/workflows/ |
 
 ---
 
@@ -71,78 +67,97 @@ Ollama: http://127.0.0.1:11434
 ```
 ai-image-studio/
 ├── frontend/                        # Next.js 16 (Tailwind v4)
-│   ├── app/page.tsx                 # 메인 페이지 (컴포넌트 조합)
-│   ├── components/                  # UI 컴포넌트 7개
-│   ├── hooks/                       # 커스텀 훅 4개
-│   ├── stores/useAppStore.ts        # Zustand 스토어
-│   ├── lib/api.ts                   # API 클라이언트
-│   └── .env.local                   # NEXT_PUBLIC_API_URL=http://127.0.0.1:8001
+│   ├── app/page.tsx                 # 메인 페이지
+│   ├── components/
+│   │   ├── Header.tsx               # 로고 + 상태 + 새생성/히스토리/설정
+│   │   ├── ImageGrid.tsx            # 동적 그리드 (batchSize 기반)
+│   │   ├── ImageViewer.tsx          # 풀스크린 뷰어 (줌/패닝)
+│   │   ├── PromptDock.tsx           # 프롬프트 입력 + 프리셋 + 설정
+│   │   ├── SettingsSidebar.tsx      # 고급 설정 (VAE, LoRA, Steps 등)
+│   │   ├── SettingsPanel.tsx        # 설정 모달 (프로세스/단축키)
+│   │   ├── HistoryBar.tsx           # 하단 썸네일 갤러리
+│   │   ├── HistoryPanel.tsx         # 전체 히스토리 패널
+│   │   ├── ErrorToast.tsx           # 에러 알림
+│   │   └── icons.tsx                # SVG 아이콘
+│   ├── hooks/
+│   │   ├── useGenerate.ts           # 2단계 생성 (보강→확인→생성)
+│   │   ├── useWebSocket.ts          # WS 진행률 수신
+│   │   ├── useModels.ts             # 모델 목록 조회
+│   │   └── useProcessStatus.ts      # 프로세스 상태 폴링
+│   ├── stores/useAppStore.ts        # Zustand 전역 상태
+│   ├── lib/
+│   │   ├── api.ts                   # API 클라이언트
+│   │   └── presets.ts               # 프리셋 시스템
+│   └── .env.local
 │
 ├── backend/                         # FastAPI
-│   ├── main.py                      # 엔트리 (포트 8001)
-│   ├── config.py                    # 설정 (gemma4:26b, ComfyUI:8000)
-│   ├── routers/                     # generate, process, models, prompt
-│   ├── services/                    # process_manager, comfyui_client, workflow_manager, prompt_engine
-│   └── workflows/
-│       ├── qwen_image.json          # ★ 현재 기본 워크플로우
-│       └── txt2img.json             # SDXL용 (사용 안 함)
+│   ├── main.py                      # 엔트리
+│   ├── config.py                    # 환경 설정
+│   ├── database.py                  # SQLite 히스토리 DB
+│   ├── routers/
+│   │   ├── generate.py              # 이미지 생성 + WS + 히스토리 저장
+│   │   ├── history.py               # 히스토리 CRUD API
+│   │   ├── process.py               # ComfyUI/Ollama 관리
+│   │   ├── models.py                # 모델 목록 (UNET + 체크포인트)
+│   │   └── prompt.py                # AI 프롬프트 보강
+│   ├── services/
+│   │   ├── comfyui_client.py        # ComfyUI REST/WS 클라이언트
+│   │   ├── process_manager.py       # 프로세스 라이프사이클
+│   │   ├── workflow_manager.py      # 워크플로우 파라미터 주입
+│   │   └── prompt_engine.py         # Ollama 프롬프트 보강 엔진
+│   └── workflows/qwen_image.json    # Qwen Image 워크플로우
 │
-├── data/images/                     # 생성된 이미지 저장
-├── docs/SESSION_STATUS.md           # ← 이 파일
-└── .env                             # 환경변수 (gitignore)
+├── data/
+│   ├── images/                      # 생성 이미지 (날짜별 하위폴더)
+│   └── history.db                   # SQLite 히스토리 DB
+└── docs/SESSION_STATUS.md           # ← 이 파일
 ```
 
 ---
 
-## API 엔드포인트 (14개)
+## 주요 기능 요약
 
-| 메서드 | 경로 | 설명 |
-|--------|------|------|
-| POST | `/api/generate` | 이미지 생성 (즉시 task_id 반환, 백그라운드 처리) |
-| POST | `/api/generate/cancel/{task_id}` | 생성 취소 |
-| GET | `/api/generate/status/{task_id}` | 태스크 상태 조회 |
-| WS | `/api/ws/generate` | 전체 라이프사이클 스트리밍 |
-| GET | `/api/process/status` | Ollama/ComfyUI 상태 |
-| POST | `/api/process/comfyui/start\|stop` | ComfyUI 제어 |
-| GET | `/api/models/list` | 모델 목록 |
-| POST | `/api/prompt/enhance` | 프롬프트 AI 보강 |
+| 기능 | 설명 |
+|------|------|
+| AI 보강 2단계 | 생성→AI보강→사용자확인/수정→이미지생성 |
+| 프리셋→AI보강 | 프리셋 스타일이 AI 보강 지침에 전달 (portrait/landscape 등) |
+| 동적 그리드 | batchSize에 따라 1칸/2칸/2x2 레이아웃 |
+| 풀스크린 뷰어 | 더블클릭, 마우스 휠 줌 0.5x~5x, 드래그 패닝 |
+| 히스토리 | DB 자동 저장, 하단 썸네일 갤러리, 상단 패널 (설정 복원) |
+| 프리셋 | 기본 5종 + 커스텀 저장 (localStorage) |
+| 설정 페이지 | 프로세스 관리 + 기본 설정 + 단축키 안내 |
+| ComfyUI 자동 시작 | subprocess + Windows 플래그 |
+
+## 단축키
+
+| 키 | 동작 |
+|----|------|
+| Ctrl+Enter | 생성 / 보강 확인 |
+| ESC | 취소 / 뷰어 닫기 / 보강 취소 |
+| 더블클릭 | 이미지 크게 보기 |
+| ← → | 뷰어 이미지 전환 |
+| + − 0 | 줌 인 / 줌 아웃 / 리셋 |
 
 ---
 
-## E2E 테스트 결과 (2026-04-11)
+## 이번 세션 커밋 히스토리 (2026-04-11)
 
 ```
-프롬프트: "A cute cat sitting on a windowsill, soft morning light, cozy atmosphere"
-    ↓ Ollama gemma4:26b 보강 (~15초)
-보강: "masterpiece, best quality, photorealistic, ...a cute fluffy kitten sitting peacefully..."
-    ↓ ComfyUI Qwen Image 2512 생성 (~60초, 50 steps)
-결과: 1328×1328 PNG, 2.2MB ✅ 성공
-    ↓ 이미지 서빙: http://127.0.0.1:8001/images/test.png ✅
-    ↓ 프론트 그리드 표시: ❌ WS 완료 메시지 전달 안 됨 (버그)
+5b9e17b  fix: WS 이미지 표시 + ComfyUI 자동 실행 + UI 6건
+087d2b4  fix: 동적 그리드 + hydration + 스피너
+2b65ea1  feat: AI보강 2단계 분리
+51f205a  feat: 풀스크린 뷰어 + 접근성 + 단축키
+d2c15db  fix: Codex 리뷰 (중복방지/수정본/ESC)
+70dff7a  fix: 이미지 비율 object-contain
+fe018ee  feat: Phase 3 히스토리 시스템
+c992c51  feat: 상단 히스토리 패널
+1ae7d77  fix: 히스토리 피드백 반영
+4ff9808  feat: Phase 4 프리셋+줌+설정
+171cf20  fix: Codex Phase 4 피드백 3건
+41aac51  docs: Phase 2~4 완료 상태 반영
+ce33745  feat: 프리셋→AI보강 스타일 연동
 ```
 
 ---
 
-## Git 커밋 히스토리
-
-1. `65352ba` — init: 프로젝트 초기 세팅
-2. `1208ca0` — feat(frontend): 메인 생성 페이지 UI + 디자인 시스템
-3. `a5609cd` — docs: 세션 복구용 프로젝트 상태 문서 추가
-4. `e899066` — feat: Phase 1 MVP 백엔드 + UI 간소화 완성
-5. `8d59b72` — fix: Qwen Image 워크플로우 연동 + 실제 생성 테스트 성공
-
----
-
-## 향후 로드맵
-
-| Phase | 내용 | 상태 |
-|-------|------|------|
-| 1.5 버그 | WS 이미지 표시 수정 | 다음 세션 |
-| 2 | img2img, 풀스크린 뷰어, 단축키 | 미착수 |
-| 3 | 히스토리 시스템 (DB + 검색 + 재생성) | 미착수 |
-| 4 | 설정 페이지, 프리셋 | 미착수 |
-| 5 | 영상 생성 연동 (WAN/HunyuanVideo) | 미착수 |
-
----
-
-> 새 세션 시작 시: 이 파일 읽고 → WS 버그 수정부터 시작
+> 새 세션 시작 시: 이 파일 읽고 → Phase 5 기획 또는 피드백 반영
