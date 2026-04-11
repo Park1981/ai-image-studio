@@ -63,11 +63,14 @@ Ollama: http://127.0.0.1:11434
 | 항목 | 값 |
 |------|------|
 | 이미지 생성 | Qwen Image 2512 (fp8, diffusion_models) |
+| 이미지 수정 | Qwen Image Edit 2511 (bf16, diffusion_models) |
 | 텍스트 인코더 | qwen_2.5_vl_7b_fp8_scaled |
 | VAE | qwen_image_vae |
-| LLM (프롬프트 보강) | gemma4:26b (Ollama) |
-| 워크플로우 | workflows/qwen_image.json |
-| 기본 파라미터 | euler, simple, 50 steps, cfg=4, 1328×1328 |
+| LLM (프롬프트 보강) | gemma4:26b (Ollama, 설정에서 변경 가능) |
+| 생성 워크플로우 | workflows/qwen_image.json |
+| 수정 워크플로우 | workflows/qwen_image_edit.json |
+| 생성 기본 파라미터 | euler, simple, 50 steps, cfg=4, 1328×1328 |
+| 수정 기본 파라미터 | euler, simple, 50 steps, cfg=4 (원본 이미지 크기 유지) |
 
 ---
 
@@ -114,10 +117,14 @@ ai-image-studio/
 │   │   ├── process_manager.py       # 프로세스 라이프사이클
 │   │   ├── workflow_manager.py      # 워크플로우 파라미터 주입
 │   │   └── prompt_engine.py         # Ollama 프롬프트 보강 엔진
-│   └── workflows/qwen_image.json    # Qwen Image 워크플로우
+│   └── workflows/
+│       ├── qwen_image.json          # Qwen Image 생성 워크플로우
+│       ├── qwen_image_edit.json     # Qwen Image Edit 수정 워크플로우
+│       └── txt2img.json             # 범용 txt2img 워크플로우
 │
 ├── data/
 │   ├── images/                      # 생성 이미지 (날짜별 하위폴더)
+│   ├── uploads/                     # 수정 모드 소스 이미지 업로드
 │   └── history.db                   # SQLite 히스토리 DB
 └── docs/SESSION_STATUS.md           # ← 이 파일
 ```
@@ -129,12 +136,15 @@ ai-image-studio/
 | 기능 | 설명 |
 |------|------|
 | AI 보강 2단계 | 생성→AI보강→사용자확인/수정→이미지생성 |
+| Ollama 폴백 경고 | AI보강 실패 시 빨간색 경고 배너 + 재시도 버튼 |
+| LLM 모델 스위칭 | 설정 페이지에서 Ollama 모델 선택 (5개 모델) |
+| 이미지 수정 (Phase 5) | 생성/수정 모드 토글, 이미지 업로드 → Qwen Edit → 수정 결과 |
 | 프리셋→AI보강 | 프리셋 스타일이 AI 보강 지침에 전달 (portrait/landscape 등) |
 | 동적 그리드 | batchSize에 따라 1칸/2칸/2x2 레이아웃 |
 | 풀스크린 뷰어 | 더블클릭, 마우스 휠 줌 0.5x~5x, 드래그 패닝 |
 | 히스토리 | DB 자동 저장, 하단 썸네일 갤러리, 상단 패널 (설정 복원) |
 | 프리셋 | 기본 5종 + 커스텀 저장 (localStorage) |
-| 설정 페이지 | 프로세스 관리 + 기본 설정 + 단축키 안내 |
+| 설정 페이지 | 프로세스 관리 + LLM 모델 선택 + 기본 설정 + 단축키 |
 | ComfyUI 자동 시작 | subprocess + Windows 플래그 |
 
 ## 단축키
@@ -149,7 +159,16 @@ ai-image-studio/
 
 ---
 
-## 이번 세션 커밋 히스토리 (2026-04-11)
+## 세션 2 커밋 히스토리 (2026-04-12)
+
+```
+c00afc3  feat: Ollama 폴백 경고 + LLM 모델 스위칭
+533f0dd  feat: Phase 5 — Qwen Image Edit 이미지 수정 기능
+862ba5e  docs: Phase 5 완료 상태 + Phase 6~7 로드맵 갱신
+5fdf584  fix: Qwen Image Edit 워크플로우 필드명 수정
+```
+
+## 세션 1 커밋 히스토리 (2026-04-11)
 
 ```
 5b9e17b  fix: WS 이미지 표시 + ComfyUI 자동 실행 + UI 6건
@@ -169,4 +188,26 @@ ce33745  feat: 프리셋→AI보강 스타일 연동
 
 ---
 
-> 새 세션 시작 시: 이 파일 읽고 → Phase 5 기획 또는 피드백 반영
+## Phase 5 기술 상세 (다음 세션 참고)
+
+### 이미지 수정 파이프라인
+```
+사용자 이미지 업로드 → POST /api/images/upload → data/uploads/ 저장
+                     → POST /api/generate/edit → ComfyUI /upload/image
+                     → qwen_image_edit.json 워크플로우 실행
+                     → WS 진행률 → 결과 이미지 다운로드 → 그리드 표시
+```
+
+### 수정 워크플로우 핵심 노드
+- TextEncodeQwenImageEdit: 필드명 `prompt` (text 아님!)
+- CFGNorm: 필드명 `strength` (scale 아님!)
+- LoadImage: ComfyUI input 디렉토리에 업로드 필요
+
+### 알려진 제한/개선 사항
+- 브라우저 UI에서 form_input으로 textarea 값 설정 시 React state 동기 문제 있음
+- 히스토리 DB 저장 시 EditRequest에 prompt 속성 없어서 warning 발생 (기능은 정상)
+- 수정 모드에서 생성된 이미지 그리드 "수정" 버튼으로 바로 재수정 가능
+
+---
+
+> 새 세션 시작 시: 이 파일 읽고 → Phase 6 (AI 보강 디테일) 또는 Phase 7 (영상 생성) 진행
