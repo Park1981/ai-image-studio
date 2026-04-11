@@ -8,8 +8,10 @@
 ## 현재 진행 단계
 
 **Phase 0: 프로젝트 초기화 ✅ 완료**
-**Phase 0.5: 디자인 시스템 확정 🔄 진행 중 (사용자 피드백 대기)**
-**Phase 1~5: 미착수**
+**Phase 0.5: 디자인 시스템 확정 ✅ 완료**
+**Phase 1: MVP 백엔드 + 프론트엔드 연동 ✅ 완료**
+**Phase 1.5: UI 간소화 + 버그 수정 ✅ 완료**
+**Phase 2~5: 미착수**
 
 ---
 
@@ -25,13 +27,45 @@
 - [x] Python 가상환경 (.venv) + 의존성 설치
 - [x] 초기 커밋 + GitHub push
 
-### Phase 0.5 디자인 (부분 완료)
+### Phase 0.5 디자인 (완료)
 - [x] 디자인 브리프 문서 작성 (docs/design-brief.md)
-- [x] 스티치 앱으로 디자인 시도 → 설정 페이지만 나옴, 100% 만족 안 됨
-- [x] 직접 "Dark Room" 컨셉 디자인 시스템 구축 (globals.css)
-- [x] 메인 생성 페이지 UI 구현 (page.tsx) — 2x2 그리드 + 사이드바 + 프롬프트 독
-- [ ] **사용자 디자인 피드백 대기 중** ← 현재 여기
-- [ ] 피드백 반영 후 design-tokens.ts 최종 확정
+- [x] "Dark Room" 컨셉 디자인 시스템 구축 (globals.css)
+- [x] 메인 생성 페이지 UI 구현 — 2x2 그리드 + 사이드바 + 프롬프트 독
+- [x] 디자인 피드백 확정
+
+### Phase 1 MVP (완료)
+- [x] C→D 드라이브 이동 후 venv 재생성 + 의존성 재설치
+- [x] .env 업데이트 (gemma4:latest, 경로 확인)
+- [x] **백엔드 서비스 4개 구현**:
+  - `services/process_manager.py` — ComfyUI 온디맨드 실행/종료 + 자동 셧다운
+  - `services/comfyui_client.py` — ComfyUI REST/WebSocket 통신
+  - `services/workflow_manager.py` — JSON 워크플로우 템플릿 + 파라미터 주입 + LoRA 동적 삽입
+  - `services/prompt_engine.py` — Ollama 프롬프트 보강/번역 + 폴백 처리
+- [x] **ComfyUI 워크플로우 템플릿** (`workflows/txt2img.json`)
+- [x] **백엔드 라우터 4개 구현**:
+  - `routers/generate.py` — 이미지 생성 + 취소 + WebSocket 진행률
+  - `routers/process.py` — 프로세스 상태 조회 + ComfyUI 시작/종료
+  - `routers/models.py` — 모델 목록 조회
+  - `routers/prompt.py` — 프롬프트 AI 보강
+- [x] `main.py` 업데이트 — 라우터 등록 + lifespan + 정적 파일 서빙 + 로깅
+- [x] **프론트엔드 컴포넌트 분리** (page.tsx 360줄 → 39줄):
+  - `components/Header.tsx` — 실시간 프로세스 상태 표시
+  - `components/ImageGrid.tsx` — 2x2 그리드 + 이미지 표시 + 선택 + 프로그레스 바
+  - `components/PromptDock.tsx` — 프롬프트 입력 + AI 보강 + 생성/취소
+  - `components/SettingsSidebar.tsx` — 모든 설정 Zustand 연동
+  - `components/HistoryBar.tsx` — Phase 3 플레이스홀더
+  - `components/ErrorToast.tsx` — 에러 토스트 (5초 자동 소멸)
+  - `components/icons.tsx` — 아이콘 12개
+- [x] **커스텀 훅 4개 구현**:
+  - `hooks/useGenerate.ts` — 생성 플로우 오케스트레이션
+  - `hooks/useWebSocket.ts` — WebSocket 진행률 수신
+  - `hooks/useProcessStatus.ts` — 10초 간격 프로세스 폴링
+  - `hooks/useModels.ts` — 모델 목록 동적 로드
+- [x] `stores/useAppStore.ts` — 전체 상태 확장 (설정 파라미터, 모델 목록, 선택 UI)
+- [x] `lib/api.ts` — 구체 API 메서드 8개 추가
+- [x] 백엔드 uvicorn 실행 확인 + API 헬스체크 정상
+- [x] 프론트엔드 빌드 + 브라우저 UI 확인 (콘솔 에러 없음)
+- [x] ruff + ESLint 린트 통과
 
 ---
 
@@ -39,36 +73,55 @@
 
 ```
 ai-image-studio/
-├── frontend/                    # Next.js 14 (Tailwind v4, App Router)
+├── frontend/                        # Next.js 16 (Tailwind v4, App Router)
 │   ├── app/
-│   │   ├── globals.css          # ★ 디자인 시스템 (@theme 토큰, 애니메이션)
-│   │   ├── layout.tsx           # Sora + Geist + Geist Mono 폰트
-│   │   └── page.tsx             # ★ 메인 생성 페이지 (전체 UI)
-│   ├── components/ui/           # (빈 폴더 — Phase 1에서 컴포넌트화)
-│   ├── hooks/                   # (빈 폴더)
-│   ├── stores/useAppStore.ts    # Zustand 스토어 (상태 타입 정의됨)
-│   ├── styles/design-tokens.ts  # 디자인 토큰 (globals.css와 동기화 필요)
-│   ├── lib/api.ts               # API 클라이언트 (fetch 래퍼)
-│   └── .env.local               # NEXT_PUBLIC_API_URL
+│   │   ├── globals.css              # 디자인 시스템 (@theme 토큰, 애니메이션)
+│   │   ├── layout.tsx               # Sora + Geist + Geist Mono 폰트
+│   │   └── page.tsx                 # 메인 페이지 (컴포넌트 조합)
+│   ├── components/
+│   │   ├── Header.tsx               # 헤더 + 프로세스 상태
+│   │   ├── ImageGrid.tsx            # 2x2 이미지 그리드
+│   │   ├── PromptDock.tsx           # 프롬프트 입력 + 생성 버튼
+│   │   ├── SettingsSidebar.tsx      # 설정 사이드바
+│   │   ├── HistoryBar.tsx           # 히스토리 (Phase 3)
+│   │   ├── ErrorToast.tsx           # 에러 토스트
+│   │   └── icons.tsx                # SVG 아이콘 모음
+│   ├── hooks/
+│   │   ├── useGenerate.ts           # 생성 플로우 훅
+│   │   ├── useWebSocket.ts          # WebSocket 훅
+│   │   ├── useProcessStatus.ts      # 상태 폴링 훅
+│   │   └── useModels.ts             # 모델 목록 훅
+│   ├── stores/useAppStore.ts        # Zustand 스토어
+│   ├── lib/api.ts                   # API 클라이언트
+│   └── .env.local                   # NEXT_PUBLIC_API_URL
 │
-├── backend/                     # FastAPI
-│   ├── main.py                  # 엔트리 + lifespan + CORS + 헬스체크
-│   ├── config.py                # pydantic-settings (.env 로드)
-│   ├── database.py              # aiosqlite 스키마 (generations 테이블)
-│   ├── models/schemas.py        # ★ Pydantic 스키마 (Generate, Enhance, Process, History)
-│   ├── routers/                 # (빈 __init__.py만 — Phase 1에서 구현)
-│   ├── services/                # (빈 __init__.py만 — Phase 1에서 구현)
-│   └── workflows/               # (빈 폴더 — ComfyUI JSON 템플릿)
+├── backend/                         # FastAPI
+│   ├── main.py                      # 엔트리 + lifespan + CORS + 라우터 등록
+│   ├── config.py                    # pydantic-settings (.env 로드)
+│   ├── database.py                  # aiosqlite 스키마
+│   ├── models/schemas.py            # Pydantic 스키마
+│   ├── routers/
+│   │   ├── generate.py              # 이미지 생성 + 취소 + WS
+│   │   ├── process.py               # 프로세스 상태/시작/종료
+│   │   ├── models.py                # 모델 목록
+│   │   └── prompt.py                # 프롬프트 보강
+│   ├── services/
+│   │   ├── process_manager.py       # ComfyUI/Ollama 프로세스 관리
+│   │   ├── comfyui_client.py        # ComfyUI API 클라이언트
+│   │   ├── workflow_manager.py      # 워크플로우 템플릿 + 파라미터 주입
+│   │   └── prompt_engine.py         # Ollama 프롬프트 보강
+│   └── workflows/
+│       └── txt2img.json             # txt2img 기본 워크플로우
 │
-├── .venv/                       # Python 가상환경 (의존성 설치 완료)
+├── .venv/                           # Python 가상환경 (D 드라이브)
+├── data/                            # DB + 생성 이미지 저장
 ├── docs/
-│   ├── design-brief.md          # 스티치용 프로젝트 소개 문서
-│   └── SESSION_STATUS.md        # ← 이 파일
-├── stitch-output/               # 스티치 산출물 (DESIGN.md, code.html, screen.png)
+│   ├── design-brief.md              # 디자인 방향 문서
+│   └── SESSION_STATUS.md            # ← 이 파일
 │
-├── AI_Image_Studio_기획서_v1.1.md  # ★ 원본 기획서 (전체 설계)
-├── CLAUDE.md                    # Claude Code 프로젝트 설정
-├── .env / .env.example          # 환경변수
+├── AI_Image_Studio_기획서_v1.1.md     # 원본 기획서
+├── CLAUDE.md                        # Claude Code 설정
+├── .env / .env.example              # 환경변수
 └── .gitignore
 ```
 
@@ -82,6 +135,7 @@ ai-image-studio/
 | UI 라이브러리 | **Tailwind만** | shadcn/ui 미사용 (사용자 결정) |
 | DB | **aiosqlite** | SQLModel 아님 (사용자 결정) |
 | Config | **pydantic-settings** | .env 자동 로드 |
+| LLM 모델 | **gemma4:latest** | gemma3에서 변경 |
 | Phase 1 추가 | **생성 취소** | ComfyUI /interrupt 래핑 |
 | Phase 2 추가 | **키보드 단축키** | Ctrl+Enter, Escape 등 |
 | 폰트 | Sora(display) + Geist(UI) + Geist Mono(tech) | |
@@ -89,26 +143,50 @@ ai-image-studio/
 
 ---
 
+## API 엔드포인트 (14개)
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/` | 헬스 체크 |
+| GET | `/api/health` | 상세 헬스 체크 |
+| POST | `/api/generate` | 이미지 생성 요청 |
+| POST | `/api/generate/cancel/{task_id}` | 생성 취소 |
+| GET | `/api/generate/status/{task_id}` | 태스크 상태 조회 |
+| WS | `/api/ws/generate` | 생성 진행률 WebSocket |
+| GET | `/api/process/status` | 프로세스 상태 |
+| POST | `/api/process/comfyui/start` | ComfyUI 시작 |
+| POST | `/api/process/comfyui/stop` | ComfyUI 종료 |
+| GET | `/api/models/list` | 모델 목록 |
+| POST | `/api/prompt/enhance` | 프롬프트 AI 보강 |
+| - | `/images/{path}` | 정적 이미지 서빙 |
+
+---
+
 ## 다음 할 일 (우선순위 순)
 
-### 1. 디자인 피드백 반영 (Phase 0.5 마무리)
-- 사용자에게 localhost:3000 보여주고 피드백 받기
-- 컬러/레이아웃/폰트 수정사항 반영
-- design-tokens.ts를 globals.css와 동기화
+### 1. Phase 2: 고급 기능 구현
+- [ ] img2img, inpaint 워크플로우 추가
+- [ ] 이미지 풀스크린 뷰어 (오버레이)
+- [ ] 키보드 단축키 체계 (Ctrl+Enter, Escape 등)
+- [ ] 이미지 다운로드/복사 기능
+- [ ] 설정 프리셋 (저장/불러오기)
 
-### 2. Phase 1: MVP 백엔드 구현
-핵심 파일 생성 순서:
-1. `backend/config.py` — ✅ 완료
-2. `backend/services/process_manager.py` — ComfyUI 온디맨드 실행/종료
-3. `backend/services/comfyui_client.py` — ComfyUI API 통신
-4. `backend/services/workflow_manager.py` — JSON 템플릿 주입
-5. `backend/routers/generate.py` — 생성 API + 취소 + WebSocket 진행률
-6. `backend/routers/process.py` — 프로세스 상태 API
+### 2. Phase 3: 히스토리 시스템
+- [ ] 생성 이력 DB 저장 (aiosqlite)
+- [ ] 히스토리 페이지 (/history)
+- [ ] 과거 설정으로 재생성
+- [ ] 히스토리바 실제 데이터 연동
 
-### 3. Phase 1: MVP 프론트엔드 연동
-- page.tsx의 인라인 컴포넌트를 개별 파일로 분리
-- useWebSocket.ts, useGenerate.ts 훅 구현
-- 실제 API 연동
+### 3. Phase 4: 설정 페이지
+- [ ] 설정 페이지 (/settings)
+- [ ] ComfyUI/Ollama URL 설정
+- [ ] 기본값 설정
+- [ ] 테마 설정
+
+### 4. Phase 5: 안정화
+- [ ] structlog 도입
+- [ ] 에러 복구 로직 강화
+- [ ] 성능 최적화
 
 ---
 
@@ -120,23 +198,8 @@ ai-image-studio/
 | `docs/design-brief.md` | 디자인 방향 요약 | UI 수정 시 |
 | `backend/models/schemas.py` | API 스키마 정의 | 라우터/서비스 구현 시 |
 | `frontend/app/globals.css` | 디자인 토큰 전체 | UI 수정 시 |
-| `frontend/app/page.tsx` | 메인 페이지 전체 | 컴포넌트 분리 시 |
-| `frontend/stores/useAppStore.ts` | 상태 타입 정의 | 프론트 로직 구현 시 |
-
----
-
-## 강화된 기획 (v2.0) 주요 추가사항
-
-기획서 v1.1에 없었던 것 중 추가하기로 한 것:
-1. **생성 취소 API** — `POST /api/generate/cancel/{task_id}` (Phase 1)
-2. **큐 관리** — asyncio.Queue 인메모리 (Phase 1)
-3. **키보드 단축키** — Ctrl+Enter 생성, Escape 취소 (Phase 2)
-4. **이미지 저장 전략** — PNG Info 메타데이터 + 날짜별 디렉토리 (Phase 3)
-5. **에러 처리 세분화** — 상황별 한국어 메시지 + 자동 복구 (전 Phase)
-6. **설정 페이지 강화** — 프리셋, 기본값, 테마 (Phase 4~5)
-7. **structlog** — 구조화 로깅 (Phase 5)
-
-전체 플랜은 `.claude/plans/declarative-finding-bee.md`에 있음.
+| `frontend/stores/useAppStore.ts` | 전역 상태 타입 | 프론트 로직 구현 시 |
+| `frontend/lib/api.ts` | API 클라이언트 | API 호출 추가/수정 시 |
 
 ---
 
@@ -150,12 +213,11 @@ cd frontend && npm run dev          # localhost:3000
 cd backend && ../.venv/Scripts/uvicorn main:app --reload --port 8000
 
 # 린트
-cd backend && ../.venv/Scripts/ruff check .
+cd D:/AI-Image-Studio && .venv/Scripts/ruff check backend/
 cd frontend && npm run lint
 
-# GitHub (주의: GH_TOKEN 만료됨, keyring 인증 사용)
-unset GH_TOKEN                      # 반드시 먼저 실행
-gh auth status                      # Park1981 keyring 인증 확인
+# GitHub
+gh auth status                      # Park1981 인증 확인
 ```
 
 ---
@@ -164,7 +226,9 @@ gh auth status                      # Park1981 keyring 인증 확인
 
 1. `65352ba` — init: 프로젝트 초기 세팅 (Phase 0)
 2. `1208ca0` — feat(frontend): 메인 생성 페이지 UI + 디자인 시스템
+3. `a5609cd` — docs: 세션 복구용 프로젝트 상태 문서 추가
+4. *(커밋 대기)* — feat: Phase 1 MVP 백엔드 + 프론트엔드 연동
 
 ---
 
-> 새 세션 시작 시: 이 파일 + 기획서 + CLAUDE.md 읽고 Phase 0.5 피드백부터 이어가기
+> 새 세션 시작 시: 이 파일 + CLAUDE.md 읽고 Phase 2부터 이어가기

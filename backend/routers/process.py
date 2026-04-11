@@ -1,0 +1,67 @@
+"""
+프로세스 상태 관리 라우터
+- Ollama / ComfyUI 실행 상태 조회
+- ComfyUI 수동 시작/종료
+"""
+
+from fastapi import APIRouter
+
+from models.schemas import (
+    ApiResponse,
+    ComfyUIStatus,
+    OllamaStatus,
+    ProcessStatusResponse,
+)
+from services.process_manager import process_manager
+
+router = APIRouter(prefix="/api/process", tags=["프로세스"])
+
+
+@router.get("/status", response_model=ApiResponse[ProcessStatusResponse])
+async def get_process_status():
+    """Ollama / ComfyUI 프로세스 상태 조회"""
+    ollama_running = await process_manager.check_ollama()
+    comfyui_running = await process_manager.check_comfyui()
+
+    return {
+        "success": True,
+        "data": ProcessStatusResponse(
+            ollama=OllamaStatus(running=ollama_running),
+            comfyui=ComfyUIStatus(
+                running=comfyui_running,
+                uptime_min=process_manager.get_comfyui_uptime_minutes(),
+            ),
+        ),
+    }
+
+
+@router.post("/comfyui/start", response_model=ApiResponse[dict])
+async def start_comfyui():
+    """ComfyUI 수동 시작"""
+    started = await process_manager.start_comfyui()
+    if not started:
+        return {
+            "success": False,
+            "data": {},
+            "error": "ComfyUI 시작에 실패했습니다. 경로 설정을 확인해주세요.",
+        }
+    return {
+        "success": True,
+        "data": {"message": "ComfyUI가 시작되었습니다."},
+    }
+
+
+@router.post("/comfyui/stop", response_model=ApiResponse[dict])
+async def stop_comfyui():
+    """ComfyUI 수동 종료"""
+    stopped = await process_manager.stop_comfyui()
+    if not stopped:
+        return {
+            "success": False,
+            "data": {},
+            "error": "ComfyUI 종료에 실패했습니다.",
+        }
+    return {
+        "success": True,
+        "data": {"message": "ComfyUI가 종료되었습니다."},
+    }
