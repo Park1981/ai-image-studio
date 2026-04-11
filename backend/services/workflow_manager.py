@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from config import settings
-from models.schemas import GenerateRequest, LoraConfig
+from models.schemas import EditRequest, GenerateRequest, LoraConfig
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +28,8 @@ _NODE_EMPTY_SD3_LATENT: str = "EmptySD3LatentImage"
 _NODE_CHECKPOINT_LOADER: str = "CheckpointLoaderSimple"
 _NODE_VAE_LOADER: str = "VAELoader"
 _NODE_LORA_LOADER: str = "LoraLoader"
+_NODE_LOAD_IMAGE: str = "LoadImage"
+_NODE_TEXT_ENCODE_QWEN_EDIT: str = "TextEncodeQwenImageEdit"
 
 
 class WorkflowManager:
@@ -116,6 +118,73 @@ class WorkflowManager:
             request.steps,
             request.width,
             request.height,
+        )
+        return prompt
+
+    # ─────────────────────────────────────────────
+    # 이미지 수정 파라미터 주입
+    # ─────────────────────────────────────────────
+
+    def build_edit_prompt(
+        self,
+        request: EditRequest,
+        workflow: dict[str, Any],
+        comfyui_image_name: str,
+    ) -> dict[str, Any]:
+        """
+        이미지 수정 워크플로우에 파라미터 주입
+        - LoadImage 노드에 소스 이미지 파일명 설정
+        - TextEncodeQwenImageEdit (Positive) 노드에 수정 프롬프트 설정
+        - TextEncodeQwenImageEdit (Negative) 노드는 빈 텍스트 유지
+        - KSampler 노드에 샘플링 파라미터 설정
+        """
+        prompt = copy.deepcopy(workflow)
+
+        # 시드 처리: -1이면 랜덤 생성
+        seed = request.seed
+        if seed < 0:
+            seed = random.randint(0, _MAX_SEED)
+
+        # LoadImage 노드에 소스 이미지 설정
+        load_img_result = self._find_node_by_class(prompt, _NODE_LOAD_IMAGE)
+        if load_img_result:
+            _node_id, node = load_img_result
+            inputs = node.setdefault("inputs", {})
+            inputs["image"] = comfyui_image_name
+        else:
+            logger.warning("LoadImage 노드 없음 — 소스 이미지 설정 건너뜀")
+
+        # TextEncodeQwenImageEdit 노드에 프롬프트 주입
+        edit_nodes = self._find_nodes_by_class(prompt, _NODE_TEXT_ENCODE_QWEN_EDIT)
+        if edit_nodes:
+            # _meta.title로 Positive/Negative 구분
+            for _nid, ndata in edit_nodes:
+                meta_title = ndata.get("_meta", {}).get("title", "")
+                inputs = ndata.setdefault("inputs", {})
+                if "Positive" in meta_title:
+                    inputs["text"] = request.edit_prompt
+                elif "Negative" in meta_title:
+                    inputs["text"] = ""  # 네거티브는 빈 텍스트
+        else:
+            logger.warning("TextEncodeQwenImageEdit 노드 없음 — 프롬프트 주입 건너뜀")
+
+        # KSampler 노드에 샘플링 파라미터 주입
+        ksampler_result = self._find_node_by_class(prompt, _NODE_KSAMPLER)
+        if ksampler_result:
+            _node_id, node = ksampler_result
+            inputs = node.setdefault("inputs", {})
+            inputs["seed"] = seed
+            inputs["steps"] = request.steps
+            inputs["cfg"] = request.cfg
+        else:
+            logger.warning("KSampler 노드 없음 — 샘플링 파라미터 주입 건너뜀")
+
+        logger.info(
+            "이미지 수정 워크플로우 빌드 완료: seed=%d, steps=%d, cfg=%.1f, image=%s",
+            seed,
+            request.steps,
+            request.cfg,
+            comfyui_image_name,
         )
         return prompt
 

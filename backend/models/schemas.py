@@ -51,6 +51,15 @@ class GenerateRequest(BaseModel):
     mode: str = "qwen_image"  # qwen_image | txt2img | img2img | inpaint
 
 
+class EditRequest(BaseModel):
+    """이미지 수정 요청 (Qwen Image Edit)"""
+    source_image: str  # 업로드된 이미지 파일명
+    edit_prompt: str  # 수정 지시 프롬프트
+    steps: int = Field(default=50, ge=1, le=150)
+    cfg: float = Field(default=4.0, ge=1.0, le=30.0)
+    seed: int = -1  # -1 = 랜덤
+
+
 class GenerateResponse(BaseModel):
     """이미지 생성 응답"""
     task_id: str

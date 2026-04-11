@@ -31,6 +31,21 @@ export interface GenerateRequest {
   auto_enhance?: boolean
 }
 
+// ── 이미지 수정 요청 타입 ──
+export interface EditRequest {
+  source_image: string  // 업로드된 이미지 파일명
+  edit_prompt: string   // 수정 지시 프롬프트
+  steps?: number
+  cfg?: number
+  seed?: number
+}
+
+// ── 이미지 업로드 응답 타입 ──
+export interface UploadResponse {
+  filename: string
+  size: number
+}
+
 // ── 생성 응답 타입 ──
 export interface GenerateResponse {
   task_id: string
@@ -171,6 +186,45 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(request),
     }),
+
+  /** 이미지 수정 요청 (Qwen Image Edit) */
+  generateEdit: (request: EditRequest) =>
+    fetchApi<GenerateResponse>('/api/generate/edit', {
+      method: 'POST',
+      body: JSON.stringify(request),
+    }),
+
+  /** 이미지 업로드 (수정 모드 소스 이미지) */
+  uploadImage: async (file: File): Promise<ApiResponse<UploadResponse>> => {
+    const url = `${API_BASE}/api/images/upload`
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        body: formData,
+        // Content-Type 헤더를 설정하지 않음 — FormData가 자동으로 boundary 설정
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        return {
+          success: false,
+          data: null as unknown as UploadResponse,
+          error: errorData?.error || `업로드 실패 (${response.status})`,
+        }
+      }
+
+      return await response.json()
+    } catch {
+      return {
+        success: false,
+        data: null as unknown as UploadResponse,
+        error: '이미지 업로드에 실패했습니다. 서버 연결을 확인해주세요.',
+      }
+    }
+  },
 
   /** 이미지 생성 취소 */
   cancelGeneration: (taskId: string) =>

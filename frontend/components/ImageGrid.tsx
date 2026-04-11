@@ -9,6 +9,7 @@
 
 import { useAppStore } from '@/stores/useAppStore'
 import { useGenerate } from '@/hooks/useGenerate'
+import { api } from '@/lib/api'
 import { ImagePlaceholderIcon, CheckIcon } from './icons'
 import ImageViewer from './ImageViewer'
 
@@ -32,6 +33,10 @@ export default function ImageGrid() {
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
   const setSeed = useAppStore((s) => s.setSeed)
   const setViewerIndex = useAppStore((s) => s.setViewerIndex)
+
+  const setEditMode = useAppStore((s) => s.setEditMode)
+  const setEditSourceImage = useAppStore((s) => s.setEditSourceImage)
+  const setEditSourcePreview = useAppStore((s) => s.setEditSourcePreview)
 
   const { generate } = useGenerate()
 
@@ -81,6 +86,36 @@ export default function ImageGrid() {
   /** 이미지 변형 (준비 중 토스트) */
   const handleVariation = () => {
     setErrorMessage('이미지 변형 기능은 준비 중입니다')
+  }
+
+  /** 선택된 이미지로 수정 모드 전환 */
+  const handleEditImage = async (index: number) => {
+    const image = generatedImages[index]
+    if (!image) return
+
+    // 이미지 URL에서 파일을 가져와 업로드
+    const imageUrl = `${IMAGE_BASE}${image.url}`
+
+    try {
+      // 이미지를 fetch하여 File 객체로 변환
+      const resp = await fetch(imageUrl)
+      const blob = await resp.blob()
+      const file = new File([blob], image.filename || 'edit-source.png', { type: blob.type })
+
+      // 프리뷰 설정
+      setEditSourcePreview(imageUrl)
+
+      // 백엔드에 업로드
+      const uploadResp = await api.uploadImage(file)
+      if (uploadResp.success && uploadResp.data) {
+        setEditSourceImage(uploadResp.data.filename)
+        setEditMode(true)
+      } else {
+        setErrorMessage(uploadResp.error || '이미지 업로드에 실패했습니다.')
+      }
+    } catch {
+      setErrorMessage('이미지를 수정 모드로 전환하는 중 오류가 발생했습니다.')
+    }
   }
 
   return (
@@ -156,6 +191,7 @@ export default function ImageGrid() {
                 <div className="glass rounded-xl px-3 py-2 flex items-center gap-1.5 border border-edge">
                   {[
                     { label: '다시 생성', handler: handleRegenerate, title: '같은 설정, 새 시드로 다시 생성' },
+                    { label: '수정', handler: () => handleEditImage(i), title: '이 이미지를 수정 모드로 전환' },
                     { label: '영상 만들기', handler: handleVideo },
                     { label: '저장', handler: handleSave },
                     { label: '변형', handler: handleVariation },

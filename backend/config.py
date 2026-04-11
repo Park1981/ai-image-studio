@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     # 데이터 경로
     history_db_path: str = "./data/history.db"
     output_image_path: str = "./data/images"
+    upload_path: str = "./data/uploads"
 
     # 워크플로우 템플릿 경로
     workflows_path: str = "./workflows"
@@ -49,6 +50,7 @@ class Settings(BaseSettings):
         """데이터 디렉토리 자동 생성"""
         Path(self.output_image_path).mkdir(parents=True, exist_ok=True)
         Path(self.history_db_path).parent.mkdir(parents=True, exist_ok=True)
+        Path(self.upload_path).mkdir(parents=True, exist_ok=True)
 
 
 # 싱글톤 인스턴스

@@ -140,6 +140,14 @@ interface AppState {
   // ── 설정 패널 ──
   settingsOpen: boolean
   setSettingsOpen: (open: boolean) => void
+
+  // ── 이미지 수정 모드 ──
+  editMode: boolean
+  setEditMode: (mode: boolean) => void
+  editSourceImage: string | null  // 업로드된 소스 이미지 파일명
+  setEditSourceImage: (filename: string | null) => void
+  editSourcePreview: string | null  // 프리뷰용 Data URL
+  setEditSourcePreview: (preview: string | null) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -250,4 +258,12 @@ export const useAppStore = create<AppState>((set) => ({
   // ── 설정 패널 ──
   settingsOpen: false,
   setSettingsOpen: (open) => set({ settingsOpen: open }),
+
+  // ── 이미지 수정 모드 ──
+  editMode: false,
+  setEditMode: (mode) => set({ editMode: mode }),
+  editSourceImage: null,
+  setEditSourceImage: (filename) => set({ editSourceImage: filename }),
+  editSourcePreview: null,
+  setEditSourcePreview: (preview) => set({ editSourcePreview: preview }),
 }))

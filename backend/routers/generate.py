@@ -9,13 +9,16 @@ import asyncio
 import json
 import logging
 import uuid
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, UploadFile, WebSocket, WebSocketDisconnect
 
+from config import settings
 from database import save_generation
 from models.schemas import (
     ApiResponse,
+    EditRequest,
     GenerateRequest,
     GenerateResponse,
 )
@@ -171,6 +174,148 @@ async def cancel_generation(task_id: str):
             "interrupted": interrupted,
             "message": "생성이 취소되었습니다.",
         },
+    }
+
+
+@router.post("/api/images/upload", response_model=ApiResponse[dict])
+async def upload_image(file: UploadFile):
+    """
+    이미지 업로드 — 로컬 data/uploads/ 에 저장 후 파일 정보 반환
+    이미지 수정(edit) 모드의 소스 이미지 업로드에 사용
+    """
+    if not file.filename:
+        return {
+            "success": False,
+            "data": {},
+            "error": "파일이 선택되지 않았습니다.",
+        }
+
+    # 안전한 파일명 생성 (UUID 접두사로 충돌 방지)
+    safe_name = Path(file.filename).name
+    unique_name = f"{uuid.uuid4().hex[:8]}_{safe_name}"
+
+    upload_dir = Path(settings.upload_path)
+    upload_dir.mkdir(parents=True, exist_ok=True)
+    file_path = upload_dir / unique_name
+
+    try:
+        content = await file.read()
+        file_path.write_bytes(content)
+        logger.info("이미지 업로드 완료: %s (%d bytes)", unique_name, len(content))
+        return {
+            "success": True,
+            "data": {
+                "filename": unique_name,
+                "size": len(content),
+            },
+        }
+    except Exception as exc:
+        logger.error("이미지 업로드 실패: %s", exc)
+        return {
+            "success": False,
+            "data": {},
+            "error": f"파일 저장 실패: {exc}",
+        }
+
+
+# ─────────────────────────────────────────────
+# 이미지 수정 (Edit) 엔드포인트
+# ─────────────────────────────────────────────
+
+def _create_edit_task(request: EditRequest) -> str:
+    """이미지 수정 태스크 생성 및 ID 반환"""
+    task_id = str(uuid.uuid4())[:8]
+    _tasks[task_id] = {
+        "status": "queued",
+        "request": request,
+        "prompt_id": None,
+        "progress": 0,
+        "images": [],
+        "error": None,
+        "enhanced_prompt": None,
+        "negative_prompt": None,
+    }
+    return task_id
+
+
+async def _run_edit_generation(task_id: str) -> None:
+    """
+    백그라운드에서 이미지 수정 파이프라인 실행
+    1. ComfyUI 확인/시작
+    2. 소스 이미지를 ComfyUI에 업로드
+    3. 수정 워크플로우 빌드
+    4. ComfyUI에 큐잉
+    """
+    task = _tasks[task_id]
+    request: EditRequest = task["request"]
+
+    try:
+        # 1단계: ComfyUI 확인/시작
+        task["status"] = "warming_up"
+        comfyui_running = await process_manager.check_comfyui()
+        if not comfyui_running:
+            started = await process_manager.start_comfyui()
+            if not started:
+                task["status"] = "error"
+                task["error"] = "ComfyUI를 시작할 수 없습니다. 설치 경로를 확인해주세요."
+                return
+
+        # 비활동 타이머 리셋
+        process_manager.reset_activity_timer()
+
+        # 2단계: 소스 이미지를 ComfyUI input 디렉토리에 업로드
+        task["status"] = "generating"
+        upload_dir = Path(settings.upload_path)
+        local_path = upload_dir / request.source_image
+
+        if not local_path.exists():
+            task["status"] = "error"
+            task["error"] = f"소스 이미지를 찾을 수 없습니다: {request.source_image}"
+            return
+
+        comfyui_image_name = await comfyui_client.upload_image(
+            str(local_path), request.source_image
+        )
+
+        # 3단계: 수정 워크플로우 빌드
+        wf = workflow_manager.load_workflow("qwen_image_edit")
+        prompt_payload = workflow_manager.build_edit_prompt(
+            request, wf, comfyui_image_name
+        )
+
+        # 4단계: ComfyUI에 큐잉
+        result = await comfyui_client.queue_prompt(prompt_payload, task_id)
+        task["prompt_id"] = result.get("prompt_id")
+
+        logger.info(
+            "수정 태스크 %s: 큐잉 완료 (prompt_id=%s)",
+            task_id, task["prompt_id"],
+        )
+
+    except Exception as exc:
+        task["status"] = "error"
+        task["error"] = f"이미지 수정 파이프라인 오류: {exc}"
+        logger.error("수정 태스크 %s 실패: %s", task_id, exc)
+
+
+@router.post("/api/generate/edit", response_model=ApiResponse[GenerateResponse])
+async def generate_edit(request: EditRequest):
+    """
+    이미지 수정 요청 — 즉시 task_id 반환
+    소스 이미지 + 수정 프롬프트로 Qwen Image Edit 실행
+    WebSocket으로 진행률 수신 (기존 메커니즘 재활용)
+    """
+    task_id = _create_edit_task(request)
+
+    # 백그라운드 태스크로 수정 파이프라인 실행
+    asyncio.create_task(_run_edit_generation(task_id))
+
+    return {
+        "success": True,
+        "data": GenerateResponse(
+            task_id=task_id,
+            status="queued",
+        ),
     }
 
 

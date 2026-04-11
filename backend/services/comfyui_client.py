@@ -50,6 +50,53 @@ class ComfyUIClient:
         )
 
     # ─────────────────────────────────────────────
+    # 이미지 업로드 (ComfyUI input 디렉토리)
+    # ─────────────────────────────────────────────
+
+    async def upload_image(self, image_path: str, filename: str) -> str:
+        """
+        이미지를 ComfyUI input 디렉토리로 업로드
+        POST /upload/image (multipart form data)
+        반환: ComfyUI가 실제 저장한 파일명
+        """
+        try:
+            async with self._make_client() as client:
+                with open(image_path, "rb") as f:
+                    files = {
+                        "image": (filename, f, "image/png"),
+                    }
+                    data = {
+                        "overwrite": "true",
+                    }
+                    resp = await client.post(
+                        "/upload/image",
+                        files=files,
+                        data=data,
+                    )
+                    resp.raise_for_status()
+                    result = resp.json()
+                    uploaded_name = result.get("name", filename)
+                    logger.info(
+                        "ComfyUI 이미지 업로드 완료: %s → %s",
+                        filename,
+                        uploaded_name,
+                    )
+                    return uploaded_name
+        except httpx.TimeoutException as exc:
+            logger.error("이미지 업로드 타임아웃: %s", exc)
+            raise
+        except httpx.HTTPStatusError as exc:
+            logger.error(
+                "이미지 업로드 HTTP 오류 %d: %s",
+                exc.response.status_code,
+                exc.response.text,
+            )
+            raise
+        except httpx.HTTPError as exc:
+            logger.error("이미지 업로드 실패: %s", exc)
+            raise
+
+    # ─────────────────────────────────────────────
     # 프롬프트 큐잉
     # ─────────────────────────────────────────────
 

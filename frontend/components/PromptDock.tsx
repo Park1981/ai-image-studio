@@ -11,7 +11,8 @@ import { useAppStore } from '@/stores/useAppStore'
 import { useGenerate } from '@/hooks/useGenerate'
 import { useModels } from '@/hooks/useModels'
 import { getAllPresets, saveCustomPresets, loadCustomPresets, type Preset } from '@/lib/presets'
-import { SparkleIcon, XCircleIcon, BoltIcon, StopIcon, GearIcon, WarningIcon } from './icons'
+import { api } from '@/lib/api'
+import { SparkleIcon, XCircleIcon, BoltIcon, StopIcon, GearIcon, WarningIcon, EditIcon, UploadIcon } from './icons'
 
 /** 사이즈 프리셋 목록 (Qwen Image 권장 해상도 포함) */
 const SIZE_PRESETS = [
@@ -52,6 +53,14 @@ export default function PromptDock() {
   const toggleSidebar = useAppStore((s) => s.toggleSidebar)
   const sidebarOpen = useAppStore((s) => s.sidebarOpen)
 
+  // 이미지 수정 모드 상태
+  const editMode = useAppStore((s) => s.editMode)
+  const setEditMode = useAppStore((s) => s.setEditMode)
+  const editSourceImage = useAppStore((s) => s.editSourceImage)
+  const setEditSourceImage = useAppStore((s) => s.setEditSourceImage)
+  const editSourcePreview = useAppStore((s) => s.editSourcePreview)
+  const setEditSourcePreview = useAppStore((s) => s.setEditSourcePreview)
+
   // 모델 목록 가져오기
   const availableModels = useModels()
 
@@ -63,11 +72,137 @@ export default function PromptDock() {
   // 네거티브 프롬프트 표시 토글
   const [showNegative, setShowNegative] = useState(false)
 
+  // 파일 입력 참조
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
   // 텍스트영역 참조
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // 이미지 업로드 중 여부
+  const [uploading, setUploading] = useState(false)
+
   // AI 보강 중 여부
   const isEnhancing = generationStatus === 'enhancing'
+
+  /** 이미지 파일 업로드 처리 */
+  const handleFileUpload = useCallback(async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('이미지 파일만 업로드할 수 있습니다.')
+      return
+    }
+
+    setUploading(true)
+    try {
+      // Data URL 프리뷰 생성
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        setEditSourcePreview(e.target?.result as string)
+      }
+      reader.readAsDataURL(file)
+
+      // 백엔드에 업로드
+      const response = await api.uploadImage(file)
+      if (response.success && response.data) {
+        setEditSourceImage(response.data.filename)
+      } else {
+        setErrorMessage(response.error || '이미지 업로드에 실패했습니다.')
+        setEditSourcePreview(null)
+      }
+    } catch {
+      setErrorMessage('이미지 업로드 중 오류가 발생했습니다.')
+      setEditSourcePreview(null)
+    } finally {
+      setUploading(false)
+    }
+  }, [setErrorMessage, setEditSourceImage, setEditSourcePreview])
+
+  /** 파일 입력 변경 핸들러 */
+  const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) handleFileUpload(file)
+    // 같은 파일 재선택 허용
+    e.target.value = ''
+  }, [handleFileUpload])
+
+  /** 드래그 앤 드롭 핸들러 */
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    const file = e.dataTransfer.files[0]
+    if (file) handleFileUpload(file)
+  }, [handleFileUpload])
+
+  /** 수정 모드에서 생성 실행 */
+  const handleEditGenerate = useCallback(async () => {
+    if (!editSourceImage) {
+      setErrorMessage('수정할 이미지를 먼저 업로드해주세요.')
+      return
+    }
+    if (!prompt.trim()) {
+      setErrorMessage('수정할 내용을 설명해주세요.')
+      return
+    }
+
+    const store = useAppStore.getState()
+    store.setGenerationStatus('warming_up')
+    store.setProgress(0)
+    store.setErrorMessage(null)
+
+    try {
+      const response = await api.generateEdit({
+        source_image: editSourceImage,
+        edit_prompt: prompt.trim(),
+        steps: store.steps,
+        cfg: store.cfg,
+        seed: store.seed,
+      })
+
+      if (!response.success) {
+        store.setGenerationStatus('error')
+        store.setErrorMessage(response.error || '이미지 수정 요청에 실패했습니다.')
+        return
+      }
+
+      const { task_id } = response.data
+      store.setCurrentTaskId(task_id)
+
+      // WebSocket 연결으로 진행률 수신
+      const wsUrl = api.wsUrl('/api/ws/generate')
+      const ws = new WebSocket(wsUrl)
+      ws.onopen = () => ws.send(JSON.stringify({ task_id }))
+      ws.onmessage = (event: MessageEvent) => {
+        try {
+          const msg = JSON.parse(event.data)
+          const s = useAppStore.getState()
+          switch (msg.type) {
+            case 'status':
+              if (['warming_up', 'enhancing', 'generating'].includes(msg.status)) {
+                s.setGenerationStatus(msg.status)
+              }
+              break
+            case 'progress':
+              s.setProgress(msg.progress)
+              s.setGenerationStatus('generating')
+              break
+            case 'executing':
+              s.setGenerationStatus('generating')
+              break
+            case 'completed':
+              s.setGenerationStatus('completed')
+              s.setProgress(100)
+              s.setGeneratedImages(msg.images)
+              break
+            case 'error':
+              s.setGenerationStatus('error')
+              s.setErrorMessage(msg.message || msg.error || '이미지 수정 중 오류')
+              break
+          }
+        } catch { /* JSON 파싱 실패 무시 */ }
+      }
+    } catch {
+      store.setGenerationStatus('error')
+      store.setErrorMessage('이미지 수정 중 예상치 못한 오류가 발생했습니다.')
+    }
+  }, [editSourceImage, prompt, setErrorMessage])
 
   /** Ctrl+Enter 단축키로 생성/확인 */
   useEffect(() => {
@@ -76,6 +211,8 @@ export default function PromptDock() {
         e.preventDefault()
         if (enhancePending) {
           confirmEnhance()
+        } else if (editMode && !isGenerating && prompt.trim()) {
+          handleEditGenerate()
         } else if (!isGenerating && prompt.trim()) {
           generate()
         }
@@ -89,18 +226,20 @@ export default function PromptDock() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [generate, confirmEnhance, cancelEnhance, isGenerating, enhancePending, prompt])
+  }, [generate, handleEditGenerate, confirmEnhance, cancelEnhance, isGenerating, enhancePending, editMode, prompt])
 
   /** 생성/취소 버튼 클릭 */
   const handleGenerateClick = useCallback(() => {
     if (isGenerating) {
       cancel()
+    } else if (editMode) {
+      handleEditGenerate()
     } else if (enhancePending) {
       confirmEnhance()
     } else {
       generate()
     }
-  }, [isGenerating, enhancePending, generate, confirmEnhance, cancel])
+  }, [isGenerating, editMode, handleEditGenerate, enhancePending, generate, confirmEnhance, cancel])
 
   /** 프리셋 적용 — 파라미터 + AI 보강 스타일 힌트 */
   const handlePresetSelect = useCallback((presetId: string) => {
@@ -152,12 +291,65 @@ export default function PromptDock() {
   return (
     <div className="shrink-0 px-2 pb-2">
       <div className="prompt-glow rounded-xl bg-surface border border-edge transition-all">
+        {/* 수정 모드: 소스 이미지 업로드 영역 */}
+        {editMode && (
+          <div className="px-3 pt-3 pb-1">
+            {editSourcePreview ? (
+              /* 업로드된 이미지 프리뷰 */
+              <div className="flex items-center gap-3">
+                <div className="relative w-14 h-14 rounded-lg overflow-hidden border border-edge shrink-0">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={editSourcePreview}
+                    alt="수정할 이미지"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[11px] text-text-sub truncate">
+                    {editSourceImage || '업로드 중...'}
+                  </p>
+                  <button
+                    onClick={() => {
+                      setEditSourceImage(null)
+                      setEditSourcePreview(null)
+                    }}
+                    className="text-[10px] text-bad/70 hover:text-bad transition-colors mt-0.5"
+                  >
+                    이미지 제거
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* 이미지 업로드 드롭존 */
+              <div
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => fileInputRef.current?.click()}
+                className="flex flex-col items-center justify-center gap-1.5 py-4 rounded-lg border-2 border-dashed border-edge hover:border-accent/50 cursor-pointer transition-all hover:bg-accent-muted/10"
+              >
+                <UploadIcon />
+                <span className="text-[11px] text-text-sub">
+                  {uploading ? '업로드 중...' : '이미지를 드래그하거나 클릭하여 선택'}
+                </span>
+              </div>
+            )}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </div>
+        )}
+
         {/* 메인 프롬프트 입력 */}
         <textarea
           ref={textareaRef}
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="이미지를 설명해주세요... (한국어 입력 가능)"
+          placeholder={editMode ? '수정할 내용을 설명해주세요...' : '이미지를 설명해주세요... (한국어 입력 가능)'}
           rows={2}
           disabled={isGenerating || enhancePending}
           className="w-full bg-transparent resize-none outline-none px-4 pt-3 pb-1 text-[13px] placeholder-text-ghost leading-relaxed disabled:opacity-50"
@@ -263,123 +455,156 @@ export default function PromptDock() {
         {!enhancePending && (
           <div className="flex items-center justify-between px-2.5 pb-2 gap-1 flex-wrap">
             <div className="flex items-center gap-1 flex-wrap">
-              {/* AI 보강 토글 */}
-              <button
-                onClick={autoEnhance ? () => setAutoEnhance(false) : () => setAutoEnhance(true)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                  autoEnhance
-                    ? 'bg-accent-muted text-accent-bright'
-                    : 'text-text-sub hover:text-text hover:bg-white/[0.04]'
-                }`}
-                title={autoEnhance ? '자동 보강 ON' : '자동 보강 OFF'}
-                disabled={isEnhancing}
-              >
-                <SparkleIcon />
-                AI 보강
-              </button>
-
-              {/* 네거티브 프롬프트 토글 */}
-              <button
-                onClick={() => setShowNegative(!showNegative)}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-all ${
-                  showNegative
-                    ? 'bg-bad/10 text-bad'
-                    : 'text-text-sub hover:text-text hover:bg-white/[0.04]'
-                }`}
-              >
-                <XCircleIcon />
-                네거티브
-              </button>
-
-              {/* 구분선 */}
-              <div className="w-px h-4 bg-edge mx-0.5" />
-
-              {/* 프리셋 드롭다운 */}
-              <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value === '__save__') {
-                    handleSavePreset()
-                  } else {
-                    handlePresetSelect(e.target.value)
-                  }
-                  e.target.value = ''
-                }}
-                disabled={isGenerating}
-                className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer disabled:opacity-40"
-              >
-                <option value="">프리셋</option>
-                {presetList.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.icon} {p.name}
-                  </option>
-                ))}
-                <option value="__save__">💾 현재 설정 저장...</option>
-              </select>
-
-              {/* 모델 드롭다운 */}
-              <select
-                value={checkpoint}
-                onChange={(e) => setCheckpoint(e.target.value)}
-                disabled={isGenerating}
-                className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all max-w-[160px] truncate cursor-pointer disabled:opacity-40"
-                title={checkpoint || 'Qwen Image (워크플로우 기본)'}
-              >
-                <option value="">Qwen Image (기본)</option>
-                {availableModels.diffusionModels.length > 0 && (
-                  <optgroup label="Diffusion Models">
-                    {availableModels.diffusionModels.map((dm) => (
-                      <option key={dm} value={dm}>{dm}</option>
-                    ))}
-                  </optgroup>
-                )}
-                {availableModels.checkpoints.length > 0 && (
-                  <optgroup label="Checkpoints">
-                    {availableModels.checkpoints.map((cp) => (
-                      <option key={cp} value={cp}>{cp}</option>
-                    ))}
-                  </optgroup>
-                )}
-              </select>
-
-              {/* 사이즈 드롭다운 */}
-              <select
-                value={currentSizeLabel}
-                onChange={(e) => {
-                  const preset = SIZE_PRESETS.find((p) => p.label === e.target.value)
-                  if (preset) {
-                    setWidth(preset.w)
-                    setHeight(preset.h)
-                  }
-                }}
-                disabled={isGenerating}
-                className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer disabled:opacity-40"
-              >
-                {SIZE_PRESETS.map((preset) => (
-                  <option key={preset.label} value={preset.label}>
-                    {preset.label}
-                  </option>
-                ))}
-              </select>
-
-              {/* 배치 수 버튼 그룹 */}
-              <div className="flex items-center rounded-lg border border-edge overflow-hidden">
-                {BATCH_OPTIONS.map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setBatchSize(n)}
-                    disabled={isGenerating}
-                    className={`px-2 py-1.5 text-[11px] font-mono transition-all disabled:opacity-40 ${
-                      batchSize === n
-                        ? 'bg-accent-muted text-accent-bright'
-                        : 'bg-ground text-text-sub hover:bg-elevated'
-                    }`}
-                    title={`${n}장 생성`}
-                  >
-                    x{n}
-                  </button>
-                ))}
+              {/* 생성 / 수정 모드 토글 */}
+              <div className="flex items-center rounded-lg border border-edge overflow-hidden mr-0.5">
+                <button
+                  onClick={() => setEditMode(false)}
+                  disabled={isGenerating}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium transition-all disabled:opacity-40 ${
+                    !editMode
+                      ? 'bg-accent-muted text-accent-bright'
+                      : 'bg-ground text-text-sub hover:bg-elevated'
+                  }`}
+                >
+                  <BoltIcon />
+                  생성
+                </button>
+                <button
+                  onClick={() => setEditMode(true)}
+                  disabled={isGenerating}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 text-[11px] font-medium transition-all disabled:opacity-40 ${
+                    editMode
+                      ? 'bg-accent-muted text-accent-bright'
+                      : 'bg-ground text-text-sub hover:bg-elevated'
+                  }`}
+                >
+                  <EditIcon />
+                  수정
+                </button>
               </div>
+
+              {/* 생성 모드 전용 컨트롤 (수정 모드에서는 숨김) */}
+              {!editMode && (
+                <>
+                  {/* AI 보강 토글 */}
+                  <button
+                    onClick={autoEnhance ? () => setAutoEnhance(false) : () => setAutoEnhance(true)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                      autoEnhance
+                        ? 'bg-accent-muted text-accent-bright'
+                        : 'text-text-sub hover:text-text hover:bg-white/[0.04]'
+                    }`}
+                    title={autoEnhance ? '자동 보강 ON' : '자동 보강 OFF'}
+                    disabled={isEnhancing}
+                  >
+                    <SparkleIcon />
+                    AI 보강
+                  </button>
+
+                  {/* 네거티브 프롬프트 토글 */}
+                  <button
+                    onClick={() => setShowNegative(!showNegative)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-all ${
+                      showNegative
+                        ? 'bg-bad/10 text-bad'
+                        : 'text-text-sub hover:text-text hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    <XCircleIcon />
+                    네거티브
+                  </button>
+
+                  {/* 구분선 */}
+                  <div className="w-px h-4 bg-edge mx-0.5" />
+
+                  {/* 프리셋 드롭다운 */}
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value === '__save__') {
+                        handleSavePreset()
+                      } else {
+                        handlePresetSelect(e.target.value)
+                      }
+                      e.target.value = ''
+                    }}
+                    disabled={isGenerating}
+                    className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer disabled:opacity-40"
+                  >
+                    <option value="">프리셋</option>
+                    {presetList.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.icon} {p.name}
+                      </option>
+                    ))}
+                    <option value="__save__">💾 현재 설정 저장...</option>
+                  </select>
+
+                  {/* 모델 드롭다운 */}
+                  <select
+                    value={checkpoint}
+                    onChange={(e) => setCheckpoint(e.target.value)}
+                    disabled={isGenerating}
+                    className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all max-w-[160px] truncate cursor-pointer disabled:opacity-40"
+                    title={checkpoint || 'Qwen Image (워크플로우 기본)'}
+                  >
+                    <option value="">Qwen Image (기본)</option>
+                    {availableModels.diffusionModels.length > 0 && (
+                      <optgroup label="Diffusion Models">
+                        {availableModels.diffusionModels.map((dm) => (
+                          <option key={dm} value={dm}>{dm}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                    {availableModels.checkpoints.length > 0 && (
+                      <optgroup label="Checkpoints">
+                        {availableModels.checkpoints.map((cp) => (
+                          <option key={cp} value={cp}>{cp}</option>
+                        ))}
+                      </optgroup>
+                    )}
+                  </select>
+
+                  {/* 사이즈 드롭다운 */}
+                  <select
+                    value={currentSizeLabel}
+                    onChange={(e) => {
+                      const preset = SIZE_PRESETS.find((p) => p.label === e.target.value)
+                      if (preset) {
+                        setWidth(preset.w)
+                        setHeight(preset.h)
+                      }
+                    }}
+                    disabled={isGenerating}
+                    className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer disabled:opacity-40"
+                  >
+                    {SIZE_PRESETS.map((preset) => (
+                      <option key={preset.label} value={preset.label}>
+                        {preset.label}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* 배치 수 버튼 그룹 */}
+                  <div className="flex items-center rounded-lg border border-edge overflow-hidden">
+                    {BATCH_OPTIONS.map((n) => (
+                      <button
+                        key={n}
+                        onClick={() => setBatchSize(n)}
+                        disabled={isGenerating}
+                        className={`px-2 py-1.5 text-[11px] font-mono transition-all disabled:opacity-40 ${
+                          batchSize === n
+                            ? 'bg-accent-muted text-accent-bright'
+                            : 'bg-ground text-text-sub hover:bg-elevated'
+                        }`}
+                        title={`${n}장 생성`}
+                      >
+                        x{n}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
 
               {/* 고급 설정 토글 */}
               <button
@@ -401,7 +626,7 @@ export default function PromptDock() {
               </span>
             </div>
 
-            {/* 생성/취소 버튼 */}
+            {/* 생성/수정/취소 버튼 */}
             <button
               onClick={handleGenerateClick}
               disabled={!isGenerating && !prompt.trim()}
@@ -415,6 +640,11 @@ export default function PromptDock() {
                 <>
                   <StopIcon />
                   취소
+                </>
+              ) : editMode ? (
+                <>
+                  <EditIcon />
+                  수정
                 </>
               ) : (
                 <>
