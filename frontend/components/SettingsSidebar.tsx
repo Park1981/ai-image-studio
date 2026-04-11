@@ -285,8 +285,9 @@ export default function SettingsSidebar() {
             value={scheduler}
             onChange={(e) => setScheduler(e.target.value)}
           >
-            <option value="karras">karras</option>
+            <option value="simple">simple</option>
             <option value="normal">normal</option>
+            <option value="karras">karras</option>
             <option value="exponential">exponential</option>
             <option value="sgm_uniform">sgm_uniform</option>
           </select>

@@ -58,6 +58,7 @@ export interface ProcessStatusResponse {
 // ── 모델 목록 응답 타입 ──
 export interface ModelsResponse {
   checkpoints: string[]
+  diffusion_models: string[]
   loras: string[]
   vaes: string[]
 }

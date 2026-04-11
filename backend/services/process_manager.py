@@ -8,6 +8,7 @@ ComfyUI / Ollama 프로세스 라이프사이클 관리
 import asyncio
 import logging
 import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -96,13 +97,23 @@ class ProcessManager:
         logger.info("ComfyUI 시작 중: %s", exe_path)
 
         try:
-            # shell=False 필수 (보안), Windows 경로 호환
+            # Windows: 별도 콘솔 없이 백그라운드 실행 + 출력 버퍼 차단 방지
+            creation_flags = 0
+            if sys.platform == "win32":
+                creation_flags = (
+                    subprocess.CREATE_NO_WINDOW
+                    | subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+
+            # shell=False 필수 (보안), DEVNULL로 출력 버퍼 막힘 방지
             self._comfyui_process = subprocess.Popen(
                 [str(exe_path)],
                 cwd=str(exe_path.parent),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
                 shell=False,  # 보안: 명시적 False
+                creationflags=creation_flags,
             )
         except OSError as exc:
             logger.error("ComfyUI 프로세스 생성 실패: %s", exc)

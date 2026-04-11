@@ -114,8 +114,9 @@ export default function PromptDock() {
     }
   }, [isGenerating, generate, cancel])
 
-  /** 현재 사이즈 프리셋 라벨 계산 */
-  const currentSizeLabel = `${width}x${height}`
+  /** 현재 사이즈 프리셋 라벨 계산 (프리셋 매칭, 없으면 커스텀) */
+  const currentSizeLabel =
+    SIZE_PRESETS.find((p) => p.w === width && p.h === height)?.label ?? 'custom'
 
   return (
     <div className="shrink-0 px-2 pb-2">
@@ -193,20 +194,29 @@ export default function PromptDock() {
             {/* 구분선 */}
             <div className="w-px h-4 bg-edge mx-0.5" />
 
-            {/* 모델 드롭다운 (인라인) */}
+            {/* 모델 드롭다운 (인라인) — UNET + 체크포인트 통합 */}
             <select
               value={checkpoint}
               onChange={(e) => setCheckpoint(e.target.value)}
               disabled={isGenerating}
-              className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all max-w-[140px] truncate cursor-pointer disabled:opacity-40"
-              title={checkpoint || '모델 선택'}
+              className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all max-w-[160px] truncate cursor-pointer disabled:opacity-40"
+              title={checkpoint || 'Qwen Image (워크플로우 기본)'}
             >
-              <option value="">모델 선택</option>
-              {availableModels.checkpoints.map((cp) => (
-                <option key={cp} value={cp}>
-                  {cp}
-                </option>
-              ))}
+              <option value="">Qwen Image (기본)</option>
+              {availableModels.diffusionModels.length > 0 && (
+                <optgroup label="Diffusion Models">
+                  {availableModels.diffusionModels.map((dm) => (
+                    <option key={dm} value={dm}>{dm}</option>
+                  ))}
+                </optgroup>
+              )}
+              {availableModels.checkpoints.length > 0 && (
+                <optgroup label="Checkpoints">
+                  {availableModels.checkpoints.map((cp) => (
+                    <option key={cp} value={cp}>{cp}</option>
+                  ))}
+                </optgroup>
+              )}
             </select>
 
             {/* 사이즈 드롭다운 (인라인) */}

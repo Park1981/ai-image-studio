@@ -10,22 +10,24 @@
 **Phase 0: 프로젝트 초기화 ✅ 완료**
 **Phase 0.5: 디자인 시스템 확정 ✅ 완료**
 **Phase 1: MVP 백엔드 + 프론트엔드 연동 ✅ 완료**
-**Phase 1.5: Qwen 모델 연동 + E2E 생성 테스트 ✅ 완료 (이미지 표시 버그 잔존)**
+**Phase 1.5: Qwen 모델 연동 + E2E 생성 테스트 ✅ 완료 (이미지 표시 버그 수정 완료)**
 **Phase 2~5: 미착수**
 
 ---
 
-## 🔴 다음 세션에서 바로 할 것
+## 🟢 Phase 1.5 버그 수정 완료 (2026-04-11)
 
-### 1. WS 완료 후 이미지 프론트 표시 버그 수정
-- **증상**: 이미지 생성은 성공 (ComfyUI 히스토리에 이미지 있음), 프로그레스 바도 96%까지 나옴, 하지만 완료 후 이미지가 그리드에 안 나타남
-- **원인 추정**: WebSocket 핸들러에서 ComfyUI WS의 `executing(node=None)` 수신 후 → 이미지 다운로드 단계에서 WS 연결이 끊기거나, completed 메시지가 프론트로 전달 안 됨
-- **디버그 방법**: `generate.py`의 `ws_generate()` 함수에서 이미지 다운로드 전후에 로그 추가, 프론트 콘솔에서 WS 메시지 확인
-- **관련 파일**: `backend/routers/generate.py` (ws_generate), `frontend/hooks/useWebSocket.ts` (dispatchWsMessage)
+### 수정된 버그 6개
+1. **WS 이미지 표시 버그** — `generate.py`에서 async generator 정리 중 예외가 except에 잡혀 다운로드 스킵 → `execution_done` 플래그로 해결
+2. **ComfyUI 히스토리 prompt 파싱** — ComfyUI `/history` 응답의 `prompt` 필드가 list인데 dict로 가정 → isinstance 분기 추가
+3. **ComfyUI 자동 실행** — `subprocess.PIPE`가 Electron 앱 출력 버퍼 차서 멈춤 → `DEVNULL` + Windows 플래그
+4. **사이즈 드롭다운 값 불일치** — `"1328x1328"` vs `"1:1"` 매칭 안 됨 → `SIZE_PRESETS.find()` 매칭
+5. **스케줄러 "simple" 누락** — Qwen 기본값인데 옵션에 없었음 → 추가
+6. **모델 드롭다운** — `UNETLoader` 기반 모델 미표시 + 불필요한 자동 선택 → `diffusion_models` 추가, 자동선택 제거
 
-### 2. .env 업데이트 (필요 시 커밋)
-- .env는 .gitignore라 커밋 안 됨
-- .env.example 업데이트 필요: ComfyUI 포트 8000, 백엔드 포트 8001, 모델 경로 등
+### 다음 세션에서 할 것
+- Phase 2: img2img, 풀스크린 뷰어, 단축키
+- .env.example 업데이트
 
 ---
 

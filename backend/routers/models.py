@@ -17,11 +17,19 @@ router = APIRouter(prefix="/api/models", tags=["모델"])
 async def get_model_list():
     """사용 가능한 모델 목록 조회 (체크포인트, LoRA, VAE)"""
     # ComfyUI가 실행 중인지 확인
+    # 빈 응답 기본값
+    empty = {
+        "checkpoints": [],
+        "diffusion_models": [],
+        "loras": [],
+        "vaes": [],
+    }
+
     running = await process_manager.check_comfyui()
     if not running:
         return {
             "success": False,
-            "data": {"checkpoints": [], "loras": [], "vaes": []},
+            "data": empty,
             "error": "ComfyUI가 실행 중이 아닙니다. 먼저 시작해주세요.",
         }
 
@@ -31,6 +39,6 @@ async def get_model_list():
     except Exception as exc:
         return {
             "success": False,
-            "data": {"checkpoints": [], "loras": [], "vaes": []},
+            "data": empty,
             "error": f"모델 목록 조회 실패: {exc}",
         }

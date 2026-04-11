@@ -156,12 +156,13 @@ class ComfyUIClient:
     async def get_models(self) -> dict[str, list[str]]:
         """
         사용 가능한 모델 목록 조회 (GET /object_info)
-        반환: {"checkpoints": [...], "loras": [...], "vaes": [...]}
+        반환: {"checkpoints": [...], "loras": [...], "vaes": [...], "diffusion_models": [...]}
         """
         result: dict[str, list[str]] = {
             "checkpoints": [],
             "loras": [],
             "vaes": [],
+            "diffusion_models": [],
         }
 
         try:
@@ -176,6 +177,12 @@ class ComfyUIClient:
             if "ckpt_name" in ckpt_input:
                 result["checkpoints"] = list(ckpt_input["ckpt_name"][0])
 
+            # UNETLoader → unet_name 입력의 선택지 (Qwen, Flux 등 최신 모델)
+            unet_info = object_info.get("UNETLoader", {})
+            unet_input = unet_info.get("input", {}).get("required", {})
+            if "unet_name" in unet_input:
+                result["diffusion_models"] = list(unet_input["unet_name"][0])
+
             # LoraLoader → lora_name 입력의 선택지
             lora_info = object_info.get("LoraLoader", {})
             lora_input = lora_info.get("input", {}).get("required", {})
@@ -189,8 +196,9 @@ class ComfyUIClient:
                 result["vaes"] = list(vae_input["vae_name"][0])
 
             logger.info(
-                "모델 목록 조회: 체크포인트=%d, LoRA=%d, VAE=%d",
+                "모델 목록 조회: 체크포인트=%d, UNET=%d, LoRA=%d, VAE=%d",
                 len(result["checkpoints"]),
+                len(result["diffusion_models"]),
                 len(result["loras"]),
                 len(result["vaes"]),
             )
@@ -328,7 +336,15 @@ class ComfyUIClient:
         outputs = prompt_history.get("outputs", {})
 
         # KSampler 노드에서 seed 추출 시도
-        prompt_inputs = prompt_history.get("prompt", {})
+        # ComfyUI 히스토리의 prompt 필드는 리스트:
+        # [index, prompt_id, workflow_dict, extra_data, output_nodes]
+        raw_prompt = prompt_history.get("prompt", {})
+        if isinstance(raw_prompt, list) and len(raw_prompt) > 2:
+            prompt_inputs = raw_prompt[2] if isinstance(raw_prompt[2], dict) else {}
+        elif isinstance(raw_prompt, dict):
+            prompt_inputs = raw_prompt
+        else:
+            prompt_inputs = {}
         seed = self._extract_seed_from_prompt(prompt_inputs)
 
         saved_images: list[dict[str, Any]] = []

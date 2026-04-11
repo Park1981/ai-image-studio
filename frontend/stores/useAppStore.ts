@@ -33,6 +33,7 @@ export interface LoraConfig {
 /** 사용 가능한 모델 목록 */
 interface AvailableModels {
   checkpoints: string[]
+  diffusionModels: string[]
   loras: string[]
   vaes: string[]
 }
@@ -190,7 +191,7 @@ export const useAppStore = create<AppState>((set) => ({
   setBatchSize: (batchSize) => set({ batchSize }),
 
   // ── 사용 가능한 모델 목록 ──
-  availableModels: { checkpoints: [], loras: [], vaes: [] },
+  availableModels: { checkpoints: [], diffusionModels: [], loras: [], vaes: [] },
   setAvailableModels: (models) => set({ availableModels: models }),
 
   // ── UI 선택 상태 ──

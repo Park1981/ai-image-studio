@@ -278,6 +278,7 @@ async def ws_generate(websocket: WebSocket):
             prompt_id = task["prompt_id"]
 
             # ── 단계 2: ComfyUI WebSocket으로 생성 진행률 수신 ──
+            execution_done = False  # 실행 정상 완료 여부 추적
             try:
                 async for ws_msg in comfyui_client.connect_ws(task_id):
                     msg_type = ws_msg.get("type", "")
@@ -299,6 +300,7 @@ async def ws_generate(websocket: WebSocket):
                     elif msg_type == "executing":
                         node = ws_msg.get("data", {}).get("node")
                         if node is None:
+                            execution_done = True
                             break  # 실행 완료
                         await websocket.send_json({
                             "type": "executing",
@@ -320,15 +322,27 @@ async def ws_generate(websocket: WebSocket):
                         break
 
             except Exception as exc:
-                logger.error("ComfyUI WS 스트리밍 오류: %s", exc)
-                await websocket.send_json({
-                    "type": "error",
-                    "task_id": task_id,
-                    "message": f"진행률 수신 오류: {exc}",
-                })
-                continue
+                if not execution_done:
+                    # WS 스트리밍 중 실제 오류 — 에러 전송 후 다음 태스크 대기
+                    logger.error("ComfyUI WS 스트리밍 오류: %s", exc)
+                    try:
+                        await websocket.send_json({
+                            "type": "error",
+                            "task_id": task_id,
+                            "message": f"진행률 수신 오류: {exc}",
+                        })
+                    except Exception:
+                        logger.error("프론트 WS 전송도 실패 — 연결 끊김")
+                    continue
+                # 실행 완료 후 WS 정리 중 예외 — 무시하고 이미지 다운로드 진행
+                logger.info("WS 정리 중 예외 (무시): %s", exc)
 
             # ── 단계 3: 이미지 다운로드 및 완료 전송 ──
+            logger.info(
+                "태스크 %s: WS 루프 종료 (execution_done=%s, status=%s, prompt_id=%s)",
+                task_id, execution_done, task["status"], prompt_id,
+            )
+
             if task["status"] != "error":
                 try:
                     saved = await comfyui_client.download_and_save_images(
@@ -337,20 +351,28 @@ async def ws_generate(websocket: WebSocket):
                     task["images"] = saved
                     task["status"] = "completed"
                     task["progress"] = 100
+                    logger.info(
+                        "태스크 %s: 이미지 %d개 저장 완료, completed 전송 시도",
+                        task_id, len(saved),
+                    )
                     await websocket.send_json({
                         "type": "completed",
                         "task_id": task_id,
                         "images": saved,
                     })
+                    logger.info("태스크 %s: completed 전송 성공", task_id)
                 except Exception as exc:
-                    logger.error("이미지 다운로드 실패: %s", exc)
+                    logger.error("이미지 다운로드 실패: %s", exc, exc_info=True)
                     task["status"] = "error"
                     task["error"] = f"이미지 저장 실패: {exc}"
-                    await websocket.send_json({
-                        "type": "error",
-                        "task_id": task_id,
-                        "message": f"이미지 저장 실패: {exc}",
-                    })
+                    try:
+                        await websocket.send_json({
+                            "type": "error",
+                            "task_id": task_id,
+                            "message": f"이미지 저장 실패: {exc}",
+                        })
+                    except Exception:
+                        logger.error("에러 메시지 전송도 실패 — 프론트 WS 끊김")
 
     except WebSocketDisconnect:
         logger.info("WebSocket 클라이언트 연결 해제")
