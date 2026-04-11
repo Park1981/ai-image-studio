@@ -8,6 +8,7 @@ export interface Preset {
   name: string
   icon: string  // 이모지
   builtin: boolean  // 기본 제공 여부
+  styleHint: string  // AI 보강 시 전달할 스타일 힌트
   params: {
     sampler: string
     scheduler: string
@@ -25,6 +26,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     name: '포토리얼',
     icon: '📷',
     builtin: true,
+    styleHint: 'photorealistic',
     params: { sampler: 'euler', scheduler: 'simple', steps: 50, cfg: 4, width: 1328, height: 1328 },
   },
   {
@@ -32,6 +34,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     name: '인물 세로',
     icon: '🧑',
     builtin: true,
+    styleHint: 'portrait',
     params: { sampler: 'euler', scheduler: 'simple', steps: 50, cfg: 4, width: 928, height: 1664 },
   },
   {
@@ -39,6 +42,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     name: '풍경 가로',
     icon: '🏔️',
     builtin: true,
+    styleHint: 'landscape',
     params: { sampler: 'euler', scheduler: 'simple', steps: 50, cfg: 4, width: 1664, height: 928 },
   },
   {
@@ -46,6 +50,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     name: '빠른 생성',
     icon: '⚡',
     builtin: true,
+    styleHint: 'photorealistic',
     params: { sampler: 'euler', scheduler: 'simple', steps: 20, cfg: 4, width: 1024, height: 1024 },
   },
   {
@@ -53,6 +58,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     name: '고품질',
     icon: '💎',
     builtin: true,
+    styleHint: 'cinematic',
     params: { sampler: 'euler', scheduler: 'simple', steps: 80, cfg: 5, width: 1328, height: 1328 },
   },
 ]

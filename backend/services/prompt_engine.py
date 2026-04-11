@@ -72,6 +72,22 @@ _STYLE_INSTRUCTIONS: dict[str, str] = {
         "magical, ethereal, detailed environment, epic composition, "
         "dramatic lighting, concept art."
     ),
+    "portrait": (
+        "Style: PORTRAIT PHOTOGRAPHY. "
+        "This is a VERTICAL 9:16 portrait image. "
+        "Add tags like: masterpiece, best quality, portrait, "
+        "face focus, shallow depth of field, beautiful detailed eyes, "
+        "skin texture, studio lighting, upper body, looking at viewer, "
+        "bokeh background, 8k uhd, dslr."
+    ),
+    "landscape": (
+        "Style: LANDSCAPE PHOTOGRAPHY. "
+        "This is a HORIZONTAL 16:9 wide image. "
+        "Add tags like: masterpiece, best quality, landscape, "
+        "wide angle, panoramic, scenic view, dramatic sky, "
+        "golden hour, nature, vast, atmospheric perspective, "
+        "high resolution, 8k uhd."
+    ),
 }
 
 # Ollama 실패 시 스타일별 기본 품질 태그 (폴백용)
@@ -95,6 +111,16 @@ _FALLBACK_QUALITY_TAGS: dict[str, str] = {
     "fantasy": (
         "masterpiece, best quality, fantasy art, "
         "magical, ethereal, epic composition"
+    ),
+    "portrait": (
+        "masterpiece, best quality, portrait, "
+        "face focus, shallow depth of field, detailed eyes, "
+        "bokeh background, 8k uhd"
+    ),
+    "landscape": (
+        "masterpiece, best quality, landscape, "
+        "wide angle, panoramic, scenic view, "
+        "dramatic sky, 8k uhd"
     ),
 }
 

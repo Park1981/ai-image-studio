@@ -101,16 +101,18 @@ export default function PromptDock() {
     }
   }, [isGenerating, enhancePending, generate, confirmEnhance, cancel])
 
-  /** 프리셋 적용 */
+  /** 프리셋 적용 — 파라미터 + AI 보강 스타일 힌트 */
   const handlePresetSelect = useCallback((presetId: string) => {
     const preset = getAllPresets().find((p) => p.id === presetId)
     if (!preset) return
-    useAppStore.getState().setSampler(preset.params.sampler)
-    useAppStore.getState().setScheduler(preset.params.scheduler)
-    useAppStore.getState().setSteps(preset.params.steps)
-    useAppStore.getState().setCfg(preset.params.cfg)
-    useAppStore.getState().setWidth(preset.params.width)
-    useAppStore.getState().setHeight(preset.params.height)
+    const s = useAppStore.getState()
+    s.setSampler(preset.params.sampler)
+    s.setScheduler(preset.params.scheduler)
+    s.setSteps(preset.params.steps)
+    s.setCfg(preset.params.cfg)
+    s.setWidth(preset.params.width)
+    s.setHeight(preset.params.height)
+    s.setActiveStyleHint(preset.styleHint)
   }, [])
 
   // 프리셋 목록 상태 (커스텀 저장 시 즉시 갱신용)
@@ -127,6 +129,7 @@ export default function PromptDock() {
       name: name.trim(),
       icon: '🎨',
       builtin: false,
+      styleHint: store.activeStyleHint,
       params: {
         sampler: store.sampler,
         scheduler: store.scheduler,

@@ -80,6 +80,8 @@ interface AppState {
   setEnhancePending: (pending: boolean) => void
   enhancedNegative: string  // 보강된 네거티브 프롬프트 (확인 전)
   setEnhancedNegative: (neg: string) => void
+  activeStyleHint: string  // 프리셋 기반 AI 보강 스타일 힌트
+  setActiveStyleHint: (style: string) => void
 
   // ── 모델 설정 ──
   checkpoint: string
@@ -177,6 +179,8 @@ export const useAppStore = create<AppState>((set) => ({
   setEnhancePending: (pending) => set({ enhancePending: pending }),
   enhancedNegative: '',
   setEnhancedNegative: (neg) => set({ enhancedNegative: neg }),
+  activeStyleHint: 'photorealistic',
+  setActiveStyleHint: (style) => set({ activeStyleHint: style }),
 
   // ── 모델 설정 ──
   checkpoint: '',

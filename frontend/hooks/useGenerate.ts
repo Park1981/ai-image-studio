@@ -62,7 +62,9 @@ export function useGenerate() {
       setProgress(0)
       setErrorMessage(null)
 
-      const response = await api.enhancePrompt(textToEnhance)
+      // 프리셋 스타일 힌트를 AI 보강에 전달
+      const styleHint = useAppStore.getState().activeStyleHint
+      const response = await api.enhancePrompt(textToEnhance, styleHint)
 
       if (response.success && response.data) {
         setEnhancedPrompt(response.data.enhanced)
