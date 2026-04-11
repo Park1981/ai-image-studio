@@ -1,7 +1,7 @@
 /**
  * 히스토리 패널 (사이드 오버레이)
  * 헤더 "히스토리" 버튼 클릭 시 오른쪽에서 슬라이드 인
- * 전체 생성 이력 목록 + 클릭 시 설정 복원
+ * 전체 생성 이력 + AI보강 프롬프트 + 설정 복원
  */
 
 'use client'
@@ -37,6 +37,7 @@ export default function HistoryPanel() {
   const setGenerationStatus = useAppStore((s) => s.setGenerationStatus)
   const setSelectedImageIndex = useAppStore((s) => s.setSelectedImageIndex)
   const setBatchSize = useAppStore((s) => s.setBatchSize)
+  const setEnhancedPrompt = useAppStore((s) => s.setEnhancedPrompt)
 
   /** 히스토리 목록 가져오기 */
   const fetchHistory = useCallback(async (pageNum: number, append = false) => {
@@ -73,6 +74,7 @@ export default function HistoryPanel() {
   const handleSelect = useCallback((item: HistoryItem) => {
     setPrompt(item.prompt)
     setNegativePrompt(item.negative_prompt || '')
+    setEnhancedPrompt(item.enhanced_prompt || '')
     setSampler(item.sampler)
     setScheduler(item.scheduler)
     setWidth(item.width)
@@ -80,17 +82,18 @@ export default function HistoryPanel() {
     setSteps(item.steps)
     setCfg(item.cfg)
     setSeed(item.seed)
-    setBatchSize(item.images.length || 1)
+    const imgCount = item.images?.length || 1
+    setBatchSize(imgCount)
     setSelectedImageIndex(null)
 
-    if (item.images.length > 0) {
+    if (item.images && item.images.length > 0) {
       setGeneratedImages(item.images)
       setGenerationStatus('completed')
     }
 
     setHistoryPanelOpen(false)
   }, [
-    setPrompt, setNegativePrompt, setSampler, setScheduler,
+    setPrompt, setNegativePrompt, setEnhancedPrompt, setSampler, setScheduler,
     setWidth, setHeight, setSteps, setCfg, setSeed, setBatchSize,
     setGeneratedImages, setGenerationStatus, setSelectedImageIndex,
     setHistoryPanelOpen,
@@ -108,6 +111,7 @@ export default function HistoryPanel() {
 
   /** 시간 포맷 */
   const formatTime = (dateStr: string) => {
+    if (!dateStr) return ''
     const d = new Date(dateStr)
     const now = new Date()
     const diffMs = now.getTime() - d.getTime()
@@ -130,7 +134,7 @@ export default function HistoryPanel() {
       />
 
       {/* 패널 */}
-      <div className="fixed top-0 right-0 bottom-0 z-50 w-[360px] bg-ground border-l border-edge flex flex-col shadow-2xl">
+      <div className="fixed top-0 right-0 bottom-0 z-50 w-[380px] bg-ground border-l border-edge flex flex-col shadow-2xl">
         {/* 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
           <div>
@@ -157,12 +161,15 @@ export default function HistoryPanel() {
           )}
 
           {items.map((item) => {
-            const thumb = item.images[0]
+            const thumb = item.images?.[0]
             return (
-              <button
+              <div
                 key={item.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => handleSelect(item)}
-                className="w-full flex gap-3 px-4 py-3 border-b border-edge/50 hover:bg-white/[0.02] transition-all text-left group"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSelect(item) }}
+                className="w-full flex gap-3 px-4 py-3 border-b border-edge/50 hover:bg-white/[0.02] transition-all text-left cursor-pointer group"
               >
                 {/* 썸네일 */}
                 <div className="w-14 h-14 rounded-lg shrink-0 overflow-hidden bg-surface ring-1 ring-edge">
@@ -180,9 +187,15 @@ export default function HistoryPanel() {
 
                 {/* 정보 */}
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-text line-clamp-2 leading-relaxed">
+                  <p className="text-[11px] text-text line-clamp-1 leading-relaxed">
                     {item.prompt}
                   </p>
+                  {/* AI 보강 프롬프트 */}
+                  {item.enhanced_prompt && (
+                    <p className="text-[10px] text-accent-bright/50 line-clamp-1 mt-0.5">
+                      AI: {item.enhanced_prompt}
+                    </p>
+                  )}
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-[10px] font-mono text-text-ghost">
                       {item.width}x{item.height}
@@ -191,15 +204,21 @@ export default function HistoryPanel() {
                       {item.steps}steps
                     </span>
                     <span className="text-[10px] text-text-ghost">
+                      seed:{item.seed}
+                    </span>
+                    <span className="text-[10px] text-text-ghost ml-auto">
                       {formatTime(item.created_at)}
                     </span>
                   </div>
                 </div>
 
                 {/* 삭제 버튼 */}
-                <button
-                  onClick={(e) => handleDelete(item.id, e)}
-                  className="w-6 h-6 rounded-md flex items-center justify-center text-text-ghost hover:text-bad opacity-0 group-hover:opacity-100 transition-all shrink-0 self-center"
+                <span
+                  role="button"
+                  tabIndex={0}
+                  onClick={(e) => handleDelete(item.id, e as unknown as React.MouseEvent)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); handleDelete(item.id, e as unknown as React.MouseEvent) } }}
+                  className="w-6 h-6 rounded-md flex items-center justify-center text-text-ghost hover:text-bad opacity-0 group-hover:opacity-100 transition-all shrink-0 self-center cursor-pointer"
                   title="삭제"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -207,8 +226,8 @@ export default function HistoryPanel() {
                     <path d="m19 6-.867 12.142A2 2 0 0 1 16.138 20H7.862a2 2 0 0 1-1.995-1.858L5 6" />
                     <path d="M10 11v6M14 11v6M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
                   </svg>
-                </button>
-              </button>
+                </span>
+              </div>
             )
           })}
 

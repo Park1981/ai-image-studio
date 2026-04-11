@@ -62,6 +62,22 @@ export default function Header() {
   const processStatus = useProcessStatus()
   const toggleHistoryPanel = useAppStore((s) => s.toggleHistoryPanel)
 
+  /** 새 생성 — 전체 상태 초기화 */
+  const handleNewGeneration = () => {
+    const s = useAppStore.getState()
+    s.setPrompt('')
+    s.setNegativePrompt('')
+    s.setEnhancedPrompt('')
+    s.setEnhancedNegative('')
+    s.setEnhancePending(false)
+    s.setGeneratedImages([])
+    s.setGenerationStatus('idle')
+    s.setSelectedImageIndex(null)
+    s.setProgress(0)
+    s.setErrorMessage(null)
+    s.setSeed(-1)
+  }
+
   return (
     <header className="flex items-center justify-between px-5 h-12 border-b border-edge shrink-0">
       {/* 로고 */}
@@ -85,6 +101,17 @@ export default function Header() {
           running={processStatus.comfyui.running}
         />
         <div className="w-px h-4 bg-edge mx-1" />
+        {/* 새 생성 (초기화) */}
+        <NavButton
+          icon={
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          }
+          label="새 생성"
+          onClick={handleNewGeneration}
+        />
         <NavButton icon={<ClockIcon />} label="히스토리" onClick={toggleHistoryPanel} />
         <NavButton icon={<GearIcon />} label="설정" />
       </div>

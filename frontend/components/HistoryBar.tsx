@@ -1,6 +1,7 @@
 /**
  * 히스토리 바 컴포넌트 (하단)
- * 최근 생성 이력 썸네일 표시 + 클릭 시 설정 복원
+ * 최근 생성 이력 썸네일만 표시 (클릭 없이 갤러리 뷰)
+ * 상세 조작은 상단 히스토리 패널에서
  */
 
 'use client'
@@ -12,27 +13,9 @@ import { api, type HistoryItem } from '@/lib/api'
 /** 백엔드 이미지 서버 기본 URL */
 const IMAGE_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
-/** 폴링 간격 — 생성 완료 시 자동 갱신 (5초) */
-const POLL_INTERVAL = 5_000
-
 export default function HistoryBar() {
   const [items, setItems] = useState<HistoryItem[]>([])
   const generationStatus = useAppStore((s) => s.generationStatus)
-
-  // 스토어 액션 (설정 복원용)
-  const setPrompt = useAppStore((s) => s.setPrompt)
-  const setNegativePrompt = useAppStore((s) => s.setNegativePrompt)
-  const setSampler = useAppStore((s) => s.setSampler)
-  const setScheduler = useAppStore((s) => s.setScheduler)
-  const setWidth = useAppStore((s) => s.setWidth)
-  const setHeight = useAppStore((s) => s.setHeight)
-  const setSteps = useAppStore((s) => s.setSteps)
-  const setCfg = useAppStore((s) => s.setCfg)
-  const setSeed = useAppStore((s) => s.setSeed)
-  const setGeneratedImages = useAppStore((s) => s.setGeneratedImages)
-  const setGenerationStatus = useAppStore((s) => s.setGenerationStatus)
-  const setSelectedImageIndex = useAppStore((s) => s.setSelectedImageIndex)
-  const setBatchSize = useAppStore((s) => s.setBatchSize)
 
   /** 히스토리 목록 가져오기 */
   const fetchHistory = useCallback(async () => {
@@ -42,44 +25,18 @@ export default function HistoryBar() {
     }
   }, [])
 
-  // 초기 로드 + 생성 완료 시 자동 갱신
+  // 초기 로드
   useEffect(() => {
     fetchHistory()
   }, [fetchHistory])
 
-  // 생성 상태가 completed로 변할 때 히스토리 갱신
+  // 생성 완료 시 자동 갱신
   useEffect(() => {
     if (generationStatus === 'completed') {
-      // 약간 딜레이 후 갱신 (DB 저장 완료 대기)
       const timer = setTimeout(fetchHistory, 1000)
       return () => clearTimeout(timer)
     }
   }, [generationStatus, fetchHistory])
-
-  /** 히스토리 항목 클릭 → 설정 복원 + 이미지 표시 */
-  const handleSelect = useCallback((item: HistoryItem) => {
-    setPrompt(item.prompt)
-    setNegativePrompt(item.negative_prompt || '')
-    setSampler(item.sampler)
-    setScheduler(item.scheduler)
-    setWidth(item.width)
-    setHeight(item.height)
-    setSteps(item.steps)
-    setCfg(item.cfg)
-    setSeed(item.seed)
-    setBatchSize(item.images.length || 1)
-    setSelectedImageIndex(null)
-
-    // 이미지 복원
-    if (item.images.length > 0) {
-      setGeneratedImages(item.images)
-      setGenerationStatus('completed')
-    }
-  }, [
-    setPrompt, setNegativePrompt, setSampler, setScheduler,
-    setWidth, setHeight, setSteps, setCfg, setSeed, setBatchSize,
-    setGeneratedImages, setGenerationStatus, setSelectedImageIndex,
-  ])
 
   if (items.length === 0) {
     return (
@@ -98,34 +55,26 @@ export default function HistoryBar() {
       </span>
 
       {items.map((item) => {
-        const thumb = item.images[0]
+        const thumb = item.images?.[0]
         return (
-          <button
+          <div
             key={item.id}
-            onClick={() => handleSelect(item)}
-            className="w-9 h-9 rounded-md shrink-0 ring-1 ring-edge hover:ring-accent-bright/50 transition-all overflow-hidden bg-ground"
-            title={`${item.prompt.slice(0, 40)}... (${item.width}x${item.height})`}
+            className="w-9 h-9 rounded-md shrink-0 ring-1 ring-edge overflow-hidden bg-ground"
+            title={item.prompt.slice(0, 50)}
           >
             {thumb ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
                 src={`${IMAGE_BASE}${thumb.url}`}
-                alt={item.prompt.slice(0, 20)}
+                alt=""
                 className="w-full h-full object-cover"
               />
             ) : (
               <div className="w-full h-full shimmer" />
             )}
-          </button>
+          </div>
         )
       })}
-
-      <button
-        onClick={fetchHistory}
-        className="text-[10px] text-text-dim hover:text-text-sub transition-colors shrink-0 ml-1"
-      >
-        새로고침
-      </button>
     </div>
   )
 }
