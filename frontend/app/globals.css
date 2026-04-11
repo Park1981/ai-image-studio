@@ -1,26 +1,216 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* ═══════════════════════════════════════════════
+   AI Image Studio — Design System
+   "The Dark Room" 컨셉: 이미지가 유일한 빛의 원천
+   ═══════════════════════════════════════════════ */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* ── 서피스 계층 (깊은 다크 → 밝은 다크) ── */
+  --color-void: #08080a;
+  --color-ground: #0c0c0e;
+  --color-surface: #111114;
+  --color-raised: #18181c;
+  --color-elevated: #1f1f24;
+  --color-floating: #26262c;
+  --color-overlay: #2e2e36;
+
+  /* ── 프라이머리 액센트 (바이올렛) ── */
+  --color-accent: #7c3aed;
+  --color-accent-bright: #a78bfa;
+  --color-accent-dim: #5b21b6;
+  --color-accent-muted: rgba(124, 58, 237, 0.15);
+  --color-accent-glow: rgba(124, 58, 237, 0.25);
+
+  /* ── 텍스트 ── */
+  --color-text: #f0f0f3;
+  --color-text-sub: #9494a0;
+  --color-text-dim: #5c5c6a;
+  --color-text-ghost: #3a3a44;
+
+  /* ── 시맨틱 ── */
+  --color-ok: #34d399;
+  --color-warn: #fbbf24;
+  --color-bad: #f87171;
+  --color-info: #60a5fa;
+
+  /* ── 보더 ── */
+  --color-edge: rgba(255, 255, 255, 0.06);
+  --color-edge-hover: rgba(255, 255, 255, 0.12);
+  --color-edge-accent: rgba(124, 58, 237, 0.3);
+
+  /* ── 폰트 ── */
+  --font-sans: var(--font-geist-sans), "Segoe UI", sans-serif;
+  --font-mono: var(--font-geist-mono), "Consolas", monospace;
+  --font-display: var(--font-sora), var(--font-geist-sans), sans-serif;
+
+  /* ── 라운딩 ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ── 베이스 리셋 ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-elevated) transparent;
+}
+
+::selection {
+  background: var(--color-accent-muted);
+  color: var(--color-accent-bright);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-void);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 노이즈 텍스처 오버레이 ── */
+.noise::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 200px;
+}
+
+/* ── 커스텀 스크롤바 ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--color-elevated);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-floating);
+}
+
+/* ── 글로우 버튼 이펙트 ── */
+.btn-glow {
+  position: relative;
+  background: linear-gradient(135deg, var(--color-accent) 0%, #9333ea 50%, var(--color-accent-bright) 100%);
+  background-size: 200% 200%;
+  transition: all 0.3s ease;
+}
+.btn-glow:hover {
+  background-position: 100% 100%;
+  box-shadow:
+    0 0 20px var(--color-accent-glow),
+    0 0 60px rgba(124, 58, 237, 0.1);
+}
+.btn-glow:active {
+  transform: scale(0.97);
+}
+
+/* ── 글래스 모피즘 ── */
+.glass {
+  background: rgba(17, 17, 20, 0.7);
+  backdrop-filter: blur(20px) saturate(1.2);
+  -webkit-backdrop-filter: blur(20px) saturate(1.2);
+}
+
+/* ── 상태 펄스 ── */
+@keyframes status-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pulse-live {
+  animation: status-pulse 2s ease-in-out infinite;
+}
+
+/* ── 이미지 플레이스홀더 그라디언트 애니메이션 ── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(
+    110deg,
+    var(--color-surface) 0%,
+    var(--color-raised) 40%,
+    var(--color-elevated) 50%,
+    var(--color-raised) 60%,
+    var(--color-surface) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+}
+
+/* ── 프롬프트 입력 포커스 글로우 ── */
+.prompt-glow:focus-within {
+  box-shadow:
+    0 0 0 1px var(--color-accent),
+    0 0 15px var(--color-accent-glow),
+    inset 0 0 30px rgba(124, 58, 237, 0.03);
+}
+
+/* ── 카드 호버 ── */
+.card-hover {
+  transition: all 0.2s ease;
+  border: 1px solid var(--color-edge);
+}
+.card-hover:hover {
+  border-color: var(--color-edge-hover);
+  background: var(--color-raised);
+}
+
+/* ── 사이드바 인풋 ── */
+.input-field {
+  background: var(--color-ground);
+  border: 1px solid var(--color-edge);
+  border-radius: var(--radius-sm);
+  padding: 7px 10px;
+  font-size: 12px;
+  color: var(--color-text);
+  transition: border-color 0.15s ease;
+  outline: none;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.input-field:hover {
+  border-color: var(--color-edge-hover);
+}
+.input-field:focus {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-accent-muted);
+}
+
+/* ── 슬라이더 ── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  background: var(--color-elevated);
+  border-radius: 999px;
+  outline: none;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent-bright);
+  border: 2px solid var(--color-surface);
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(0.95);
+  background: var(--color-accent);
 }
