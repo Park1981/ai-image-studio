@@ -1,8 +1,7 @@
 """
 ComfyUI / Ollama 프로세스 라이프사이클 관리
-- Ollama: 상시 실행 (헬스체크만 수행)
-- ComfyUI: 온디맨드 실행/종료 (VRAM 절약 전략)
-- 자동 셧다운 타이머: 일정 시간 비활동 시 ComfyUI 종료
+- ComfyUI: 앱 시작/종료와 함께 동작 (상시 실행)
+- Ollama: AI 보강 시만 온디맨드 호출 (VRAM 즉시 반납)
 """
 
 import asyncio
@@ -36,10 +35,6 @@ class ProcessManager:
         self._comfyui_process: subprocess.Popen | None = None
         # ComfyUI 시작 시각 (업타임 계산용)
         self._comfyui_started_at: float | None = None
-        # 마지막 생성 요청 시각 (자동 셧다운 판단용)
-        self._last_activity: float = 0.0
-        # 자동 셧다운 타이머 태스크
-        self._shutdown_task: asyncio.Task | None = None
 
     # ─────────────────────────────────────────────
     # Ollama 헬스체크
@@ -123,7 +118,6 @@ class ProcessManager:
         started = await self._wait_for_comfyui_ready()
         if started:
             self._comfyui_started_at = time.time()
-            self.reset_activity_timer()
             logger.info("ComfyUI 기동 완료 (PID: %d)", self._comfyui_process.pid)
         else:
             logger.error("ComfyUI 기동 타임아웃 (%.0f초)", _STARTUP_TIMEOUT)
@@ -160,9 +154,6 @@ class ProcessManager:
         - terminate()로 우아한 종료 시도
         - 타임아웃 후 kill()로 강제 종료
         """
-        # 자동 셧다운 타이머 취소
-        self._cancel_shutdown_task()
-
         if self._comfyui_process is None:
             logger.info("ComfyUI 프로세스 핸들 없음 — 종료 불필요")
             return True
@@ -206,49 +197,6 @@ class ProcessManager:
         if await self.check_comfyui():
             return True
         return await self.start_comfyui()
-
-    # ─────────────────────────────────────────────
-    # 자동 셧다운 타이머
-    # ─────────────────────────────────────────────
-
-    def reset_activity_timer(self) -> None:
-        """생성 요청마다 호출 — 자동 셧다운 타이머 리셋"""
-        self._last_activity = time.time()
-
-        # 기존 타이머 취소 후 새로 생성
-        self._cancel_shutdown_task()
-
-        # 이벤트 루프가 돌고 있으면 타이머 태스크 등록
-        try:
-            loop = asyncio.get_running_loop()
-            self._shutdown_task = loop.create_task(self._auto_shutdown_worker())
-        except RuntimeError:
-            # 이벤트 루프 없으면 무시 (테스트 환경 등)
-            pass
-
-    async def _auto_shutdown_worker(self) -> None:
-        """설정된 비활동 시간 경과 후 ComfyUI 자동 종료"""
-        timeout_seconds = settings.comfyui_auto_shutdown_minutes * 60
-        try:
-            await asyncio.sleep(timeout_seconds)
-
-            # 타이머 만료 후 마지막 활동 시점 재검증
-            elapsed = time.time() - self._last_activity
-            if elapsed >= timeout_seconds:
-                logger.info(
-                    "ComfyUI 비활동 %d분 경과 — 자동 종료",
-                    settings.comfyui_auto_shutdown_minutes,
-                )
-                await self.stop_comfyui()
-        except asyncio.CancelledError:
-            # 타이머 리셋 시 정상 취소
-            pass
-
-    def _cancel_shutdown_task(self) -> None:
-        """자동 셧다운 태스크 취소"""
-        if self._shutdown_task is not None and not self._shutdown_task.done():
-            self._shutdown_task.cancel()
-            self._shutdown_task = None
 
     # ─────────────────────────────────────────────
     # Ollama 모델 목록 조회

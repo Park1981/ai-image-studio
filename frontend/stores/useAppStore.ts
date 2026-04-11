@@ -4,7 +4,7 @@
  */
 
 import { create } from 'zustand'
-import type { EnhanceCategoryItem, EnhanceCategoryConfig } from '@/lib/api'
+import type { EnhanceCategoryItem, EnhanceCategoryConfig, ModelPresetsResponse } from '@/lib/api'
 
 // ── 타입 정의 ──
 
@@ -165,6 +165,10 @@ interface AppState {
   // ── 보강 결과 카테고리 데이터 ──
   enhancedCategories: EnhanceCategoryItem[]
   setEnhancedCategories: (cats: EnhanceCategoryItem[]) => void
+
+  // ── 모델별 권장 설정 프리셋 ──
+  modelPresets: ModelPresetsResponse | null
+  setModelPresets: (presets: ModelPresetsResponse) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -312,4 +316,8 @@ export const useAppStore = create<AppState>((set) => ({
   // ── 보강 결과 카테고리 데이터 ──
   enhancedCategories: [],
   setEnhancedCategories: (cats) => set({ enhancedCategories: cats }),
+
+  // ── 모델별 권장 설정 프리셋 ──
+  modelPresets: null,
+  setModelPresets: (presets) => set({ modelPresets: presets }),
 }))

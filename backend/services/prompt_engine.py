@@ -303,6 +303,7 @@ class PromptEngine:
             "system": system_prompt,
             "prompt": user_message,
             "stream": False,
+            "keep_alive": "0",  # 완료 후 VRAM 즉시 반납 (ComfyUI와 VRAM 충돌 방지)
             "options": {
                 "temperature": temperature,
                 "num_predict": 2048,  # 카테고리별 출력이므로 토큰 늘림

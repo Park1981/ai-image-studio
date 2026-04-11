@@ -106,6 +106,26 @@ export interface HistoryListResponse {
 
 export type HistoryDetailResponse = HistoryItem
 
+// ── 모델 프리셋 타입 ──
+export interface ModelPresetInfo {
+  name: string
+  sampler: string
+  scheduler: string
+  steps: number
+  cfg: number
+  default_width: number
+  default_height: number
+  min_size: number
+  max_size: number
+  step_size: number
+  description: string
+}
+
+export interface ModelPresetsResponse {
+  diffusion_models: Record<string, ModelPresetInfo>
+  checkpoints: Record<string, ModelPresetInfo>
+}
+
 // ── AI 보강 카테고리 설정 타입 ──
 export interface EnhanceCategoryConfig {
   subject: boolean
@@ -280,6 +300,10 @@ export const api = {
   /** 사용 가능한 모델 목록 조회 */
   getModels: () =>
     fetchApi<ModelsResponse>('/api/models/list'),
+
+  /** 모델별 권장 파라미터 프리셋 조회 */
+  getModelPresets: () =>
+    fetchApi<ModelPresetsResponse>('/api/models/presets'),
 
   // ── 프롬프트 보강 API ──
 

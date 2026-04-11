@@ -87,6 +87,9 @@ export default function PromptDock() {
   // 카테고리 자세히 보기 토글
   const [showCategoryDetail, setShowCategoryDetail] = useState(false)
 
+  // 커스텀 사이즈 입력 모드
+  const [showCustomSize, setShowCustomSize] = useState(false)
+
   // 파일 입력 참조
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -98,6 +101,41 @@ export default function PromptDock() {
 
   // AI 보강 중 여부
   const isEnhancing = generationStatus === 'enhancing'
+
+  // 모델 프리셋 데이터
+  const modelPresets = useAppStore((s) => s.modelPresets)
+
+  // 모델 프리셋 fetch (초기 1회)
+  useEffect(() => {
+    if (!modelPresets) {
+      api.getModelPresets().then((res) => {
+        if (res.success && res.data) {
+          useAppStore.getState().setModelPresets(res.data)
+        }
+      })
+    }
+  }, [modelPresets])
+
+  /** 모델 선택 시 권장 파라미터 자동 적용 */
+  const handleModelSelect = useCallback((modelName: string) => {
+    const s = useAppStore.getState()
+    s.setCheckpoint(modelName)
+
+    // 모델명에서 확장자 제거하여 프리셋 키 매칭
+    const key = modelName.replace(/\.safetensors$/, '')
+    const presets = s.modelPresets
+    if (!presets) return
+
+    const preset = presets.diffusion_models[key] || presets.checkpoints[key]
+    if (preset) {
+      s.setSampler(preset.sampler)
+      s.setScheduler(preset.scheduler)
+      s.setSteps(preset.steps)
+      s.setCfg(preset.cfg)
+      s.setWidth(preset.default_width)
+      s.setHeight(preset.default_height)
+    }
+  }, [])
 
   /** 이미지 파일 업로드 처리 */
   const handleFileUpload = useCallback(async (file: File) => {
@@ -632,10 +670,10 @@ export default function PromptDock() {
                     <option value="__save__">💾 현재 설정 저장...</option>
                   </select>
 
-                  {/* 모델 드롭다운 */}
+                  {/* 모델 드롭다운 — 선택 시 권장 파라미터 자동 적용 */}
                   <select
                     value={checkpoint}
-                    onChange={(e) => setCheckpoint(e.target.value)}
+                    onChange={(e) => handleModelSelect(e.target.value)}
                     disabled={isGenerating}
                     className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all max-w-[160px] truncate cursor-pointer disabled:opacity-40"
                     title={checkpoint || 'Qwen Image (워크플로우 기본)'}
@@ -657,25 +695,63 @@ export default function PromptDock() {
                     )}
                   </select>
 
-                  {/* 사이즈 드롭다운 */}
-                  <select
-                    value={currentSizeLabel}
-                    onChange={(e) => {
-                      const preset = SIZE_PRESETS.find((p) => p.label === e.target.value)
-                      if (preset) {
-                        setWidth(preset.w)
-                        setHeight(preset.h)
-                      }
-                    }}
-                    disabled={isGenerating}
-                    className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer disabled:opacity-40"
-                  >
-                    {SIZE_PRESETS.map((preset) => (
-                      <option key={preset.label} value={preset.label}>
-                        {preset.label}
-                      </option>
-                    ))}
-                  </select>
+                  {/* 사이즈: 프리셋 드롭다운 + 커스텀 입력 토글 */}
+                  {showCustomSize ? (
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        value={width}
+                        onChange={(e) => setWidth(Math.max(256, Math.min(2048, parseInt(e.target.value) || 256)))}
+                        disabled={isGenerating}
+                        className="w-[60px] bg-ground text-[11px] font-mono text-text-sub rounded-lg px-1.5 py-1.5 border border-edge focus:border-accent outline-none text-center disabled:opacity-40"
+                        title="너비 (px)"
+                      />
+                      <span className="text-[10px] text-text-ghost">×</span>
+                      <input
+                        type="number"
+                        value={height}
+                        onChange={(e) => setHeight(Math.max(256, Math.min(2048, parseInt(e.target.value) || 256)))}
+                        disabled={isGenerating}
+                        className="w-[60px] bg-ground text-[11px] font-mono text-text-sub rounded-lg px-1.5 py-1.5 border border-edge focus:border-accent outline-none text-center disabled:opacity-40"
+                        title="높이 (px)"
+                      />
+                      <button
+                        onClick={() => setShowCustomSize(false)}
+                        className="text-[10px] text-text-ghost hover:text-accent-bright transition-colors px-1"
+                        title="비율 프리셋으로 전환"
+                      >
+                        비율
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-0.5">
+                      <select
+                        value={currentSizeLabel}
+                        onChange={(e) => {
+                          const preset = SIZE_PRESETS.find((p) => p.label === e.target.value)
+                          if (preset) {
+                            setWidth(preset.w)
+                            setHeight(preset.h)
+                          }
+                        }}
+                        disabled={isGenerating}
+                        className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer disabled:opacity-40"
+                      >
+                        {SIZE_PRESETS.map((preset) => (
+                          <option key={preset.label} value={preset.label}>
+                            {preset.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => setShowCustomSize(true)}
+                        className="text-[10px] text-text-ghost hover:text-accent-bright transition-colors px-1"
+                        title="직접 픽셀 입력"
+                      >
+                        px
+                      </button>
+                    </div>
+                  )}
 
                   {/* 배치 수 버튼 그룹 */}
                   <div className="flex items-center rounded-lg border border-edge overflow-hidden">

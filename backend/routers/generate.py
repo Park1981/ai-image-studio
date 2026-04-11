@@ -77,8 +77,7 @@ async def _run_generation(task_id: str) -> None:
                 task["error"] = "ComfyUI를 시작할 수 없습니다. 설치 경로를 확인해주세요."
                 return
 
-        # 비활동 타이머 리셋
-        process_manager.reset_activity_timer()
+        # ComfyUI 실행 확인 완료
 
         # 2단계: 프롬프트 보강
         enhanced = request.prompt
@@ -260,8 +259,7 @@ async def _run_edit_generation(task_id: str) -> None:
                 task["error"] = "ComfyUI를 시작할 수 없습니다. 설치 경로를 확인해주세요."
                 return
 
-        # 비활동 타이머 리셋
-        process_manager.reset_activity_timer()
+        # ComfyUI 실행 확인 완료
 
         # 2단계: 소스 이미지를 ComfyUI input 디렉토리에 업로드
         task["status"] = "generating"

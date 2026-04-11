@@ -32,13 +32,18 @@ async def lifespan(app: FastAPI):
     settings.ensure_data_dirs()
     await init_db()
 
-    # Ollama 상태 확인
-    ollama_ok = await process_manager.check_ollama()
+    # ComfyUI 자동 시작 (앱과 함께 실행)
     comfyui_ok = await process_manager.check_comfyui()
+    if not comfyui_ok:
+        logger.info("ComfyUI 자동 시작 중...")
+        comfyui_ok = await process_manager.start_comfyui()
+
+    # Ollama 상태 확인 (온디맨드 — AI 보강 시 자동 시작됨)
+    ollama_ok = await process_manager.check_ollama()
 
     logger.info("🚀 AI Image Studio 백엔드 시작")
-    logger.info("   ComfyUI: %s (%s)", settings.comfyui_url, "✅ 실행 중" if comfyui_ok else "⏸️ 대기")
-    logger.info("   Ollama:  %s (%s) — 모델: %s", settings.ollama_url, "✅ 실행 중" if ollama_ok else "❌ 미실행", settings.ollama_model)
+    logger.info("   ComfyUI: %s (%s)", settings.comfyui_url, "✅ 실행 중" if comfyui_ok else "❌ 시작 실패")
+    logger.info("   Ollama:  %s (%s) — 온디맨드 (AI 보강 시 자동)", settings.ollama_url, "✅ 대기 중" if ollama_ok else "⏸️ 미실행")
 
     yield
 

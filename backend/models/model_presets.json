@@ -1,0 +1,124 @@
+{
+  "_comment": "모델별 권장 파라미터 — 모델 선택 시 자동 적용, 사용자 오버라이드 가능",
+  "diffusion_models": {
+    "qwen_image_fp8_e4m3fn": {
+      "name": "Qwen Image 2512",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 50,
+      "cfg": 4.0,
+      "default_width": 1328,
+      "default_height": 1328,
+      "min_size": 512,
+      "max_size": 2048,
+      "step_size": 16,
+      "description": "고품질 이미지 생성 (fp8)"
+    },
+    "qwen_image_edit_2511_bf16": {
+      "name": "Qwen Image Edit 2511",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 50,
+      "cfg": 4.0,
+      "default_width": 1328,
+      "default_height": 1328,
+      "min_size": 512,
+      "max_size": 2048,
+      "step_size": 16,
+      "description": "이미지 수정 전용 (bf16)"
+    },
+    "qwen_image_edit_2509_fp8_e4m3fn": {
+      "name": "Qwen Image Edit 2509",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 50,
+      "cfg": 4.0,
+      "default_width": 1024,
+      "default_height": 1024,
+      "min_size": 512,
+      "max_size": 2048,
+      "step_size": 16,
+      "description": "이미지 수정 구버전 (fp8)"
+    },
+    "flux1-dev-kontext_fp8_scaled": {
+      "name": "Flux.1 Dev Kontext",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 25,
+      "cfg": 1.0,
+      "default_width": 1024,
+      "default_height": 1024,
+      "min_size": 512,
+      "max_size": 2048,
+      "step_size": 16,
+      "description": "Flux.1 텍스트-이미지 (fp8)"
+    },
+    "flux2_dev_fp8mixed": {
+      "name": "Flux.2 Dev",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 25,
+      "cfg": 1.0,
+      "default_width": 1024,
+      "default_height": 1024,
+      "min_size": 512,
+      "max_size": 2048,
+      "step_size": 16,
+      "description": "Flux.2 텍스트-이미지 (fp8 mixed)"
+    },
+    "hidream_i1_dev_fp8": {
+      "name": "HiDream I1 Dev",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 28,
+      "cfg": 5.0,
+      "default_width": 1024,
+      "default_height": 1024,
+      "min_size": 512,
+      "max_size": 2048,
+      "step_size": 16,
+      "description": "HiDream 이미지 생성 (fp8)"
+    },
+    "hidreamI1FP8Uncensored_devV01AlphaTopless": {
+      "name": "HiDream I1 Uncensored",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 28,
+      "cfg": 5.0,
+      "default_width": 1024,
+      "default_height": 1024,
+      "min_size": 512,
+      "max_size": 2048,
+      "step_size": 16,
+      "description": "HiDream 무검열 (fp8)"
+    },
+    "zImage_turbo": {
+      "name": "zImage Turbo",
+      "sampler": "euler_ancestral",
+      "scheduler": "simple",
+      "steps": 8,
+      "cfg": 2.0,
+      "default_width": 1024,
+      "default_height": 1024,
+      "min_size": 512,
+      "max_size": 2048,
+      "step_size": 8,
+      "description": "초고속 생성 (Turbo)"
+    }
+  },
+  "checkpoints": {
+    "ltx-2.3-22b-dev-fp8": {
+      "name": "LTX 2.3 Video",
+      "sampler": "euler",
+      "scheduler": "simple",
+      "steps": 30,
+      "cfg": 3.0,
+      "default_width": 768,
+      "default_height": 512,
+      "min_size": 256,
+      "max_size": 1280,
+      "step_size": 16,
+      "description": "LTX 영상 생성 모델"
+    }
+  }
+}
