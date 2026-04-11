@@ -11,6 +11,7 @@ import ImageGrid from '@/components/ImageGrid'
 import PromptDock from '@/components/PromptDock'
 import SettingsSidebar from '@/components/SettingsSidebar'
 import HistoryBar from '@/components/HistoryBar'
+import HistoryPanel from '@/components/HistoryPanel'
 import ErrorToast from '@/components/ErrorToast'
 import { useAppStore } from '@/stores/useAppStore'
 
@@ -39,6 +40,9 @@ export default function Home() {
 
       {/* 히스토리 바 (하단) */}
       <HistoryBar />
+
+      {/* 히스토리 전체 패널 (오버레이) */}
+      <HistoryPanel />
     </div>
   )
 }

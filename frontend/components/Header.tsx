@@ -6,6 +6,7 @@
 'use client'
 
 import { useProcessStatus } from '@/hooks/useProcessStatus'
+import { useAppStore } from '@/stores/useAppStore'
 import { ClockIcon, GearIcon, LogoSparkIcon } from './icons'
 
 /** 상태 표시 알약 */
@@ -38,12 +39,15 @@ function StatusPill({
 function NavButton({
   icon,
   label,
+  onClick,
 }: {
   icon: React.ReactNode
   label: string
+  onClick?: () => void
 }) {
   return (
     <button
+      onClick={onClick}
       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-text-sub hover:text-text hover:bg-white/[0.04] transition-all text-xs"
       title={label}
     >
@@ -56,6 +60,7 @@ function NavButton({
 export default function Header() {
   // 실시간 프로세스 상태 (10초 간격 폴링)
   const processStatus = useProcessStatus()
+  const toggleHistoryPanel = useAppStore((s) => s.toggleHistoryPanel)
 
   return (
     <header className="flex items-center justify-between px-5 h-12 border-b border-edge shrink-0">
@@ -80,7 +85,7 @@ export default function Header() {
           running={processStatus.comfyui.running}
         />
         <div className="w-px h-4 bg-edge mx-1" />
-        <NavButton icon={<ClockIcon />} label="히스토리" />
+        <NavButton icon={<ClockIcon />} label="히스토리" onClick={toggleHistoryPanel} />
         <NavButton icon={<GearIcon />} label="설정" />
       </div>
     </header>

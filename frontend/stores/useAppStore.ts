@@ -125,6 +125,11 @@ interface AppState {
   sidebarOpen: boolean
   setSidebarOpen: (open: boolean) => void
   toggleSidebar: () => void
+
+  // ── 히스토리 패널 ──
+  historyPanelOpen: boolean
+  setHistoryPanelOpen: (open: boolean) => void
+  toggleHistoryPanel: () => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -220,4 +225,9 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarOpen: false,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   toggleSidebar: () => set((state) => ({ sidebarOpen: !state.sidebarOpen })),
+
+  // ── 히스토리 패널 ──
+  historyPanelOpen: false,
+  setHistoryPanelOpen: (open) => set({ historyPanelOpen: open }),
+  toggleHistoryPanel: () => set((state) => ({ historyPanelOpen: !state.historyPanelOpen })),
 }))
