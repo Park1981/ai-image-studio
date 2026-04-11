@@ -1,0 +1,60 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Next.js
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+
+# Python
+backend/*.egg-info/
+backend/.pytest_cache/
+backend/.ruff_cache/
+.venv/
+venv/
+env/
+
+# Data (런타임 생성)
+data/
+*.db
+*.sqlite
+
+# Logs
+*.log
+logs/
+
+# Generated images (로컬 저장)
+images/
+
+# Temporary
+*.tmp
+*.temp
+temp/
+
+# bkit/PDCA docs (개발 도구)
+docs/.pdca-status.json
+docs/.bkit-memory.json
