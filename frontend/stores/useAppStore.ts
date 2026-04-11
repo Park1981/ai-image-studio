@@ -80,8 +80,12 @@ interface AppState {
   setEnhancePending: (pending: boolean) => void
   enhancedNegative: string  // 보강된 네거티브 프롬프트 (확인 전)
   setEnhancedNegative: (neg: string) => void
+  enhanceFallback: boolean  // Ollama 호출 실패 → 폴백 사용 여부
+  setEnhanceFallback: (fallback: boolean) => void
   activeStyleHint: string  // 프리셋 기반 AI 보강 스타일 힌트
   setActiveStyleHint: (style: string) => void
+  ollamaModel: string  // AI 보강에 사용할 Ollama 모델
+  setOllamaModel: (model: string) => void
 
   // ── 모델 설정 ──
   checkpoint: string
@@ -179,8 +183,12 @@ export const useAppStore = create<AppState>((set) => ({
   setEnhancePending: (pending) => set({ enhancePending: pending }),
   enhancedNegative: '',
   setEnhancedNegative: (neg) => set({ enhancedNegative: neg }),
+  enhanceFallback: false,
+  setEnhanceFallback: (fallback) => set({ enhanceFallback: fallback }),
   activeStyleHint: 'photorealistic',
   setActiveStyleHint: (style) => set({ activeStyleHint: style }),
+  ollamaModel: '',  // 빈 문자열 = 서버 기본 모델 (gemma4:26b)
+  setOllamaModel: (model) => set({ ollamaModel: model }),
 
   // ── 모델 설정 ──
   checkpoint: '',

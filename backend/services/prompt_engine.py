@@ -145,7 +145,7 @@ class PromptEngine:
     # ─────────────────────────────────────────────
 
     async def enhance_prompt(
-        self, prompt: str, style: str = "photorealistic"
+        self, prompt: str, style: str = "photorealistic", model: str = ""
     ) -> EnhanceResponse:
         """
         프롬프트 보강 (Ollama LLM 활용)
@@ -162,8 +162,11 @@ class PromptEngine:
 
         user_message = f"{style_instruction}\n\nUser prompt: {prompt}"
 
+        # 모델 지정이 있으면 해당 모델 사용, 없으면 기본 설정
+        use_model = model.strip() if model else self._model
+
         try:
-            result = await self._call_ollama(user_message)
+            result = await self._call_ollama(user_message, use_model)
 
             if result is not None:
                 enhanced = result.get("enhanced", prompt)
@@ -179,20 +182,22 @@ class PromptEngine:
         except Exception as exc:
             logger.error("프롬프트 보강 실패 — 폴백 사용: %s", exc)
 
-        # 폴백: 원본 + 기본 태그
+        # 폴백: 원본 + 기본 태그 (fallback=True로 클라이언트에 알림)
         return self._build_fallback(prompt, style)
 
     # ─────────────────────────────────────────────
     # Ollama API 호출
     # ─────────────────────────────────────────────
 
-    async def _call_ollama(self, user_message: str) -> dict | None:
+    async def _call_ollama(
+        self, user_message: str, model: str | None = None
+    ) -> dict | None:
         """
         Ollama /api/generate 호출
         반환: 파싱된 JSON 딕셔너리 또는 None
         """
         payload = {
-            "model": self._model,
+            "model": model or self._model,
             "system": _SYSTEM_PROMPT,
             "prompt": user_message,
             "stream": False,
@@ -290,6 +295,7 @@ class PromptEngine:
             original=prompt,
             enhanced=enhanced,
             negative=_FALLBACK_NEGATIVE,
+            fallback=True,  # Ollama 실패 → 폴백 사용 표시
         )
 
 

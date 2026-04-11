@@ -68,6 +68,7 @@ class EnhanceRequest(BaseModel):
     """프롬프트 보강 요청"""
     prompt: str
     style: str = "photorealistic"  # photorealistic | anime | illustration | etc.
+    model: str = ""  # Ollama 모델 이름 (빈 문자열이면 기본 모델 사용)
 
 
 class EnhanceResponse(BaseModel):
@@ -75,6 +76,7 @@ class EnhanceResponse(BaseModel):
     original: str
     enhanced: str
     negative: str
+    fallback: bool = False  # Ollama 호출 실패 시 폴백 사용 여부
 
 
 # ─────────────────────────────────────────────

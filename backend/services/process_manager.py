@@ -251,6 +251,32 @@ class ProcessManager:
             self._shutdown_task = None
 
     # ─────────────────────────────────────────────
+    # Ollama 모델 목록 조회
+    # ─────────────────────────────────────────────
+
+    async def list_ollama_models(self) -> list[dict]:
+        """Ollama 설치된 모델 목록 반환 (GET /api/tags)"""
+        try:
+            async with httpx.AsyncClient(timeout=_HTTP_TIMEOUT) as client:
+                resp = await client.get(f"{settings.ollama_url}/api/tags")
+                resp.raise_for_status()
+                data = resp.json()
+                models = data.get("models", [])
+                # 이름, 크기, 수정일 등 필요한 정보만 추출
+                return [
+                    {
+                        "name": m.get("name", ""),
+                        "size_gb": round(m.get("size", 0) / (1024**3), 1),
+                        "modified_at": m.get("modified_at", ""),
+                    }
+                    for m in models
+                    if m.get("name")
+                ]
+        except (httpx.HTTPError, httpx.TimeoutException) as exc:
+            logger.error("Ollama 모델 목록 조회 실패: %s", exc)
+            return []
+
+    # ─────────────────────────────────────────────
     # 상태 조회 (업타임 등)
     # ─────────────────────────────────────────────
 

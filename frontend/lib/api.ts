@@ -96,6 +96,14 @@ export interface EnhancePromptResponse {
   original: string
   enhanced: string
   negative: string
+  fallback?: boolean  // Ollama 호출 실패 시 폴백 사용 여부
+}
+
+// ── Ollama 모델 정보 타입 ──
+export interface OllamaModelInfo {
+  name: string
+  size_gb: number
+  modified_at: string
 }
 
 // 공통 fetch 래퍼 (에러 처리 포함)
@@ -202,11 +210,15 @@ export const api = {
   // ── 프롬프트 보강 API ──
 
   /** 프롬프트 AI 보강 */
-  enhancePrompt: (prompt: string, style?: string) =>
+  enhancePrompt: (prompt: string, style?: string, model?: string) =>
     fetchApi<EnhancePromptResponse>('/api/prompt/enhance', {
       method: 'POST',
-      body: JSON.stringify({ prompt, style }),
+      body: JSON.stringify({ prompt, style, model: model || '' }),
     }),
+
+  /** Ollama 설치된 모델 목록 조회 */
+  getOllamaModels: () =>
+    fetchApi<OllamaModelInfo[]>('/api/process/ollama/models'),
 
   // ── 히스토리 API ──
 

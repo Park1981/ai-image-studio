@@ -35,6 +35,13 @@ async def get_process_status():
     }
 
 
+@router.get("/ollama/models", response_model=ApiResponse[list])
+async def list_ollama_models():
+    """Ollama 설치된 모델 목록 조회"""
+    models = await process_manager.list_ollama_models()
+    return {"success": True, "data": models}
+
+
 @router.post("/comfyui/start", response_model=ApiResponse[dict])
 async def start_comfyui():
     """ComfyUI 수동 시작"""

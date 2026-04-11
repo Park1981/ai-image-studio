@@ -17,5 +17,6 @@ async def enhance_prompt(request: EnhanceRequest):
     result = await prompt_engine.enhance_prompt(
         prompt=request.prompt,
         style=request.style,
+        model=request.model,
     )
     return {"success": True, "data": result}

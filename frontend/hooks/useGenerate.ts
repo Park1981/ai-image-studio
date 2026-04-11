@@ -45,6 +45,7 @@ export function useGenerate() {
   const setEnhancedPrompt = useAppStore((s) => s.setEnhancedPrompt)
   const setEnhancedNegative = useAppStore((s) => s.setEnhancedNegative)
   const setEnhancePending = useAppStore((s) => s.setEnhancePending)
+  const setEnhanceFallback = useAppStore((s) => s.setEnhanceFallback)
   const setNegativePrompt = useAppStore((s) => s.setNegativePrompt)
 
   /** 1단계: AI 프롬프트 보강 (sourcePrompt 지정 시 해당 프롬프트로 보강) */
@@ -62,13 +63,14 @@ export function useGenerate() {
       setProgress(0)
       setErrorMessage(null)
 
-      // 프리셋 스타일 힌트를 AI 보강에 전달
-      const styleHint = useAppStore.getState().activeStyleHint
-      const response = await api.enhancePrompt(textToEnhance, styleHint)
+      // 프리셋 스타일 힌트 + 선택된 Ollama 모델을 AI 보강에 전달
+      const { activeStyleHint, ollamaModel } = useAppStore.getState()
+      const response = await api.enhancePrompt(textToEnhance, activeStyleHint, ollamaModel)
 
       if (response.success && response.data) {
         setEnhancedPrompt(response.data.enhanced)
         setEnhancedNegative(response.data.negative || '')
+        setEnhanceFallback(response.data.fallback ?? false)
         setEnhancePending(true)
         setGenerationStatus('idle')
       } else {
@@ -99,6 +101,7 @@ export function useGenerate() {
       setProgress(0)
       setErrorMessage(null)
       setEnhancePending(false)
+      setEnhanceFallback(false)
 
       // auto_enhance=false — 이미 보강된 프롬프트를 직접 전달
       const response = await api.generate({
@@ -174,8 +177,9 @@ export function useGenerate() {
     setEnhancePending(false)
     setEnhancedPrompt('')
     setEnhancedNegative('')
+    setEnhanceFallback(false)
     setGenerationStatus('idle')
-  }, [setEnhancePending, setEnhancedPrompt, setEnhancedNegative, setGenerationStatus])
+  }, [setEnhancePending, setEnhancedPrompt, setEnhancedNegative, setEnhanceFallback, setGenerationStatus])
 
   /** 이미지 생성 취소 */
   const cancel = useCallback(async () => {

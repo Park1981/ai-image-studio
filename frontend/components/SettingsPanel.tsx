@@ -6,9 +6,9 @@
 
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
-import { api } from '@/lib/api'
+import { api, type OllamaModelInfo } from '@/lib/api'
 
 export default function SettingsPanel() {
   const settingsOpen = useAppStore((s) => s.settingsOpen)
@@ -18,8 +18,29 @@ export default function SettingsPanel() {
   const setAutoEnhance = useAppStore((s) => s.setAutoEnhance)
   const batchSize = useAppStore((s) => s.batchSize)
   const setBatchSize = useAppStore((s) => s.setBatchSize)
+  const ollamaModel = useAppStore((s) => s.ollamaModel)
+  const setOllamaModel = useAppStore((s) => s.setOllamaModel)
 
   const [comfyLoading, setComfyLoading] = useState(false)
+  const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([])
+  const [modelsLoading, setModelsLoading] = useState(false)
+
+  /** Ollama 모델 목록 불러오기 */
+  const fetchOllamaModels = useCallback(async () => {
+    setModelsLoading(true)
+    const res = await api.getOllamaModels()
+    if (res.success && res.data) {
+      setOllamaModels(res.data)
+    }
+    setModelsLoading(false)
+  }, [])
+
+  // 설정 패널 열릴 때 모델 목록 조회
+  useEffect(() => {
+    if (settingsOpen) {
+      fetchOllamaModels()
+    }
+  }, [settingsOpen, fetchOllamaModels])
 
   /** ComfyUI 시작/종료 후 즉시 상태 갱신 */
   const handleToggleComfyUI = async () => {
@@ -123,6 +144,35 @@ export default function SettingsPanel() {
                     autoEnhance ? 'left-5' : 'left-0.5'
                   }`} />
                 </button>
+              </div>
+
+              {/* AI 보강 모델 (Ollama) */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[12px] text-text-sub">AI 보강 모델</span>
+                  <button
+                    onClick={fetchOllamaModels}
+                    disabled={modelsLoading}
+                    className="text-[10px] text-text-ghost hover:text-text-sub transition-all disabled:opacity-40"
+                    title="모델 목록 새로고침"
+                  >
+                    {modelsLoading ? '...' : '↻'}
+                  </button>
+                </div>
+                <select
+                  value={ollamaModel}
+                  onChange={(e) => setOllamaModel(e.target.value)}
+                  className="bg-surface text-[11px] font-mono text-text-sub rounded-md px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer max-w-[200px] truncate"
+                >
+                  <option value="">gemma4:26b (기본)</option>
+                  {ollamaModels
+                    .filter((m) => m.name !== 'gemma4:26b')
+                    .map((m) => (
+                      <option key={m.name} value={m.name}>
+                        {m.name} ({m.size_gb}GB)
+                      </option>
+                    ))}
+                </select>
               </div>
 
               {/* 기본 배치 수 */}

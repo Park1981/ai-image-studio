@@ -11,7 +11,7 @@ import { useAppStore } from '@/stores/useAppStore'
 import { useGenerate } from '@/hooks/useGenerate'
 import { useModels } from '@/hooks/useModels'
 import { getAllPresets, saveCustomPresets, loadCustomPresets, type Preset } from '@/lib/presets'
-import { SparkleIcon, XCircleIcon, BoltIcon, StopIcon, GearIcon } from './icons'
+import { SparkleIcon, XCircleIcon, BoltIcon, StopIcon, GearIcon, WarningIcon } from './icons'
 
 /** 사이즈 프리셋 목록 (Qwen Image 권장 해상도 포함) */
 const SIZE_PRESETS = [
@@ -37,6 +37,7 @@ export default function PromptDock() {
   const enhancePending = useAppStore((s) => s.enhancePending)
   const enhancedNegative = useAppStore((s) => s.enhancedNegative)
   const generationStatus = useAppStore((s) => s.generationStatus)
+  const enhanceFallback = useAppStore((s) => s.enhanceFallback)
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
 
   // 인라인 설정 상태
@@ -164,12 +165,35 @@ export default function PromptDock() {
 
         {/* AI 보강 결과 확인 영역 (2단계 플로우) */}
         {enhancePending && enhancedPrompt && (
-          <div className="mx-3 mb-2 rounded-lg border border-accent/30 bg-accent-muted/30 p-3">
+          <div className={`mx-3 mb-2 rounded-lg border p-3 ${
+            enhanceFallback
+              ? 'border-bad/40 bg-bad/5'
+              : 'border-accent/30 bg-accent-muted/30'
+          }`}>
             <div className="flex items-center gap-1.5 mb-1.5">
-              <SparkleIcon />
-              <span className="text-[11px] font-medium text-accent-bright">AI 보강 결과</span>
+              {enhanceFallback ? <WarningIcon /> : <SparkleIcon />}
+              <span className={`text-[11px] font-medium ${
+                enhanceFallback ? 'text-bad' : 'text-accent-bright'
+              }`}>
+                {enhanceFallback ? 'AI 보강 실패 — 기본 프롬프트 적용됨' : 'AI 보강 결과'}
+              </span>
               <span className="text-[10px] text-text-ghost ml-auto">수정 가능</span>
             </div>
+            {/* Ollama 폴백 경고 배너 */}
+            {enhanceFallback && (
+              <div className="flex items-center gap-2 mb-2 px-2 py-1.5 rounded-md bg-bad/10 border border-bad/20">
+                <span className="text-[10px] text-bad/80 leading-snug">
+                  Ollama(gemma4) 연결 실패로 기본 품질 태그만 추가되었습니다.
+                </span>
+                <button
+                  onClick={() => enhance(prompt.trim())}
+                  disabled={isEnhancing}
+                  className="shrink-0 px-2.5 py-1 rounded-md text-[10px] font-medium text-bad border border-bad/30 hover:bg-bad/10 transition-all disabled:opacity-40"
+                >
+                  {isEnhancing ? '재시도 중...' : '재시도'}
+                </button>
+              </div>
+            )}
             {/* 보강된 프롬프트 편집 가능 */}
             <textarea
               value={enhancedPrompt}
