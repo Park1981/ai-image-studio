@@ -85,6 +85,14 @@ export default function ImageViewer() {
     setDragging(false)
   }, [])
 
+  /** 창 밖에서 마우스 놓아도 dragging 해제 */
+  useEffect(() => {
+    if (!dragging) return
+    const handleGlobalMouseUp = () => setDragging(false)
+    window.addEventListener('mouseup', handleGlobalMouseUp)
+    return () => window.removeEventListener('mouseup', handleGlobalMouseUp)
+  }, [dragging])
+
   /** 키보드 + 줌 단축키 */
   useEffect(() => {
     if (!isOpen) return

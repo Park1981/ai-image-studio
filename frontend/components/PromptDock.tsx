@@ -113,6 +113,9 @@ export default function PromptDock() {
     useAppStore.getState().setHeight(preset.params.height)
   }, [])
 
+  // 프리셋 목록 상태 (커스텀 저장 시 즉시 갱신용)
+  const [presetList, setPresetList] = useState(() => getAllPresets())
+
   /** 현재 설정을 프리셋으로 저장 */
   const handleSavePreset = useCallback(() => {
     const name = window.prompt('프리셋 이름을 입력하세요:')
@@ -135,6 +138,7 @@ export default function PromptDock() {
     }
     custom.push(newPreset)
     saveCustomPresets(custom)
+    setPresetList(getAllPresets())
   }, [])
 
   /** 현재 사이즈 프리셋 라벨 계산 */
@@ -278,7 +282,7 @@ export default function PromptDock() {
                 className="bg-ground text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer disabled:opacity-40"
               >
                 <option value="">프리셋</option>
-                {getAllPresets().map((p) => (
+                {presetList.map((p) => (
                   <option key={p.id} value={p.id}>
                     {p.icon} {p.name}
                   </option>

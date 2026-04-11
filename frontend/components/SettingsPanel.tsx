@@ -21,13 +21,21 @@ export default function SettingsPanel() {
 
   const [comfyLoading, setComfyLoading] = useState(false)
 
-  /** ComfyUI 시작/종료 */
+  /** ComfyUI 시작/종료 후 즉시 상태 갱신 */
   const handleToggleComfyUI = async () => {
     setComfyLoading(true)
     if (processStatus.comfyui.running) {
       await api.stopComfyUI()
     } else {
       await api.startComfyUI()
+    }
+    // 즉시 상태 갱신 (10초 폴링 대기 안 함)
+    const status = await api.getProcessStatus()
+    if (status.success && status.data) {
+      useAppStore.getState().setProcessStatus({
+        ollama: { running: status.data.ollama.running, modelLoaded: null },
+        comfyui: { running: status.data.comfyui.running, vramUsedGb: 0, vramTotalGb: 16 },
+      })
     }
     setComfyLoading(false)
   }
