@@ -144,6 +144,15 @@ body {
   animation: shimmer 3s ease-in-out infinite;
 }
 
+/* ── 무한 프로그레스 바 (AI 보강 중) ── */
+@keyframes indeterminate {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(400%); }
+}
+.animate-indeterminate {
+  animation: indeterminate 1.5s ease-in-out infinite;
+}
+
 /* ── 프롬프트 입력 포커스 글로우 ── */
 .prompt-glow:focus-within {
   box-shadow:

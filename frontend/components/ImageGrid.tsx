@@ -1,8 +1,8 @@
 /**
  * 이미지 그리드 컴포넌트
- * 2x2 그리드로 생성된 이미지 또는 플레이스홀더 표시
- * 생성 중에는 프로그레스 바 오버레이 표시
- * 생성 완료 후 선택 시 액션 오버레이 표시 (다시 생성, 영상 만들기, 저장, 변형)
+ * batchSize에 따라 동적 레이아웃 (1→1칸, 2→1x2, 3~4→2x2)
+ * 생성 중에는 프로그레스 바/스피너 오버레이 표시
+ * 생성 완료 후 선택 시 액션 오버레이 표시
  */
 
 'use client'
@@ -13,6 +13,13 @@ import { ImagePlaceholderIcon, CheckIcon } from './icons'
 
 /** 백엔드 이미지 서버 기본 URL */
 const IMAGE_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+
+/** batchSize에 따른 그리드 CSS 클래스 */
+function getGridClass(count: number): string {
+  if (count <= 1) return 'grid-cols-1 grid-rows-1'
+  if (count === 2) return 'grid-cols-2 grid-rows-1'
+  return 'grid-cols-2 grid-rows-2'
+}
 
 export default function ImageGrid() {
   const selectedImageIndex = useAppStore((s) => s.selectedImageIndex)
@@ -26,20 +33,25 @@ export default function ImageGrid() {
 
   const { generate } = useGenerate()
 
-  // 표시할 슬롯 수 (배치 사이즈 기준, 최소 4개)
-  const slotCount = Math.max(batchSize, 4)
+  // 표시할 슬롯 수 — batchSize 기준 (생성 완료 후에는 실제 이미지 수)
+  const slotCount = generatedImages.length > 0
+    ? Math.max(generatedImages.length, batchSize)
+    : batchSize
+
   const isActive =
     generationStatus === 'generating' ||
     generationStatus === 'warming_up' ||
     generationStatus === 'enhancing'
 
-  // 생성 완료 여부 (이미지가 존재하는 상태)
+  // AI 보강 중 여부 (스피너 표시용)
+  const isEnhancing = generationStatus === 'enhancing'
+
+  // 생성 완료 여부
   const hasImages = generatedImages.length > 0
   const isCompleted = generationStatus === 'completed'
 
   /** 이미지 선택 토글 */
   const handleSelect = (index: number) => {
-    // 이미지가 있는 슬롯만 선택 가능
     if (!generatedImages[index]) return
     setSelectedImageIndex(index === selectedImageIndex ? null : index)
   }
@@ -70,15 +82,18 @@ export default function ImageGrid() {
   }
 
   return (
-    <div className="relative flex-1 grid grid-cols-2 grid-rows-2 gap-1.5 p-2 min-h-0 overflow-hidden">
+    <div className={`relative flex-1 grid ${getGridClass(slotCount)} gap-1.5 p-2 min-h-0 overflow-hidden`}>
       {Array.from({ length: slotCount }, (_, i) => {
         const image = generatedImages[i]
         const isSelected = selectedImageIndex === i
 
         return (
-          <button
+          <div
             key={i}
+            role="button"
+            tabIndex={0}
             onClick={() => handleSelect(i)}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleSelect(i) }}
             className={`relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 ${
               isSelected
                 ? 'ring-2 ring-accent-bright ring-offset-2 ring-offset-void scale-[0.99]'
@@ -133,42 +148,54 @@ export default function ImageGrid() {
               >
                 <div className="glass rounded-xl px-3 py-2 flex items-center gap-1.5 border border-edge">
                   {/* 다시 생성 */}
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={handleRegenerate}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleRegenerate() }}
+                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
                     title="같은 설정, 새 시드로 다시 생성"
                   >
                     다시 생성
-                  </button>
+                  </span>
                   {/* 영상 만들기 */}
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={handleVideo}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleVideo() }}
+                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
                   >
                     영상 만들기
-                  </button>
+                  </span>
                   {/* 저장 */}
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={handleSave}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
                   >
                     저장
-                  </button>
+                  </span>
                   {/* 변형 */}
-                  <button
+                  <span
+                    role="button"
+                    tabIndex={0}
                     onClick={handleVariation}
-                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all"
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleVariation() }}
+                    className="px-2.5 py-1.5 rounded-lg text-[10px] font-medium text-text-sub hover:text-text hover:bg-white/[0.06] transition-all cursor-pointer"
                   >
                     변형
-                  </button>
+                  </span>
                 </div>
               </div>
             )}
-          </button>
+          </div>
         )
       })}
 
-      {/* 생성 중 프로그레스 바 오버레이 */}
+      {/* 생성 중 프로그레스/스피너 오버레이 */}
       {isActive && (
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
           <div className="w-64 bg-surface/90 backdrop-blur-md rounded-xl p-4 border border-edge shadow-2xl pointer-events-auto">
@@ -177,21 +204,30 @@ export default function ImageGrid() {
               <span className="text-[11px] font-medium text-text">
                 {generationStatus === 'warming_up'
                   ? 'ComfyUI 준비 중...'
-                  : generationStatus === 'enhancing'
+                  : isEnhancing
                     ? 'AI 프롬프트 보강 중...'
                     : '이미지 생성 중...'}
               </span>
-              <span className="text-[11px] font-mono text-accent-bright tabular-nums">
-                {Math.round(progress)}%
-              </span>
+              {/* AI 보강 중에는 스피너, 생성 중에는 퍼센트 */}
+              {isEnhancing ? (
+                <div className="w-4 h-4 border-2 border-accent-bright/30 border-t-accent-bright rounded-full animate-spin" />
+              ) : (
+                <span className="text-[11px] font-mono text-accent-bright tabular-nums">
+                  {Math.round(progress)}%
+                </span>
+              )}
             </div>
 
-            {/* 프로그레스 바 */}
+            {/* 프로그레스 바 — AI 보강 중에는 indeterminate 애니메이션 */}
             <div className="h-1.5 bg-elevated rounded-full overflow-hidden">
-              <div
-                className="h-full bg-gradient-to-r from-accent to-accent-bright rounded-full transition-all duration-300 ease-out"
-                style={{ width: `${progress}%` }}
-              />
+              {isEnhancing ? (
+                <div className="h-full w-1/3 bg-gradient-to-r from-accent to-accent-bright rounded-full animate-indeterminate" />
+              ) : (
+                <div
+                  className="h-full bg-gradient-to-r from-accent to-accent-bright rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${progress}%` }}
+                />
+              )}
             </div>
           </div>
         </div>
