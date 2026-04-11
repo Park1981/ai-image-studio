@@ -8,7 +8,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
-import { api, type OllamaModelInfo } from '@/lib/api'
+import { api, type OllamaModelInfo, type EnhanceCategoryConfig } from '@/lib/api'
 
 export default function SettingsPanel() {
   const settingsOpen = useAppStore((s) => s.settingsOpen)
@@ -20,6 +20,9 @@ export default function SettingsPanel() {
   const setBatchSize = useAppStore((s) => s.setBatchSize)
   const ollamaModel = useAppStore((s) => s.ollamaModel)
   const setOllamaModel = useAppStore((s) => s.setOllamaModel)
+  const enhanceSettings = useAppStore((s) => s.enhanceSettings)
+  const setEnhanceSettings = useAppStore((s) => s.setEnhanceSettings)
+  const setEnhanceCategory = useAppStore((s) => s.setEnhanceCategory)
 
   const [comfyLoading, setComfyLoading] = useState(false)
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([])
@@ -190,6 +193,87 @@ export default function SettingsPanel() {
                       }`}
                     >
                       {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </section>
+
+          {/* AI 보강 세부 설정 */}
+          <section>
+            <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3">AI 보강 세부 설정</h3>
+
+            <div className="space-y-3">
+              {/* 창의성 슬라이더 */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[12px] text-text-sub">창의성</span>
+                  <span className="text-[11px] font-mono text-text-ghost">
+                    {enhanceSettings.creativity.toFixed(1)}
+                    <span className="text-[9px] ml-1">
+                      {enhanceSettings.creativity <= 0.3 ? '보수적' : enhanceSettings.creativity >= 0.8 ? '창의적' : '보통'}
+                    </span>
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="1.0"
+                  step="0.1"
+                  value={enhanceSettings.creativity}
+                  onChange={(e) => setEnhanceSettings({ creativity: parseFloat(e.target.value) })}
+                  className="w-full h-1.5 rounded-full appearance-none bg-elevated accent-accent cursor-pointer"
+                />
+                <div className="flex justify-between text-[9px] text-text-ghost mt-0.5">
+                  <span>보수적</span>
+                  <span>창의적</span>
+                </div>
+              </div>
+
+              {/* 디테일 레벨 */}
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] text-text-sub">디테일 수준</span>
+                <div className="flex items-center gap-1">
+                  {(['minimal', 'normal', 'detailed'] as const).map((level) => (
+                    <button
+                      key={level}
+                      onClick={() => setEnhanceSettings({ detailLevel: level })}
+                      className={`px-2.5 py-1 rounded-md text-[11px] transition-all ${
+                        enhanceSettings.detailLevel === level
+                          ? 'bg-accent-muted text-accent-bright'
+                          : 'bg-surface text-text-sub hover:bg-elevated'
+                      }`}
+                    >
+                      {level === 'minimal' ? '간략' : level === 'normal' ? '보통' : '상세'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* 카테고리 ON/OFF 토글 */}
+              <div>
+                <span className="text-[12px] text-text-sub block mb-2">보강 카테고리</span>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {([
+                    { key: 'subject' as keyof EnhanceCategoryConfig, icon: '🧑', label: '피사체/인물' },
+                    { key: 'background' as keyof EnhanceCategoryConfig, icon: '🏞️', label: '배경/환경' },
+                    { key: 'lighting' as keyof EnhanceCategoryConfig, icon: '💡', label: '조명' },
+                    { key: 'style' as keyof EnhanceCategoryConfig, icon: '📷', label: '스타일' },
+                    { key: 'mood' as keyof EnhanceCategoryConfig, icon: '🎨', label: '분위기' },
+                    { key: 'technical' as keyof EnhanceCategoryConfig, icon: '⚙️', label: '기술적' },
+                  ]).map(({ key, icon, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setEnhanceCategory(key, !enhanceSettings.categories[key])}
+                      className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-[11px] transition-all border ${
+                        enhanceSettings.categories[key]
+                          ? 'bg-accent-muted/50 border-accent/30 text-accent-bright'
+                          : 'bg-surface border-edge text-text-ghost hover:text-text-sub'
+                      }`}
+                    >
+                      <span className="text-[12px]">{icon}</span>
+                      {label}
                     </button>
                   ))}
                 </div>

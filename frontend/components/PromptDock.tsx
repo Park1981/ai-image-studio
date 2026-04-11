@@ -2,6 +2,7 @@
  * 프롬프트 입력 독 컴포넌트
  * 프롬프트 입력 + 인라인 기본 설정 (모델, 사이즈, 배치)
  * AI 보강 2단계: 보강 → 사용자 확인/수정 → 이미지 생성
+ * 구조화 보강: 카테고리별 EN/KO 표시 + 자세히 보기
  */
 
 'use client'
@@ -26,6 +27,16 @@ const SIZE_PRESETS = [
 /** 배치 수 옵션 */
 const BATCH_OPTIONS = [1, 2, 3, 4] as const
 
+/** 카테고리 아이콘 매핑 */
+const CATEGORY_ICONS: Record<string, string> = {
+  subject: '🧑',
+  background: '🏞️',
+  lighting: '💡',
+  style: '📷',
+  mood: '🎨',
+  technical: '⚙️',
+}
+
 export default function PromptDock() {
   const prompt = useAppStore((s) => s.prompt)
   const setPrompt = useAppStore((s) => s.setPrompt)
@@ -40,6 +51,7 @@ export default function PromptDock() {
   const generationStatus = useAppStore((s) => s.generationStatus)
   const enhanceFallback = useAppStore((s) => s.enhanceFallback)
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
+  const enhancedCategories = useAppStore((s) => s.enhancedCategories)
 
   // 인라인 설정 상태
   const checkpoint = useAppStore((s) => s.checkpoint)
@@ -71,6 +83,9 @@ export default function PromptDock() {
 
   // 네거티브 프롬프트 표시 토글
   const [showNegative, setShowNegative] = useState(false)
+
+  // 카테고리 자세히 보기 토글
+  const [showCategoryDetail, setShowCategoryDetail] = useState(false)
 
   // 파일 입력 참조
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -131,7 +146,10 @@ export default function PromptDock() {
     if (file) handleFileUpload(file)
   }, [handleFileUpload])
 
-  /** 수정 모드에서 생성 실행 */
+  // 수정 모드 중복 호출 방지 guard
+  const editBusyRef = useRef(false)
+
+  /** 수정 모드에서 생성 실행 (AI보강 결과 또는 원본 프롬프트 사용) */
   const handleEditGenerate = useCallback(async () => {
     if (!editSourceImage) {
       setErrorMessage('수정할 이미지를 먼저 업로드해주세요.')
@@ -142,15 +160,31 @@ export default function PromptDock() {
       return
     }
 
+    // autoEnhance ON이고 보강 대기 중이 아니면 → 먼저 보강 실행
+    if (autoEnhance && !enhancePending) {
+      await enhance(prompt.trim(), 'edit')
+      return
+    }
+
+    // 중복 호출 방지
+    if (editBusyRef.current) return
+    editBusyRef.current = true
+
+    // 보강 확인 후 또는 autoEnhance OFF → 바로 수정 실행
+    const finalPrompt = enhancePending ? (enhancedPrompt || prompt.trim()) : prompt.trim()
+
     const store = useAppStore.getState()
     store.setGenerationStatus('warming_up')
     store.setProgress(0)
     store.setErrorMessage(null)
+    store.setEnhancePending(false)
+    store.setEnhanceFallback(false)
+    store.setEnhancedCategories([])
 
     try {
       const response = await api.generateEdit({
         source_image: editSourceImage,
-        edit_prompt: prompt.trim(),
+        edit_prompt: finalPrompt,
         steps: store.steps,
         cfg: store.cfg,
         seed: store.seed,
@@ -190,19 +224,24 @@ export default function PromptDock() {
               s.setGenerationStatus('completed')
               s.setProgress(100)
               s.setGeneratedImages(msg.images)
+              ws.close()
               break
             case 'error':
               s.setGenerationStatus('error')
               s.setErrorMessage(msg.message || msg.error || '이미지 수정 중 오류')
+              ws.close()
               break
           }
         } catch { /* JSON 파싱 실패 무시 */ }
       }
+      ws.onerror = () => ws.close()
     } catch {
       store.setGenerationStatus('error')
       store.setErrorMessage('이미지 수정 중 예상치 못한 오류가 발생했습니다.')
+    } finally {
+      editBusyRef.current = false
     }
-  }, [editSourceImage, prompt, setErrorMessage])
+  }, [editSourceImage, prompt, autoEnhance, enhancePending, enhancedPrompt, enhance, setErrorMessage])
 
   /** Ctrl+Enter 단축키로 생성/확인 */
   useEffect(() => {
@@ -210,7 +249,11 @@ export default function PromptDock() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
         if (enhancePending) {
-          confirmEnhance()
+          if (editMode) {
+            handleEditGenerate()
+          } else {
+            confirmEnhance()
+          }
         } else if (editMode && !isGenerating && prompt.trim()) {
           handleEditGenerate()
         } else if (!isGenerating && prompt.trim()) {
@@ -253,6 +296,10 @@ export default function PromptDock() {
     s.setWidth(preset.params.width)
     s.setHeight(preset.params.height)
     s.setActiveStyleHint(preset.styleHint)
+    // 프리셋에 카테고리 설정이 있으면 적용
+    if (preset.enhanceCategories) {
+      s.setEnhanceSettings({ categories: preset.enhanceCategories })
+    }
   }, [])
 
   // 프리셋 목록 상태 (커스텀 저장 시 즉시 갱신용)
@@ -278,6 +325,7 @@ export default function PromptDock() {
         width: store.width,
         height: store.height,
       },
+      enhanceCategories: { ...store.enhanceSettings.categories },
     }
     custom.push(newPreset)
     saveCustomPresets(custom)
@@ -355,7 +403,7 @@ export default function PromptDock() {
           className="w-full bg-transparent resize-none outline-none px-4 pt-3 pb-1 text-[13px] placeholder-text-ghost leading-relaxed disabled:opacity-50"
         />
 
-        {/* AI 보강 결과 확인 영역 (2단계 플로우) */}
+        {/* AI 보강 결과 확인 영역 (2단계 플로우) — 생성/수정 모두 */}
         {enhancePending && enhancedPrompt && (
           <div className={`mx-3 mb-2 rounded-lg border p-3 ${
             enhanceFallback
@@ -367,8 +415,20 @@ export default function PromptDock() {
               <span className={`text-[11px] font-medium ${
                 enhanceFallback ? 'text-bad' : 'text-accent-bright'
               }`}>
-                {enhanceFallback ? 'AI 보강 실패 — 기본 프롬프트 적용됨' : 'AI 보강 결과'}
+                {enhanceFallback
+                  ? 'AI 보강 실패 — 기본 프롬프트 적용됨'
+                  : editMode ? 'AI 수정 보강 결과' : 'AI 보강 결과'
+                }
               </span>
+              {/* 자세히 보기 토글 */}
+              {enhancedCategories.length > 0 && (
+                <button
+                  onClick={() => setShowCategoryDetail(!showCategoryDetail)}
+                  className="text-[10px] text-accent-bright/70 hover:text-accent-bright transition-colors ml-1"
+                >
+                  {showCategoryDetail ? '간략히' : '자세히'}
+                </button>
+              )}
               <span className="text-[10px] text-text-ghost ml-auto">수정 가능</span>
             </div>
             {/* Ollama 폴백 경고 배너 */}
@@ -378,7 +438,7 @@ export default function PromptDock() {
                   Ollama(gemma4) 연결 실패로 기본 품질 태그만 추가되었습니다.
                 </span>
                 <button
-                  onClick={() => enhance(prompt.trim())}
+                  onClick={() => enhance(prompt.trim(), editMode ? 'edit' : 'generate')}
                   disabled={isEnhancing}
                   className="shrink-0 px-2.5 py-1 rounded-md text-[10px] font-medium text-bad border border-bad/30 hover:bg-bad/10 transition-all disabled:opacity-40"
                 >
@@ -386,13 +446,45 @@ export default function PromptDock() {
                 </button>
               </div>
             )}
-            {/* 보강된 프롬프트 편집 가능 */}
-            <textarea
-              value={enhancedPrompt}
-              onChange={(e) => setEnhancedPrompt(e.target.value)}
-              rows={3}
-              className="w-full bg-ground/50 rounded-md resize-none outline-none px-3 py-2 text-[12px] text-text leading-relaxed border border-edge focus:border-accent"
-            />
+
+            {/* 카테고리 상세 보기 */}
+            {showCategoryDetail && enhancedCategories.length > 0 ? (
+              <div className="space-y-2 mb-2">
+                {enhancedCategories.map((cat) => (
+                  <div
+                    key={cat.name}
+                    className={`rounded-md border px-2.5 py-2 ${
+                      cat.auto_filled
+                        ? 'border-accent/20 bg-accent-muted/10'
+                        : 'border-edge bg-ground/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="text-[11px]">{CATEGORY_ICONS[cat.name] || '📎'}</span>
+                      <span className="text-[10px] font-medium text-text-sub">
+                        {cat.label_ko}
+                      </span>
+                      {cat.auto_filled && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent-bright">
+                          AI 자동
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-text leading-relaxed">{cat.text_en}</p>
+                    <p className="text-[10px] text-text-sub/70 mt-0.5">{cat.text_ko}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              /* 합쳐진 보강 프롬프트 편집 */
+              <textarea
+                value={enhancedPrompt}
+                onChange={(e) => setEnhancedPrompt(e.target.value)}
+                rows={3}
+                className="w-full bg-ground/50 rounded-md resize-none outline-none px-3 py-2 text-[12px] text-text leading-relaxed border border-edge focus:border-accent"
+              />
+            )}
+
             {/* 보강된 네거티브 프롬프트 */}
             {enhancedNegative && (
               <p className="mt-1.5 text-[10px] text-bad/60 truncate">
@@ -402,14 +494,14 @@ export default function PromptDock() {
             {/* 액션 버튼 */}
             <div className="flex items-center gap-2 mt-2">
               <button
-                onClick={() => confirmEnhance()}
+                onClick={() => editMode ? handleEditGenerate() : confirmEnhance()}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[12px] font-semibold btn-glow text-white"
               >
-                <BoltIcon />
-                이미지 생성
+                {editMode ? <EditIcon /> : <BoltIcon />}
+                {editMode ? '이미지 수정' : '이미지 생성'}
               </button>
               <button
-                onClick={() => enhance(enhancedPrompt)}
+                onClick={() => enhance(enhancedPrompt, editMode ? 'edit' : 'generate')}
                 disabled={isEnhancing}
                 className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-accent-bright hover:bg-accent-muted transition-all border border-accent/30"
               >
@@ -422,7 +514,7 @@ export default function PromptDock() {
                 취소
               </button>
               <span className="text-[10px] text-text-ghost ml-auto hidden lg:inline">
-                Ctrl+Enter 생성 · ESC 취소
+                Ctrl+Enter {editMode ? '수정' : '생성'} · ESC 취소
               </span>
             </div>
           </div>
@@ -483,24 +575,24 @@ export default function PromptDock() {
                 </button>
               </div>
 
+              {/* AI 보강 토글 — 생성 + 수정 모드 모두 표시 */}
+              <button
+                onClick={autoEnhance ? () => setAutoEnhance(false) : () => setAutoEnhance(true)}
+                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+                  autoEnhance
+                    ? 'bg-accent-muted text-accent-bright'
+                    : 'text-text-sub hover:text-text hover:bg-white/[0.04]'
+                }`}
+                title={autoEnhance ? '자동 보강 ON' : '자동 보강 OFF'}
+                disabled={isEnhancing}
+              >
+                <SparkleIcon />
+                AI 보강
+              </button>
+
               {/* 생성 모드 전용 컨트롤 (수정 모드에서는 숨김) */}
               {!editMode && (
                 <>
-                  {/* AI 보강 토글 */}
-                  <button
-                    onClick={autoEnhance ? () => setAutoEnhance(false) : () => setAutoEnhance(true)}
-                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
-                      autoEnhance
-                        ? 'bg-accent-muted text-accent-bright'
-                        : 'text-text-sub hover:text-text hover:bg-white/[0.04]'
-                    }`}
-                    title={autoEnhance ? '자동 보강 ON' : '자동 보강 OFF'}
-                    disabled={isEnhancing}
-                  >
-                    <SparkleIcon />
-                    AI 보강
-                  </button>
-
                   {/* 네거티브 프롬프트 토글 */}
                   <button
                     onClick={() => setShowNegative(!showNegative)}

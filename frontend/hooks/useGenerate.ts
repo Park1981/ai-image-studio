@@ -49,7 +49,7 @@ export function useGenerate() {
   const setNegativePrompt = useAppStore((s) => s.setNegativePrompt)
 
   /** 1단계: AI 프롬프트 보강 (sourcePrompt 지정 시 해당 프롬프트로 보강) */
-  const enhance = useCallback(async (sourcePrompt?: string) => {
+  const enhance = useCallback(async (sourcePrompt?: string, mode?: 'generate' | 'edit') => {
     const textToEnhance = sourcePrompt ?? prompt.trim()
     if (!textToEnhance) {
       setErrorMessage('프롬프트를 입력해주세요.')
@@ -63,21 +63,41 @@ export function useGenerate() {
       setProgress(0)
       setErrorMessage(null)
 
-      // 프리셋 스타일 힌트 + 선택된 Ollama 모델을 AI 보강에 전달
-      const { activeStyleHint, ollamaModel } = useAppStore.getState()
-      const response = await api.enhancePrompt(textToEnhance, activeStyleHint, ollamaModel)
+      // 프리셋 스타일 힌트 + Ollama 모델 + 보강 설정을 전달
+      const { activeStyleHint, ollamaModel, enhanceSettings } = useAppStore.getState()
+      const response = await api.enhancePrompt(
+        textToEnhance,
+        activeStyleHint,
+        ollamaModel,
+        {
+          mode: mode || 'generate',
+          creativity: enhanceSettings.creativity,
+          detail_level: enhanceSettings.detailLevel,
+          categories: enhanceSettings.categories,
+        }
+      )
 
       if (response.success && response.data) {
         setEnhancedPrompt(response.data.enhanced)
         setEnhancedNegative(response.data.negative || '')
         setEnhanceFallback(response.data.fallback ?? false)
+        // 카테고리 상세 결과 저장
+        useAppStore.getState().setEnhancedCategories(response.data.categories || [])
         setEnhancePending(true)
         setGenerationStatus('idle')
       } else {
+        // 실패 시 이전 보강 결과 초기화
+        setEnhancedPrompt('')
+        setEnhancedNegative('')
+        useAppStore.getState().setEnhancedCategories([])
         setGenerationStatus('idle')
         setErrorMessage(response.error || '프롬프트 보강에 실패했습니다.')
       }
     } catch {
+      // 에러 시 이전 보강 결과 초기화
+      setEnhancedPrompt('')
+      setEnhancedNegative('')
+      useAppStore.getState().setEnhancedCategories([])
       setGenerationStatus('idle')
       setErrorMessage('프롬프트 보강 중 오류가 발생했습니다.')
     } finally {
@@ -179,6 +199,7 @@ export function useGenerate() {
     setEnhancedNegative('')
     setEnhanceFallback(false)
     setGenerationStatus('idle')
+    useAppStore.getState().setEnhancedCategories([])
   }, [setEnhancePending, setEnhancedPrompt, setEnhancedNegative, setEnhanceFallback, setGenerationStatus])
 
   /** 이미지 생성 취소 */

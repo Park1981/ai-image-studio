@@ -73,19 +73,43 @@ class GenerateResponse(BaseModel):
 # 프롬프트 보강
 # ─────────────────────────────────────────────
 
+class EnhanceCategoryConfig(BaseModel):
+    """AI 보강 카테고리별 ON/OFF 설정"""
+    subject: bool = True       # 피사체/인물
+    background: bool = True    # 배경/환경
+    lighting: bool = True      # 조명
+    style: bool = True         # 스타일
+    mood: bool = True          # 분위기
+    technical: bool = False    # 기술적 (카메라/렌즈) — 기본 OFF
+
+
 class EnhanceRequest(BaseModel):
     """프롬프트 보강 요청"""
     prompt: str
     style: str = "photorealistic"  # photorealistic | anime | illustration | etc.
     model: str = ""  # Ollama 모델 이름 (빈 문자열이면 기본 모델 사용)
+    mode: str = "generate"  # generate | edit
+    creativity: float = Field(default=0.7, ge=0.1, le=1.0)  # Ollama temperature
+    detail_level: str = "normal"  # minimal | normal | detailed
+    categories: EnhanceCategoryConfig = EnhanceCategoryConfig()
+
+
+class EnhanceCategoryItem(BaseModel):
+    """보강 결과의 카테고리별 항목"""
+    name: str          # subject | background | lighting | style | mood | technical
+    label_ko: str      # 한국어 라벨 (피사체/인물)
+    text_en: str       # 영어 보강 텍스트
+    text_ko: str       # 한국어 설명
+    auto_filled: bool  # AI가 자동 채운 항목 여부
 
 
 class EnhanceResponse(BaseModel):
     """프롬프트 보강 응답"""
     original: str
-    enhanced: str
+    enhanced: str  # 최종 합쳐진 프롬프트
     negative: str
     fallback: bool = False  # Ollama 호출 실패 시 폴백 사용 여부
+    categories: list[EnhanceCategoryItem] = []  # 카테고리별 상세 결과
 
 
 # ─────────────────────────────────────────────

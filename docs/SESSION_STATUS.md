@@ -16,16 +16,12 @@
 **Phase 4: 프리셋 + 뷰어 줌 + 설정 페이지 + 프리셋→AI보강 연동 ✅**
 **Phase 4.5: Ollama 폴백 경고 + LLM 모델 스위칭 ✅**
 **Phase 5: Qwen Image Edit 이미지 수정 기능 ✅**
-**Phase 6: 미착수 (AI 보강 디테일 옵션)**
+**Phase 6: 구조화 AI 보강 + 수정 모드 AI보강 ✅**
 **Phase 7: 미착수 (영상 생성)**
 
 ---
 
 ## 🔴 다음 세션에서 할 것
-
-### Phase 6: AI 보강 디테일 옵션
-- 보강 세부 설정 (창의성, 디테일 수준, 스타일 강도 토글)
-- prompt_engine 파라미터 확장
 
 ### Phase 7: 영상 생성
 - WAN 2.2 / HunyuanVideo 연동 (모델 이미 설치됨)
@@ -210,4 +206,33 @@ ce33745  feat: 프리셋→AI보강 스타일 연동
 
 ---
 
-> 새 세션 시작 시: 이 파일 읽고 → Phase 6 (AI 보강 디테일) 또는 Phase 7 (영상 생성) 진행
+## Phase 6 기술 상세 (세션 3, 2026-04-12)
+
+### 구조화 AI 보강 시스템
+```
+사용자 입력 → Ollama (gemma4:26b) 분석
+  → 6개 카테고리별 분류 (피사체/배경/조명/스타일/분위기/기술적)
+  → 사용자가 입력한 카테고리: 유지 + 디테일 보강
+  → 빈 카테고리: AI가 문맥에 맞게 자동 채우기
+  → 영어 보강 텍스트 + 한국어 설명 반환
+  → auto_filled 플래그로 AI 자동 채움 표시
+```
+
+### 주요 변경 파일
+- `backend/services/prompt_engine.py`: 카테고리 기반 시스템 프롬프트, 생성/수정 모드 분리
+- `backend/models/schemas.py`: EnhanceCategoryConfig, EnhanceCategoryItem 추가
+- `frontend/stores/useAppStore.ts`: enhanceSettings (creativity/detailLevel/categories)
+- `frontend/components/PromptDock.tsx`: 수정 모드 AI보강, 자세히 보기 토글
+- `frontend/components/SettingsPanel.tsx`: AI 보강 세부 설정 (창의성/디테일/카테고리 토글)
+- `frontend/lib/presets.ts`: 프리셋별 카테고리 기본값 연동
+
+### Codex 리뷰 반영 (5건)
+- [bug] edit 모드 busyRef 중복 호출 방지 추가
+- [warning] 시스템 프롬프트에 동적 카테고리 수 반영
+- [warning] enhance 실패 시 이전 결과 초기화
+- [warning] edit 모드 WebSocket close() 추가
+- [warning] edit negative dead data — 인지됨 (향후 개선)
+
+---
+
+> 새 세션 시작 시: 이 파일 읽고 → Phase 7 (영상 생성) 진행

@@ -4,6 +4,7 @@
  */
 
 import { create } from 'zustand'
+import type { EnhanceCategoryItem, EnhanceCategoryConfig } from '@/lib/api'
 
 // ── 타입 정의 ──
 
@@ -28,6 +29,13 @@ export interface LoraConfig {
   name: string
   strengthModel: number
   strengthClip: number
+}
+
+/** AI 보강 세부 설정 */
+interface EnhanceSettings {
+  creativity: number  // 0.1~1.0 (Ollama temperature)
+  detailLevel: 'minimal' | 'normal' | 'detailed'
+  categories: EnhanceCategoryConfig
 }
 
 /** 사용 가능한 모델 목록 */
@@ -148,6 +156,15 @@ interface AppState {
   setEditSourceImage: (filename: string | null) => void
   editSourcePreview: string | null  // 프리뷰용 Data URL
   setEditSourcePreview: (preview: string | null) => void
+
+  // ── AI 보강 세부 설정 ──
+  enhanceSettings: EnhanceSettings
+  setEnhanceSettings: (settings: Partial<EnhanceSettings>) => void
+  setEnhanceCategory: (name: keyof EnhanceCategoryConfig, value: boolean) => void
+
+  // ── 보강 결과 카테고리 데이터 ──
+  enhancedCategories: EnhanceCategoryItem[]
+  setEnhancedCategories: (cats: EnhanceCategoryItem[]) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -266,4 +283,33 @@ export const useAppStore = create<AppState>((set) => ({
   setEditSourceImage: (filename) => set({ editSourceImage: filename }),
   editSourcePreview: null,
   setEditSourcePreview: (preview) => set({ editSourcePreview: preview }),
+
+  // ── AI 보강 세부 설정 ──
+  enhanceSettings: {
+    creativity: 0.7,
+    detailLevel: 'normal',
+    categories: {
+      subject: true,
+      background: true,
+      lighting: true,
+      style: true,
+      mood: true,
+      technical: false,
+    },
+  },
+  setEnhanceSettings: (partial) =>
+    set((state) => ({
+      enhanceSettings: { ...state.enhanceSettings, ...partial },
+    })),
+  setEnhanceCategory: (name, value) =>
+    set((state) => ({
+      enhanceSettings: {
+        ...state.enhanceSettings,
+        categories: { ...state.enhanceSettings.categories, [name]: value },
+      },
+    })),
+
+  // ── 보강 결과 카테고리 데이터 ──
+  enhancedCategories: [],
+  setEnhancedCategories: (cats) => set({ enhancedCategories: cats }),
 }))

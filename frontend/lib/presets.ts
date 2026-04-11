@@ -3,6 +3,8 @@
  * 기본 제공 프리셋 + 사용자 커스텀 프리셋 (localStorage)
  */
 
+import type { EnhanceCategoryConfig } from '@/lib/api'
+
 export interface Preset {
   id: string
   name: string
@@ -17,6 +19,7 @@ export interface Preset {
     width: number
     height: number
   }
+  enhanceCategories?: EnhanceCategoryConfig  // AI 보강 카테고리 기본값
 }
 
 /** 기본 제공 프리셋 */
@@ -28,6 +31,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     builtin: true,
     styleHint: 'photorealistic',
     params: { sampler: 'euler', scheduler: 'simple', steps: 50, cfg: 4, width: 1328, height: 1328 },
+    enhanceCategories: { subject: true, background: true, lighting: true, style: true, mood: true, technical: false },
   },
   {
     id: 'portrait',
@@ -36,6 +40,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     builtin: true,
     styleHint: 'portrait',
     params: { sampler: 'euler', scheduler: 'simple', steps: 50, cfg: 4, width: 928, height: 1664 },
+    enhanceCategories: { subject: true, background: true, lighting: true, style: true, mood: false, technical: true },
   },
   {
     id: 'landscape',
@@ -44,6 +49,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     builtin: true,
     styleHint: 'landscape',
     params: { sampler: 'euler', scheduler: 'simple', steps: 50, cfg: 4, width: 1664, height: 928 },
+    enhanceCategories: { subject: false, background: true, lighting: true, style: true, mood: true, technical: true },
   },
   {
     id: 'fast',
@@ -52,6 +58,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     builtin: true,
     styleHint: 'photorealistic',
     params: { sampler: 'euler', scheduler: 'simple', steps: 20, cfg: 4, width: 1024, height: 1024 },
+    enhanceCategories: { subject: true, background: true, lighting: true, style: true, mood: false, technical: false },
   },
   {
     id: 'highquality',
@@ -60,6 +67,7 @@ export const BUILTIN_PRESETS: Preset[] = [
     builtin: true,
     styleHint: 'cinematic',
     params: { sampler: 'euler', scheduler: 'simple', steps: 80, cfg: 5, width: 1328, height: 1328 },
+    enhanceCategories: { subject: true, background: true, lighting: true, style: true, mood: true, technical: true },
   },
 ]
 

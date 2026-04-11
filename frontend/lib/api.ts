@@ -106,12 +106,32 @@ export interface HistoryListResponse {
 
 export type HistoryDetailResponse = HistoryItem
 
+// ── AI 보강 카테고리 설정 타입 ──
+export interface EnhanceCategoryConfig {
+  subject: boolean
+  background: boolean
+  lighting: boolean
+  style: boolean
+  mood: boolean
+  technical: boolean
+}
+
+// ── AI 보강 카테고리 결과 항목 타입 ──
+export interface EnhanceCategoryItem {
+  name: string        // subject | background | lighting | style | mood | technical
+  label_ko: string    // 한국어 라벨
+  text_en: string     // 영어 보강 텍스트
+  text_ko: string     // 한국어 설명
+  auto_filled: boolean // AI가 자동 채운 항목 여부
+}
+
 // ── 프롬프트 보강 응답 타입 ──
 export interface EnhancePromptResponse {
   original: string
   enhanced: string
   negative: string
   fallback?: boolean  // Ollama 호출 실패 시 폴백 사용 여부
+  categories: EnhanceCategoryItem[]  // 카테고리별 상세 결과
 }
 
 // ── Ollama 모델 정보 타입 ──
@@ -263,11 +283,29 @@ export const api = {
 
   // ── 프롬프트 보강 API ──
 
-  /** 프롬프트 AI 보강 */
-  enhancePrompt: (prompt: string, style?: string, model?: string) =>
+  /** 구조화 프롬프트 AI 보강 */
+  enhancePrompt: (
+    prompt: string,
+    style?: string,
+    model?: string,
+    options?: {
+      mode?: 'generate' | 'edit'
+      creativity?: number
+      detail_level?: 'minimal' | 'normal' | 'detailed'
+      categories?: EnhanceCategoryConfig
+    }
+  ) =>
     fetchApi<EnhancePromptResponse>('/api/prompt/enhance', {
       method: 'POST',
-      body: JSON.stringify({ prompt, style, model: model || '' }),
+      body: JSON.stringify({
+        prompt,
+        style,
+        model: model || '',
+        mode: options?.mode || 'generate',
+        creativity: options?.creativity ?? 0.7,
+        detail_level: options?.detail_level || 'normal',
+        categories: options?.categories,
+      }),
     }),
 
   /** Ollama 설치된 모델 목록 조회 */
