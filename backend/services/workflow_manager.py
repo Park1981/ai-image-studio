@@ -162,9 +162,9 @@ class WorkflowManager:
                 meta_title = ndata.get("_meta", {}).get("title", "")
                 inputs = ndata.setdefault("inputs", {})
                 if "Positive" in meta_title:
-                    inputs["text"] = request.edit_prompt
+                    inputs["prompt"] = request.edit_prompt
                 elif "Negative" in meta_title:
-                    inputs["text"] = ""  # 네거티브는 빈 텍스트
+                    inputs["prompt"] = ""  # 네거티브는 빈 텍스트
         else:
             logger.warning("TextEncodeQwenImageEdit 노드 없음 — 프롬프트 주입 건너뜀")
 

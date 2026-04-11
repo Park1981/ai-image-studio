@@ -30,7 +30,7 @@
     "class_type": "TextEncodeQwenImageEdit",
     "_meta": { "title": "Positive" },
     "inputs": {
-      "text": "",
+      "prompt": "",
       "clip": ["2", 0],
       "vae": ["3", 0],
       "image": ["4", 0]
@@ -40,7 +40,7 @@
     "class_type": "TextEncodeQwenImageEdit",
     "_meta": { "title": "Negative" },
     "inputs": {
-      "text": "",
+      "prompt": "",
       "clip": ["2", 0],
       "vae": ["3", 0],
       "image": ["4", 0]
@@ -63,7 +63,7 @@
   "9": {
     "class_type": "CFGNorm",
     "inputs": {
-      "scale": 1,
+      "strength": 1,
       "model": ["8", 0]
     }
   },
