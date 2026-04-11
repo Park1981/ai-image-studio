@@ -18,7 +18,7 @@
 **Phase 5: Qwen Image Edit 이미지 수정 기능 ✅**
 **Phase 6: 구조화 AI 보강 + 수정 모드 AI보강 ✅**
 **Phase 7: 미착수 (프로세스 관리 + 모델 설정 + 사이즈)**
-**Phase 8: 미착수 (잔여 개선 + 품질)**
+**Phase 8: 잔여 개선 + 품질 ✅**
 **Phase 9: 미착수 (최종 레이아웃 리팩토링)**
 **Phase 10: 미착수 (영상 생성 — 최종 단계)**
 
@@ -42,12 +42,11 @@
 - 비율 프리셋(1:1, 16:9 등) 외에 직접 width × height 픽셀 입력 지원
 - 예: 500×500, 1920×1080 등 자유 입력
 
-### Phase 8: 잔여 개선 + 품질
-- 프리셋 삭제 UI (커스텀 프리셋 삭제 기능 없음)
-- 뷰어 `prefers-reduced-motion` 대응
-- localStorage JSON 구조 검증
-- 모달 접근성 (`role="dialog"` / `aria-modal` / 포커스 관리)
-- 히스토리 DB EditRequest.prompt warning 수정
+### Phase 8: 잔여 개선 + 품질 ✅
+- ~~프리셋 삭제 UI~~ → 설정 패널에 커스텀 프리셋 삭제 추가
+- ~~모달 접근성~~ → 설정/뷰어/히스토리 패널 role="dialog" + aria-modal 적용
+- ~~히스토리 DB EditRequest.prompt warning~~ → EditRequest 타입 분기 처리
+- 뷰어 `prefers-reduced-motion` 대응 (향후)
 
 ### Phase 9: 최종 레이아웃 리팩토링 (모든 기능 완성 후)
 - 하단 프롬프트 독 → **오른쪽 패널**로 이동

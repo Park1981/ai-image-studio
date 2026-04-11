@@ -89,6 +89,14 @@ export function saveCustomPresets(presets: Preset[]): void {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(presets))
 }
 
+/** 커스텀 프리셋 삭제 (ID 기반) */
+export function deleteCustomPreset(id: string): Preset[] {
+  const current = loadCustomPresets()
+  const filtered = current.filter((p) => p.id !== id)
+  saveCustomPresets(filtered)
+  return filtered
+}
+
 /** 전체 프리셋 목록 (기본 + 커스텀) */
 export function getAllPresets(): Preset[] {
   return [...BUILTIN_PRESETS, ...loadCustomPresets()]

@@ -507,22 +507,23 @@ async def ws_generate(websocket: WebSocket):
                     logger.info("태스크 %s: completed 전송 성공", task_id)
 
                     # ── DB에 히스토리 저장 ──
-                    req: GenerateRequest = task["request"]
+                    raw_req = task["request"]
+                    is_edit = isinstance(raw_req, EditRequest)
                     try:
                         await save_generation(
                             generation_id=task_id,
-                            prompt=req.prompt,
+                            prompt=raw_req.edit_prompt if is_edit else raw_req.prompt,
                             enhanced_prompt=task.get("enhanced_prompt"),
                             negative_prompt=task.get("negative_prompt"),
-                            checkpoint=req.checkpoint,
-                            loras=json.dumps([l.model_dump() for l in req.loras]),
-                            sampler=req.sampler,
-                            scheduler=req.scheduler,
-                            width=req.width,
-                            height=req.height,
-                            steps=req.steps,
-                            cfg=req.cfg,
-                            seed=saved[0]["seed"] if saved else req.seed,
+                            checkpoint=raw_req.checkpoint if hasattr(raw_req, "checkpoint") else "",
+                            loras=json.dumps([l.model_dump() for l in raw_req.loras]) if hasattr(raw_req, "loras") else "[]",
+                            sampler=raw_req.sampler if hasattr(raw_req, "sampler") else "euler",
+                            scheduler=raw_req.scheduler if hasattr(raw_req, "scheduler") else "simple",
+                            width=raw_req.width if hasattr(raw_req, "width") else 1024,
+                            height=raw_req.height if hasattr(raw_req, "height") else 1024,
+                            steps=raw_req.steps,
+                            cfg=raw_req.cfg,
+                            seed=saved[0]["seed"] if saved else raw_req.seed,
                             images=json.dumps(saved),
                         )
                         logger.info("태스크 %s: 히스토리 DB 저장 완료", task_id)

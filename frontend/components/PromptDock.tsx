@@ -121,12 +121,26 @@ export default function PromptDock() {
     const s = useAppStore.getState()
     s.setCheckpoint(modelName)
 
-    // 모델명에서 확장자 제거하여 프리셋 키 매칭
-    const key = modelName.replace(/\.safetensors$/, '')
     const presets = s.modelPresets
     if (!presets) return
 
-    const preset = presets.diffusion_models[key] || presets.checkpoints[key]
+    // 모델명에서 확장자 + 경로 제거하여 프리셋 키 매칭
+    const key = modelName.replace(/\.safetensors$/, '').replace(/^.*[\\\/]/, '')
+
+    // 직접 키 매칭 또는 aliases 검색
+    type PresetEntry = { aliases?: string[]; sampler: string; scheduler: string; steps: number; cfg: number; default_width: number; default_height: number }
+    const allPresets = { ...presets.diffusion_models, ...presets.checkpoints } as Record<string, PresetEntry>
+    let preset: PresetEntry | undefined = allPresets[key]
+    if (!preset) {
+      // aliases에서 매칭 검색
+      for (const [, v] of Object.entries(allPresets)) {
+        if (v.aliases?.includes(key)) {
+          preset = v
+          break
+        }
+      }
+    }
+
     if (preset) {
       s.setSampler(preset.sampler)
       s.setScheduler(preset.scheduler)
@@ -701,19 +715,27 @@ export default function PromptDock() {
                       <input
                         type="number"
                         value={width}
-                        onChange={(e) => setWidth(Math.max(256, Math.min(2048, parseInt(e.target.value) || 256)))}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value) || 256
+                          setWidth(Math.round(Math.max(256, Math.min(2048, v)) / 8) * 8)
+                        }}
+                        step={8}
                         disabled={isGenerating}
                         className="w-[60px] bg-ground text-[11px] font-mono text-text-sub rounded-lg px-1.5 py-1.5 border border-edge focus:border-accent outline-none text-center disabled:opacity-40"
-                        title="너비 (px)"
+                        title="너비 (px, 8의 배수)"
                       />
                       <span className="text-[10px] text-text-ghost">×</span>
                       <input
                         type="number"
                         value={height}
-                        onChange={(e) => setHeight(Math.max(256, Math.min(2048, parseInt(e.target.value) || 256)))}
+                        onChange={(e) => {
+                          const v = parseInt(e.target.value) || 256
+                          setHeight(Math.round(Math.max(256, Math.min(2048, v)) / 8) * 8)
+                        }}
+                        step={8}
                         disabled={isGenerating}
                         className="w-[60px] bg-ground text-[11px] font-mono text-text-sub rounded-lg px-1.5 py-1.5 border border-edge focus:border-accent outline-none text-center disabled:opacity-40"
-                        title="높이 (px)"
+                        title="높이 (px, 8의 배수)"
                       />
                       <button
                         onClick={() => setShowCustomSize(false)}

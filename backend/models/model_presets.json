@@ -3,6 +3,7 @@
   "diffusion_models": {
     "qwen_image_fp8_e4m3fn": {
       "name": "Qwen Image 2512",
+      "aliases": ["qwen_image_2512_fp8_e4m3fn"],
       "sampler": "euler",
       "scheduler": "simple",
       "steps": 50,

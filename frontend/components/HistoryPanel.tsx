@@ -131,10 +131,16 @@ export default function HistoryPanel() {
       <div
         className="fixed inset-0 z-40 bg-black/50"
         onClick={() => setHistoryPanelOpen(false)}
+        aria-hidden="true"
       />
 
       {/* 패널 */}
-      <div className="fixed top-0 right-0 bottom-0 z-50 w-[380px] bg-ground border-l border-edge flex flex-col shadow-2xl">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="히스토리"
+        className="fixed top-0 right-0 bottom-0 z-50 w-[380px] bg-ground border-l border-edge flex flex-col shadow-2xl"
+      >
         {/* 헤더 */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
           <div>

@@ -9,6 +9,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { api, type OllamaModelInfo, type EnhanceCategoryConfig } from '@/lib/api'
+import { loadCustomPresets, deleteCustomPreset, type Preset } from '@/lib/presets'
 
 export default function SettingsPanel() {
   const settingsOpen = useAppStore((s) => s.settingsOpen)
@@ -27,6 +28,7 @@ export default function SettingsPanel() {
   const [comfyLoading, setComfyLoading] = useState(false)
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
+  const [customPresets, setCustomPresets] = useState<Preset[]>([])
 
   /** Ollama 모델 목록 불러오기 */
   const fetchOllamaModels = useCallback(async () => {
@@ -38,10 +40,11 @@ export default function SettingsPanel() {
     setModelsLoading(false)
   }, [])
 
-  // 설정 패널 열릴 때 모델 목록 조회
+  // 설정 패널 열릴 때 모델 목록 + 커스텀 프리셋 로드
   useEffect(() => {
     if (settingsOpen) {
       fetchOllamaModels()
+      setCustomPresets(loadCustomPresets())
     }
   }, [settingsOpen, fetchOllamaModels])
 
@@ -72,10 +75,16 @@ export default function SettingsPanel() {
       <div
         className="fixed inset-0 z-40 bg-black/50"
         onClick={() => setSettingsOpen(false)}
+        aria-hidden="true"
       />
 
       {/* 패널 */}
-      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[420px] max-h-[80vh] bg-ground border border-edge rounded-xl shadow-2xl flex flex-col overflow-hidden">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label="설정"
+        className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[420px] max-h-[80vh] bg-ground border border-edge rounded-xl shadow-2xl flex flex-col overflow-hidden"
+      >
         {/* 헤더 */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-edge">
           <h2 className="text-[14px] font-semibold text-text">설정</h2>
@@ -280,6 +289,31 @@ export default function SettingsPanel() {
               </div>
             </div>
           </section>
+
+          {/* 커스텀 프리셋 관리 */}
+          {customPresets.length > 0 && (
+            <section>
+              <h3 className="text-[11px] font-semibold uppercase tracking-wider text-text-dim mb-3">커스텀 프리셋</h3>
+              <div className="space-y-1.5">
+                {customPresets.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-surface border border-edge">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[12px]">{p.icon}</span>
+                      <span className="text-[12px] text-text truncate">{p.name}</span>
+                    </div>
+                    <button
+                      onClick={() => {
+                        setCustomPresets(deleteCustomPreset(p.id))
+                      }}
+                      className="text-[10px] text-bad/60 hover:text-bad transition-colors shrink-0 px-1.5"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           {/* 단축키 안내 */}
           <section>
