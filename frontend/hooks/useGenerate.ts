@@ -6,13 +6,16 @@
 
 'use client'
 
-import { useCallback } from 'react'
+import { useCallback, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { api } from '@/lib/api'
 import { useWebSocket } from './useWebSocket'
 
 export function useGenerate() {
   const { connect, disconnect } = useWebSocket()
+
+  // 중복 호출 방지 guard (렌더 사이클보다 빠른 더블클릭/연타 차단)
+  const busyRef = useRef(false)
 
   // 스토어에서 필요한 상태와 액션
   const prompt = useAppStore((s) => s.prompt)
@@ -44,19 +47,22 @@ export function useGenerate() {
   const setEnhancePending = useAppStore((s) => s.setEnhancePending)
   const setNegativePrompt = useAppStore((s) => s.setNegativePrompt)
 
-  /** 1단계: AI 프롬프트 보강 (autoEnhance ON일 때) */
-  const enhance = useCallback(async () => {
-    if (!prompt.trim()) {
+  /** 1단계: AI 프롬프트 보강 (sourcePrompt 지정 시 해당 프롬프트로 보강) */
+  const enhance = useCallback(async (sourcePrompt?: string) => {
+    const textToEnhance = sourcePrompt ?? prompt.trim()
+    if (!textToEnhance) {
       setErrorMessage('프롬프트를 입력해주세요.')
       return
     }
+    if (busyRef.current) return
+    busyRef.current = true
 
     try {
       setGenerationStatus('enhancing')
       setProgress(0)
       setErrorMessage(null)
 
-      const response = await api.enhancePrompt(prompt.trim())
+      const response = await api.enhancePrompt(textToEnhance)
 
       if (response.success && response.data) {
         setEnhancedPrompt(response.data.enhanced)
@@ -70,6 +76,8 @@ export function useGenerate() {
     } catch {
       setGenerationStatus('idle')
       setErrorMessage('프롬프트 보강 중 오류가 발생했습니다.')
+    } finally {
+      busyRef.current = false
     }
   }, [
     prompt, setGenerationStatus, setProgress, setErrorMessage,
@@ -81,6 +89,8 @@ export function useGenerate() {
     if (generationStatus === 'generating' || generationStatus === 'warming_up') {
       return
     }
+    if (busyRef.current) return
+    busyRef.current = true
 
     try {
       setGenerationStatus('warming_up')
@@ -124,6 +134,8 @@ export function useGenerate() {
     } catch {
       setGenerationStatus('error')
       setErrorMessage('이미지 생성 중 예상치 못한 오류가 발생했습니다.')
+    } finally {
+      busyRef.current = false
     }
   }, [
     generationStatus, checkpoint, loras, vae,

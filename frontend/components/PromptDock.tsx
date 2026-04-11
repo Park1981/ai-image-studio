@@ -78,9 +78,10 @@ export default function PromptDock() {
           generate()
         }
       }
-      // ESC로 보강 취소
+      // ESC로 보강 취소 (풀스크린 뷰어가 열려있으면 뷰어가 우선 처리)
       if (e.key === 'Escape' && enhancePending) {
-        cancelEnhance()
+        const viewerOpen = useAppStore.getState().viewerIndex !== null
+        if (!viewerOpen) cancelEnhance()
       }
     }
 
@@ -148,7 +149,7 @@ export default function PromptDock() {
                 이미지 생성
               </button>
               <button
-                onClick={() => enhance()}
+                onClick={() => enhance(enhancedPrompt)}
                 disabled={isEnhancing}
                 className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-accent-bright hover:bg-accent-muted transition-all border border-accent/30"
               >
