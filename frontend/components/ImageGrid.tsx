@@ -112,7 +112,7 @@ export default function ImageGrid() {
               <img
                 src={`${IMAGE_BASE}${image.url}`}
                 alt={`생성된 이미지 #${i + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain bg-void"
                 loading="lazy"
               />
             ) : (
