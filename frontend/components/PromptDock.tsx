@@ -13,13 +13,13 @@ import { useModels } from '@/hooks/useModels'
 import { api } from '@/lib/api'
 import { SparkleIcon, XCircleIcon, BoltIcon, StopIcon, GearIcon } from './icons'
 
-/** 사이즈 프리셋 목록 */
+/** 사이즈 프리셋 목록 (Qwen Image 권장 해상도 포함) */
 const SIZE_PRESETS = [
-  { label: '512x512', w: 512, h: 512 },
-  { label: '768x768', w: 768, h: 768 },
-  { label: '1024x1024', w: 1024, h: 1024 },
-  { label: '768x1344', w: 768, h: 1344 },
-  { label: '1344x768', w: 1344, h: 768 },
+  { label: '1:1', w: 1328, h: 1328 },
+  { label: '16:9', w: 1664, h: 928 },
+  { label: '9:16', w: 928, h: 1664 },
+  { label: '4:3', w: 1472, h: 1104 },
+  { label: '3:2', w: 1584, h: 1056 },
 ] as const
 
 /** 배치 수 옵션 */

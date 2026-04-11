@@ -48,7 +48,7 @@ class GenerateRequest(BaseModel):
     cfg: float = Field(default=7.0, ge=1.0, le=30.0)
     seed: int = -1  # -1 = 랜덤
     batch_size: int = Field(default=1, ge=1, le=4)
-    mode: str = "txt2img"  # txt2img | img2img | inpaint
+    mode: str = "qwen_image"  # qwen_image | txt2img | img2img | inpaint
 
 
 class GenerateResponse(BaseModel):

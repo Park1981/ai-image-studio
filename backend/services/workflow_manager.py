@@ -24,6 +24,7 @@ _MAX_SEED: int = 2**32 - 1
 _NODE_KSAMPLER: str = "KSampler"
 _NODE_CLIP_TEXT_POSITIVE: str = "CLIPTextEncode"
 _NODE_EMPTY_LATENT: str = "EmptyLatentImage"
+_NODE_EMPTY_SD3_LATENT: str = "EmptySD3LatentImage"
 _NODE_CHECKPOINT_LOADER: str = "CheckpointLoaderSimple"
 _NODE_VAE_LOADER: str = "VAELoader"
 _NODE_LORA_LOADER: str = "LoraLoader"
@@ -209,8 +210,11 @@ class WorkflowManager:
         workflow: dict[str, Any],
         request: GenerateRequest,
     ) -> None:
-        """EmptyLatentImage 노드에 이미지 크기/배치 주입"""
+        """EmptyLatentImage 또는 EmptySD3LatentImage 노드에 이미지 크기/배치 주입"""
         result = self._find_node_by_class(workflow, _NODE_EMPTY_LATENT)
+        if result is None:
+            # SD3/Qwen 등 최신 모델용 Latent 노드 탐색
+            result = self._find_node_by_class(workflow, _NODE_EMPTY_SD3_LATENT)
         if result is None:
             logger.warning("EmptyLatentImage 노드 없음 — 크기 설정 건너뜀")
             return

@@ -26,7 +26,7 @@ class Settings(BaseSettings):
 
     # Ollama 설정
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "gemma4:latest"
+    ollama_model: str = "gemma4:26b"
 
     # 앱 설정
     app_host: str = "127.0.0.1"

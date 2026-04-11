@@ -90,11 +90,11 @@ async def _run_generation(task_id: str) -> None:
             except Exception as exc:
                 logger.warning("프롬프트 보강 실패, 원본 사용: %s", exc)
 
-        # 3단계: 워크플로우 빌드
+        # 3단계: 워크플로우 빌드 (기본: qwen_image)
         try:
             wf = workflow_manager.load_workflow(request.mode)
         except FileNotFoundError:
-            wf = workflow_manager.load_workflow("txt2img")
+            wf = workflow_manager.load_workflow("qwen_image")
 
         request_copy = request.model_copy(
             update={"prompt": enhanced, "negative_prompt": negative}
