@@ -44,3 +44,37 @@ async def get_db() -> aiosqlite.Connection:
     db = await aiosqlite.connect(settings.history_db_path)
     db.row_factory = aiosqlite.Row
     return db
+
+
+async def save_generation(
+    generation_id: str,
+    prompt: str,
+    enhanced_prompt: str | None,
+    negative_prompt: str | None,
+    checkpoint: str,
+    loras: str,  # JSON 문자열
+    sampler: str,
+    scheduler: str,
+    width: int,
+    height: int,
+    steps: int,
+    cfg: float,
+    seed: int,
+    images: str,  # JSON 문자열
+) -> None:
+    """생성 완료 시 DB에 이력 저장"""
+    async with aiosqlite.connect(settings.history_db_path) as db:
+        await db.execute(
+            """
+            INSERT INTO generations
+                (id, prompt, enhanced_prompt, negative_prompt, checkpoint,
+                 loras, sampler, scheduler, width, height, steps, cfg, seed, images)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                generation_id, prompt, enhanced_prompt, negative_prompt,
+                checkpoint, loras, sampler, scheduler,
+                width, height, steps, cfg, seed, images,
+            ),
+        )
+        await db.commit()

@@ -13,7 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from database import init_db
-from routers import generate, models, process, prompt
+from routers import generate, history, models, process, prompt
 from services.process_manager import process_manager
 
 # 로깅 설정
@@ -71,6 +71,7 @@ app.mount("/images", StaticFiles(directory=str(images_dir)), name="images")
 
 # ── 라우터 등록 ──
 app.include_router(generate.router)
+app.include_router(history.router)
 app.include_router(process.router)
 app.include_router(models.router)
 app.include_router(prompt.router)

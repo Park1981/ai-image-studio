@@ -13,6 +13,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from database import save_generation
 from models.schemas import (
     ApiResponse,
     GenerateRequest,
@@ -361,6 +362,30 @@ async def ws_generate(websocket: WebSocket):
                         "images": saved,
                     })
                     logger.info("태스크 %s: completed 전송 성공", task_id)
+
+                    # ── DB에 히스토리 저장 ──
+                    req: GenerateRequest = task["request"]
+                    try:
+                        await save_generation(
+                            generation_id=task_id,
+                            prompt=req.prompt,
+                            enhanced_prompt=task.get("enhanced_prompt"),
+                            negative_prompt=task.get("negative_prompt"),
+                            checkpoint=req.checkpoint,
+                            loras=json.dumps([l.model_dump() for l in req.loras]),
+                            sampler=req.sampler,
+                            scheduler=req.scheduler,
+                            width=req.width,
+                            height=req.height,
+                            steps=req.steps,
+                            cfg=req.cfg,
+                            seed=saved[0]["seed"] if saved else req.seed,
+                            images=json.dumps(saved),
+                        )
+                        logger.info("태스크 %s: 히스토리 DB 저장 완료", task_id)
+                    except Exception as db_exc:
+                        logger.warning("히스토리 DB 저장 실패 (무시): %s", db_exc)
+
                 except Exception as exc:
                     logger.error("이미지 다운로드 실패: %s", exc, exc_info=True)
                     task["status"] = "error"

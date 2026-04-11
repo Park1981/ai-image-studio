@@ -63,6 +63,34 @@ export interface ModelsResponse {
   vaes: string[]
 }
 
+// ── 히스토리 응답 타입 ──
+export interface HistoryItem {
+  id: string
+  prompt: string
+  enhanced_prompt: string | null
+  negative_prompt: string | null
+  checkpoint: string
+  sampler: string
+  scheduler: string
+  width: number
+  height: number
+  steps: number
+  cfg: number
+  seed: number
+  images: { url: string; seed: number; filename: string }[]
+  created_at: string
+}
+
+export interface HistoryListResponse {
+  items: HistoryItem[]
+  total: number
+  page: number
+  limit: number
+  has_more: boolean
+}
+
+export type HistoryDetailResponse = HistoryItem
+
 // ── 프롬프트 보강 응답 타입 ──
 export interface EnhancePromptResponse {
   original: string
@@ -178,5 +206,21 @@ export const api = {
     fetchApi<EnhancePromptResponse>('/api/prompt/enhance', {
       method: 'POST',
       body: JSON.stringify({ prompt, style }),
+    }),
+
+  // ── 히스토리 API ──
+
+  /** 생성 이력 목록 조회 */
+  getHistory: (page = 1, limit = 20) =>
+    fetchApi<HistoryListResponse>(`/api/history?page=${page}&limit=${limit}`),
+
+  /** 이력 상세 조회 */
+  getHistoryDetail: (id: string) =>
+    fetchApi<HistoryDetailResponse>(`/api/history/${id}`),
+
+  /** 이력 삭제 */
+  deleteHistory: (id: string) =>
+    fetchApi<{ id: string; message: string }>(`/api/history/${id}`, {
+      method: 'DELETE',
     }),
 }
