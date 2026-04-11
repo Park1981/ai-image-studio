@@ -130,6 +130,10 @@ interface AppState {
   historyPanelOpen: boolean
   setHistoryPanelOpen: (open: boolean) => void
   toggleHistoryPanel: () => void
+
+  // ── 설정 패널 ──
+  settingsOpen: boolean
+  setSettingsOpen: (open: boolean) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -230,4 +234,8 @@ export const useAppStore = create<AppState>((set) => ({
   historyPanelOpen: false,
   setHistoryPanelOpen: (open) => set({ historyPanelOpen: open }),
   toggleHistoryPanel: () => set((state) => ({ historyPanelOpen: !state.historyPanelOpen })),
+
+  // ── 설정 패널 ──
+  settingsOpen: false,
+  setSettingsOpen: (open) => set({ settingsOpen: open }),
 }))

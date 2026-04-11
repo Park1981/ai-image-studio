@@ -12,6 +12,7 @@ import PromptDock from '@/components/PromptDock'
 import SettingsSidebar from '@/components/SettingsSidebar'
 import HistoryBar from '@/components/HistoryBar'
 import HistoryPanel from '@/components/HistoryPanel'
+import SettingsPanel from '@/components/SettingsPanel'
 import ErrorToast from '@/components/ErrorToast'
 import { useAppStore } from '@/stores/useAppStore'
 
@@ -43,6 +44,9 @@ export default function Home() {
 
       {/* 히스토리 전체 패널 (오버레이) */}
       <HistoryPanel />
+
+      {/* 설정 패널 (모달) */}
+      <SettingsPanel />
     </div>
   )
 }

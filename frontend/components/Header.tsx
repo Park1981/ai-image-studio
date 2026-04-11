@@ -61,6 +61,7 @@ export default function Header() {
   // 실시간 프로세스 상태 (10초 간격 폴링)
   const processStatus = useProcessStatus()
   const toggleHistoryPanel = useAppStore((s) => s.toggleHistoryPanel)
+  const setSettingsOpen = useAppStore((s) => s.setSettingsOpen)
 
   /** 새 생성 — 전체 상태 초기화 */
   const handleNewGeneration = () => {
@@ -113,7 +114,7 @@ export default function Header() {
           onClick={handleNewGeneration}
         />
         <NavButton icon={<ClockIcon />} label="히스토리" onClick={toggleHistoryPanel} />
-        <NavButton icon={<GearIcon />} label="설정" />
+        <NavButton icon={<GearIcon />} label="설정" onClick={() => setSettingsOpen(true)} />
       </div>
     </header>
   )
