@@ -22,6 +22,8 @@ export default function PromptInput() {
   const enhancePending = useAppStore((s) => s.enhancePending)
   const generationStatus = useAppStore((s) => s.generationStatus)
   const editMode = useAppStore((s) => s.editMode)
+  const enhanceLlmProvider = useAppStore((s) => s.enhanceLlmProvider)
+  const setEnhanceLlmProvider = useAppStore((s) => s.setEnhanceLlmProvider)
 
   // ── 로컬 상태 ──
   const [showNegative, setShowNegative] = useState(false)
@@ -144,6 +146,17 @@ export default function PromptInput() {
         >
           <SparkleIcon /> AI 보강
         </button>
+        {autoEnhance && (
+          <select
+            value={enhanceLlmProvider}
+            onChange={(e) => setEnhanceLlmProvider(e.target.value as 'auto' | 'ollama' | 'claude')}
+            className="bg-transparent text-[10px] text-text-sub border border-edge rounded-md px-1 py-1 outline-none focus:border-accent"
+          >
+            <option value="auto">자동</option>
+            <option value="ollama">로컬 AI</option>
+            <option value="claude">Claude</option>
+          </select>
+        )}
         {!editMode && (
           <button
             onClick={() => setShowNegative(!showNegative)}

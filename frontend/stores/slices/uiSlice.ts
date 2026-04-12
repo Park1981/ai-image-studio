@@ -35,6 +35,10 @@ export interface UiSlice {
   setEditSourceImage: (filename: string | null) => void
   editSourcePreview: string | null  // 프리뷰용 Data URL
   setEditSourcePreview: (preview: string | null) => void
+
+  // ── 히스토리 갱신 트리거 ──
+  historyVersion: number
+  bumpHistoryVersion: () => void
 }
 
 // ── 슬라이스 생성 ──
@@ -69,4 +73,8 @@ export const createUiSlice: StateCreator<UiSlice, [], [], UiSlice> = (set) => ({
   setEditSourceImage: (filename) => set({ editSourceImage: filename }),
   editSourcePreview: null,
   setEditSourcePreview: (preview) => set({ editSourcePreview: preview }),
+
+  // ── 히스토리 갱신 트리거 ──
+  historyVersion: 0,
+  bumpHistoryVersion: () => set((state) => ({ historyVersion: state.historyVersion + 1 })),
 })

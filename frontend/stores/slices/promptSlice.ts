@@ -40,6 +40,10 @@ export interface PromptSlice {
   ollamaModel: string  // AI 보강에 사용할 Ollama 모델
   setOllamaModel: (model: string) => void
 
+  // ── AI 보강 LLM 제공자 선택 ──
+  enhanceLlmProvider: 'auto' | 'ollama' | 'claude'
+  setEnhanceLlmProvider: (provider: 'auto' | 'ollama' | 'claude') => void
+
   // ── AI 보강 세부 설정 ──
   enhanceSettings: EnhanceSettings
   setEnhanceSettings: (settings: Partial<EnhanceSettings>) => void
@@ -74,6 +78,10 @@ export const createPromptSlice: StateCreator<PromptSlice, [], [], PromptSlice> =
   setActiveStyleHint: (style) => set({ activeStyleHint: style }),
   ollamaModel: '',  // 빈 문자열 = 서버 기본 모델 (gemma4:26b)
   setOllamaModel: (model) => set({ ollamaModel: model }),
+
+  // ── AI 보강 LLM 제공자 선택 ──
+  enhanceLlmProvider: 'auto',
+  setEnhanceLlmProvider: (provider) => set({ enhanceLlmProvider: provider }),
 
   // ── AI 보강 세부 설정 ──
   enhanceSettings: {

@@ -244,6 +244,7 @@ class PromptEngine:
         creativity: float = 0.7,
         detail_level: str = "normal",
         categories: EnhanceCategoryConfig | None = None,
+        provider: str = "auto",
     ) -> EnhanceResponse:
         """
         구조화 프롬프트 보강 (Ollama LLM 활용)
@@ -279,24 +280,25 @@ class PromptEngine:
         # 모델 선택
         use_model = model.strip() if model else self._model
 
-        # ── 1단계: Ollama 시도 ──
+        # ── 1단계: provider에 따라 Ollama 시도 ──
         result: dict | None = None
-        provider = "ollama"
+        used_provider = "ollama"
 
-        try:
-            result = await self._call_ollama(
-                system_prompt, user_message, use_model, creativity
-            )
-        except Exception as exc:
-            logger.error("Ollama 호출 실패: %s", exc)
+        if provider in ("auto", "ollama"):
+            try:
+                result = await self._call_ollama(
+                    system_prompt, user_message, use_model, creativity
+                )
+            except Exception as exc:
+                logger.error("Ollama 호출 실패: %s", exc)
 
-        # ── 2단계: Ollama 실패 → Claude CLI 폴백 시도 ──
-        if result is None:
-            logger.info("Ollama 응답 없음 — Claude CLI 폴백 시도")
+        # ── 2단계: provider에 따라 Claude CLI 시도 ──
+        if result is None and provider in ("auto", "claude"):
+            logger.info("Claude CLI 시도 (provider=%s)", provider)
             try:
                 result = await self._call_claude_cli(system_prompt, user_message)
                 if result is not None:
-                    provider = "claude_cli"
+                    used_provider = "claude_cli"
             except Exception as exc:
                 logger.error("Claude CLI 폴백 실패: %s", exc)
 
@@ -335,14 +337,14 @@ class PromptEngine:
 
         logger.info(
             "구조화 프롬프트 보강 완료 (provider: %s, 스타일: %s, 모드: %s, 카테고리: %d개)",
-            provider, style, mode, len(category_items),
+            used_provider, style, mode, len(category_items),
         )
         return EnhanceResponse(
             original=prompt,
             enhanced=enhanced,
             negative=negative,
             categories=category_items,
-            provider=provider,
+            provider=used_provider,
         )
 
     # ─────────────────────────────────────────────

@@ -132,6 +132,7 @@ export default function HistoryPanel() {
     if (response.success) {
       setItems((prev) => prev.filter((item) => item.id !== id))
       setTotal((prev) => prev - 1)
+      useAppStore.getState().bumpHistoryVersion()
     }
   }, [])
 

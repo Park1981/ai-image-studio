@@ -15,6 +15,7 @@ interface PresetEntry {
   scheduler: string
   steps: number
   cfg: number
+  vae?: string
   default_width: number
   default_height: number
 }
@@ -56,6 +57,7 @@ export function useModelPresets() {
       s.setCfg(preset.cfg)
       s.setWidth(preset.default_width)
       s.setHeight(preset.default_height)
+      s.setVae(preset.vae || '')
     }
   }, [])
 

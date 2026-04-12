@@ -34,6 +34,7 @@ async def enhance_prompt(request: EnhanceRequest):
         creativity=request.creativity,
         detail_level=request.detail_level,
         categories=request.categories,
+        provider=request.provider,
     )
     return {"success": True, "data": result}
 

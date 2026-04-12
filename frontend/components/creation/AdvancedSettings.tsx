@@ -5,7 +5,7 @@
 
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useMemo } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { useModels } from '@/hooks/useModels'
 import { PlusIcon, RefreshIcon, XIcon } from '../icons'
@@ -30,16 +30,38 @@ export default function AdvancedSettings() {
   const setScheduler = useAppStore((s) => s.setScheduler)
 
   const availableModels = useModels()
+  const modelPresets = useAppStore((s) => s.modelPresets)
+  const checkpoint = useAppStore((s) => s.checkpoint)
 
   // ── 토글 상태 ──
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [showLoraSelect, setShowLoraSelect] = useState(false)
 
-  /** LoRA 추가 */
-  const handleAddLora = useCallback(() => {
+  // 현재 모델의 compatible_loras 패턴 추출
+  const compatiblePatterns = useMemo(() => {
+    if (!modelPresets) return []
+    const key = checkpoint.replace(/\.safetensors$/, '').replace(/^.*[\\\/]/, '')
+    const all = { ...modelPresets.diffusion_models, ...modelPresets.checkpoints }
+    const preset = all[key]
+    if (!preset) {
+      for (const v of Object.values(all)) {
+        if (v.aliases?.includes(key)) return v.compatible_loras || []
+      }
+    }
+    return preset?.compatible_loras || []
+  }, [modelPresets, checkpoint])
+
+  // 필터링된 LoRA 목록 (이미 추가된 것 제외, compatible 패턴 적용)
+  const filteredLoras = useMemo(() => {
     const addedNames = new Set(loras.map((l) => l.name))
-    const available = availableModels.loras.filter((n) => !addedNames.has(n))
-    if (available.length > 0) addLora({ name: available[0], strengthModel: 0.7, strengthClip: 0.7 })
-  }, [loras, availableModels.loras, addLora])
+    let available = availableModels.loras.filter((n) => !addedNames.has(n))
+    if (compatiblePatterns.length > 0) {
+      available = available.filter((name) =>
+        compatiblePatterns.some((p) => name.toLowerCase().includes(p.toLowerCase()))
+      )
+    }
+    return available
+  }, [availableModels.loras, loras, compatiblePatterns])
 
   return (
     <>
@@ -101,13 +123,34 @@ export default function AdvancedSettings() {
                 </div>
               </div>
             ))}
-            <button
-              onClick={handleAddLora}
-              disabled={availableModels.loras.length === 0}
-              className="flex items-center gap-1.5 text-[11px] text-accent-bright hover:text-accent transition-colors w-full justify-center py-1.5 rounded-lg border border-dashed border-edge hover:border-accent/30 disabled:opacity-30"
-            >
-              <PlusIcon /> LoRA 추가
-            </button>
+            {showLoraSelect ? (
+              <div className="flex gap-1">
+                <select
+                  autoFocus
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      addLora({ name: e.target.value, strengthModel: 0.7, strengthClip: 0.7 })
+                      setShowLoraSelect(false)
+                    }
+                  }}
+                  onBlur={() => setShowLoraSelect(false)}
+                  className="flex-1 bg-surface text-[11px] font-mono text-text-sub rounded-lg px-2 py-1.5 border border-edge focus:border-accent outline-none"
+                >
+                  <option value="">LoRA 선택...</option>
+                  {filteredLoras.map((name) => (
+                    <option key={name} value={name}>{name}</option>
+                  ))}
+                </select>
+              </div>
+            ) : (
+              <button
+                onClick={() => setShowLoraSelect(true)}
+                disabled={filteredLoras.length === 0}
+                className="flex items-center gap-1.5 text-[11px] text-accent-bright hover:text-accent transition-colors w-full justify-center py-1.5 rounded-lg border border-dashed border-edge hover:border-accent/30 disabled:opacity-30"
+              >
+                <PlusIcon /> LoRA 추가 {filteredLoras.length > 0 && `(${filteredLoras.length})`}
+              </button>
+            )}
           </div>
 
           {/* Steps */}

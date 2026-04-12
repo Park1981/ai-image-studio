@@ -45,7 +45,7 @@ export function useEnhance() {
       setErrorMessage(null)
 
       // 프리셋 스타일 힌트 + Ollama 모델 + 보강 설정을 전달
-      const { activeStyleHint, ollamaModel, enhanceSettings, editMode, editSourceImage } = useAppStore.getState()
+      const { activeStyleHint, ollamaModel, enhanceSettings, editMode, editSourceImage, enhanceLlmProvider } = useAppStore.getState()
 
       // 수정 모드 + 소스 이미지 있으면 비전(이미지 분석) API 사용
       const useVision = (mode === 'edit' || editMode) && !!editSourceImage
@@ -70,6 +70,7 @@ export function useEnhance() {
               creativity: enhanceSettings.creativity,
               detail_level: enhanceSettings.detailLevel,
               categories: enhanceSettings.categories,
+              provider: enhanceLlmProvider,
             }
           )
 

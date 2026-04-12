@@ -96,6 +96,7 @@ class EnhanceRequest(BaseModel):
     creativity: float = Field(default=0.7, ge=0.1, le=1.0)  # Ollama temperature
     detail_level: str = "normal"  # minimal | normal | detailed
     categories: EnhanceCategoryConfig = EnhanceCategoryConfig()
+    provider: str = "auto"  # auto | ollama | claude
 
 
 class EnhanceWithVisionRequest(BaseModel):

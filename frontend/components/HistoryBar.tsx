@@ -16,6 +16,7 @@ const IMAGE_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 export default function HistoryBar() {
   const [items, setItems] = useState<HistoryItem[]>([])
   const generationStatus = useAppStore((s) => s.generationStatus)
+  const historyVersion = useAppStore((s) => s.historyVersion)
 
   /** 히스토리 목록 가져오기 */
   const fetchHistory = useCallback(async () => {
@@ -37,6 +38,14 @@ export default function HistoryBar() {
       return () => clearTimeout(timer)
     }
   }, [generationStatus, fetchHistory])
+
+  // 히스토리 변경(삭제 등) 시 갱신
+  useEffect(() => {
+    if (historyVersion > 0) {
+      const timer = setTimeout(fetchHistory, 300)
+      return () => clearTimeout(timer)
+    }
+  }, [historyVersion, fetchHistory])
 
   if (items.length === 0) {
     return (

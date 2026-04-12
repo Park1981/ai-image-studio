@@ -130,10 +130,14 @@ export interface PromptTemplate {
 // ── 모델 프리셋 타입 ──
 export interface ModelPresetInfo {
   name: string
+  aliases?: string[]
+  mode?: string
   sampler: string
   scheduler: string
   steps: number
   cfg: number
+  vae?: string
+  compatible_loras?: string[]
   default_width: number
   default_height: number
   min_size: number
@@ -339,6 +343,7 @@ export const api = {
       creativity?: number
       detail_level?: 'minimal' | 'normal' | 'detailed'
       categories?: EnhanceCategoryConfig
+      provider?: 'auto' | 'ollama' | 'claude'
     }
   ) =>
     fetchApi<EnhancePromptResponse>('/api/prompt/enhance', {
@@ -351,6 +356,7 @@ export const api = {
         creativity: options?.creativity ?? 0.7,
         detail_level: options?.detail_level || 'normal',
         categories: options?.categories,
+        provider: options?.provider || 'auto',
       }),
     }),
 
