@@ -10,9 +10,31 @@ import { useCallback, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { api } from '@/lib/api'
 
+/** 백엔드 이미지 서버 기본 URL */
+const IMAGE_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+
 export function useEditMode() {
   // 중복 호출 방지 guard
   const busyRef = useRef(false)
+
+  /**
+   * 생성된 이미지에서 바로 수정 모드로 전환
+   * 재업로드 없이 서버 내 이미지 경로를 직접 사용
+   */
+  const startEditFromGenerated = useCallback((imageUrl: string, filename: string) => {
+    const store = useAppStore.getState()
+
+    // imageUrl에서 서버 내 경로 추출: /images/2026-04-11/xxx.png → data/images/2026-04-11/xxx.png
+    // URL 형태: /images/날짜/파일명.png
+    const pathMatch = imageUrl.match(/\/images\/(.+)/)
+    const serverPath = pathMatch ? pathMatch[1] : filename
+
+    // editMode ON + 소스 이미지 경로 설정
+    store.setEditSourceImage(serverPath)
+    store.setEditSourcePreview(`${IMAGE_BASE}${imageUrl}`)
+    store.setEditMode(true)
+    store.setSelectedImageIndex(null)
+  }, [])
 
   /** 수정 모드 이미지 생성 실행 (WebSocket 연결 포함) */
   const executeEdit = useCallback(async (editPrompt: string) => {
@@ -42,6 +64,14 @@ export function useEditMode() {
       const response = await api.generateEdit({
         source_image: editSourceImage,
         edit_prompt: editPrompt.trim(),
+        auto_enhance: store.autoEnhance,
+        checkpoint: store.checkpoint,
+        loras: store.loras.map((l) => ({
+          name: l.name,
+          strength_model: l.strengthModel,
+          strength_clip: l.strengthClip,
+        })),
+        vae: store.vae,
         steps: store.steps,
         cfg: store.cfg,
         seed: store.seed,
@@ -103,5 +133,5 @@ export function useEditMode() {
     }
   }, [])
 
-  return { executeEdit }
+  return { executeEdit, startEditFromGenerated }
 }

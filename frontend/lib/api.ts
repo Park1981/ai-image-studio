@@ -33,8 +33,12 @@ export interface GenerateRequest {
 
 // ── 이미지 수정 요청 타입 ──
 export interface EditRequest {
-  source_image: string  // 업로드된 이미지 파일명
+  source_image: string  // 업로드된 이미지 파일명 또는 서버 내 경로
   edit_prompt: string   // 수정 지시 프롬프트
+  auto_enhance?: boolean  // AI 프롬프트 보강 여부
+  checkpoint?: string   // 체크포인트 이름
+  loras?: { name: string; strength_model: number; strength_clip: number }[]
+  vae?: string          // VAE 이름
   steps?: number
   cfg?: number
   seed?: number
@@ -152,6 +156,7 @@ export interface EnhancePromptResponse {
   negative: string
   fallback?: boolean  // Ollama 호출 실패 시 폴백 사용 여부
   categories: EnhanceCategoryItem[]  // 카테고리별 상세 결과
+  provider?: string  // 보강 제공자: "ollama" | "claude_cli" | "fallback"
 }
 
 // ── Ollama 모델 정보 타입 ──
@@ -328,6 +333,31 @@ export const api = {
         mode: options?.mode || 'generate',
         creativity: options?.creativity ?? 0.7,
         detail_level: options?.detail_level || 'normal',
+        categories: options?.categories,
+      }),
+    }),
+
+  /** 비전(이미지 분석) 기반 프롬프트 AI 보강 (수정 모드) */
+  enhanceEditPrompt: (
+    prompt: string,
+    sourceImage: string,
+    style?: string,
+    model?: string,
+    options?: {
+      creativity?: number
+      detailLevel?: string
+      categories?: EnhanceCategoryConfig
+    }
+  ) =>
+    fetchApi<EnhancePromptResponse>('/api/prompt/enhance-with-vision', {
+      method: 'POST',
+      body: JSON.stringify({
+        prompt,
+        source_image: sourceImage,
+        style: style || 'photorealistic',
+        ollama_model: model || '',
+        creativity: options?.creativity ?? 0.7,
+        detail_level: options?.detailLevel || 'normal',
         categories: options?.categories,
       }),
     }),

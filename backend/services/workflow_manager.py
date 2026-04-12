@@ -179,6 +179,26 @@ class WorkflowManager:
         else:
             logger.warning("KSampler 노드 없음 — 샘플링 파라미터 주입 건너뜀")
 
+        # 체크포인트 주입 (EditRequest에 checkpoint 필드가 있는 경우)
+        if request.checkpoint:
+            ckpt_result = self._find_node_by_class(prompt, _NODE_CHECKPOINT_LOADER)
+            if ckpt_result:
+                _ckpt_id, ckpt_node = ckpt_result
+                ckpt_inputs = ckpt_node.setdefault("inputs", {})
+                ckpt_inputs["ckpt_name"] = request.checkpoint
+
+        # VAE 주입 (EditRequest에 vae 필드가 있는 경우)
+        if request.vae:
+            vae_result = self._find_node_by_class(prompt, _NODE_VAE_LOADER)
+            if vae_result:
+                _vae_id, vae_node = vae_result
+                vae_inputs = vae_node.setdefault("inputs", {})
+                vae_inputs["vae_name"] = request.vae
+
+        # LoRA 주입 (EditRequest에 loras 필드가 있는 경우)
+        if request.loras:
+            self._inject_loras(prompt, request.loras)
+
         logger.info(
             "이미지 수정 워크플로우 빌드 완료: seed=%d, steps=%d, cfg=%.1f, image=%s",
             seed,

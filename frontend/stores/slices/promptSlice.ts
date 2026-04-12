@@ -33,6 +33,8 @@ export interface PromptSlice {
   setEnhancedNegative: (neg: string) => void
   enhanceFallback: boolean  // Ollama 호출 실패 -> 폴백 사용 여부
   setEnhanceFallback: (fallback: boolean) => void
+  enhanceProvider: string  // 보강 제공자: "ollama" | "claude_cli" | "fallback"
+  setEnhanceProvider: (provider: string) => void
   activeStyleHint: string  // 프리셋 기반 AI 보강 스타일 힌트
   setActiveStyleHint: (style: string) => void
   ollamaModel: string  // AI 보강에 사용할 Ollama 모델
@@ -66,6 +68,8 @@ export const createPromptSlice: StateCreator<PromptSlice, [], [], PromptSlice> =
   setEnhancedNegative: (neg) => set({ enhancedNegative: neg }),
   enhanceFallback: false,
   setEnhanceFallback: (fallback) => set({ enhanceFallback: fallback }),
+  enhanceProvider: 'ollama',
+  setEnhanceProvider: (provider) => set({ enhanceProvider: provider }),
   activeStyleHint: 'photorealistic',
   setActiveStyleHint: (style) => set({ activeStyleHint: style }),
   ollamaModel: '',  // 빈 문자열 = 서버 기본 모델 (gemma4:26b)

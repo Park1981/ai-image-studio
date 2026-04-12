@@ -43,9 +43,13 @@ interface WsErrorMessage {
 type WsMessage = WsProgressMessage | WsStatusMessage | WsExecutingMessage | WsCompletedMessage | WsErrorMessage
 
 /** 재접속 최대 횟수 */
-const MAX_RECONNECT_ATTEMPTS = 3
-/** 재접속 대기 시간 (ms) */
-const RECONNECT_DELAY = 2000
+const MAX_RECONNECT_ATTEMPTS = 5
+
+/** Exponential backoff 딜레이 계산 (ms) */
+function getReconnectDelay(attempt: number): number {
+  // 1s, 2s, 4s, 8s, 16s (최대)
+  return Math.min(1000 * Math.pow(2, attempt), 16000)
+}
 
 /** WebSocket 메시지를 스토어로 디스패치 */
 function dispatchWsMessage(msg: WsMessage) {
@@ -134,10 +138,11 @@ function createWebSocket(
       status === 'generating' &&
       reconnectCountRef.current < MAX_RECONNECT_ATTEMPTS
     ) {
-      reconnectCountRef.current = reconnectCountRef.current + 1
+      const attempt = reconnectCountRef.current
+      reconnectCountRef.current = attempt + 1
       setTimeout(
         () => createWebSocket(taskId, wsRef, reconnectCountRef, setIsConnected),
-        RECONNECT_DELAY,
+        getReconnectDelay(attempt),
       )
     }
   }

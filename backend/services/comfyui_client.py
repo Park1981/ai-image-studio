@@ -280,6 +280,8 @@ class ComfyUIClient:
                 ws_uri,
                 open_timeout=_WS_CONNECT_TIMEOUT,
                 close_timeout=_HEALTH_TIMEOUT,
+                ping_interval=30,   # 30초마다 ping으로 연결 상태 확인
+                ping_timeout=10,    # 10초 내 pong 없으면 끊김 감지
             ) as ws:
                 async for raw_message in ws:
                     # 바이너리 메시지는 프리뷰 이미지 — 스킵

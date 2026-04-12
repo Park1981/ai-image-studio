@@ -8,6 +8,7 @@
 
 import { useEffect, useCallback, useState, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
+import { useEditMode } from '@/hooks/useEditMode'
 
 /** 백엔드 이미지 서버 기본 URL */
 const IMAGE_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
@@ -20,6 +21,7 @@ export default function ImageViewer() {
   const generatedImages = useAppStore((s) => s.generatedImages)
   const viewerIndex = useAppStore((s) => s.viewerIndex)
   const setViewerIndex = useAppStore((s) => s.setViewerIndex)
+  const { startEditFromGenerated } = useEditMode()
 
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -166,8 +168,21 @@ export default function ImageViewer() {
           <div className="glass rounded-lg px-3 py-1.5 text-[11px] font-mono text-text-sub">
             {currentImage.filename} · seed: {currentImage.seed}
           </div>
-          <div className="glass rounded-lg px-3 py-1.5 text-[11px] text-text-ghost">
-            {(viewerIndex ?? 0) + 1} / {generatedImages.length}
+          <div className="flex items-center gap-2">
+            {/* 이미지 수정 버튼 */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                startEditFromGenerated(currentImage.url, currentImage.filename)
+                close()
+              }}
+              className="pointer-events-auto glass rounded-lg px-3 py-1.5 text-[11px] font-medium text-accent-bright hover:bg-accent-muted/30 transition-all cursor-pointer"
+            >
+              수정
+            </button>
+            <div className="glass rounded-lg px-3 py-1.5 text-[11px] text-text-ghost">
+              {(viewerIndex ?? 0) + 1} / {generatedImages.length}
+            </div>
           </div>
         </div>
       </div>

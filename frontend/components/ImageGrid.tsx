@@ -9,7 +9,7 @@
 
 import { useAppStore } from '@/stores/useAppStore'
 import { useGenerate } from '@/hooks/useGenerate'
-import { api } from '@/lib/api'
+import { useEditMode } from '@/hooks/useEditMode'
 import { ImagePlaceholderIcon, CheckIcon } from './icons'
 import ImageViewer from './ImageViewer'
 
@@ -34,11 +34,8 @@ export default function ImageGrid() {
   const setSeed = useAppStore((s) => s.setSeed)
   const setViewerIndex = useAppStore((s) => s.setViewerIndex)
 
-  const setEditMode = useAppStore((s) => s.setEditMode)
-  const setEditSourceImage = useAppStore((s) => s.setEditSourceImage)
-  const setEditSourcePreview = useAppStore((s) => s.setEditSourcePreview)
-
   const { generate } = useGenerate()
+  const { startEditFromGenerated } = useEditMode()
 
   // 표시할 슬롯 수 — batchSize 기준 (생성 완료 후에는 실제 이미지 수)
   const slotCount = generatedImages.length > 0
@@ -88,34 +85,11 @@ export default function ImageGrid() {
     setErrorMessage('이미지 변형 기능은 준비 중입니다')
   }
 
-  /** 선택된 이미지로 수정 모드 전환 */
-  const handleEditImage = async (index: number) => {
+  /** 선택된 이미지로 수정 모드 전환 (재업로드 없이 직접 서버 경로 사용) */
+  const handleEditImage = (index: number) => {
     const image = generatedImages[index]
     if (!image) return
-
-    // 이미지 URL에서 파일을 가져와 업로드
-    const imageUrl = `${IMAGE_BASE}${image.url}`
-
-    try {
-      // 이미지를 fetch하여 File 객체로 변환
-      const resp = await fetch(imageUrl)
-      const blob = await resp.blob()
-      const file = new File([blob], image.filename || 'edit-source.png', { type: blob.type })
-
-      // 프리뷰 설정
-      setEditSourcePreview(imageUrl)
-
-      // 백엔드에 업로드
-      const uploadResp = await api.uploadImage(file)
-      if (uploadResp.success && uploadResp.data) {
-        setEditSourceImage(uploadResp.data.filename)
-        setEditMode(true)
-      } else {
-        setErrorMessage(uploadResp.error || '이미지 업로드에 실패했습니다.')
-      }
-    } catch {
-      setErrorMessage('이미지를 수정 모드로 전환하는 중 오류가 발생했습니다.')
-    }
+    startEditFromGenerated(image.url, image.filename)
   }
 
   return (

@@ -211,6 +211,50 @@ async def upload_image(file: UploadFile):
 
 
 # ─────────────────────────────────────────────
+# 소스 이미지 경로 해석 헬퍼
+# ─────────────────────────────────────────────
+
+def _resolve_source_image(source_image: str) -> Path | None:
+    """
+    소스 이미지 경로를 해석하여 실제 파일 경로 반환.
+    - data/uploads/ 또는 data/images/ 내 경로 허용
+    - path traversal 방지: resolve() 후 허용 디렉토리 내인지 검증
+    - 존재하지 않는 파일이면 None 반환
+    """
+    upload_dir = Path(settings.upload_path).resolve()
+    images_dir = Path(settings.output_image_path).resolve()
+
+    # 1) uploads/ 디렉토리에서 먼저 탐색 (기존 동작 호환)
+    upload_path = (Path(settings.upload_path) / source_image).resolve()
+    if upload_path.is_file() and _is_within(upload_path, upload_dir):
+        return upload_path
+
+    # 2) images/ 디렉토리에서 탐색 (생성된 이미지 경로 지원)
+    #    source_image가 "data/images/2026-04-11/xxx.png" 형태일 수 있음
+    images_path = (Path(settings.output_image_path) / source_image).resolve()
+    if images_path.is_file() and _is_within(images_path, images_dir):
+        return images_path
+
+    # 3) 상대 경로 그대로 시도 (data/images/... 전체 경로 전달 시)
+    direct_path = Path(source_image).resolve()
+    if direct_path.is_file() and (
+        _is_within(direct_path, upload_dir) or _is_within(direct_path, images_dir)
+    ):
+        return direct_path
+
+    return None
+
+
+def _is_within(path: Path, parent: Path) -> bool:
+    """path가 parent 디렉토리 내에 있는지 검증 (path traversal 방지)"""
+    try:
+        path.relative_to(parent)
+        return True
+    except ValueError:
+        return False
+
+
+# ─────────────────────────────────────────────
 # 이미지 수정 (Edit) 엔드포인트
 # ─────────────────────────────────────────────
 
@@ -235,22 +279,41 @@ async def _run_edit_generation(task_id: str) -> None:
 
         # 2단계: 소스 이미지를 ComfyUI input 디렉토리에 업로드
         task.status = "generating"
-        upload_dir = Path(settings.upload_path)
-        local_path = upload_dir / request.source_image
+        local_path = _resolve_source_image(request.source_image)
 
-        if not local_path.exists():
+        if local_path is None:
             task.status = "error"
             task.error = f"소스 이미지를 찾을 수 없습니다: {request.source_image}"
             return
 
         comfyui_image_name = await comfyui_client.upload_image(
-            str(local_path), request.source_image
+            str(local_path), local_path.name
+        )
+
+        # 2.5단계: AI 프롬프트 보강 (auto_enhance가 True인 경우)
+        enhanced_edit_prompt = request.edit_prompt
+        if request.auto_enhance:
+            task.status = "enhancing"
+            try:
+                vision_result = await prompt_engine.enhance_prompt_with_vision(
+                    prompt=request.edit_prompt,
+                    image_path=str(local_path),
+                )
+                enhanced_edit_prompt = vision_result.enhanced
+                task.enhanced_prompt = enhanced_edit_prompt
+                task.negative_prompt = vision_result.negative
+            except Exception as exc:
+                logger.warning("수정 모드 프롬프트 보강 실패, 원본 사용: %s", exc)
+
+        # 보강된 프롬프트로 요청 업데이트
+        request_copy = request.model_copy(
+            update={"edit_prompt": enhanced_edit_prompt}
         )
 
         # 3단계: 수정 워크플로우 빌드
         wf = workflow_manager.load_workflow("qwen_image_edit")
         prompt_payload = workflow_manager.build_edit_prompt(
-            request, wf, comfyui_image_name
+            request_copy, wf, comfyui_image_name
         )
 
         # 4단계: ComfyUI에 큐잉

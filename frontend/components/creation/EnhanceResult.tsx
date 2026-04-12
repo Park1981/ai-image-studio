@@ -25,6 +25,7 @@ export default function EnhanceResult() {
   const setEnhancedPrompt = useAppStore((s) => s.setEnhancedPrompt)
   const enhancedNegative = useAppStore((s) => s.enhancedNegative)
   const enhanceFallback = useAppStore((s) => s.enhanceFallback)
+  const enhanceProvider = useAppStore((s) => s.enhanceProvider)
   const enhancedCategories = useAppStore((s) => s.enhancedCategories)
   const generationStatus = useAppStore((s) => s.generationStatus)
   const editMode = useAppStore((s) => s.editMode)
@@ -56,7 +57,11 @@ export default function EnhanceResult() {
       <div className="flex items-center gap-1.5 mb-1.5">
         {enhanceFallback ? <WarningIcon /> : <SparkleIcon />}
         <span className={`text-[11px] font-medium ${enhanceFallback ? 'text-bad' : 'text-accent-bright'}`}>
-          {enhanceFallback ? 'AI 보강 실패 — 기본 프롬프트' : editMode ? 'AI 수정 보강 결과' : 'AI 보강 결과'}
+          {enhanceFallback
+            ? 'AI 보강 실패 — 기본 프롬프트'
+            : enhanceProvider === 'claude_cli'
+              ? editMode ? 'Claude로 수정 보강됨' : 'Claude로 보강됨'
+              : editMode ? 'AI 수정 보강 결과' : 'AI 보강 결과'}
         </span>
         {enhancedCategories.length > 0 && (
           <button

@@ -45,23 +45,40 @@ export function useEnhance() {
       setErrorMessage(null)
 
       // 프리셋 스타일 힌트 + Ollama 모델 + 보강 설정을 전달
-      const { activeStyleHint, ollamaModel, enhanceSettings } = useAppStore.getState()
-      const response = await api.enhancePrompt(
-        textToEnhance,
-        activeStyleHint,
-        ollamaModel,
-        {
-          mode: mode || 'generate',
-          creativity: enhanceSettings.creativity,
-          detail_level: enhanceSettings.detailLevel,
-          categories: enhanceSettings.categories,
-        }
-      )
+      const { activeStyleHint, ollamaModel, enhanceSettings, editMode, editSourceImage } = useAppStore.getState()
+
+      // 수정 모드 + 소스 이미지 있으면 비전(이미지 분석) API 사용
+      const useVision = (mode === 'edit' || editMode) && !!editSourceImage
+      const response = useVision
+        ? await api.enhanceEditPrompt(
+            textToEnhance,
+            editSourceImage!,
+            activeStyleHint,
+            ollamaModel,
+            {
+              creativity: enhanceSettings.creativity,
+              detailLevel: enhanceSettings.detailLevel,
+              categories: enhanceSettings.categories,
+            }
+          )
+        : await api.enhancePrompt(
+            textToEnhance,
+            activeStyleHint,
+            ollamaModel,
+            {
+              mode: mode || 'generate',
+              creativity: enhanceSettings.creativity,
+              detail_level: enhanceSettings.detailLevel,
+              categories: enhanceSettings.categories,
+            }
+          )
 
       if (response.success && response.data) {
         setEnhancedPrompt(response.data.enhanced)
         setEnhancedNegative(response.data.negative || '')
         setEnhanceFallback(response.data.fallback ?? false)
+        // 보강 제공자 저장 (ollama | claude_cli | fallback)
+        useAppStore.getState().setEnhanceProvider(response.data.provider || 'ollama')
         // 카테고리 상세 결과 저장
         useAppStore.getState().setEnhancedCategories(response.data.categories || [])
         setEnhancePending(true)
@@ -104,6 +121,7 @@ export function useEnhance() {
     setEnhancedNegative('')
     setEnhanceFallback(false)
     setGenerationStatus('idle')
+    useAppStore.getState().setEnhanceProvider('ollama')
     useAppStore.getState().setEnhancedCategories([])
   }, [setEnhancePending, setEnhancedPrompt, setEnhancedNegative, setEnhanceFallback, setGenerationStatus])
 

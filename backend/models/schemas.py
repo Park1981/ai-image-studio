@@ -53,8 +53,12 @@ class GenerateRequest(BaseModel):
 
 class EditRequest(BaseModel):
     """이미지 수정 요청 (Qwen Image Edit)"""
-    source_image: str  # 업로드된 이미지 파일명
+    source_image: str  # 업로드된 이미지 파일명 또는 서버 내 생성 이미지 경로
     edit_prompt: str  # 수정 지시 프롬프트
+    auto_enhance: bool = True  # AI 프롬프트 보강 여부
+    checkpoint: str = ""  # 체크포인트 이름 (빈 문자열이면 워크플로우 기본값)
+    loras: list[LoraConfig] = []  # LoRA 설정 목록
+    vae: str = ""  # VAE 이름 (빈 문자열이면 기본값)
     steps: int = Field(default=50, ge=1, le=150)
     cfg: float = Field(default=4.0, ge=1.0, le=30.0)
     seed: int = -1  # -1 = 랜덤
@@ -94,6 +98,17 @@ class EnhanceRequest(BaseModel):
     categories: EnhanceCategoryConfig = EnhanceCategoryConfig()
 
 
+class EnhanceWithVisionRequest(BaseModel):
+    """비전(이미지 분석) 기반 프롬프트 보강 요청"""
+    prompt: str
+    source_image: str  # 이미지 파일명 (uploads/ 또는 images/ 디렉토리)
+    style: str = "photorealistic"
+    ollama_model: str = ""  # 비전 모델 (빈 문자열이면 기본 모델 사용)
+    creativity: float = Field(default=0.7, ge=0.1, le=1.0)
+    detail_level: str = "normal"  # minimal | normal | detailed
+    categories: EnhanceCategoryConfig | None = None
+
+
 class EnhanceCategoryItem(BaseModel):
     """보강 결과의 카테고리별 항목"""
     name: str          # subject | background | lighting | style | mood | technical
@@ -110,6 +125,7 @@ class EnhanceResponse(BaseModel):
     negative: str
     fallback: bool = False  # Ollama 호출 실패 시 폴백 사용 여부
     categories: list[EnhanceCategoryItem] = []  # 카테고리별 상세 결과
+    provider: str = "ollama"  # 보강 제공자: "ollama" | "claude_cli" | "fallback"
 
 
 # ─────────────────────────────────────────────
