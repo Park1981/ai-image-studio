@@ -157,6 +157,32 @@ class ProcessStatusResponse(BaseModel):
 # 히스토리
 # ─────────────────────────────────────────────
 
+# ─────────────────────────────────────────────
+# 프롬프트 템플릿
+# ─────────────────────────────────────────────
+
+class PromptTemplateCreate(BaseModel):
+    """프롬프트 템플릿 생성 요청"""
+    name: str
+    prompt: str = ""
+    negative_prompt: str = ""
+    style: str = "photorealistic"
+
+
+class PromptTemplate(BaseModel):
+    """프롬프트 템플릿 응답"""
+    id: int
+    name: str
+    prompt: str
+    negative_prompt: str
+    style: str
+    created_at: str | None = None
+
+
+# ─────────────────────────────────────────────
+# 히스토리
+# ─────────────────────────────────────────────
+
 class HistoryItem(BaseModel):
     """생성 이력 항목"""
     id: str

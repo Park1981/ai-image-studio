@@ -23,12 +23,17 @@ async def get_process_status():
     ollama_running = await process_manager.check_ollama()
     comfyui_running = await process_manager.check_comfyui()
 
+    # VRAM 사용량 조회 (nvidia-smi)
+    vram = process_manager.get_vram_usage()
+
     return {
         "success": True,
         "data": ProcessStatusResponse(
             ollama=OllamaStatus(running=ollama_running),
             comfyui=ComfyUIStatus(
                 running=comfyui_running,
+                vram_used_gb=vram["used_gb"],
+                vram_total_gb=vram["total_gb"],
                 uptime_min=process_manager.get_comfyui_uptime_minutes(),
             ),
         ),

@@ -30,8 +30,8 @@ export function useProcessStatus() {
           },
           comfyui: {
             running: response.data.comfyui.running,
-            vramUsedGb: 0,
-            vramTotalGb: 16,
+            vramUsedGb: response.data.comfyui.vram_used_gb ?? 0,
+            vramTotalGb: response.data.comfyui.vram_total_gb ?? 16,
           },
         })
       }

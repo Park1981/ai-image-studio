@@ -71,7 +71,7 @@ export interface TaskStatusResponse {
 // ── 프로세스 상태 응답 타입 ──
 export interface ProcessStatusResponse {
   ollama: { running: boolean }
-  comfyui: { running: boolean; uptime_min?: number }
+  comfyui: { running: boolean; uptime_min?: number; vram_used_gb?: number; vram_total_gb?: number }
 }
 
 // ── 모델 목록 응답 타입 ──
@@ -109,6 +109,23 @@ export interface HistoryListResponse {
 }
 
 export type HistoryDetailResponse = HistoryItem
+
+// ── 프롬프트 템플릿 타입 ──
+export interface PromptTemplateCreate {
+  name: string
+  prompt: string
+  negative_prompt: string
+  style: string
+}
+
+export interface PromptTemplate {
+  id: number
+  name: string
+  prompt: string
+  negative_prompt: string
+  style: string
+  created_at: string | null
+}
 
 // ── 모델 프리셋 타입 ──
 export interface ModelPresetInfo {
@@ -368,9 +385,12 @@ export const api = {
 
   // ── 히스토리 API ──
 
-  /** 생성 이력 목록 조회 */
-  getHistory: (page = 1, limit = 20) =>
-    fetchApi<HistoryListResponse>(`/api/history?page=${page}&limit=${limit}`),
+  /** 생성 이력 목록 조회 (검색 지원) */
+  getHistory: (page = 1, limit = 20, query = '') => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (query) params.set('q', query)
+    return fetchApi<HistoryListResponse>(`/api/history?${params.toString()}`)
+  },
 
   /** 이력 상세 조회 */
   getHistoryDetail: (id: string) =>
@@ -379,6 +399,25 @@ export const api = {
   /** 이력 삭제 */
   deleteHistory: (id: string) =>
     fetchApi<{ id: string; message: string }>(`/api/history/${id}`, {
+      method: 'DELETE',
+    }),
+
+  // ── 프롬프트 템플릿 API ──
+
+  /** 저장된 프롬프트 템플릿 목록 조회 */
+  getTemplates: () =>
+    fetchApi<PromptTemplate[]>('/api/prompt/templates'),
+
+  /** 새 프롬프트 템플릿 저장 */
+  saveTemplate: (data: PromptTemplateCreate) =>
+    fetchApi<PromptTemplate>('/api/prompt/templates', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  /** 프롬프트 템플릿 삭제 */
+  deleteTemplate: (id: number) =>
+    fetchApi<{ id: number; message: string }>(`/api/prompt/templates/${id}`, {
       method: 'DELETE',
     }),
 }

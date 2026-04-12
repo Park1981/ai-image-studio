@@ -29,6 +29,15 @@ CREATE TABLE IF NOT EXISTS generations (
 
 CREATE INDEX IF NOT EXISTS idx_generations_created_at
     ON generations(created_at DESC);
+
+CREATE TABLE IF NOT EXISTS prompt_templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    prompt TEXT DEFAULT '',
+    negative_prompt TEXT DEFAULT '',
+    style TEXT DEFAULT 'photorealistic',
+    created_at TEXT NOT NULL DEFAULT (datetime('now', 'localtime'))
+);
 """
 
 
@@ -78,3 +87,111 @@ async def save_generation(
             ),
         )
         await db.commit()
+
+
+# ─────────────────────────────────────────────
+# 프롬프트 템플릿 CRUD
+# ─────────────────────────────────────────────
+
+async def save_template(
+    name: str,
+    prompt: str,
+    negative_prompt: str,
+    style: str,
+) -> dict:
+    """프롬프트 템플릿 저장"""
+    async with aiosqlite.connect(settings.history_db_path) as db:
+        cursor = await db.execute(
+            """
+            INSERT INTO prompt_templates (name, prompt, negative_prompt, style)
+            VALUES (?, ?, ?, ?)
+            """,
+            (name, prompt, negative_prompt, style),
+        )
+        await db.commit()
+        template_id = cursor.lastrowid
+
+    return {
+        "id": template_id,
+        "name": name,
+        "prompt": prompt,
+        "negative_prompt": negative_prompt,
+        "style": style,
+    }
+
+
+async def get_templates() -> list[dict]:
+    """프롬프트 템플릿 전체 목록 조회 (최신순)"""
+    async with aiosqlite.connect(settings.history_db_path) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT * FROM prompt_templates ORDER BY created_at DESC"
+        )
+        rows = await cursor.fetchall()
+        return [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "prompt": r["prompt"],
+                "negative_prompt": r["negative_prompt"],
+                "style": r["style"],
+                "created_at": r["created_at"],
+            }
+            for r in rows
+        ]
+
+
+async def delete_template(template_id: int) -> bool:
+    """프롬프트 템플릿 삭제 (삭제 성공 여부 반환)"""
+    async with aiosqlite.connect(settings.history_db_path) as db:
+        cursor = await db.execute(
+            "DELETE FROM prompt_templates WHERE id = ?",
+            (template_id,),
+        )
+        await db.commit()
+        return cursor.rowcount > 0
+
+
+# ─────────────────────────────────────────────
+# 히스토리 검색
+# ─────────────────────────────────────────────
+
+async def search_generations(
+    query: str,
+    limit: int,
+    offset: int,
+) -> tuple[list[dict], int]:
+    """프롬프트 텍스트 검색 포함 히스토리 조회 (검색어, 페이지네이션)"""
+    async with aiosqlite.connect(settings.history_db_path) as db:
+        db.row_factory = aiosqlite.Row
+
+        if query:
+            like_param = f"%{query}%"
+            # 전체 개수
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM generations WHERE prompt LIKE ?",
+                (like_param,),
+            )
+            row = await cursor.fetchone()
+            total = row[0] if row else 0
+
+            # 목록 조회
+            cursor = await db.execute(
+                """SELECT * FROM generations
+                   WHERE prompt LIKE ?
+                   ORDER BY created_at DESC LIMIT ? OFFSET ?""",
+                (like_param, limit, offset),
+            )
+        else:
+            cursor = await db.execute("SELECT COUNT(*) FROM generations")
+            row = await cursor.fetchone()
+            total = row[0] if row else 0
+
+            cursor = await db.execute(
+                "SELECT * FROM generations ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            )
+
+        rows = await cursor.fetchall()
+        items = [dict(r) for r in rows]
+        return items, total

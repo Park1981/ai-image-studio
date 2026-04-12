@@ -1,17 +1,21 @@
 /**
  * 히스토리 패널 (사이드 오버레이)
  * 헤더 "히스토리" 버튼 클릭 시 오른쪽에서 슬라이드 인
- * 전체 생성 이력 + AI보강 프롬프트 + 설정 복원
+ * 전체 생성 이력 + AI보강 프롬프트 + 설정 복원 + 검색
  */
 
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { api, type HistoryItem } from '@/lib/api'
+import { SearchIcon } from './icons'
 
 /** 백엔드 이미지 서버 기본 URL */
 const IMAGE_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
+
+/** 검색 디바운스 타이머 (ms) */
+const SEARCH_DEBOUNCE = 300
 
 export default function HistoryPanel() {
   const historyPanelOpen = useAppStore((s) => s.historyPanelOpen)
@@ -22,6 +26,10 @@ export default function HistoryPanel() {
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // 검색 관련 상태
+  const [searchQuery, setSearchQuery] = useState('')
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // 스토어 액션 (설정 복원용)
   const setPrompt = useAppStore((s) => s.setPrompt)
@@ -39,10 +47,10 @@ export default function HistoryPanel() {
   const setBatchSize = useAppStore((s) => s.setBatchSize)
   const setEnhancedPrompt = useAppStore((s) => s.setEnhancedPrompt)
 
-  /** 히스토리 목록 가져오기 */
-  const fetchHistory = useCallback(async (pageNum: number, append = false) => {
+  /** 히스토리 목록 가져오기 (검색어 포함) */
+  const fetchHistory = useCallback(async (pageNum: number, query: string, append = false) => {
     setLoading(true)
-    const response = await api.getHistory(pageNum, 20)
+    const response = await api.getHistory(pageNum, 20, query)
     if (response.success && response.data) {
       if (append) {
         setItems((prev) => [...prev, ...response.data.items])
@@ -59,18 +67,36 @@ export default function HistoryPanel() {
   // 패널 열릴 때 목록 로드
   useEffect(() => {
     if (historyPanelOpen) {
-      fetchHistory(1)
+      setSearchQuery('')
+      fetchHistory(1, '')
     }
   }, [historyPanelOpen, fetchHistory])
+
+  // 검색어 디바운스 처리
+  useEffect(() => {
+    if (!historyPanelOpen) return
+
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current)
+    }
+
+    debounceRef.current = setTimeout(() => {
+      fetchHistory(1, searchQuery)
+    }, SEARCH_DEBOUNCE)
+
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [searchQuery, historyPanelOpen, fetchHistory])
 
   /** 더 보기 */
   const handleLoadMore = () => {
     if (!loading && hasMore) {
-      fetchHistory(page + 1, true)
+      fetchHistory(page + 1, searchQuery, true)
     }
   }
 
-  /** 항목 클릭 → 설정 복원 */
+  /** 항목 클릭 → 설정 복원 ("이 설정으로 재생성") */
   const handleSelect = useCallback((item: HistoryItem) => {
     setPrompt(item.prompt)
     setNegativePrompt(item.negative_prompt || '')
@@ -145,7 +171,9 @@ export default function HistoryPanel() {
         <div className="flex items-center justify-between px-4 py-3 border-b border-edge shrink-0">
           <div>
             <h2 className="text-[13px] font-semibold text-text">생성 히스토리</h2>
-            <p className="text-[10px] text-text-ghost mt-0.5">{total}건</p>
+            <p className="text-[10px] text-text-ghost mt-0.5">
+              {searchQuery ? `검색 결과 ${total}건` : `${total}건`}
+            </p>
           </div>
           <button
             onClick={() => setHistoryPanelOpen(false)}
@@ -158,11 +186,40 @@ export default function HistoryPanel() {
           </button>
         </div>
 
+        {/* 검색 입력 */}
+        <div className="px-3 py-2 border-b border-edge/50 shrink-0">
+          <div className="relative">
+            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-ghost">
+              <SearchIcon />
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="프롬프트 검색..."
+              className="w-full bg-surface rounded-lg outline-none pl-8 pr-3 py-2 text-[12px] placeholder-text-ghost border border-edge focus:border-accent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-ghost hover:text-text transition-colors"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
         {/* 목록 */}
         <div className="flex-1 overflow-y-auto">
           {items.length === 0 && !loading && (
             <div className="flex items-center justify-center h-32">
-              <p className="text-[12px] text-text-ghost">생성 이력이 없습니다</p>
+              <p className="text-[12px] text-text-ghost">
+                {searchQuery ? '검색 결과가 없습니다' : '생성 이력이 없습니다'}
+              </p>
             </div>
           )}
 

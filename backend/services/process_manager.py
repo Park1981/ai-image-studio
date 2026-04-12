@@ -35,6 +35,8 @@ class ProcessManager:
         self._comfyui_process: subprocess.Popen | None = None
         # ComfyUI 시작 시각 (업타임 계산용)
         self._comfyui_started_at: float | None = None
+        # 마지막 이미지 생성 완료 시각 (유휴 자동 종료용)
+        self._last_generation_at: float | None = None
 
     # ─────────────────────────────────────────────
     # Ollama 헬스체크
@@ -223,6 +225,85 @@ class ProcessManager:
         except (httpx.HTTPError, httpx.TimeoutException) as exc:
             logger.error("Ollama 모델 목록 조회 실패: %s", exc)
             return []
+
+    # ─────────────────────────────────────────────
+    # VRAM 사용량 조회 (nvidia-smi)
+    # ─────────────────────────────────────────────
+
+    def get_vram_usage(self) -> dict:
+        """
+        nvidia-smi로 GPU VRAM 사용량 조회.
+        반환: {"used_gb": float, "total_gb": float}
+        nvidia-smi 없거나 실패 시 기본값 반환.
+        """
+        try:
+            result = subprocess.run(
+                [
+                    "nvidia-smi",
+                    "--query-gpu=memory.used,memory.total",
+                    "--format=csv,noheader,nounits",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                shell=False,  # 보안: 명시적 False
+            )
+            if result.returncode == 0 and result.stdout.strip():
+                # "4567, 16384" 형태 파싱 (MiB 단위)
+                line = result.stdout.strip().split("\n")[0]
+                parts = line.split(",")
+                used_mib = float(parts[0].strip())
+                total_mib = float(parts[1].strip())
+                return {
+                    "used_gb": round(used_mib / 1024, 1),
+                    "total_gb": round(total_mib / 1024, 1),
+                }
+        except FileNotFoundError:
+            logger.debug("nvidia-smi 미발견 — VRAM 모니터링 불가")
+        except subprocess.TimeoutExpired:
+            logger.warning("nvidia-smi 타임아웃 (5초)")
+        except (ValueError, IndexError, OSError) as exc:
+            logger.warning("nvidia-smi 파싱 실패: %s", exc)
+
+        # 실패 시 기본값 반환
+        return {"used_gb": 0, "total_gb": settings.vram_total_gb}
+
+    # ─────────────────────────────────────────────
+    # 유휴 자동 종료
+    # ─────────────────────────────────────────────
+
+    def mark_generation_complete(self) -> None:
+        """이미지 생성 완료 시 시각 기록 (유휴 타이머 시작)"""
+        self._last_generation_at = time.time()
+        logger.info("생성 완료 시각 기록 — 유휴 타이머 시작")
+
+    async def check_idle_shutdown(self) -> bool:
+        """
+        유휴 자동 종료 체크.
+        마지막 생성 후 설정 시간 경과 시 ComfyUI 종료.
+        반환: True면 종료 실행됨.
+        """
+        if self._last_generation_at is None:
+            return False
+
+        idle_seconds = time.time() - self._last_generation_at
+        threshold = settings.comfyui_auto_shutdown_minutes * 60
+
+        if idle_seconds > threshold:
+            # ComfyUI가 실행 중인지 먼저 확인
+            if await self.check_comfyui():
+                logger.info(
+                    "ComfyUI 유휴 자동 종료: %.1f분 유휴 (임계값 %d분)",
+                    idle_seconds / 60,
+                    settings.comfyui_auto_shutdown_minutes,
+                )
+                await self.stop_comfyui()
+                self._last_generation_at = None  # 타이머 리셋
+                return True
+            else:
+                # 이미 종료되어 있으면 타이머만 리셋
+                self._last_generation_at = None
+        return False
 
     # ─────────────────────────────────────────────
     # 상태 조회 (업타임 등)

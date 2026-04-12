@@ -564,6 +564,9 @@ async def ws_generate(websocket: WebSocket):
                     except Exception as db_exc:
                         logger.warning("히스토리 DB 저장 실패 (무시): %s", db_exc)
 
+                    # 유휴 자동 종료 타이머 시작
+                    process_manager.mark_generation_complete()
+
                 except Exception as exc:
                     logger.error("이미지 다운로드 실패: %s", exc, exc_info=True)
                     task.status = "error"

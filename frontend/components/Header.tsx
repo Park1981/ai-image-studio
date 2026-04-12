@@ -35,6 +35,44 @@ function StatusPill({
   )
 }
 
+/** VRAM 사용량 프로그레스 바 */
+function VramBar({
+  usedGb,
+  totalGb,
+}: {
+  usedGb: number
+  totalGb: number
+}) {
+  const pct = totalGb > 0 ? (usedGb / totalGb) * 100 : 0
+  // 85% 이상 빨간색, 60-85% 노란색, 60% 이하 초록색
+  const barColor =
+    pct >= 85
+      ? 'bg-red-500'
+      : pct >= 60
+        ? 'bg-yellow-500'
+        : 'bg-ok'
+  const textColor =
+    pct >= 85
+      ? 'text-red-400'
+      : pct >= 60
+        ? 'text-yellow-400'
+        : 'text-text-dim'
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className={`text-[10px] font-mono ${textColor}`}>
+        VRAM {usedGb.toFixed(1)}/{totalGb.toFixed(0)}G
+      </span>
+      <div className="w-14 h-1.5 bg-white/[0.06] rounded-full overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-500 ${barColor}`}
+          style={{ width: `${Math.min(pct, 100)}%` }}
+        />
+      </div>
+    </div>
+  )
+}
+
 /** 네비게이션 버튼 */
 function NavButton({
   icon,
@@ -101,6 +139,13 @@ export default function Header() {
           label="ComfyUI"
           running={processStatus.comfyui.running}
         />
+        {/* ComfyUI 실행 중일 때만 VRAM 사용량 표시 */}
+        {processStatus.comfyui.running && (
+          <VramBar
+            usedGb={processStatus.comfyui.vramUsedGb}
+            totalGb={processStatus.comfyui.vramTotalGb}
+          />
+        )}
         <div className="w-px h-4 bg-edge mx-1" />
         {/* 새 생성 (초기화) */}
         <NavButton

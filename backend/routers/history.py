@@ -10,7 +10,7 @@ import logging
 
 from fastapi import APIRouter, Query
 
-from database import get_db
+from database import get_db, search_generations
 from models.schemas import ApiResponse
 
 logger = logging.getLogger(__name__)
@@ -22,55 +22,43 @@ router = APIRouter(prefix="/api/history", tags=["히스토리"])
 async def get_history_list(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=20, ge=1, le=100),
+    q: str = Query(default="", description="프롬프트 검색어"),
 ):
-    """생성 이력 목록 조회 (최신순, 페이지네이션)"""
+    """생성 이력 목록 조회 (최신순, 페이지네이션, 검색)"""
     offset = (page - 1) * limit
 
-    db = await get_db()
-    try:
-        # 전체 개수
-        cursor = await db.execute("SELECT COUNT(*) FROM generations")
-        row = await cursor.fetchone()
-        total = row[0] if row else 0
+    rows, total = await search_generations(query=q, limit=limit, offset=offset)
 
-        # 목록 조회
-        cursor = await db.execute(
-            "SELECT * FROM generations ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (limit, offset),
-        )
-        rows = await cursor.fetchall()
+    items = []
+    for r in rows:
+        images_raw = r.get("images", "[]")
+        items.append({
+            "id": r["id"],
+            "prompt": r["prompt"],
+            "enhanced_prompt": r.get("enhanced_prompt"),
+            "negative_prompt": r.get("negative_prompt"),
+            "width": r["width"],
+            "height": r["height"],
+            "steps": r["steps"],
+            "cfg": r["cfg"],
+            "seed": r["seed"],
+            "sampler": r["sampler"],
+            "scheduler": r["scheduler"],
+            "checkpoint": r["checkpoint"],
+            "images": json.loads(images_raw) if images_raw else [],
+            "created_at": r["created_at"],
+        })
 
-        items = []
-        for r in rows:
-            items.append({
-                "id": r["id"],
-                "prompt": r["prompt"],
-                "enhanced_prompt": r["enhanced_prompt"],
-                "negative_prompt": r["negative_prompt"],
-                "width": r["width"],
-                "height": r["height"],
-                "steps": r["steps"],
-                "cfg": r["cfg"],
-                "seed": r["seed"],
-                "sampler": r["sampler"],
-                "scheduler": r["scheduler"],
-                "checkpoint": r["checkpoint"],
-                "images": json.loads(r["images"]) if r["images"] else [],
-                "created_at": r["created_at"],
-            })
-
-        return {
-            "success": True,
-            "data": {
-                "items": items,
-                "total": total,
-                "page": page,
-                "limit": limit,
-                "has_more": offset + limit < total,
-            },
-        }
-    finally:
-        await db.close()
+    return {
+        "success": True,
+        "data": {
+            "items": items,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "has_more": offset + limit < total,
+        },
+    }
 
 
 @router.get("/{history_id}", response_model=ApiResponse[dict])
