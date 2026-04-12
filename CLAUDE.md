@@ -53,6 +53,23 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 - Frontend: vitest + React Testing Library
 - ComfyUI 관련: mock client로 테스트 (실제 ComfyUI 불필요)
 
+## Browser Testing (Chrome 자동화)
+- 이미지 생성/수정/AI보강 테스트: 스크린샷 최소 **3분 간격**, 중간은 JS/read_page로 상태 확인
+- 레이아웃/UI 수정 등 일반 테스트: 스크린샷 간격 제한 없음
+- 스크린샷 누적으로 2000px 멀티이미지 제한 주의 — 가능하면 텍스트 기반 확인 우선
+- ComfyUI 작업(생성/수정)은 시간이 오래 걸리므로 충분히 대기 후 결과 확인
+
+## Code Review (Codex 연동)
+- 구현/수정 완료 후 codex:codex-rescue 에이전트에게 리뷰 요청
+- Codex 피드백 반영 후 상호 보완하여 품질 향상
+- 대규모 코드 분석, 갭 분석 등 토큰 소모가 큰 작업도 Codex에 위임 가능
+
+## Model System
+- 생성 모드: Qwen Image 2512 (기본), zImage Turbo
+- 수정 모드: Qwen Edit 2511 (기본)
+- 모델 프리셋: backend/models/model_presets.json (mode, vae, 권장 파라미터 포함)
+- 모드 전환 시 모델+파라미터(steps, cfg, sampler, scheduler, vae) 자동 적용
+
 ## Git
 - Branch: feature/{module}-{description}
 - Commit: type(scope): description (Korean OK)
