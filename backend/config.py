@@ -26,7 +26,17 @@ class Settings(BaseSettings):
 
     # Ollama 설정
     ollama_url: str = "http://127.0.0.1:11434"
-    ollama_model: str = "gemma4:26b"
+    ollama_model: str = "gemma4-un"  # 비전(멀티모달) 지원 모델
+
+    # LLM 폴백 설정 (Ollama 실패 시)
+    claude_cli_path: str = "claude"  # Claude CLI 실행 경로
+    llm_fallback_enabled: bool = True  # Ollama 실패 시 Claude CLI 폴백
+
+    # VRAM 모니터링
+    vram_total_gb: float = 16.0  # GPU VRAM 총량
+
+    # 기본 워크플로우
+    default_workflow: str = "qwen_image"
 
     # 앱 설정
     app_host: str = "127.0.0.1"

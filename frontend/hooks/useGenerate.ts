@@ -2,6 +2,9 @@
  * 이미지 생성 오케스트레이션 훅
  * 2단계 플로우: AI보강 → 사용자 확인 → 이미지 생성
  * autoEnhance OFF면 바로 생성
+ *
+ * enhance 로직은 useEnhance 훅으로 분리,
+ * editMode 생성 로직은 useEditMode 훅으로 분리
  */
 
 'use client'
@@ -10,9 +13,16 @@ import { useCallback, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { api } from '@/lib/api'
 import { useWebSocket } from './useWebSocket'
+import { useEnhance } from './useEnhance'
 
 export function useGenerate() {
   const { connect, disconnect } = useWebSocket()
+  const {
+    enhance,
+    getEnhancedResult,
+    cancelEnhance,
+    enhancePending,
+  } = useEnhance()
 
   // 중복 호출 방지 guard (렌더 사이클보다 빠른 더블클릭/연타 차단)
   const busyRef = useRef(false)
@@ -21,9 +31,6 @@ export function useGenerate() {
   const prompt = useAppStore((s) => s.prompt)
   const negativePrompt = useAppStore((s) => s.negativePrompt)
   const autoEnhance = useAppStore((s) => s.autoEnhance)
-  const enhancedPrompt = useAppStore((s) => s.enhancedPrompt)
-  const enhancedNegative = useAppStore((s) => s.enhancedNegative)
-  const enhancePending = useAppStore((s) => s.enhancePending)
   const checkpoint = useAppStore((s) => s.checkpoint)
   const loras = useAppStore((s) => s.loras)
   const vae = useAppStore((s) => s.vae)
@@ -42,73 +49,10 @@ export function useGenerate() {
   const setCurrentTaskId = useAppStore((s) => s.setCurrentTaskId)
   const setProgress = useAppStore((s) => s.setProgress)
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
-  const setEnhancedPrompt = useAppStore((s) => s.setEnhancedPrompt)
-  const setEnhancedNegative = useAppStore((s) => s.setEnhancedNegative)
   const setEnhancePending = useAppStore((s) => s.setEnhancePending)
   const setEnhanceFallback = useAppStore((s) => s.setEnhanceFallback)
-  const setNegativePrompt = useAppStore((s) => s.setNegativePrompt)
 
-  /** 1단계: AI 프롬프트 보강 (sourcePrompt 지정 시 해당 프롬프트로 보강) */
-  const enhance = useCallback(async (sourcePrompt?: string, mode?: 'generate' | 'edit') => {
-    const textToEnhance = sourcePrompt ?? prompt.trim()
-    if (!textToEnhance) {
-      setErrorMessage('프롬프트를 입력해주세요.')
-      return
-    }
-    if (busyRef.current) return
-    busyRef.current = true
-
-    try {
-      setGenerationStatus('enhancing')
-      setProgress(0)
-      setErrorMessage(null)
-
-      // 프리셋 스타일 힌트 + Ollama 모델 + 보강 설정을 전달
-      const { activeStyleHint, ollamaModel, enhanceSettings } = useAppStore.getState()
-      const response = await api.enhancePrompt(
-        textToEnhance,
-        activeStyleHint,
-        ollamaModel,
-        {
-          mode: mode || 'generate',
-          creativity: enhanceSettings.creativity,
-          detail_level: enhanceSettings.detailLevel,
-          categories: enhanceSettings.categories,
-        }
-      )
-
-      if (response.success && response.data) {
-        setEnhancedPrompt(response.data.enhanced)
-        setEnhancedNegative(response.data.negative || '')
-        setEnhanceFallback(response.data.fallback ?? false)
-        // 카테고리 상세 결과 저장
-        useAppStore.getState().setEnhancedCategories(response.data.categories || [])
-        setEnhancePending(true)
-        setGenerationStatus('idle')
-      } else {
-        // 실패 시 이전 보강 결과 초기화
-        setEnhancedPrompt('')
-        setEnhancedNegative('')
-        useAppStore.getState().setEnhancedCategories([])
-        setGenerationStatus('idle')
-        setErrorMessage(response.error || '프롬프트 보강에 실패했습니다.')
-      }
-    } catch {
-      // 에러 시 이전 보강 결과 초기화
-      setEnhancedPrompt('')
-      setEnhancedNegative('')
-      useAppStore.getState().setEnhancedCategories([])
-      setGenerationStatus('idle')
-      setErrorMessage('프롬프트 보강 중 오류가 발생했습니다.')
-    } finally {
-      busyRef.current = false
-    }
-  }, [
-    prompt, setGenerationStatus, setProgress, setErrorMessage,
-    setEnhancedPrompt, setEnhancedNegative, setEnhancePending,
-  ])
-
-  /** 2단계: 이미지 생성 실행 (보강 확인 후 또는 autoEnhance OFF) */
+  /** 이미지 생성 실행 (보강 확인 후 또는 autoEnhance OFF) */
   const startGeneration = useCallback(async (finalPrompt: string, finalNegative: string) => {
     if (generationStatus === 'generating' || generationStatus === 'warming_up') {
       return
@@ -166,7 +110,7 @@ export function useGenerate() {
     generationStatus, checkpoint, loras, vae,
     sampler, scheduler, width, height, steps, cfg, seed, batchSize,
     setGenerationStatus, setCurrentTaskId, setProgress,
-    setErrorMessage, setEnhancePending, connect,
+    setErrorMessage, setEnhancePending, setEnhanceFallback, connect,
   ])
 
   /** 통합 생성 버튼 핸들러 */
@@ -187,20 +131,9 @@ export function useGenerate() {
 
   /** 보강 결과 확인 → 이미지 생성 */
   const confirmEnhance = useCallback(async () => {
-    const finalPrompt = enhancedPrompt || prompt.trim()
-    const finalNegative = enhancedNegative || negativePrompt.trim()
+    const { finalPrompt, finalNegative } = getEnhancedResult()
     await startGeneration(finalPrompt, finalNegative)
-  }, [enhancedPrompt, enhancedNegative, prompt, negativePrompt, startGeneration])
-
-  /** 보강 취소 (원래 프롬프트로 복귀) */
-  const cancelEnhance = useCallback(() => {
-    setEnhancePending(false)
-    setEnhancedPrompt('')
-    setEnhancedNegative('')
-    setEnhanceFallback(false)
-    setGenerationStatus('idle')
-    useAppStore.getState().setEnhancedCategories([])
-  }, [setEnhancePending, setEnhancedPrompt, setEnhancedNegative, setEnhanceFallback, setGenerationStatus])
+  }, [getEnhancedResult, startGeneration])
 
   /** 이미지 생성 취소 */
   const cancel = useCallback(async () => {

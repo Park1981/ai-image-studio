@@ -1,0 +1,48 @@
+/**
+ * 생성 파라미터 슬라이스
+ * sampler, scheduler, 해상도, steps, cfg, seed, batchSize 관리
+ */
+
+import type { StateCreator } from 'zustand'
+
+export interface SettingsSlice {
+  // ── 생성 파라미터 ──
+  sampler: string
+  setSampler: (sampler: string) => void
+  scheduler: string
+  setScheduler: (scheduler: string) => void
+  width: number
+  setWidth: (width: number) => void
+  height: number
+  setHeight: (height: number) => void
+  steps: number
+  setSteps: (steps: number) => void
+  cfg: number
+  setCfg: (cfg: number) => void
+  seed: number
+  setSeed: (seed: number) => void
+  batchSize: number
+  setBatchSize: (batchSize: number) => void
+}
+
+// ── 슬라이스 생성 ──
+
+export const createSettingsSlice: StateCreator<SettingsSlice, [], [], SettingsSlice> = (set) => ({
+  // ── 생성 파라미터 ──
+  sampler: 'euler',
+  setSampler: (sampler) => set({ sampler }),
+  scheduler: 'simple',
+  setScheduler: (scheduler) => set({ scheduler }),
+  width: 1328,
+  setWidth: (width) => set({ width }),
+  height: 1328,
+  setHeight: (height) => set({ height }),
+  steps: 50,
+  setSteps: (steps) => set({ steps }),
+  cfg: 4.0,
+  setCfg: (cfg) => set({ cfg }),
+  seed: -1,
+  setSeed: (seed) => set({ seed }),
+  batchSize: 4,
+  setBatchSize: (batchSize) => set({ batchSize }),
+})

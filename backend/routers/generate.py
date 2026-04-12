@@ -10,7 +10,6 @@ import json
 import logging
 import uuid
 from pathlib import Path
-from typing import Any
 
 from fastapi import APIRouter, UploadFile, WebSocket, WebSocketDisconnect
 
@@ -25,33 +24,32 @@ from models.schemas import (
 from services.comfyui_client import comfyui_client
 from services.process_manager import process_manager
 from services.prompt_engine import prompt_engine
+from services.task_manager import Task, task_manager
 from services.workflow_manager import workflow_manager
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["생성"])
 
+
 # ─────────────────────────────────────────────
-# 인메모리 태스크 관리 (Phase 1 MVP)
+# ComfyUI 확인/시작 헬퍼
 # ─────────────────────────────────────────────
 
-_tasks: dict[str, dict[str, Any]] = {}
-
-
-def _create_task(request: GenerateRequest) -> str:
-    """새 태스크 생성 및 ID 반환"""
-    task_id = str(uuid.uuid4())[:8]
-    _tasks[task_id] = {
-        "status": "queued",
-        "request": request,
-        "prompt_id": None,
-        "progress": 0,
-        "images": [],
-        "error": None,
-        "enhanced_prompt": None,
-        "negative_prompt": None,
-    }
-    return task_id
+async def _ensure_comfyui(task: Task) -> bool:
+    """
+    ComfyUI 실행 확인 및 시작.
+    성공 시 True, 실패 시 task에 에러 세팅 후 False 반환.
+    """
+    task.status = "warming_up"
+    comfyui_running = await process_manager.check_comfyui()
+    if not comfyui_running:
+        started = await process_manager.start_comfyui()
+        if not started:
+            task.status = "error"
+            task.error = "ComfyUI를 시작할 수 없습니다. 설치 경로를 확인해주세요."
+            return False
+    return True
 
 
 # ─────────────────────────────────────────────
@@ -63,33 +61,28 @@ async def _run_generation(task_id: str) -> None:
     백그라운드에서 이미지 생성 전체 파이프라인 실행
     REST 핸들러와 분리되어 즉시 응답 가능
     """
-    task = _tasks[task_id]
-    request: GenerateRequest = task["request"]
+    task = await task_manager.get_task(task_id)
+    if task is None:
+        logger.error("태스크 %s를 찾을 수 없습니다.", task_id)
+        return
+    request: GenerateRequest = task.request
 
     try:
         # 1단계: ComfyUI 확인/시작
-        task["status"] = "warming_up"
-        comfyui_running = await process_manager.check_comfyui()
-        if not comfyui_running:
-            started = await process_manager.start_comfyui()
-            if not started:
-                task["status"] = "error"
-                task["error"] = "ComfyUI를 시작할 수 없습니다. 설치 경로를 확인해주세요."
-                return
-
-        # ComfyUI 실행 확인 완료
+        if not await _ensure_comfyui(task):
+            return
 
         # 2단계: 프롬프트 보강
         enhanced = request.prompt
         negative = request.negative_prompt
         if request.auto_enhance:
-            task["status"] = "enhancing"
+            task.status = "enhancing"
             try:
                 result = await prompt_engine.enhance_prompt(request.prompt)
                 enhanced = result.enhanced
                 negative = negative or result.negative
-                task["enhanced_prompt"] = enhanced
-                task["negative_prompt"] = negative
+                task.enhanced_prompt = enhanced
+                task.negative_prompt = negative
             except Exception as exc:
                 logger.warning("프롬프트 보강 실패, 원본 사용: %s", exc)
 
@@ -105,18 +98,18 @@ async def _run_generation(task_id: str) -> None:
         prompt_payload = workflow_manager.build_prompt(request_copy, wf)
 
         # 4단계: ComfyUI에 큐잉
-        task["status"] = "generating"
+        task.status = "generating"
         result = await comfyui_client.queue_prompt(prompt_payload, task_id)
-        task["prompt_id"] = result.get("prompt_id")
+        task.prompt_id = result.get("prompt_id")
 
         logger.info(
             "태스크 %s: 생성 큐잉 완료 (prompt_id=%s)",
-            task_id, task["prompt_id"],
+            task_id, task.prompt_id,
         )
 
     except Exception as exc:
-        task["status"] = "error"
-        task["error"] = f"생성 파이프라인 오류: {exc}"
+        task.status = "error"
+        task.error = f"생성 파이프라인 오류: {exc}"
         logger.error("태스크 %s 생성 실패: %s", task_id, exc)
 
 
@@ -130,15 +123,15 @@ async def generate_image(request: GenerateRequest):
     이미지 생성 요청 — 즉시 task_id 반환
     실제 생성은 백그라운드에서 진행, WebSocket으로 진행률 수신
     """
-    task_id = _create_task(request)
+    task = await task_manager.create_task(request, mode="generate")
 
     # 백그라운드 태스크로 생성 파이프라인 실행
-    asyncio.create_task(_run_generation(task_id))
+    asyncio.create_task(_run_generation(task.id))
 
     return {
         "success": True,
         "data": GenerateResponse(
-            task_id=task_id,
+            task_id=task.id,
             status="queued",
         ),
     }
@@ -147,7 +140,7 @@ async def generate_image(request: GenerateRequest):
 @router.post("/api/generate/cancel/{task_id}", response_model=ApiResponse[dict])
 async def cancel_generation(task_id: str):
     """생성 중인 태스크 취소"""
-    task = _tasks.get(task_id)
+    task = await task_manager.get_task(task_id)
     if task is None:
         return {
             "success": False,
@@ -155,16 +148,16 @@ async def cancel_generation(task_id: str):
             "error": "존재하지 않는 태스크입니다.",
         }
 
-    if task["status"] not in ("queued", "warming_up", "enhancing", "generating"):
+    if task.status not in ("queued", "warming_up", "enhancing", "generating"):
         return {
             "success": False,
             "data": {},
-            "error": f"취소할 수 없는 상태입니다: {task['status']}",
+            "error": f"취소할 수 없는 상태입니다: {task.status}",
         }
 
     # ComfyUI interrupt 호출
     interrupted = await comfyui_client.interrupt()
-    task["status"] = "cancelled"
+    task.status = "cancelled"
 
     return {
         "success": True,
@@ -221,22 +214,6 @@ async def upload_image(file: UploadFile):
 # 이미지 수정 (Edit) 엔드포인트
 # ─────────────────────────────────────────────
 
-def _create_edit_task(request: EditRequest) -> str:
-    """이미지 수정 태스크 생성 및 ID 반환"""
-    task_id = str(uuid.uuid4())[:8]
-    _tasks[task_id] = {
-        "status": "queued",
-        "request": request,
-        "prompt_id": None,
-        "progress": 0,
-        "images": [],
-        "error": None,
-        "enhanced_prompt": None,
-        "negative_prompt": None,
-    }
-    return task_id
-
-
 async def _run_edit_generation(task_id: str) -> None:
     """
     백그라운드에서 이미지 수정 파이프라인 실행
@@ -245,30 +222,25 @@ async def _run_edit_generation(task_id: str) -> None:
     3. 수정 워크플로우 빌드
     4. ComfyUI에 큐잉
     """
-    task = _tasks[task_id]
-    request: EditRequest = task["request"]
+    task = await task_manager.get_task(task_id)
+    if task is None:
+        logger.error("수정 태스크 %s를 찾을 수 없습니다.", task_id)
+        return
+    request: EditRequest = task.request
 
     try:
         # 1단계: ComfyUI 확인/시작
-        task["status"] = "warming_up"
-        comfyui_running = await process_manager.check_comfyui()
-        if not comfyui_running:
-            started = await process_manager.start_comfyui()
-            if not started:
-                task["status"] = "error"
-                task["error"] = "ComfyUI를 시작할 수 없습니다. 설치 경로를 확인해주세요."
-                return
-
-        # ComfyUI 실행 확인 완료
+        if not await _ensure_comfyui(task):
+            return
 
         # 2단계: 소스 이미지를 ComfyUI input 디렉토리에 업로드
-        task["status"] = "generating"
+        task.status = "generating"
         upload_dir = Path(settings.upload_path)
         local_path = upload_dir / request.source_image
 
         if not local_path.exists():
-            task["status"] = "error"
-            task["error"] = f"소스 이미지를 찾을 수 없습니다: {request.source_image}"
+            task.status = "error"
+            task.error = f"소스 이미지를 찾을 수 없습니다: {request.source_image}"
             return
 
         comfyui_image_name = await comfyui_client.upload_image(
@@ -283,16 +255,16 @@ async def _run_edit_generation(task_id: str) -> None:
 
         # 4단계: ComfyUI에 큐잉
         result = await comfyui_client.queue_prompt(prompt_payload, task_id)
-        task["prompt_id"] = result.get("prompt_id")
+        task.prompt_id = result.get("prompt_id")
 
         logger.info(
             "수정 태스크 %s: 큐잉 완료 (prompt_id=%s)",
-            task_id, task["prompt_id"],
+            task_id, task.prompt_id,
         )
 
     except Exception as exc:
-        task["status"] = "error"
-        task["error"] = f"이미지 수정 파이프라인 오류: {exc}"
+        task.status = "error"
+        task.error = f"이미지 수정 파이프라인 오류: {exc}"
         logger.error("수정 태스크 %s 실패: %s", task_id, exc)
 
 
@@ -303,15 +275,15 @@ async def generate_edit(request: EditRequest):
     소스 이미지 + 수정 프롬프트로 Qwen Image Edit 실행
     WebSocket으로 진행률 수신 (기존 메커니즘 재활용)
     """
-    task_id = _create_edit_task(request)
+    task = await task_manager.create_task(request, mode="edit")
 
     # 백그라운드 태스크로 수정 파이프라인 실행
-    asyncio.create_task(_run_edit_generation(task_id))
+    asyncio.create_task(_run_edit_generation(task.id))
 
     return {
         "success": True,
         "data": GenerateResponse(
-            task_id=task_id,
+            task_id=task.id,
             status="queued",
         ),
     }
@@ -320,7 +292,7 @@ async def generate_edit(request: EditRequest):
 @router.get("/api/generate/status/{task_id}", response_model=ApiResponse[dict])
 async def get_task_status(task_id: str):
     """태스크 상태 조회"""
-    task = _tasks.get(task_id)
+    task = await task_manager.get_task(task_id)
     if task is None:
         return {
             "success": False,
@@ -332,12 +304,12 @@ async def get_task_status(task_id: str):
         "success": True,
         "data": {
             "task_id": task_id,
-            "status": task["status"],
-            "progress": task["progress"],
-            "images": task["images"],
-            "error": task["error"],
-            "enhanced_prompt": task["enhanced_prompt"],
-            "negative_prompt": task["negative_prompt"],
+            "status": task.status,
+            "progress": task.progress,
+            "images": task.images,
+            "error": task.error,
+            "enhanced_prompt": task.enhanced_prompt,
+            "negative_prompt": task.negative_prompt,
         },
     }
 
@@ -371,24 +343,23 @@ async def ws_generate(websocket: WebSocket):
                 continue
 
             task_id = msg.get("task_id")
-            if not task_id or task_id not in _tasks:
+            task = await task_manager.get_task(task_id) if task_id else None
+            if not task:
                 await websocket.send_json(
                     {"type": "error", "message": "유효하지 않은 태스크 ID입니다."}
                 )
                 continue
 
-            task = _tasks[task_id]
-
             # ── 단계 1: 태스크가 generating 상태가 될 때까지 폴링 ──
             for _ in range(300):  # 최대 150초 대기
-                status = task["status"]
+                status = task.status
 
                 # 에러/취소면 즉시 알림
                 if status in ("error", "cancelled"):
                     await websocket.send_json({
                         "type": "error" if status == "error" else "cancelled",
                         "task_id": task_id,
-                        "message": task.get("error", "생성이 취소되었습니다."),
+                        "message": task.error or "생성이 취소되었습니다.",
                     })
                     break
 
@@ -398,12 +369,12 @@ async def ws_generate(websocket: WebSocket):
                     "task_id": task_id,
                     "status": status,
                     "progress": 0,
-                    "enhanced_prompt": task.get("enhanced_prompt"),
-                    "negative_prompt": task.get("negative_prompt"),
+                    "enhanced_prompt": task.enhanced_prompt,
+                    "negative_prompt": task.negative_prompt,
                 })
 
                 # prompt_id가 설정되었으면 ComfyUI WS 단계로 이동
-                if task.get("prompt_id"):
+                if task.prompt_id:
                     break
 
                 await asyncio.sleep(0.5)
@@ -416,10 +387,10 @@ async def ws_generate(websocket: WebSocket):
                 continue
 
             # 에러/취소로 종료된 경우 다음 메시지 대기
-            if task["status"] in ("error", "cancelled"):
+            if task.status in ("error", "cancelled"):
                 continue
 
-            prompt_id = task["prompt_id"]
+            prompt_id = task.prompt_id
 
             # ── 단계 2: ComfyUI WebSocket으로 생성 진행률 수신 ──
             execution_done = False  # 실행 정상 완료 여부 추적
@@ -432,7 +403,7 @@ async def ws_generate(websocket: WebSocket):
                         current = progress.get("value", 0)
                         total = progress.get("max", 1)
                         pct = int((current / total) * 100) if total > 0 else 0
-                        task["progress"] = pct
+                        task.progress = pct
                         await websocket.send_json({
                             "type": "progress",
                             "task_id": task_id,
@@ -456,8 +427,8 @@ async def ws_generate(websocket: WebSocket):
                         error_msg = ws_msg.get("data", {}).get(
                             "exception_message", "알 수 없는 오류"
                         )
-                        task["status"] = "error"
-                        task["error"] = error_msg
+                        task.status = "error"
+                        task.error = error_msg
                         await websocket.send_json({
                             "type": "error",
                             "task_id": task_id,
@@ -484,17 +455,17 @@ async def ws_generate(websocket: WebSocket):
             # ── 단계 3: 이미지 다운로드 및 완료 전송 ──
             logger.info(
                 "태스크 %s: WS 루프 종료 (execution_done=%s, status=%s, prompt_id=%s)",
-                task_id, execution_done, task["status"], prompt_id,
+                task_id, execution_done, task.status, prompt_id,
             )
 
-            if task["status"] != "error":
+            if task.status != "error":
                 try:
                     saved = await comfyui_client.download_and_save_images(
                         prompt_id
                     )
-                    task["images"] = saved
-                    task["status"] = "completed"
-                    task["progress"] = 100
+                    task.images = saved
+                    task.status = "completed"
+                    task.progress = 100
                     logger.info(
                         "태스크 %s: 이미지 %d개 저장 완료, completed 전송 시도",
                         task_id, len(saved),
@@ -507,16 +478,16 @@ async def ws_generate(websocket: WebSocket):
                     logger.info("태스크 %s: completed 전송 성공", task_id)
 
                     # ── DB에 히스토리 저장 ──
-                    raw_req = task["request"]
+                    raw_req = task.request
                     is_edit = isinstance(raw_req, EditRequest)
                     try:
                         await save_generation(
                             generation_id=task_id,
                             prompt=raw_req.edit_prompt if is_edit else raw_req.prompt,
-                            enhanced_prompt=task.get("enhanced_prompt"),
-                            negative_prompt=task.get("negative_prompt"),
+                            enhanced_prompt=task.enhanced_prompt,
+                            negative_prompt=task.negative_prompt,
                             checkpoint=raw_req.checkpoint if hasattr(raw_req, "checkpoint") else "",
-                            loras=json.dumps([l.model_dump() for l in raw_req.loras]) if hasattr(raw_req, "loras") else "[]",
+                            loras=json.dumps([lora.model_dump() for lora in raw_req.loras]) if hasattr(raw_req, "loras") else "[]",
                             sampler=raw_req.sampler if hasattr(raw_req, "sampler") else "euler",
                             scheduler=raw_req.scheduler if hasattr(raw_req, "scheduler") else "simple",
                             width=raw_req.width if hasattr(raw_req, "width") else 1024,
@@ -532,8 +503,8 @@ async def ws_generate(websocket: WebSocket):
 
                 except Exception as exc:
                     logger.error("이미지 다운로드 실패: %s", exc, exc_info=True)
-                    task["status"] = "error"
-                    task["error"] = f"이미지 저장 실패: {exc}"
+                    task.status = "error"
+                    task.error = f"이미지 저장 실패: {exc}"
                     try:
                         await websocket.send_json({
                             "type": "error",
