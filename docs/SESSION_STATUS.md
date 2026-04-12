@@ -1,60 +1,19 @@
 # AI Image Studio — 프로젝트 진행 상태
 
-> 마지막 업데이트: 2026-04-12 (세션 4)
+> 마지막 업데이트: 2026-04-12 (세션 5)
 > 세션 복구용 문서 — 새 세션에서 이 파일을 먼저 읽을 것
 
 ---
 
 ## 현재 진행 단계
 
-**Phase 0: 프로젝트 초기화 ✅**
-**Phase 0.5: 디자인 시스템 확정 ✅**
-**Phase 1: MVP 백엔드 + 프론트엔드 연동 ✅**
-**Phase 1.5: Qwen 모델 연동 + E2E + 버그 수정 6건 ✅**
-**Phase 2: AI보강 2단계 + 풀스크린 뷰어 + 접근성 + 단축키 ✅**
-**Phase 3: 히스토리 시스템 (DB + 패널 + 설정 복원) ✅**
-**Phase 4: 프리셋 + 뷰어 줌 + 설정 페이지 + 프리셋→AI보강 연동 ✅**
-**Phase 4.5: Ollama 폴백 경고 + LLM 모델 스위칭 ✅**
-**Phase 5: Qwen Image Edit 이미지 수정 기능 ✅**
-**Phase 6: 구조화 AI 보강 + 수정 모드 AI보강 ✅**
-**Phase 7: 프로세스 관리 + 모델 프리셋 + 커스텀 사이즈 ✅**
-**Phase 8: 잔여 개선 + Codex 리뷰 반영 ✅**
-**Phase 9: 최종 레이아웃 리팩토링 ✅**
-**Phase 9.5: 모델 시스템 리팩토링 ← 구현 완료, 테스트 필요**
-**Phase 10: 미착수 (영상 생성 — 최종 단계)**
-
----
-
-## 🔴 다음 세션에서 할 것 (이어서 하자)
-
-### 1. 모델 시스템 리팩 테스트 (최우선)
-세션 4에서 구현 완료된 코드가 정상 동작하는지 브라우저 테스트:
-
-**변경 파일:**
-- `backend/models/model_presets.json` — 3개 모델만 (Qwen 2512, zImage Turbo, Qwen Edit 2511)
-- `frontend/components/CreationPanel.tsx` — 모드별 필터링 + 자동 전환 + VAE 매칭
-
-**테스트 항목:**
-- [ ] 생성 모드 드롭다운: Qwen Image 2512 (기본) + zImage Turbo만 표시
-- [ ] 수정 모드 전환 시 Qwen Edit 2511 자동 선택
-- [ ] zImage Turbo 선택 시 steps=8, cfg=1.0, scheduler=sgm_uniform 적용
-- [ ] 모드 전환 시 VAE 자동 매칭 (qwen_image_vae / zImage_vae)
-- [ ] 생성 모드로 복귀 시 Qwen 2512 기본값 복원 (steps=50, cfg=4.0)
-
-### 2. E2E 테스트 이어서
-- TEST 5: 수정 모드 이미지 생성 (Qwen Edit 2511)
-- TEST 6: 새 프롬프트 txt2img 생성
-- TEST 7: 히스토리 목록 + 삭제
-- TEST 8: 에러 핸들링
-
-### 3. 발견된 이슈
-- 프롬프트 텍스트 중복 입력 현상: AI 보강 결과에 텍스트 중복 발생 → 원인 조사 필요
-
-### 4. Codex 리뷰
-- 모델 시스템 리팩 코드에 대해 codex:codex-rescue 리뷰 요청
-
-### 5. Phase 10: 영상 생성 (최종)
-- WAN 2.2 / HunyuanVideo 연동 (모델 이미 설치됨)
+**Phase 1~9: 기본 기능 구현 ✅** (txt2img, edit, 히스토리, 프리셋, 뷰어, 레이아웃)
+**Phase A: 코드 구조 리팩토링 ✅** (슬라이스 분리, 컴포넌트 분해, 공유 훅, TaskManager)
+**Phase B: 핵심 기능 개선 ✅** (비전 보강, Claude CLI 폴백, 생성→수정 흐름, Edit 확장, WS 안정화)
+**Phase C: 새 기능 추가 ✅** (템플릿, 히스토리 검색, VRAM 표시, 유휴 자동 종료)
+**Phase D: 테스트 ✅** (백엔드 pytest 64개 + 프론트엔드 vitest 34개)
+**갭 분석: 93% (14/15 항목 완벽 구현)** — SamplingSettings→AdvancedSettings 네이밍 차이만
+**Phase 10: 미착수** (영상 생성 — WAN 2.2 / HunyuanVideo 연동)
 
 ---
 
@@ -62,7 +21,7 @@
 
 ```bash
 # 서비스 포트 매핑
-ComfyUI Desktop: http://127.0.0.1:8000
+ComfyUI Desktop: http://127.0.0.1:8188
 백엔드 (FastAPI): http://127.0.0.1:8001
 프론트엔드 (Next.js): http://localhost:3000
 Ollama: http://127.0.0.1:11434
@@ -71,9 +30,13 @@ Ollama: http://127.0.0.1:11434
 1. ComfyUI Desktop 직접 실행 (바탕화면 아이콘) 또는 백엔드가 자동 시작
 2. cd backend && ../.venv/Scripts/uvicorn main:app --host 127.0.0.1 --port 8001 --reload
 3. cd frontend && npm run dev
+
+# 테스트 실행
+4. cd backend && python -m pytest tests/ -v
+5. cd frontend && npm test
 ```
 
-## 모델 시스템 (Phase 9.5 — 신규)
+## 모델 시스템
 
 | 모드 | 모델 | Steps | CFG | Sampler | Scheduler | VAE |
 |------|------|-------|-----|---------|-----------|-----|
@@ -81,68 +44,91 @@ Ollama: http://127.0.0.1:11434
 | 생성 | zImage Turbo | 8 | 1.0 | euler_ancestral | sgm_uniform | zImage_vae |
 | 수정 | Qwen Edit 2511 | 50 | 4.0 | euler | simple | qwen_image_vae |
 
-- 모드 전환(생성↔수정) 시 모델 + 파라미터 자동 적용
-- 프리셋 데이터: `backend/models/model_presets.json`
-- 필터링 로직: `frontend/components/CreationPanel.tsx` (filteredModels useMemo)
-
 ---
 
 ## 프로젝트 구조
 
 ```
 ai-image-studio/
-├── frontend/                        # Next.js 14 (Tailwind CSS)
-│   ├── app/page.tsx                 # 메인 페이지
+├── frontend/                            # Next.js 14 (Tailwind CSS)
+│   ├── app/page.tsx                     # 메인 페이지
 │   ├── components/
-│   │   ├── Header.tsx               # 로고 + 상태 + 새생성/히스토리/설정
-│   │   ├── ImageGrid.tsx            # 동적 그리드 (batchSize 기반)
-│   │   ├── ImageViewer.tsx          # 풀스크린 뷰어 (줌/패닝)
-│   │   ├── CreationPanel.tsx        # 오른쪽 통합 패널 (프롬프트+설정+모델)
-│   │   ├── SettingsPanel.tsx        # 설정 모달 (프로세스/단축키)
-│   │   ├── HistoryBar.tsx           # 하단 썸네일 갤러리
-│   │   ├── HistoryPanel.tsx         # 전체 히스토리 패널
-│   │   ├── ErrorToast.tsx           # 에러 알림
-│   │   └── icons.tsx                # SVG 아이콘
+│   │   ├── Header.tsx                   # 로고 + VRAM 바 + 상태
+│   │   ├── ImageGrid.tsx                # 동적 그리드 + "수정" 버튼
+│   │   ├── ImageViewer.tsx              # 풀스크린 뷰어 (줌/패닝)
+│   │   ├── CreationPanel.tsx            # 오른쪽 통합 패널 (레이아웃 컨테이너)
+│   │   ├── creation/                    # 서브컴포넌트 (Phase A 분해)
+│   │   │   ├── PromptInput.tsx          # 프롬프트 입력 + 네거티브 + AI보강 체크
+│   │   │   ├── EnhanceResult.tsx        # 보강 결과 카테고리 표시/확인
+│   │   │   ├── ModelSelector.tsx        # 체크포인트 선택
+│   │   │   ├── SizeSelector.tsx         # 사이즈 프리셋 + 커스텀
+│   │   │   ├── AdvancedSettings.tsx     # sampler/scheduler/steps/cfg/seed/VAE/LoRA
+│   │   │   ├── EditModePanel.tsx        # 이미지 업로드 + 프리뷰
+│   │   │   └── GenerateButton.tsx       # 생성/취소 버튼
+│   │   ├── HistoryPanel.tsx             # 히스토리 패널 (검색 지원)
+│   │   └── icons.tsx                    # SVG 아이콘
 │   ├── hooks/
-│   │   ├── useGenerate.ts           # 2단계 생성 (보강→확인→생성)
-│   │   ├── useWebSocket.ts          # WS 진행률 수신
-│   │   ├── useModels.ts             # 모델 목록 조회
-│   │   └── useProcessStatus.ts      # 프로세스 상태 폴링
-│   ├── stores/useAppStore.ts        # Zustand 전역 상태
+│   │   ├── useGenerate.ts              # 2단계 생성 오케스트레이션
+│   │   ├── useEnhance.ts               # AI 보강 로직
+│   │   ├── useEditMode.ts              # 수정 모드 전환/소스 이미지 관리
+│   │   ├── useModelPresets.ts           # 모델별 권장 파라미터 자동 적용
+│   │   ├── useWebSocket.ts             # WS 진행률 (exponential backoff)
+│   │   ├── useModels.ts                # 모델 목록 조회
+│   │   └── useProcessStatus.ts         # 프로세스 상태 폴링
+│   ├── stores/
+│   │   ├── useAppStore.ts              # Zustand (슬라이스 합성 진입점)
+│   │   └── slices/                     # 6개 슬라이스 (Phase A 분리)
+│   │       ├── promptSlice.ts
+│   │       ├── generationSlice.ts
+│   │       ├── modelSlice.ts
+│   │       ├── settingsSlice.ts
+│   │       ├── uiSlice.ts
+│   │       └── processSlice.ts
 │   ├── lib/
-│   │   ├── api.ts                   # API 클라이언트
-│   │   └── presets.ts               # 프리셋 시스템
-│   └── styles/design-tokens.ts      # 디자인 토큰
+│   │   ├── api.ts                      # API 클라이언트
+│   │   └── presets.ts                  # 프리셋 시스템
+│   ├── __tests__/                      # vitest (Phase D)
+│   │   ├── setup.ts
+│   │   ├── slices.test.ts
+│   │   └── useGenerate.test.ts
+│   └── styles/design-tokens.ts         # 디자인 토큰
 │
-├── backend/                         # FastAPI
-│   ├── main.py                      # 엔트리
-│   ├── config.py                    # 환경 설정
-│   ├── database.py                  # SQLite 히스토리 DB
+├── backend/                             # FastAPI
+│   ├── main.py                         # 엔트리 + lifespan
+│   ├── config.py                       # pydantic-settings 환경 설정
+│   ├── database.py                     # SQLite (히스토리 + 템플릿)
 │   ├── routers/
-│   │   ├── generate.py              # 이미지 생성 + WS + 히스토리 저장
-│   │   ├── history.py               # 히스토리 CRUD API
-│   │   ├── process.py               # ComfyUI/Ollama 관리
-│   │   ├── models.py                # 모델 목록 + 프리셋
-│   │   └── prompt.py                # AI 프롬프트 보강
+│   │   ├── generate.py                 # 이미지 생성/수정 + WS
+│   │   ├── history.py                  # 히스토리 CRUD + 검색
+│   │   ├── process.py                  # ComfyUI/Ollama 관리 + VRAM
+│   │   ├── models.py                   # 모델 목록 + 프리셋
+│   │   └── prompt.py                   # AI 보강 + 비전 + 템플릿 CRUD
 │   ├── services/
-│   │   ├── comfyui_client.py        # ComfyUI REST/WS 클라이언트
-│   │   ├── process_manager.py       # 프로세스 라이프사이클
-│   │   ├── workflow_manager.py      # 워크플로우 파라미터 주입
-│   │   └── prompt_engine.py         # Ollama 프롬프트 보강 엔진
+│   │   ├── comfyui_client.py           # ComfyUI REST/WS 클라이언트
+│   │   ├── process_manager.py          # 프로세스 라이프사이클 + 유휴 종료
+│   │   ├── workflow_manager.py         # 워크플로우 파라미터/LoRA 주입
+│   │   ├── prompt_engine.py            # Ollama + Claude CLI 폴백 + 비전
+│   │   └── task_manager.py             # 태스크 CRUD (asyncio.Lock)
 │   ├── models/
-│   │   ├── schemas.py               # Pydantic 스키마
-│   │   └── model_presets.json       # 모델별 권장 파라미터
-│   └── workflows/
-│       ├── qwen_image.json          # Qwen Image 생성 워크플로우
-│       ├── qwen_image_edit.json     # Qwen Image Edit 수정 워크플로우
-│       └── txt2img.json             # 범용 txt2img 워크플로우
+│   │   ├── schemas.py                  # Pydantic 스키마
+│   │   └── model_presets.json          # 모델별 권장 파라미터
+│   ├── workflows/
+│   │   ├── qwen_image.json
+│   │   ├── qwen_image_edit.json
+│   │   └── txt2img.json
+│   ├── tests/                          # pytest (Phase D)
+│   │   ├── conftest.py
+│   │   ├── test_prompt_engine.py
+│   │   ├── test_workflow_manager.py
+│   │   ├── test_task_manager.py
+│   │   └── test_generate.py
+│   └── pytest.ini
 │
-├── data/
-│   ├── images/                      # 생성 이미지 (날짜별 하위폴더)
-│   ├── uploads/                     # 수정 모드 소스 이미지 업로드
-│   └── history.db                   # SQLite 히스토리 DB
-├── docs/SESSION_STATUS.md           # ← 이 파일
-└── CLAUDE.md                        # 프로젝트 지시서
+├── docs/
+│   ├── SESSION_STATUS.md               # ← 이 파일
+│   └── design-brief.md                 # 초기 설계 문서
+├── .gitignore
+└── CLAUDE.md                           # 프로젝트 지시서
 ```
 
 ---
@@ -167,4 +153,4 @@ ai-image-studio/
 
 ---
 
-> 새 세션 시작 시: 이 파일 읽고 → "모델 시스템 리팩 테스트" 우선 진행
+> 다음 목표: Phase 10 (영상 생성 — WAN 2.2 / HunyuanVideo 연동)
