@@ -123,13 +123,19 @@ export default function PromptInput() {
 
   return (
     <>
-      {/* 프롬프트 textarea */}
+      {/* 프롬프트 textarea — 보강 대기 중에는 "원본" 라벨 + 반투명 표시로 대조성 강화 */}
       <div className="px-3 pt-3">
+        {enhancePending && (
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-[10px] font-medium text-text-dim uppercase tracking-wider">원본 프롬프트</span>
+            <span className="text-[10px] text-text-ghost">↓ 보강 결과는 아래 참고</span>
+          </div>
+        )}
         <textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
           placeholder={editMode ? '수정할 내용을 설명해주세요...' : '이미지를 설명해주세요... (한국어 입력 가능)'}
-          rows={3}
+          rows={enhancePending ? 2 : 3}
           disabled={isGenerating || enhancePending}
           className="w-full bg-surface rounded-lg resize-none outline-none px-3 py-2.5 text-[13px] placeholder-text-ghost leading-relaxed border border-edge focus:border-accent disabled:opacity-50"
         />

@@ -10,7 +10,7 @@ import { useAppStore } from '@/stores/useAppStore'
 import { useGenerate } from '@/hooks/useGenerate'
 import { useEnhance } from '@/hooks/useEnhance'
 import { useEditMode } from '@/hooks/useEditMode'
-import { BoltIcon, EditIcon, StopIcon } from '../icons'
+import { BoltIcon, EditIcon, StopIcon, SparkleIcon } from '../icons'
 
 export default function GenerateButton() {
   // ── 스토어 상태 ──
@@ -72,6 +72,22 @@ export default function GenerateButton() {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [generate, handleEditGenerate, confirmEnhance, cancelEnhance, isGenerating, enhancePending, editMode, prompt])
 
+  // ── 버튼 레이블 상태별 결정 ──
+  // 1. 생성/수정 진행 중   → "취소"
+  // 2. 보강 완료 대기 상태 → "이미지 생성" / "이미지 수정" (보강 결과로 실제 생성 실행)
+  // 3. autoEnhance ON + 입력 있음 → "프롬프트 보강" (보강 단계 선행)
+  // 4. autoEnhance OFF    → "이미지 생성" / "이미지 수정" (즉시 실행)
+  let buttonLabel: React.ReactNode
+  if (isGenerating) {
+    buttonLabel = <><StopIcon /> 취소</>
+  } else if (enhancePending) {
+    buttonLabel = editMode ? <><EditIcon /> 이미지 수정</> : <><BoltIcon /> 이미지 생성</>
+  } else if (autoEnhance && prompt.trim()) {
+    buttonLabel = <><SparkleIcon /> 프롬프트 보강</>
+  } else {
+    buttonLabel = editMode ? <><EditIcon /> 이미지 수정</> : <><BoltIcon /> 이미지 생성</>
+  }
+
   return (
     <div className="shrink-0 px-3 py-2.5 border-t border-edge">
       <button
@@ -83,13 +99,7 @@ export default function GenerateButton() {
             : 'btn-glow text-white disabled:opacity-30 disabled:cursor-not-allowed'
         }`}
       >
-        {isGenerating ? (
-          <><StopIcon /> 취소</>
-        ) : editMode ? (
-          <><EditIcon /> 수정</>
-        ) : (
-          <><BoltIcon /> 생성</>
-        )}
+        {buttonLabel}
       </button>
       <span className="block text-center text-[10px] text-text-ghost mt-1">Ctrl+Enter</span>
     </div>

@@ -28,7 +28,7 @@ from models.schemas import (
 logger = logging.getLogger(__name__)
 
 # Ollama API 타임아웃 (초) — LLM 추론은 오래 걸릴 수 있음
-_LLM_TIMEOUT: float = 90.0
+_LLM_TIMEOUT: float = 300.0  # 대형 모델(gemma4-un 16GB) 콜드스타트 대응
 
 # ─────────────────────────────────────────────
 # 카테고리 정의

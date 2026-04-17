@@ -26,6 +26,22 @@ export default function EditModePanel() {
   // 수정 모드가 아니면 렌더링 안 함
   if (!editMode) return null
 
+  /**
+   * 업로드된 이미지의 원본 치수를 sanitize 하여 스토어에 주입
+   * - Qwen Edit 권장 step_size=16의 배수로 반올림 (ComfyUI latent 호환)
+   * - min 512, max 2048 범위 클램프
+   */
+  const applySourceDimensions = (dataUrl: string) => {
+    const img = new Image()
+    img.onload = () => {
+      const snap = (v: number) => Math.max(512, Math.min(2048, Math.round(v / 16) * 16))
+      const store = useAppStore.getState()
+      store.setWidth(snap(img.naturalWidth))
+      store.setHeight(snap(img.naturalHeight))
+    }
+    img.src = dataUrl
+  }
+
   /** 이미지 업로드 처리 */
   const handleFileUpload = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -35,7 +51,12 @@ export default function EditModePanel() {
     setUploading(true)
     try {
       const reader = new FileReader()
-      reader.onload = (e) => setEditSourcePreview(e.target?.result as string)
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        setEditSourcePreview(dataUrl)
+        // 원본 이미지 치수를 자동으로 가로/세로 필드에 적용 (수정 모드 UX)
+        applySourceDimensions(dataUrl)
+      }
       reader.readAsDataURL(file)
       const response = await api.uploadImage(file)
       if (response.success && response.data) {

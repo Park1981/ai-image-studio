@@ -49,8 +49,6 @@ export function useGenerate() {
   const setCurrentTaskId = useAppStore((s) => s.setCurrentTaskId)
   const setProgress = useAppStore((s) => s.setProgress)
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
-  const setEnhancePending = useAppStore((s) => s.setEnhancePending)
-  const setEnhanceFallback = useAppStore((s) => s.setEnhanceFallback)
 
   /** 이미지 생성 실행 (보강 확인 후 또는 autoEnhance OFF) */
   const startGeneration = useCallback(async (finalPrompt: string, finalNegative: string) => {
@@ -61,11 +59,10 @@ export function useGenerate() {
     busyRef.current = true
 
     try {
+      // 보강 상태(enhancePending)는 의도적으로 유지 — 생성 중에도 보강 프롬프트 가시화
       setGenerationStatus('warming_up')
       setProgress(0)
       setErrorMessage(null)
-      setEnhancePending(false)
-      setEnhanceFallback(false)
 
       // auto_enhance=false — 이미 보강된 프롬프트를 직접 전달
       const response = await api.generate({
@@ -110,7 +107,7 @@ export function useGenerate() {
     generationStatus, checkpoint, loras, vae,
     sampler, scheduler, width, height, steps, cfg, seed, batchSize,
     setGenerationStatus, setCurrentTaskId, setProgress,
-    setErrorMessage, setEnhancePending, setEnhanceFallback, connect,
+    setErrorMessage, connect,
   ])
 
   /** 통합 생성 버튼 핸들러 */

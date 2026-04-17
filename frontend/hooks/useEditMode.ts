@@ -56,12 +56,11 @@ export function useEditMode() {
     busyRef.current = true
 
     // 상태 초기화
+    // 주의: enhancePending/enhancedCategories 는 의도적으로 유지 —
+    //       생성 중에도 "사용된 보강 프롬프트"가 UI에 남아있어야 사용자 혼란 방지
     store.setGenerationStatus('warming_up')
     store.setProgress(0)
     store.setErrorMessage(null)
-    store.setEnhancePending(false)
-    store.setEnhanceFallback(false)
-    store.setEnhancedCategories([])
 
     try {
       const response = await api.generateEdit({
