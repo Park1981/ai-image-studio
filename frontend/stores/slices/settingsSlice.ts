@@ -23,6 +23,10 @@ export interface SettingsSlice {
   setSeed: (seed: number) => void
   batchSize: number
   setBatchSize: (batchSize: number) => void
+  // 커스텀 px 모드의 비율 잠금 ('자유' | '1:1' | '16:9' | ...)
+  // 외부에서 이미지 해상도 반영 시 '자유'로 전환하기 위해 store로 노출
+  customRatio: string
+  setCustomRatio: (ratio: string) => void
 }
 
 // ── 슬라이스 생성 ──
@@ -43,6 +47,8 @@ export const createSettingsSlice: StateCreator<SettingsSlice, [], [], SettingsSl
   setCfg: (cfg) => set({ cfg }),
   seed: -1,
   setSeed: (seed) => set({ seed }),
-  batchSize: 4,
+  batchSize: 1,
   setBatchSize: (batchSize) => set({ batchSize }),
+  customRatio: '1:1',
+  setCustomRatio: (customRatio) => set({ customRatio }),
 })

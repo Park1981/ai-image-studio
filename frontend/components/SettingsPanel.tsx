@@ -26,6 +26,7 @@ export default function SettingsPanel() {
   const setEnhanceCategory = useAppStore((s) => s.setEnhanceCategory)
 
   const [comfyLoading, setComfyLoading] = useState(false)
+  const [ollamaLoading, setOllamaLoading] = useState(false)
   const [ollamaModels, setOllamaModels] = useState<OllamaModelInfo[]>([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [customPresets, setCustomPresets] = useState<Preset[]>([])
@@ -48,6 +49,17 @@ export default function SettingsPanel() {
     }
   }, [settingsOpen, fetchOllamaModels])
 
+  /** 상태 즉시 갱신 (10초 폴링 대기 안 함) */
+  const refreshProcessStatus = useCallback(async () => {
+    const status = await api.getProcessStatus()
+    if (status.success && status.data) {
+      useAppStore.getState().setProcessStatus({
+        ollama: { running: status.data.ollama.running, modelLoaded: null },
+        comfyui: { running: status.data.comfyui.running, vramUsedGb: 0, vramTotalGb: 16 },
+      })
+    }
+  }, [])
+
   /** ComfyUI 시작/종료 후 즉시 상태 갱신 */
   const handleToggleComfyUI = async () => {
     setComfyLoading(true)
@@ -56,15 +68,26 @@ export default function SettingsPanel() {
     } else {
       await api.startComfyUI()
     }
-    // 즉시 상태 갱신 (10초 폴링 대기 안 함)
-    const status = await api.getProcessStatus()
-    if (status.success && status.data) {
-      useAppStore.getState().setProcessStatus({
-        ollama: { running: status.data.ollama.running, modelLoaded: null },
-        comfyui: { running: status.data.comfyui.running, vramUsedGb: 0, vramTotalGb: 16 },
-      })
-    }
+    await refreshProcessStatus()
     setComfyLoading(false)
+  }
+
+  /** Ollama 시작/종료 후 즉시 상태 갱신 + 모델 목록 리로드 */
+  const handleToggleOllama = async () => {
+    setOllamaLoading(true)
+    const res = processStatus.ollama.running
+      ? await api.stopOllama()
+      : await api.startOllama()
+    if (!res.success && res.error) {
+      // 사용자에게 실패 이유 알림 (간단히 alert)
+      alert(res.error)
+    }
+    await refreshProcessStatus()
+    // 새로 실행됐다면 모델 목록 리로드
+    if (!processStatus.ollama.running) {
+      await fetchOllamaModels()
+    }
+    setOllamaLoading(false)
   }
 
   if (!settingsOpen) return null
@@ -112,9 +135,17 @@ export default function SettingsPanel() {
                   <div className={`w-2 h-2 rounded-full ${processStatus.ollama.running ? 'bg-ok pulse-live' : 'bg-text-ghost'}`} />
                   <span className="text-[12px] text-text">Ollama</span>
                 </div>
-                <span className={`text-[11px] ${processStatus.ollama.running ? 'text-ok' : 'text-text-ghost'}`}>
-                  {processStatus.ollama.running ? '실행 중' : '미실행'}
-                </span>
+                <button
+                  onClick={handleToggleOllama}
+                  disabled={ollamaLoading}
+                  className={`text-[11px] px-3 py-1 rounded-md transition-all ${
+                    processStatus.ollama.running
+                      ? 'text-bad hover:bg-bad/10'
+                      : 'text-ok hover:bg-ok/10'
+                  } disabled:opacity-40`}
+                >
+                  {ollamaLoading ? '...' : processStatus.ollama.running ? '종료' : '시작'}
+                </button>
               </div>
 
               {/* ComfyUI */}
@@ -176,14 +207,12 @@ export default function SettingsPanel() {
                   onChange={(e) => setOllamaModel(e.target.value)}
                   className="bg-surface text-[11px] font-mono text-text-sub rounded-md px-2 py-1.5 border border-edge hover:border-edge-hover focus:border-accent outline-none transition-all cursor-pointer max-w-[200px] truncate"
                 >
-                  <option value="">gemma4:26b (기본)</option>
-                  {ollamaModels
-                    .filter((m) => m.name !== 'gemma4:26b')
-                    .map((m) => (
-                      <option key={m.name} value={m.name}>
-                        {m.name} ({m.size_gb}GB)
-                      </option>
-                    ))}
+                  <option value="">기본 모델</option>
+                  {ollamaModels.map((m) => (
+                    <option key={m.name} value={m.name}>
+                      {m.name} ({m.size_gb}GB)
+                    </option>
+                  ))}
                 </select>
               </div>
 

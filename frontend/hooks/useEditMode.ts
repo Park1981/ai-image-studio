@@ -24,6 +24,7 @@ export function useEditMode() {
   /**
    * 생성된 이미지에서 바로 수정 모드로 전환
    * 재업로드 없이 서버 내 이미지 경로를 직접 사용
+   * 소스 이미지 해상도를 생성 파라미터(W/H)에 자동 반영
    */
   const startEditFromGenerated = useCallback((imageUrl: string, filename: string) => {
     const store = useAppStore.getState()
@@ -31,12 +32,25 @@ export function useEditMode() {
     // imageUrl에서 서버 내 경로 추출: /images/2026-04-11/xxx.png → 2026-04-11/xxx.png
     const pathMatch = imageUrl.match(/\/images\/(.+)/)
     const serverPath = pathMatch ? pathMatch[1] : filename
+    const fullUrl = `${IMAGE_BASE}${imageUrl}`
 
     // editMode ON + 소스 이미지 경로 설정
     store.setEditSourceImage(serverPath)
-    store.setEditSourcePreview(`${IMAGE_BASE}${imageUrl}`)
+    store.setEditSourcePreview(fullUrl)
     store.setEditMode(true)
     store.setSelectedImageIndex(null)
+
+    // 소스 이미지 실제 해상도 추출 → W/H + 비율 자유로 반영
+    // Qwen Edit 권장 step_size=16의 배수, 512~2048 clamp (ComfyUI latent 호환)
+    const img = new Image()
+    img.onload = () => {
+      const snap = (v: number) => Math.max(512, Math.min(2048, Math.round(v / 16) * 16))
+      const s = useAppStore.getState()
+      s.setWidth(snap(img.naturalWidth))
+      s.setHeight(snap(img.naturalHeight))
+      s.setCustomRatio('자유')
+    }
+    img.src = fullUrl
   }, [])
 
   /** 수정 모드 이미지 생성 실행 (useWebSocket으로 진행 상황 수신) */
@@ -66,7 +80,8 @@ export function useEditMode() {
       const response = await api.generateEdit({
         source_image: editSourceImage,
         edit_prompt: editPrompt.trim(),
-        auto_enhance: store.autoEnhance,
+        // 프론트의 수동 보강 플로우로 교체됨 — 백엔드 자동 보강 비활성화
+        auto_enhance: false,
         checkpoint: store.checkpoint,
         loras: store.loras.map((l) => ({
           name: l.name,
