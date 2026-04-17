@@ -37,6 +37,8 @@ class ProcessManager:
         self._comfyui_started_at: float | None = None
         # 마지막 이미지 생성 완료 시각 (유휴 자동 종료용)
         self._last_generation_at: float | None = None
+        # Ollama 서브프로세스 핸들 (수동 시작 시만 보관)
+        self._ollama_process: subprocess.Popen | None = None
 
     # ─────────────────────────────────────────────
     # Ollama 헬스체크
@@ -199,6 +201,106 @@ class ProcessManager:
         if await self.check_comfyui():
             return True
         return await self.start_comfyui()
+
+    # ─────────────────────────────────────────────
+    # Ollama 시작 / 종료 (ComfyUI 패턴 동일)
+    # ─────────────────────────────────────────────
+
+    async def start_ollama(self) -> bool:
+        """
+        Ollama 프로세스 시작 (subprocess, shell=False, `ollama serve`)
+        - 실행 파일 경로는 .env의 OLLAMA_EXECUTABLE 사용
+        - 이미 실행 중이면 True 반환
+        """
+        if await self.check_ollama():
+            logger.info("Ollama 이미 실행 중")
+            return True
+
+        executable = settings.ollama_executable
+        if not executable:
+            logger.error("ollama_executable 미설정 — .env 파일 확인 필요")
+            return False
+
+        exe_path = Path(executable)
+        if not exe_path.exists():
+            logger.error("Ollama 실행 파일 없음: %s", exe_path)
+            return False
+
+        logger.info("Ollama 시작 중: %s serve", exe_path)
+
+        try:
+            creation_flags = 0
+            if sys.platform == "win32":
+                creation_flags = (
+                    subprocess.CREATE_NO_WINDOW
+                    | subprocess.CREATE_NEW_PROCESS_GROUP
+                )
+
+            # `ollama serve` 로 백그라운드 실행 (보안: shell=False)
+            self._ollama_process = subprocess.Popen(
+                [str(exe_path), "serve"],
+                cwd=str(exe_path.parent),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                shell=False,
+                creationflags=creation_flags,
+            )
+        except OSError as exc:
+            logger.error("Ollama 프로세스 생성 실패: %s", exc)
+            return False
+
+        started = await self._wait_for_ollama_ready()
+        if started:
+            logger.info("Ollama 기동 완료 (PID: %d)", self._ollama_process.pid)
+        else:
+            logger.error("Ollama 기동 타임아웃 (%.0f초)", _STARTUP_TIMEOUT)
+            await self.stop_ollama()
+
+        return started
+
+    async def _wait_for_ollama_ready(self) -> bool:
+        """Ollama /api/tags 응답 대기 (폴링)"""
+        elapsed = 0.0
+        while elapsed < _STARTUP_TIMEOUT:
+            if await self.check_ollama():
+                return True
+            await asyncio.sleep(_HEALTH_CHECK_INTERVAL)
+            elapsed += _HEALTH_CHECK_INTERVAL
+        return False
+
+    async def stop_ollama(self) -> bool:
+        """
+        Ollama 프로세스 종료
+        - 우리가 시작한 프로세스만 종료 (외부에서 시작한 건 건드리지 않음)
+        """
+        if self._ollama_process is None:
+            logger.info("Ollama 프로세스 핸들 없음 — 백엔드가 시작한 적 없음")
+            return True
+
+        pid = self._ollama_process.pid
+        logger.info("Ollama 종료 요청 (PID: %d)", pid)
+
+        try:
+            self._ollama_process.terminate()
+            try:
+                await asyncio.to_thread(
+                    self._ollama_process.wait, timeout=_SHUTDOWN_TIMEOUT
+                )
+                logger.info("Ollama 정상 종료 완료 (PID: %d)", pid)
+            except subprocess.TimeoutExpired:
+                logger.warning(
+                    "Ollama 정상 종료 타임아웃 — 강제 종료 (PID: %d)", pid
+                )
+                self._ollama_process.kill()
+                await asyncio.to_thread(self._ollama_process.wait)
+        except OSError as exc:
+            logger.error("Ollama 종료 중 오류: %s", exc)
+            return False
+        finally:
+            self._ollama_process = None
+
+        return True
 
     # ─────────────────────────────────────────────
     # Ollama 모델 목록 조회

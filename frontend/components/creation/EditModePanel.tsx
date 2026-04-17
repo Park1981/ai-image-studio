@@ -18,6 +18,9 @@ export default function EditModePanel() {
   const editSourcePreview = useAppStore((s) => s.editSourcePreview)
   const setEditSourcePreview = useAppStore((s) => s.setEditSourcePreview)
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
+  const setWidth = useAppStore((s) => s.setWidth)
+  const setHeight = useAppStore((s) => s.setHeight)
+  const setCustomRatio = useAppStore((s) => s.setCustomRatio)
 
   // ── 로컬 상태 ──
   const [uploading, setUploading] = useState(false)
@@ -25,6 +28,20 @@ export default function EditModePanel() {
 
   // 수정 모드가 아니면 렌더링 안 함
   if (!editMode) return null
+
+  /** 이미지 URL 로부터 실제 해상도 추출 → 생성 파라미터(W/H)에 반영 */
+  const applyImageDimensions = useCallback((src: string) => {
+    const img = new Image()
+    img.onload = () => {
+      // 8단위 snap + 256~2048 clamp (SizeSelector와 동일 규칙)
+      const snap = (n: number) => Math.round(Math.max(256, Math.min(2048, n)) / 8) * 8
+      setWidth(snap(img.naturalWidth))
+      setHeight(snap(img.naturalHeight))
+      // 임의 해상도이므로 비율 잠금 해제
+      setCustomRatio('자유')
+    }
+    img.src = src
+  }, [setWidth, setHeight, setCustomRatio])
 
   /** 이미지 업로드 처리 */
   const handleFileUpload = async (file: File) => {
@@ -35,7 +52,12 @@ export default function EditModePanel() {
     setUploading(true)
     try {
       const reader = new FileReader()
-      reader.onload = (e) => setEditSourcePreview(e.target?.result as string)
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string
+        setEditSourcePreview(dataUrl)
+        // 소스 이미지 해상도를 생성 파라미터에 자동 반영
+        applyImageDimensions(dataUrl)
+      }
       reader.readAsDataURL(file)
       const response = await api.uploadImage(file)
       if (response.success && response.data) {

@@ -26,6 +26,10 @@ export interface PromptSlice {
   autoEnhance: boolean
   setAutoEnhance: (autoEnhance: boolean) => void
 
+  // ── 수동 보강 플로우: textarea 직접 보강 여부 추적 (재보강 경고용) ──
+  promptEnhanced: boolean
+  setPromptEnhanced: (enhanced: boolean) => void
+
   // ── AI 보강 2단계 플로우 ──
   enhancePending: boolean  // 보강 결과 확인 대기 중
   setEnhancePending: (pending: boolean) => void
@@ -66,6 +70,10 @@ export const createPromptSlice: StateCreator<PromptSlice, [], [], PromptSlice> =
   setEnhancedPrompt: (enhancedPrompt) => set({ enhancedPrompt }),
   autoEnhance: true,
   setAutoEnhance: (autoEnhance) => set({ autoEnhance }),
+
+  // ── 수동 보강 플로우 ──
+  promptEnhanced: false,
+  setPromptEnhanced: (enhanced) => set({ promptEnhanced: enhanced }),
   enhancePending: false,
   setEnhancePending: (pending) => set({ enhancePending: pending }),
   enhancedNegative: '',

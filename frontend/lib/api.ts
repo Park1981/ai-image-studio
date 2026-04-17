@@ -321,6 +321,18 @@ export const api = {
       method: 'POST',
     }),
 
+  /** Ollama 시작 */
+  startOllama: () =>
+    fetchApi<{ message: string }>('/api/process/ollama/start', {
+      method: 'POST',
+    }),
+
+  /** Ollama 종료 (백엔드가 시작한 경우만) */
+  stopOllama: () =>
+    fetchApi<{ message: string }>('/api/process/ollama/stop', {
+      method: 'POST',
+    }),
+
   // ── 모델 관리 API ──
 
   /** 사용 가능한 모델 목록 조회 */

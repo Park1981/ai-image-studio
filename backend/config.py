@@ -6,14 +6,37 @@ pydantic-settings로 .env 파일에서 자동 로드
 
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# backend/ 디렉토리 절대 경로 — 모든 상대 경로는 여기를 기준으로 해석
+_BACKEND_DIR = Path(__file__).resolve().parent
+
+# .env 경로를 cwd 의존 없이 config.py 파일 위치 기준으로 탐색
+# (backend/config.py 상위를 올라가며 첫 번째 .env 사용 — worktree/일반 실행 모두 지원)
+def _find_env_file() -> Path:
+    here = Path(__file__).resolve().parent
+    # 1순위: backend/../.env (일반 프로젝트 구조)
+    candidate = here.parent / ".env"
+    if candidate.exists():
+        return candidate
+    # 2순위: 상위 폴더 탐색 (worktree 환경 등)
+    for ancestor in here.parents:
+        candidate = ancestor / ".env"
+        if candidate.exists():
+            return candidate
+    # 최종 폴백 (없어도 pydantic이 환경변수에서 읽으려 시도)
+    return here.parent / ".env"
+
+
+_ENV_PATH = _find_env_file()
 
 
 class Settings(BaseSettings):
     """앱 전체 설정 (환경변수 / .env에서 로드)"""
 
     model_config = SettingsConfigDict(
-        env_file="../.env",
+        env_file=str(_ENV_PATH),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -27,6 +50,7 @@ class Settings(BaseSettings):
     # Ollama 설정
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "gemma4-un"  # 비전(멀티모달) 지원 모델
+    ollama_executable: str = ""  # ollama.exe 전체 경로 (.env에서 설정 필요 — 수동 시작용)
 
     # LLM 폴백 설정 (Ollama 실패 시)
     claude_cli_path: str = "claude"  # Claude CLI 실행 경로
@@ -50,6 +74,22 @@ class Settings(BaseSettings):
 
     # 워크플로우 템플릿 경로
     workflows_path: str = "./workflows"
+
+    # ── 경로 validator: 상대 경로를 backend/ 기준 절대 경로로 정규화 ──
+    # cwd가 달라도(worktree/일반 실행 모두) 동일하게 해석되도록 강제.
+    @field_validator(
+        "history_db_path",
+        "output_image_path",
+        "upload_path",
+        "workflows_path",
+        mode="before",
+    )
+    @classmethod
+    def _resolve_relative_to_backend(cls, v: str) -> str:
+        p = Path(v)
+        if p.is_absolute():
+            return str(p)
+        return str((_BACKEND_DIR / v).resolve())
 
     @property
     def comfyui_ws_url(self) -> str:

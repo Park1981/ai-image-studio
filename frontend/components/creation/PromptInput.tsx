@@ -10,6 +10,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { api, type PromptTemplate } from '@/lib/api'
 import { SparkleIcon, XCircleIcon, BookmarkIcon, FolderOpenIcon, XIcon } from '../icons'
+import { useEnhance } from '@/hooks/useEnhance'
 
 export default function PromptInput() {
   // ── 스토어 상태 ──
@@ -24,6 +25,11 @@ export default function PromptInput() {
   const editMode = useAppStore((s) => s.editMode)
   const enhanceLlmProvider = useAppStore((s) => s.enhanceLlmProvider)
   const setEnhanceLlmProvider = useAppStore((s) => s.setEnhanceLlmProvider)
+  const promptEnhanced = useAppStore((s) => s.promptEnhanced)
+  const setPromptEnhanced = useAppStore((s) => s.setPromptEnhanced)
+
+  // ── 수동 보강 ──
+  const { enhanceInPlace } = useEnhance()
 
   // ── 로컬 상태 ──
   const [showNegative, setShowNegative] = useState(false)
@@ -124,22 +130,35 @@ export default function PromptInput() {
   return (
     <>
       {/* 프롬프트 textarea */}
-      <div className="px-3 pt-3">
+      <div className="px-3 pt-3 relative">
         <textarea
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          onChange={(e) => {
+            setPrompt(e.target.value)
+            // 사용자가 직접 텍스트를 수정하면 '보강됨' 상태 해제
+            if (promptEnhanced) setPromptEnhanced(false)
+          }}
           placeholder={editMode ? '수정할 내용을 설명해주세요...' : '이미지를 설명해주세요... (한국어 입력 가능)'}
           rows={3}
           disabled={isGenerating || enhancePending}
           className="w-full bg-surface rounded-lg resize-none outline-none px-3 py-2.5 text-[13px] placeholder-text-ghost leading-relaxed border border-edge focus:border-accent disabled:opacity-50"
         />
+        {/* 보강됨 배지 (textarea 우측 상단) */}
+        {promptEnhanced && (
+          <span
+            className="absolute top-[18px] right-[18px] text-[9px] px-1.5 py-0.5 rounded-full bg-accent/20 text-accent-bright pointer-events-none"
+            title="AI 보강된 프롬프트 — 수정하면 배지가 사라집니다"
+          >
+            ✨ 보강됨
+          </span>
+        )}
       </div>
 
-      {/* AI 보강 토글 + 네거티브 토글 + 템플릿 버튼 */}
-      <div className="px-3 py-2 flex items-center gap-2">
+      {/* AI 보강 토글 + 네거티브 토글 + 템플릿 버튼 (좁은 패널 폭에서도 버튼이 쪼개지지 않도록 flex-wrap + whitespace-nowrap) */}
+      <div className="px-3 py-2 flex flex-wrap items-center gap-x-2 gap-y-1.5">
         <button
           onClick={() => setAutoEnhance(!autoEnhance)}
-          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium transition-all ${
+          className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium whitespace-nowrap shrink-0 transition-all ${
             autoEnhance ? 'bg-accent-muted text-accent-bright' : 'text-text-sub hover:text-text hover:bg-white/[0.04]'
           }`}
           disabled={isEnhancing}
@@ -150,7 +169,7 @@ export default function PromptInput() {
           <select
             value={enhanceLlmProvider}
             onChange={(e) => setEnhanceLlmProvider(e.target.value as 'auto' | 'ollama' | 'claude')}
-            className="bg-transparent text-[10px] text-text-sub border border-edge rounded-md px-1 py-1 outline-none focus:border-accent"
+            className="bg-transparent text-[10px] text-text-sub border border-edge rounded-md px-1 py-1 outline-none focus:border-accent shrink-0"
           >
             <option value="auto">자동</option>
             <option value="ollama">로컬 AI</option>
@@ -160,7 +179,7 @@ export default function PromptInput() {
         {!editMode && (
           <button
             onClick={() => setShowNegative(!showNegative)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] whitespace-nowrap shrink-0 transition-all ${
               showNegative ? 'bg-bad/10 text-bad' : 'text-text-sub hover:text-text hover:bg-white/[0.04]'
             }`}
           >
@@ -169,7 +188,7 @@ export default function PromptInput() {
         )}
 
         {/* 구분선 */}
-        <div className="w-px h-4 bg-edge mx-0.5" />
+        <div className="w-px h-4 bg-edge mx-0.5 shrink-0" />
 
         {/* 템플릿 저장 버튼 */}
         <button
@@ -178,20 +197,20 @@ export default function PromptInput() {
             setShowTemplates(false)
           }}
           disabled={!prompt.trim()}
-          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] text-text-sub hover:text-text hover:bg-white/[0.04] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+          className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] whitespace-nowrap shrink-0 text-text-sub hover:text-text hover:bg-white/[0.04] transition-all disabled:opacity-30 disabled:cursor-not-allowed"
           title="현재 프롬프트를 템플릿으로 저장"
         >
           <BookmarkIcon /> 저장
         </button>
 
         {/* 템플릿 불러오기 드롭다운 */}
-        <div className="relative" ref={templateDropdownRef}>
+        <div className="relative shrink-0" ref={templateDropdownRef}>
           <button
             onClick={() => {
               setShowTemplates(!showTemplates)
               setShowSaveInput(false)
             }}
-            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] text-text-sub hover:text-text hover:bg-white/[0.04] transition-all"
+            className="flex items-center gap-1 px-2 py-1.5 rounded-lg text-[11px] whitespace-nowrap text-text-sub hover:text-text hover:bg-white/[0.04] transition-all"
             title="저장된 템플릿 불러오기"
           >
             <FolderOpenIcon /> 불러오기
@@ -245,6 +264,21 @@ export default function PromptInput() {
           )}
         </div>
       </div>
+
+      {/* 수동 보강 버튼 (AI 보강 토글 ON일 때만 노출) */}
+      {autoEnhance && (
+        <div className="px-3 pb-2">
+          <button
+            onClick={() => enhanceInPlace(editMode ? 'edit' : 'generate')}
+            disabled={!prompt.trim() || isGenerating || isEnhancing}
+            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-[12px] font-medium bg-accent-muted text-accent-bright hover:bg-accent/20 border border-accent/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            title={promptEnhanced ? '주의: 이미 보강된 프롬프트를 재보강하면 내용이 중첩될 수 있어요' : '현재 프롬프트를 AI로 보강합니다'}
+          >
+            <SparkleIcon />
+            {isEnhancing ? '보강 중...' : promptEnhanced ? '프롬프트 재보강 (중첩 주의)' : '프롬프트 보강'}
+          </button>
+        </div>
+      )}
 
       {/* 템플릿 저장 인라인 입력 */}
       {showSaveInput && (
