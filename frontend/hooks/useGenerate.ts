@@ -1,7 +1,7 @@
 /**
  * 이미지 생성 오케스트레이션 훅
- * 2단계 플로우: AI보강 → 사용자 확인 → 이미지 생성
- * autoEnhance OFF면 바로 생성
+ * 단순 플로우: 현재 textarea 프롬프트로 즉시 생성
+ * (AI 보강은 PromptInput의 수동 버튼으로 실행 → 결과가 textarea에 직접 반영됨)
  *
  * enhance 로직은 useEnhance 훅으로 분리,
  * editMode 생성 로직은 useEditMode 훅으로 분리
@@ -30,7 +30,6 @@ export function useGenerate() {
   // 스토어에서 필요한 상태와 액션
   const prompt = useAppStore((s) => s.prompt)
   const negativePrompt = useAppStore((s) => s.negativePrompt)
-  const autoEnhance = useAppStore((s) => s.autoEnhance)
   const checkpoint = useAppStore((s) => s.checkpoint)
   const loras = useAppStore((s) => s.loras)
   const vae = useAppStore((s) => s.vae)
@@ -49,10 +48,8 @@ export function useGenerate() {
   const setCurrentTaskId = useAppStore((s) => s.setCurrentTaskId)
   const setProgress = useAppStore((s) => s.setProgress)
   const setErrorMessage = useAppStore((s) => s.setErrorMessage)
-  const setEnhancePending = useAppStore((s) => s.setEnhancePending)
-  const setEnhanceFallback = useAppStore((s) => s.setEnhanceFallback)
 
-  /** 이미지 생성 실행 (보강 확인 후 또는 autoEnhance OFF) */
+  /** 이미지 생성 실행 (현재 textarea 프롬프트 사용) */
   const startGeneration = useCallback(async (finalPrompt: string, finalNegative: string) => {
     if (generationStatus === 'generating' || generationStatus === 'warming_up') {
       return
@@ -61,11 +58,10 @@ export function useGenerate() {
     busyRef.current = true
 
     try {
+      // 보강 상태(enhancePending)는 의도적으로 유지 — 생성 중에도 보강 프롬프트 가시화
       setGenerationStatus('warming_up')
       setProgress(0)
       setErrorMessage(null)
-      setEnhancePending(false)
-      setEnhanceFallback(false)
 
       // auto_enhance=false — 이미 보강된 프롬프트를 직접 전달
       const response = await api.generate({
@@ -110,24 +106,17 @@ export function useGenerate() {
     generationStatus, checkpoint, loras, vae,
     sampler, scheduler, width, height, steps, cfg, seed, batchSize,
     setGenerationStatus, setCurrentTaskId, setProgress,
-    setErrorMessage, setEnhancePending, setEnhanceFallback, connect,
+    setErrorMessage, connect,
   ])
 
-  /** 통합 생성 버튼 핸들러 */
+  /** 통합 생성 버튼 핸들러 — 현재 textarea 프롬프트로 즉시 생성 */
   const generate = useCallback(async () => {
     if (!prompt.trim()) {
       setErrorMessage('프롬프트를 입력해주세요.')
       return
     }
-
-    if (autoEnhance) {
-      // 2단계 플로우: 먼저 보강
-      await enhance()
-    } else {
-      // 보강 없이 바로 생성
-      await startGeneration(prompt.trim(), negativePrompt.trim())
-    }
-  }, [prompt, negativePrompt, autoEnhance, enhance, startGeneration, setErrorMessage])
+    await startGeneration(prompt.trim(), negativePrompt.trim())
+  }, [prompt, negativePrompt, startGeneration, setErrorMessage])
 
   /** 보강 결과 확인 → 이미지 생성 */
   const confirmEnhance = useCallback(async () => {

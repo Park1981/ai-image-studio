@@ -39,6 +39,10 @@ export default function EnhanceResult() {
   const [showCategoryDetail, setShowCategoryDetail] = useState(false)
 
   const isEnhancing = generationStatus === 'enhancing'
+  const isGeneratingBusy =
+    generationStatus === 'generating' ||
+    generationStatus === 'warming_up' ||
+    generationStatus === 'enhancing'
 
   // 보강 결과가 없으면 렌더링 안 함
   if (!enhancePending || !enhancedPrompt) return null
@@ -53,7 +57,7 @@ export default function EnhanceResult() {
     <div className={`mx-3 mb-2 rounded-lg border p-3 ${
       enhanceFallback ? 'border-bad/40 bg-bad/5' : 'border-accent/30 bg-accent-muted/30'
     }`}>
-      {/* 헤더 */}
+      {/* 헤더 — 생성 중에는 "사용 중" 뱃지 표시 */}
       <div className="flex items-center gap-1.5 mb-1.5">
         {enhanceFallback ? <WarningIcon /> : <SparkleIcon />}
         <span className={`text-[11px] font-medium ${enhanceFallback ? 'text-bad' : 'text-accent-bright'}`}>
@@ -63,6 +67,11 @@ export default function EnhanceResult() {
               ? editMode ? 'Claude로 수정 보강됨' : 'Claude로 보강됨'
               : editMode ? 'AI 수정 보강 결과' : 'AI 보강 결과'}
         </span>
+        {isGeneratingBusy && (
+          <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-accent/15 text-accent-bright">
+            생성에 사용 중
+          </span>
+        )}
         {enhancedCategories.length > 0 && (
           <button
             onClick={() => setShowCategoryDetail(!showCategoryDetail)}
@@ -116,24 +125,27 @@ export default function EnhanceResult() {
         <p className="mt-1.5 text-[10px] text-bad/60 truncate">네거티브: {enhancedNegative}</p>
       )}
 
-      {/* 버튼 그룹 */}
-      <div className="flex items-center gap-2 mt-2">
+      {/* 버튼 그룹 — 라벨 잘림 방지 위해 flex-wrap + whitespace-nowrap */}
+      {/* 생성 중에는 비활성화하여 중복 제출 차단 (enhancePending 유지 + 프롬프트 가시화 목적) */}
+      <div className="flex items-center gap-2 mt-2 flex-wrap">
         <button
           onClick={() => editMode ? handleEditConfirm() : confirmEnhance()}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-[12px] font-semibold btn-glow text-white"
+          disabled={isGeneratingBusy}
+          className="flex items-center gap-1.5 px-4 py-2 rounded-lg text-[12px] font-semibold btn-glow text-white whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          {editMode ? <><EditIcon /> 수정</> : <><BoltIcon /> 생성</>}
+          {editMode ? <><EditIcon /> 이미지 수정</> : <><BoltIcon /> 이미지 생성</>}
         </button>
         <button
           onClick={() => enhance(enhancedPrompt, editMode ? 'edit' : 'generate')}
-          disabled={isEnhancing}
-          className="px-3 py-1.5 rounded-lg text-[11px] font-medium text-accent-bright hover:bg-accent-muted transition-all border border-accent/30"
+          disabled={isGeneratingBusy}
+          className="px-3 py-2 rounded-lg text-[11px] font-medium text-accent-bright hover:bg-accent-muted transition-all border border-accent/30 whitespace-nowrap disabled:opacity-40"
         >
-          {isEnhancing ? '...' : '다시 보강'}
+          {isEnhancing ? '보강 중…' : '다시 보강'}
         </button>
         <button
           onClick={() => cancelEnhance()}
-          className="px-3 py-1.5 rounded-lg text-[11px] text-text-sub hover:text-text hover:bg-white/[0.04] transition-all"
+          disabled={isGeneratingBusy}
+          className="px-3 py-2 rounded-lg text-[11px] text-text-sub hover:text-text hover:bg-white/[0.04] transition-all whitespace-nowrap disabled:opacity-40"
         >
           취소
         </button>

@@ -28,6 +28,9 @@ export function useEnhance() {
   const setEnhancedNegative = useAppStore((s) => s.setEnhancedNegative)
   const setEnhancePending = useAppStore((s) => s.setEnhancePending)
   const setEnhanceFallback = useAppStore((s) => s.setEnhanceFallback)
+  const setPrompt = useAppStore((s) => s.setPrompt)
+  const setNegativePrompt = useAppStore((s) => s.setNegativePrompt)
+  const setPromptEnhanced = useAppStore((s) => s.setPromptEnhanced)
 
   /** AI 프롬프트 보강 실행 (sourcePrompt 지정 시 해당 프롬프트로 보강) */
   const enhance = useCallback(async (sourcePrompt?: string, mode?: 'generate' | 'edit') => {
@@ -85,18 +88,96 @@ export function useEnhance() {
         setEnhancePending(true)
         setGenerationStatus('idle')
       } else {
-        // 실패 시 이전 보강 결과 초기화
-        setEnhancedPrompt('')
-        setEnhancedNegative('')
-        useAppStore.getState().setEnhancedCategories([])
+        // 실패 시 — 이전 보강 세션 상태가 남아있을 수 있으므로 명시적 초기화
+        resetEnhanceState()
+        setErrorMessage(response.error || '프롬프트 보강에 실패했습니다.')
+      }
+    } catch {
+      // 에러 시 — 동일하게 상태 정리
+      resetEnhanceState()
+      setErrorMessage('프롬프트 보강 중 오류가 발생했습니다.')
+    } finally {
+      busyRef.current = false
+    }
+
+    // 성공/실패 분기 공통 상태 정리 헬퍼
+    function resetEnhanceState() {
+      setEnhancedPrompt('')
+      setEnhancedNegative('')
+      setEnhanceFallback(false)
+      setEnhancePending(false)  // 보강 대기 상태 해제 (UI 오염 방지)
+      useAppStore.getState().setEnhancedCategories([])
+      useAppStore.getState().setEnhanceProvider('ollama')
+      setGenerationStatus('idle')
+    }
+  }, [
+    prompt, setGenerationStatus, setProgress, setErrorMessage,
+    setEnhancedPrompt, setEnhancedNegative, setEnhancePending,
+    setEnhanceFallback,
+  ])
+
+  /**
+   * 수동 보강 (in-place): 결과를 프롬프트 textarea에 직접 반영
+   * 2단계 확인 플로우 없이 한 번에 textarea 교체 → 사용자가 자유롭게 수정 후 생성
+   */
+  const enhanceInPlace = useCallback(async (mode?: 'generate' | 'edit') => {
+    const textToEnhance = prompt.trim()
+    if (!textToEnhance) {
+      setErrorMessage('프롬프트를 입력해주세요.')
+      return
+    }
+    if (busyRef.current) return
+    busyRef.current = true
+
+    try {
+      setGenerationStatus('enhancing')
+      setProgress(0)
+      setErrorMessage(null)
+
+      const { activeStyleHint, ollamaModel, enhanceSettings, editMode, editSourceImage, enhanceLlmProvider } = useAppStore.getState()
+
+      const useVision = (mode === 'edit' || editMode) && !!editSourceImage
+      const response = useVision
+        ? await api.enhanceEditPrompt(
+            textToEnhance,
+            editSourceImage!,
+            activeStyleHint,
+            ollamaModel,
+            {
+              creativity: enhanceSettings.creativity,
+              detailLevel: enhanceSettings.detailLevel,
+              categories: enhanceSettings.categories,
+            }
+          )
+        : await api.enhancePrompt(
+            textToEnhance,
+            activeStyleHint,
+            ollamaModel,
+            {
+              mode: mode || 'generate',
+              creativity: enhanceSettings.creativity,
+              detail_level: enhanceSettings.detailLevel,
+              categories: enhanceSettings.categories,
+              provider: enhanceLlmProvider,
+            }
+          )
+
+      if (response.success && response.data) {
+        // 핵심: textarea 프롬프트 직접 교체 (2단계 확인 UI 없음)
+        setPrompt(response.data.enhanced)
+        if (response.data.negative) {
+          setNegativePrompt(response.data.negative)
+        }
+        setPromptEnhanced(true)
+        setEnhanceFallback(response.data.fallback ?? false)
+        useAppStore.getState().setEnhanceProvider(response.data.provider || 'ollama')
+        useAppStore.getState().setEnhancedCategories(response.data.categories || [])
+        setGenerationStatus('idle')
+      } else {
         setGenerationStatus('idle')
         setErrorMessage(response.error || '프롬프트 보강에 실패했습니다.')
       }
     } catch {
-      // 에러 시 이전 보강 결과 초기화
-      setEnhancedPrompt('')
-      setEnhancedNegative('')
-      useAppStore.getState().setEnhancedCategories([])
       setGenerationStatus('idle')
       setErrorMessage('프롬프트 보강 중 오류가 발생했습니다.')
     } finally {
@@ -104,8 +185,7 @@ export function useEnhance() {
     }
   }, [
     prompt, setGenerationStatus, setProgress, setErrorMessage,
-    setEnhancedPrompt, setEnhancedNegative, setEnhancePending,
-    setEnhanceFallback,
+    setEnhanceFallback, setPrompt, setNegativePrompt, setPromptEnhanced,
   ])
 
   /** 보강 결과 확인 → 최종 프롬프트 반환 (생성 트리거는 호출자 담당) */
@@ -128,6 +208,7 @@ export function useEnhance() {
 
   return {
     enhance,
+    enhanceInPlace,
     getEnhancedResult,
     cancelEnhance,
     enhancePending,

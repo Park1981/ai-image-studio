@@ -23,8 +23,8 @@ async def get_process_status():
     ollama_running = await process_manager.check_ollama()
     comfyui_running = await process_manager.check_comfyui()
 
-    # VRAM 사용량 조회 (nvidia-smi)
-    vram = process_manager.get_vram_usage()
+    # VRAM 사용량 조회 (nvidia-smi — async로 이벤트 루프 비차단)
+    vram = await process_manager.get_vram_usage()
 
     return {
         "success": True,
@@ -76,4 +76,36 @@ async def stop_comfyui():
     return {
         "success": True,
         "data": {"message": "ComfyUI가 종료되었습니다."},
+    }
+
+
+@router.post("/ollama/start", response_model=ApiResponse[dict])
+async def start_ollama():
+    """Ollama 수동 시작"""
+    started = await process_manager.start_ollama()
+    if not started:
+        return {
+            "success": False,
+            "data": {},
+            "error": "Ollama 시작에 실패했습니다. .env의 OLLAMA_EXECUTABLE 경로를 확인해주세요.",
+        }
+    return {
+        "success": True,
+        "data": {"message": "Ollama가 시작되었습니다."},
+    }
+
+
+@router.post("/ollama/stop", response_model=ApiResponse[dict])
+async def stop_ollama():
+    """Ollama 수동 종료 (백엔드가 시작한 경우만)"""
+    stopped = await process_manager.stop_ollama()
+    if not stopped:
+        return {
+            "success": False,
+            "data": {},
+            "error": "Ollama 종료에 실패했습니다.",
+        }
+    return {
+        "success": True,
+        "data": {"message": "Ollama가 종료되었습니다."},
     }

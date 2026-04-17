@@ -4,11 +4,8 @@
 - 비전(이미지 분석) 기반 프롬프트 보강
 """
 
-from pathlib import Path
-
 from fastapi import APIRouter, HTTPException
 
-from config import settings
 from database import delete_template, get_templates, save_template
 from models.schemas import (
     ApiResponse,
@@ -18,6 +15,7 @@ from models.schemas import (
     PromptTemplate,
     PromptTemplateCreate,
 )
+from services.image_path import resolve_image_path
 from services.prompt_engine import prompt_engine
 
 router = APIRouter(prefix="/api/prompt", tags=["프롬프트"])
@@ -42,8 +40,8 @@ async def enhance_prompt(request: EnhanceRequest):
 @router.post("/enhance-with-vision", response_model=ApiResponse[EnhanceResponse])
 async def enhance_prompt_with_vision(request: EnhanceWithVisionRequest):
     """비전(이미지 분석) 기반 프롬프트 보강 — 원본 이미지를 Ollama 멀티모달 모델로 분석"""
-    # 이미지 파일명 → 실제 경로 변환 (uploads/ 또는 images/ 디렉토리에서 탐색)
-    image_path = _resolve_image_path(request.source_image)
+    # 이미지 파일명 → 실제 경로 변환 (services/image_path.resolve_image_path 공통 헬퍼)
+    image_path = resolve_image_path(request.source_image)
     if image_path is None:
         raise HTTPException(
             status_code=404,
@@ -100,25 +98,3 @@ async def remove_template(template_id: int):
     }
 
 
-def _resolve_image_path(filename: str) -> Path | None:
-    """
-    이미지 파일명을 실제 파일 경로로 변환
-    uploads/ → images/ 순서로 탐색
-    path traversal 방지: 파일명에 디렉토리 구분자 포함 불가
-    """
-    # path traversal 방지: 순수 파일명만 허용
-    safe_name = Path(filename).name
-    if safe_name != filename:
-        return None
-
-    # uploads/ 디렉토리에서 먼저 탐색
-    upload_candidate = Path(settings.upload_path) / safe_name
-    if upload_candidate.exists():
-        return upload_candidate.resolve()
-
-    # images/ 디렉토리에서 탐색
-    images_candidate = Path(settings.output_image_path) / safe_name
-    if images_candidate.exists():
-        return images_candidate.resolve()
-
-    return None

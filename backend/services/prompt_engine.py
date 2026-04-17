@@ -28,7 +28,7 @@ from models.schemas import (
 logger = logging.getLogger(__name__)
 
 # Ollama API 타임아웃 (초) — LLM 추론은 오래 걸릴 수 있음
-_LLM_TIMEOUT: float = 90.0
+_LLM_TIMEOUT: float = 300.0  # 대형 모델(gemma4-un 16GB) 콜드스타트 대응
 
 # ─────────────────────────────────────────────
 # 카테고리 정의
@@ -217,6 +217,55 @@ class PromptEngine:
         self._model: str = settings.ollama_model
 
     # ─────────────────────────────────────────────
+    # LLM 응답 → EnhanceResponse 조립 (텍스트/비전 공통)
+    # ─────────────────────────────────────────────
+
+    def _assemble_response(
+        self,
+        *,
+        result: dict,
+        categories: EnhanceCategoryConfig,
+        original_prompt: str,
+        provider: str,
+    ) -> EnhanceResponse:
+        """
+        LLM 응답 JSON을 EnhanceResponse로 변환 — enhance_prompt/enhance_prompt_with_vision 공통
+        - 활성화된 카테고리만 필터링
+        - text_en을 ", " 결합하여 enhanced 프롬프트 생성
+        - negative는 LLM 응답에 없으면 폴백 사용
+        """
+        raw_cats = result.get("categories", [])
+        cat_dict = categories.model_dump()
+
+        category_items: list[EnhanceCategoryItem] = []
+        for raw in raw_cats:
+            name = raw.get("name", "")
+            # 활성화된 카테고리만 포함
+            if name in cat_dict and cat_dict.get(name, False):
+                meta = CATEGORY_META.get(name, {})
+                category_items.append(
+                    EnhanceCategoryItem(
+                        name=name,
+                        label_ko=meta.get("label_ko", name),
+                        text_en=raw.get("text_en", ""),
+                        text_ko=raw.get("text_ko", ""),
+                        auto_filled=raw.get("auto_filled", True),
+                    )
+                )
+
+        combined_parts = [item.text_en for item in category_items if item.text_en]
+        enhanced = ", ".join(combined_parts) if combined_parts else original_prompt
+        negative = result.get("negative", _FALLBACK_NEGATIVE)
+
+        return EnhanceResponse(
+            original=original_prompt,
+            enhanced=enhanced,
+            negative=negative,
+            categories=category_items,
+            provider=provider,
+        )
+
+    # ─────────────────────────────────────────────
     # 카테고리 지침 빌더
     # ─────────────────────────────────────────────
 
@@ -307,45 +356,18 @@ class PromptEngine:
             logger.warning("모든 LLM 폴백 실패 — 기본 태그 폴백 사용")
             return self._build_fallback(prompt, style)
 
-        # ── LLM 응답 파싱 (Ollama 또는 Claude CLI) ──
-        raw_cats = result.get("categories", [])
-        cat_dict = categories.model_dump()
-        category_items: list[EnhanceCategoryItem] = []
-
-        for raw in raw_cats:
-            name = raw.get("name", "")
-            # 활성화된 카테고리만 포함
-            if name in cat_dict and cat_dict.get(name, False):
-                meta = CATEGORY_META.get(name, {})
-                category_items.append(
-                    EnhanceCategoryItem(
-                        name=name,
-                        label_ko=meta.get("label_ko", name),
-                        text_en=raw.get("text_en", ""),
-                        text_ko=raw.get("text_ko", ""),
-                        auto_filled=raw.get("auto_filled", True),
-                    )
-                )
-
-        # 합쳐진 프롬프트 생성 (카테고리 영어 텍스트 결합)
-        combined_parts = [
-            item.text_en for item in category_items if item.text_en
-        ]
-        enhanced = ", ".join(combined_parts) if combined_parts else prompt
-
-        negative = result.get("negative", _FALLBACK_NEGATIVE)
-
-        logger.info(
-            "구조화 프롬프트 보강 완료 (provider: %s, 스타일: %s, 모드: %s, 카테고리: %d개)",
-            used_provider, style, mode, len(category_items),
-        )
-        return EnhanceResponse(
-            original=prompt,
-            enhanced=enhanced,
-            negative=negative,
-            categories=category_items,
+        # ── LLM 응답 → EnhanceResponse 조립 (공통 헬퍼 사용) ──
+        response = self._assemble_response(
+            result=result,
+            categories=categories,
+            original_prompt=prompt,
             provider=used_provider,
         )
+        logger.info(
+            "구조화 프롬프트 보강 완료 (provider: %s, 스타일: %s, 모드: %s, 카테고리: %d개)",
+            used_provider, style, mode, len(response.categories),
+        )
+        return response
 
     # ─────────────────────────────────────────────
     # 비전 기반 프롬프트 보강
@@ -408,41 +430,18 @@ class PromptEngine:
             )
 
             if result is not None:
-                # 카테고리 결과 파싱 (기존 로직 재사용)
-                raw_cats = result.get("categories", [])
-                cat_dict = categories.model_dump()
-                category_items: list[EnhanceCategoryItem] = []
-
-                for raw in raw_cats:
-                    name = raw.get("name", "")
-                    if name in cat_dict and cat_dict.get(name, False):
-                        meta = CATEGORY_META.get(name, {})
-                        category_items.append(
-                            EnhanceCategoryItem(
-                                name=name,
-                                label_ko=meta.get("label_ko", name),
-                                text_en=raw.get("text_en", ""),
-                                text_ko=raw.get("text_ko", ""),
-                                auto_filled=raw.get("auto_filled", True),
-                            )
-                        )
-
-                combined_parts = [
-                    item.text_en for item in category_items if item.text_en
-                ]
-                enhanced = ", ".join(combined_parts) if combined_parts else prompt
-                negative = result.get("negative", _FALLBACK_NEGATIVE)
-
+                # 공통 헬퍼로 응답 조립 (텍스트 경로와 동일한 규칙)
+                response = self._assemble_response(
+                    result=result,
+                    categories=categories,
+                    original_prompt=prompt,
+                    provider="ollama",
+                )
                 logger.info(
                     "비전 기반 프롬프트 보강 완료 (스타일: %s, 카테고리: %d개)",
-                    style, len(category_items),
+                    style, len(response.categories),
                 )
-                return EnhanceResponse(
-                    original=prompt,
-                    enhanced=enhanced,
-                    negative=negative,
-                    categories=category_items,
-                )
+                return response
 
         except Exception as exc:
             logger.error("비전 보강 실패 — 텍스트 전용 폴백: %s", exc)
@@ -462,26 +461,18 @@ class PromptEngine:
     def _load_and_encode_image(self, image_path: str) -> str:
         """
         이미지 파일 읽기 → base64 인코딩
-        - 허용된 디렉토리 내 경로인지 검증 (path traversal 방지)
+        - services/image_path.resolve_image_path로 허용 디렉토리 검증
+        - Path.relative_to() 기반 검증 (접두사 비교 아님) → `uploads_evil` 우회 방지
         - 이미지가 너무 크면 리사이즈 (max 1024px)
         """
-        file_path = Path(image_path).resolve()
+        from services.image_path import resolve_image_path
 
-        # path traversal 방지: 허용 디렉토리 확인
-        allowed_dirs = [
-            Path(settings.upload_path).resolve(),
-            Path(settings.output_image_path).resolve(),
-        ]
-        if not any(
-            str(file_path).startswith(str(d)) for d in allowed_dirs
-        ):
+        # 절대경로든 상대 식별자든 resolve_image_path가 허용 루트 내에서 탐색
+        file_path = resolve_image_path(image_path)
+        if file_path is None:
             raise ValueError(
-                f"허용되지 않은 경로: {file_path} "
-                f"(허용: {[str(d) for d in allowed_dirs]})"
+                f"허용되지 않은 경로: {image_path} (허용: uploads/, images/)"
             )
-
-        if not file_path.exists():
-            raise FileNotFoundError(f"이미지 파일을 찾을 수 없음: {file_path}")
 
         # Pillow로 리사이즈 후 base64 인코딩
         try:
@@ -648,16 +639,23 @@ class PromptEngine:
                 [settings.claude_cli_path, "-p", combined, "--output-format", "text"],
                 capture_output=True,
                 text=True,
+                # Windows 기본 인코딩(cp949)로 디코딩 실패 방지 — Claude CLI는 UTF-8 출력
+                # errors="replace"로 잘못된 바이트는 치환하여 UnicodeDecodeError 방지
+                encoding="utf-8",
+                errors="replace",
                 timeout=120,  # 2분 타임아웃
                 shell=False,  # 보안: shell injection 방지
             )
 
             if result.returncode != 0:
+                # stderr도 None일 수 있으므로 방어적 처리
+                stderr_msg = (result.stderr or "")[:200]
                 logger.error("Claude CLI 비정상 종료 (code=%d): %s",
-                             result.returncode, result.stderr[:200])
+                             result.returncode, stderr_msg)
                 return None
 
-            raw_output = result.stdout.strip()
+            # result.stdout이 None일 수 있으므로 방어적 처리 (Windows subprocess 엣지케이스)
+            raw_output = (result.stdout or "").strip()
             if not raw_output:
                 logger.warning("Claude CLI 빈 응답")
                 return None

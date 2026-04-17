@@ -6,12 +6,12 @@
 // 백엔드 API 기본 URL
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
 
-// ── 공통 API 응답 타입 ──
-export interface ApiResponse<T> {
-  success: boolean
-  data: T
-  error?: string
-}
+// ── 공통 API 응답 타입 (discriminated union — 타입 안전성 강화) ──
+// success=true일 때만 data에 접근 가능 (TS narrowing)
+// success=false면 error가 보장됨 → fetchApi의 `null as T` 단언 제거
+export type ApiResponse<T> =
+  | { success: true; data: T; error?: undefined }
+  | { success: false; error: string; data?: undefined }
 
 // ── 생성 요청 타입 ──
 export interface GenerateRequest {
@@ -89,6 +89,7 @@ export interface HistoryItem {
   enhanced_prompt: string | null
   negative_prompt: string | null
   checkpoint: string
+  loras: { name: string; strength_model: number; strength_clip: number }[]  // 백엔드 스키마와 동기화
   sampler: string
   scheduler: string
   width: number
@@ -187,7 +188,8 @@ export interface OllamaModelInfo {
   modified_at: string
 }
 
-// 공통 fetch 래퍼 (에러 처리 포함)
+// 공통 fetch 래퍼 — discriminated union으로 타입 안전성 확보
+// 실패 시 `data: null as T` 같은 위험한 단언 없이 `{ success: false, error }` 반환
 async function fetchApi<T>(
   endpoint: string,
   options: RequestInit = {}
@@ -207,7 +209,6 @@ async function fetchApi<T>(
       const errorData = await response.json().catch(() => null)
       return {
         success: false,
-        data: null as T,
         error: errorData?.error || `서버 오류 (${response.status})`,
       }
     }
@@ -216,7 +217,6 @@ async function fetchApi<T>(
   } catch {
     return {
       success: false,
-      data: null as T,
       error: '서버에 연결할 수 없습니다. 백엔드가 실행 중인지 확인해주세요.',
     }
   }
@@ -277,7 +277,6 @@ export const api = {
         const errorData = await response.json().catch(() => null)
         return {
           success: false,
-          data: null as unknown as UploadResponse,
           error: errorData?.error || `업로드 실패 (${response.status})`,
         }
       }
@@ -286,7 +285,6 @@ export const api = {
     } catch {
       return {
         success: false,
-        data: null as unknown as UploadResponse,
         error: '이미지 업로드에 실패했습니다. 서버 연결을 확인해주세요.',
       }
     }
@@ -318,6 +316,18 @@ export const api = {
   /** ComfyUI 종료 */
   stopComfyUI: () =>
     fetchApi<{ message: string }>('/api/process/comfyui/stop', {
+      method: 'POST',
+    }),
+
+  /** Ollama 시작 */
+  startOllama: () =>
+    fetchApi<{ message: string }>('/api/process/ollama/start', {
+      method: 'POST',
+    }),
+
+  /** Ollama 종료 (백엔드가 시작한 경우만) */
+  stopOllama: () =>
+    fetchApi<{ message: string }>('/api/process/ollama/stop', {
       method: 'POST',
     }),
 

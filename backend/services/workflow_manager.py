@@ -101,12 +101,22 @@ class WorkflowManager:
         if seed < 0:
             seed = random.randint(0, _MAX_SEED)
 
-        # 각 노드 파라미터 주입
-        self._inject_ksampler(prompt, request, seed)
+        # 공통 헬퍼로 샘플링/체크포인트/VAE 주입 (build_edit_prompt와 공유)
+        self._set_sampling_params(
+            prompt,
+            seed=seed,
+            steps=request.steps,
+            cfg=request.cfg,
+            sampler=request.sampler,
+            scheduler=request.scheduler,
+            denoise=1.0,  # txt2img 기본값
+        )
+        self._set_checkpoint(prompt, request.checkpoint)
+        self._set_vae(prompt, request.vae)
+
+        # 생성 모드 전용 주입 (프롬프트/latent)
         self._inject_clip_text(prompt, request)
         self._inject_empty_latent(prompt, request)
-        self._inject_checkpoint(prompt, request)
-        self._inject_vae(prompt, request)
 
         # LoRA 주입 (있는 경우)
         if request.loras:
@@ -134,9 +144,8 @@ class WorkflowManager:
         """
         이미지 수정 워크플로우에 파라미터 주입
         - LoadImage 노드에 소스 이미지 파일명 설정
-        - TextEncodeQwenImageEdit (Positive) 노드에 수정 프롬프트 설정
-        - TextEncodeQwenImageEdit (Negative) 노드는 빈 텍스트 유지
-        - KSampler 노드에 샘플링 파라미터 설정
+        - TextEncodeQwenImageEdit (Positive/Negative) 노드에 프롬프트 설정
+        - KSampler/CheckpointLoader/VAELoader/LoRA는 공통 헬퍼 사용
         """
         prompt = copy.deepcopy(workflow)
 
@@ -145,68 +154,66 @@ class WorkflowManager:
         if seed < 0:
             seed = random.randint(0, _MAX_SEED)
 
-        # LoadImage 노드에 소스 이미지 설정
-        load_img_result = self._find_node_by_class(prompt, _NODE_LOAD_IMAGE)
-        if load_img_result:
-            _node_id, node = load_img_result
-            inputs = node.setdefault("inputs", {})
-            inputs["image"] = comfyui_image_name
-        else:
-            logger.warning("LoadImage 노드 없음 — 소스 이미지 설정 건너뜀")
+        # LoadImage 노드에 소스 이미지 설정 (수정 모드 전용)
+        self._set_load_image(prompt, comfyui_image_name)
 
-        # TextEncodeQwenImageEdit 노드에 프롬프트 주입
-        edit_nodes = self._find_nodes_by_class(prompt, _NODE_TEXT_ENCODE_QWEN_EDIT)
-        if edit_nodes:
-            # _meta.title로 Positive/Negative 구분
-            for _nid, ndata in edit_nodes:
-                meta_title = ndata.get("_meta", {}).get("title", "")
-                inputs = ndata.setdefault("inputs", {})
-                if "Positive" in meta_title:
-                    inputs["prompt"] = request.edit_prompt
-                elif "Negative" in meta_title:
-                    inputs["prompt"] = ""  # 네거티브는 빈 텍스트
-        else:
-            logger.warning("TextEncodeQwenImageEdit 노드 없음 — 프롬프트 주입 건너뜀")
+        # TextEncodeQwenImageEdit 노드에 프롬프트 주입 (수정 모드 전용)
+        # negative_prompt는 EditRequest 필드값 사용 (기본값 "" 유지, 보강 시 업데이트된 값 사용)
+        self._set_qwen_edit_prompts(
+            prompt,
+            positive=request.edit_prompt,
+            negative=request.negative_prompt,
+        )
 
-        # KSampler 노드에 샘플링 파라미터 주입
-        ksampler_result = self._find_node_by_class(prompt, _NODE_KSAMPLER)
-        if ksampler_result:
-            _node_id, node = ksampler_result
-            inputs = node.setdefault("inputs", {})
-            inputs["seed"] = seed
-            inputs["steps"] = request.steps
-            inputs["cfg"] = request.cfg
-        else:
-            logger.warning("KSampler 노드 없음 — 샘플링 파라미터 주입 건너뜀")
+        # KSampler 샘플링 파라미터 (sampler/scheduler는 워크플로우 기본값 유지)
+        self._set_sampling_params(
+            prompt, seed=seed, steps=request.steps, cfg=request.cfg,
+        )
 
-        # 체크포인트 주입 (EditRequest에 checkpoint 필드가 있는 경우)
-        if request.checkpoint:
-            ckpt_result = self._find_node_by_class(prompt, _NODE_CHECKPOINT_LOADER)
-            if ckpt_result:
-                _ckpt_id, ckpt_node = ckpt_result
-                ckpt_inputs = ckpt_node.setdefault("inputs", {})
-                ckpt_inputs["ckpt_name"] = request.checkpoint
-
-        # VAE 주입 (EditRequest에 vae 필드가 있는 경우)
-        if request.vae:
-            vae_result = self._find_node_by_class(prompt, _NODE_VAE_LOADER)
-            if vae_result:
-                _vae_id, vae_node = vae_result
-                vae_inputs = vae_node.setdefault("inputs", {})
-                vae_inputs["vae_name"] = request.vae
-
-        # LoRA 주입 (EditRequest에 loras 필드가 있는 경우)
+        # 공통 헬퍼로 checkpoint / vae / lora 주입
+        self._set_checkpoint(prompt, request.checkpoint)
+        self._set_vae(prompt, request.vae)
         if request.loras:
             self._inject_loras(prompt, request.loras)
 
         logger.info(
             "이미지 수정 워크플로우 빌드 완료: seed=%d, steps=%d, cfg=%.1f, image=%s",
-            seed,
-            request.steps,
-            request.cfg,
-            comfyui_image_name,
+            seed, request.steps, request.cfg, comfyui_image_name,
         )
         return prompt
+
+    # ─────────────────────────────────────────────
+    # 수정 모드 전용 주입 헬퍼
+    # ─────────────────────────────────────────────
+
+    def _set_load_image(self, workflow: dict[str, Any], image_name: str) -> None:
+        """LoadImage 노드에 소스 이미지 파일명 설정"""
+        result = self._find_node_by_class(workflow, _NODE_LOAD_IMAGE)
+        if result is None:
+            logger.warning("LoadImage 노드 없음 — 소스 이미지 설정 건너뜀")
+            return
+        _node_id, node = result
+        node.setdefault("inputs", {})["image"] = image_name
+
+    def _set_qwen_edit_prompts(
+        self,
+        workflow: dict[str, Any],
+        *,
+        positive: str,
+        negative: str,
+    ) -> None:
+        """TextEncodeQwenImageEdit 노드에 positive/negative 프롬프트 주입"""
+        edit_nodes = self._find_nodes_by_class(workflow, _NODE_TEXT_ENCODE_QWEN_EDIT)
+        if not edit_nodes:
+            logger.warning("TextEncodeQwenImageEdit 노드 없음 — 프롬프트 주입 건너뜀")
+            return
+        for _nid, ndata in edit_nodes:
+            meta_title = ndata.get("_meta", {}).get("title", "")
+            inputs = ndata.setdefault("inputs", {})
+            if "Positive" in meta_title:
+                inputs["prompt"] = positive
+            elif "Negative" in meta_title:
+                inputs["prompt"] = negative
 
     # ─────────────────────────────────────────────
     # 노드 탐색 헬퍼
@@ -239,29 +246,65 @@ class WorkflowManager:
         return nodes[0] if nodes else None
 
     # ─────────────────────────────────────────────
-    # 개별 노드 주입
+    # 공통 노드 주입 헬퍼 (build_prompt / build_edit_prompt 공유)
     # ─────────────────────────────────────────────
 
-    def _inject_ksampler(
+    def _set_sampling_params(
         self,
         workflow: dict[str, Any],
-        request: GenerateRequest,
+        *,
         seed: int,
+        steps: int,
+        cfg: float,
+        sampler: str | None = None,
+        scheduler: str | None = None,
+        denoise: float | None = None,
     ) -> None:
-        """KSampler 노드에 샘플링 파라미터 주입"""
+        """
+        KSampler 노드에 샘플링 파라미터 설정 — 생성/수정 모드 공통 헬퍼
+        sampler/scheduler/denoise는 None이면 워크플로우 기본값 유지
+        """
         result = self._find_node_by_class(workflow, _NODE_KSAMPLER)
         if result is None:
             logger.warning("KSampler 노드 없음 — 샘플링 파라미터 주입 건너뜀")
             return
-
         _node_id, node = result
         inputs = node.setdefault("inputs", {})
         inputs["seed"] = seed
-        inputs["steps"] = request.steps
-        inputs["cfg"] = request.cfg
-        inputs["sampler_name"] = request.sampler
-        inputs["scheduler"] = request.scheduler
-        inputs["denoise"] = 1.0  # txt2img 기본값
+        inputs["steps"] = steps
+        inputs["cfg"] = cfg
+        if sampler is not None:
+            inputs["sampler_name"] = sampler
+        if scheduler is not None:
+            inputs["scheduler"] = scheduler
+        if denoise is not None:
+            inputs["denoise"] = denoise
+
+    def _set_checkpoint(self, workflow: dict[str, Any], name: str) -> None:
+        """CheckpointLoaderSimple 노드에 체크포인트 이름 설정 (빈 문자열이면 스킵)"""
+        if not name:
+            return
+        result = self._find_node_by_class(workflow, _NODE_CHECKPOINT_LOADER)
+        if result is None:
+            logger.warning("CheckpointLoaderSimple 노드 없음 — 체크포인트 설정 건너뜀")
+            return
+        _node_id, node = result
+        node.setdefault("inputs", {})["ckpt_name"] = name
+
+    def _set_vae(self, workflow: dict[str, Any], name: str) -> None:
+        """VAELoader 노드에 VAE 이름 설정 (빈 문자열이면 스킵)"""
+        if not name:
+            return
+        result = self._find_node_by_class(workflow, _NODE_VAE_LOADER)
+        if result is None:
+            logger.warning("VAELoader 노드 없음 — VAE 설정 건너뜀")
+            return
+        _node_id, node = result
+        node.setdefault("inputs", {})["vae_name"] = name
+
+    # ─────────────────────────────────────────────
+    # 생성 모드 전용 주입 (프롬프트/latent)
+    # ─────────────────────────────────────────────
 
     def _inject_clip_text(
         self,
@@ -269,13 +312,9 @@ class WorkflowManager:
         request: GenerateRequest,
     ) -> None:
         """
-        CLIPTextEncode 노드에 프롬프트 주입
-        - 첫 번째 CLIPTextEncode → 긍정 프롬프트
-        - 두 번째 CLIPTextEncode → 부정 프롬프트
-
-        주의: 워크플로우에서 positive/negative 노드 순서가
-              항상 동일하다고 가정. 커스텀 워크플로우에서는
-              _meta.title로 구분하는 것이 더 안전할 수 있음.
+        CLIPTextEncode 노드에 프롬프트 주입 — _meta.title 기반 구분 (우선) + 순서 기반 fallback
+        - title에 "negative"가 있으면 부정, "positive"/"prompt"가 있으면 긍정
+        - title로 구분 실패 시 기존 순서 규칙 적용 (0번=긍정, 1번=부정)
         """
         clip_nodes = self._find_nodes_by_class(workflow, _NODE_CLIP_TEXT_POSITIVE)
 
@@ -283,16 +322,31 @@ class WorkflowManager:
             logger.warning("CLIPTextEncode 노드 없음 — 프롬프트 주입 건너뜀")
             return
 
-        # 첫 번째 = 긍정 프롬프트
-        _pos_id, pos_node = clip_nodes[0]
-        pos_inputs = pos_node.setdefault("inputs", {})
-        pos_inputs["text"] = request.prompt
+        # ── 1차: _meta.title 기반 매칭 ──
+        pos_node: dict | None = None
+        neg_node: dict | None = None
+        for _nid, node in clip_nodes:
+            title = node.get("_meta", {}).get("title", "").lower()
+            if "negative" in title and neg_node is None:
+                neg_node = node
+            elif ("positive" in title or "prompt" in title) and pos_node is None:
+                pos_node = node
 
-        # 두 번째 = 부정 프롬프트 (있을 경우)
-        if len(clip_nodes) >= 2:
-            _neg_id, neg_node = clip_nodes[1]
-            neg_inputs = neg_node.setdefault("inputs", {})
-            neg_inputs["text"] = request.negative_prompt
+        # ── 2차: 순서 기반 fallback (기존 동작 호환) ──
+        if pos_node is None and clip_nodes:
+            pos_node = clip_nodes[0][1]
+        if neg_node is None and len(clip_nodes) >= 2:
+            # pos와 다른 두 번째 노드 찾기
+            for _nid, node in clip_nodes:
+                if node is not pos_node:
+                    neg_node = node
+                    break
+
+        # 주입
+        if pos_node is not None:
+            pos_node.setdefault("inputs", {})["text"] = request.prompt
+        if neg_node is not None:
+            neg_node.setdefault("inputs", {})["text"] = request.negative_prompt
 
     def _inject_empty_latent(
         self,
@@ -313,42 +367,6 @@ class WorkflowManager:
         inputs["width"] = request.width
         inputs["height"] = request.height
         inputs["batch_size"] = request.batch_size
-
-    def _inject_checkpoint(
-        self,
-        workflow: dict[str, Any],
-        request: GenerateRequest,
-    ) -> None:
-        """CheckpointLoaderSimple 노드에 체크포인트 이름 주입"""
-        if not request.checkpoint:
-            return  # 미지정 시 워크플로우 기본값 유지
-
-        result = self._find_node_by_class(workflow, _NODE_CHECKPOINT_LOADER)
-        if result is None:
-            logger.warning("CheckpointLoaderSimple 노드 없음 — 체크포인트 설정 건너뜀")
-            return
-
-        _node_id, node = result
-        inputs = node.setdefault("inputs", {})
-        inputs["ckpt_name"] = request.checkpoint
-
-    def _inject_vae(
-        self,
-        workflow: dict[str, Any],
-        request: GenerateRequest,
-    ) -> None:
-        """VAELoader 노드에 VAE 이름 주입"""
-        if not request.vae:
-            return  # 미지정 시 워크플로우 기본값 유지
-
-        result = self._find_node_by_class(workflow, _NODE_VAE_LOADER)
-        if result is None:
-            logger.warning("VAELoader 노드 없음 — VAE 설정 건너뜀")
-            return
-
-        _node_id, node = result
-        inputs = node.setdefault("inputs", {})
-        inputs["vae_name"] = request.vae
 
     # ─────────────────────────────────────────────
     # LoRA 동적 삽입

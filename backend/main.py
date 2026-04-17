@@ -85,10 +85,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS 설정 (프론트엔드만 허용)
+# CORS 설정 (프론트엔드만 허용 — 여러 개발 포트 동시 지원)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url],
+    allow_origins=settings.frontend_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
