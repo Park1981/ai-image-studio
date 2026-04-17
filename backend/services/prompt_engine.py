@@ -639,16 +639,23 @@ class PromptEngine:
                 [settings.claude_cli_path, "-p", combined, "--output-format", "text"],
                 capture_output=True,
                 text=True,
+                # Windows 기본 인코딩(cp949)로 디코딩 실패 방지 — Claude CLI는 UTF-8 출력
+                # errors="replace"로 잘못된 바이트는 치환하여 UnicodeDecodeError 방지
+                encoding="utf-8",
+                errors="replace",
                 timeout=120,  # 2분 타임아웃
                 shell=False,  # 보안: shell injection 방지
             )
 
             if result.returncode != 0:
+                # stderr도 None일 수 있으므로 방어적 처리
+                stderr_msg = (result.stderr or "")[:200]
                 logger.error("Claude CLI 비정상 종료 (code=%d): %s",
-                             result.returncode, result.stderr[:200])
+                             result.returncode, stderr_msg)
                 return None
 
-            raw_output = result.stdout.strip()
+            # result.stdout이 None일 수 있으므로 방어적 처리 (Windows subprocess 엣지케이스)
+            raw_output = (result.stdout or "").strip()
             if not raw_output:
                 logger.warning("Claude CLI 빈 응답")
                 return None
