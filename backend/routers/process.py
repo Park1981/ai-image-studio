@@ -23,8 +23,8 @@ async def get_process_status():
     ollama_running = await process_manager.check_ollama()
     comfyui_running = await process_manager.check_comfyui()
 
-    # VRAM 사용량 조회 (nvidia-smi)
-    vram = process_manager.get_vram_usage()
+    # VRAM 사용량 조회 (nvidia-smi — async로 이벤트 루프 비차단)
+    vram = await process_manager.get_vram_usage()
 
     return {
         "success": True,

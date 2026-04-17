@@ -1,7 +1,7 @@
 /**
  * 이미지 수정 모드 훅
  * 수정 모드 생성 실행 + WebSocket 연결 로직 전담
- * GenerateButton / EnhanceResult에 산재하던 수정 모드 생성 로직을 통합
+ * useWebSocket 훅을 재사용하여 재접속/종결 처리 일관성 확보 (중복 dispatcher 제거)
  */
 
 'use client'
@@ -9,6 +9,7 @@
 import { useCallback, useRef } from 'react'
 import { useAppStore } from '@/stores/useAppStore'
 import { api } from '@/lib/api'
+import { useWebSocket } from './useWebSocket'
 
 /** 백엔드 이미지 서버 기본 URL */
 const IMAGE_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000'
@@ -17,6 +18,9 @@ export function useEditMode() {
   // 중복 호출 방지 guard
   const busyRef = useRef(false)
 
+  // 생성 모드와 동일한 WS 훅 재사용 (재접속/종결/dispatcher 일관)
+  const { connect } = useWebSocket()
+
   /**
    * 생성된 이미지에서 바로 수정 모드로 전환
    * 재업로드 없이 서버 내 이미지 경로를 직접 사용
@@ -24,8 +28,7 @@ export function useEditMode() {
   const startEditFromGenerated = useCallback((imageUrl: string, filename: string) => {
     const store = useAppStore.getState()
 
-    // imageUrl에서 서버 내 경로 추출: /images/2026-04-11/xxx.png → data/images/2026-04-11/xxx.png
-    // URL 형태: /images/날짜/파일명.png
+    // imageUrl에서 서버 내 경로 추출: /images/2026-04-11/xxx.png → 2026-04-11/xxx.png
     const pathMatch = imageUrl.match(/\/images\/(.+)/)
     const serverPath = pathMatch ? pathMatch[1] : filename
 
@@ -36,7 +39,7 @@ export function useEditMode() {
     store.setSelectedImageIndex(null)
   }, [])
 
-  /** 수정 모드 이미지 생성 실행 (WebSocket 연결 포함) */
+  /** 수정 모드 이미지 생성 실행 (useWebSocket으로 진행 상황 수신) */
   const executeEdit = useCallback(async (editPrompt: string) => {
     const store = useAppStore.getState()
     const { editSourceImage } = store
@@ -86,52 +89,15 @@ export function useEditMode() {
       const { task_id } = response.data
       store.setCurrentTaskId(task_id)
 
-      // WebSocket 연결하여 진행 상황 수신
-      const wsUrl = api.wsUrl('/api/ws/generate')
-      const ws = new WebSocket(wsUrl)
-
-      ws.onopen = () => ws.send(JSON.stringify({ task_id }))
-
-      ws.onmessage = (event: MessageEvent) => {
-        try {
-          const msg = JSON.parse(event.data)
-          const s = useAppStore.getState()
-          switch (msg.type) {
-            case 'status':
-              if (['warming_up', 'enhancing', 'generating'].includes(msg.status)) {
-                s.setGenerationStatus(msg.status)
-              }
-              break
-            case 'progress':
-              s.setProgress(msg.progress)
-              s.setGenerationStatus('generating')
-              break
-            case 'executing':
-              s.setGenerationStatus('generating')
-              break
-            case 'completed':
-              s.setGenerationStatus('completed')
-              s.setProgress(100)
-              s.setGeneratedImages(msg.images)
-              ws.close()
-              break
-            case 'error':
-              s.setGenerationStatus('error')
-              s.setErrorMessage(msg.message || msg.error || '이미지 수정 중 오류')
-              ws.close()
-              break
-          }
-        } catch { /* JSON 파싱 실패 시 무시 */ }
-      }
-
-      ws.onerror = () => ws.close()
+      // 생성 모드와 동일한 WebSocket 훅 사용 — 재접속/종결 처리 일관
+      connect(task_id)
     } catch {
       store.setGenerationStatus('error')
       store.setErrorMessage('이미지 수정 중 예상치 못한 오류가 발생했습니다.')
     } finally {
       busyRef.current = false
     }
-  }, [])
+  }, [connect])
 
   return { executeEdit, startEditFromGenerated }
 }

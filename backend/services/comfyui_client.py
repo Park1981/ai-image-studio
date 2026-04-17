@@ -311,7 +311,13 @@ class ComfyUIClient:
                         return
 
         except websockets.exceptions.ConnectionClosedError as exc:
+            # 조기 종료를 호출부가 감지할 수 있도록 명시적 에러 이벤트 yield
+            # (기존: 경고만 남기고 조용히 종료 → 잘못된 완료 흐름 가능성)
             logger.warning("WebSocket 연결 종료: %s", exc)
+            yield {
+                "type": "connection_closed",
+                "data": {"message": f"ComfyUI WebSocket 연결이 종료되었습니다: {exc}"},
+            }
         except websockets.exceptions.WebSocketException as exc:
             logger.error("WebSocket 오류: %s", exc)
             raise

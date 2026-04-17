@@ -32,36 +32,75 @@ class LoraConfig(BaseModel):
     strength_clip: float = Field(default=0.7, ge=0.0, le=2.0)
 
 
-class GenerateRequest(BaseModel):
-    """이미지 생성 요청"""
-    prompt: str
-    negative_prompt: str = ""
+class BaseImageRequest(BaseModel):
+    """
+    이미지 생성/수정 공통 필드 — GenerateRequest, EditRequest 공통 베이스
+    기본값은 Qwen Image 2512 프리셋 기준 (프런트 settingsSlice와 동기화)
+    """
     auto_enhance: bool = True
     checkpoint: str = ""
     loras: list[LoraConfig] = []
     vae: str = ""
-    sampler: str = "dpmpp_2m"
-    scheduler: str = "karras"
-    width: int = Field(default=1024, ge=256, le=2048)
-    height: int = Field(default=1024, ge=256, le=2048)
-    steps: int = Field(default=25, ge=1, le=150)
-    cfg: float = Field(default=7.0, ge=1.0, le=30.0)
+    steps: int = Field(default=50, ge=1, le=150)  # Qwen Image 권장
+    cfg: float = Field(default=4.0, ge=1.0, le=30.0)  # Qwen Image 권장
     seed: int = -1  # -1 = 랜덤
+
+    def to_history_fields(self) -> dict:
+        """DB 히스토리 저장용 공통 필드 반환 — 자식이 오버라이드하여 고유 필드 추가"""
+        return {
+            "checkpoint": self.checkpoint,
+            "loras": [lora.model_dump() for lora in self.loras],
+            "steps": self.steps,
+            "cfg": self.cfg,
+            "seed": self.seed,
+        }
+
+
+class GenerateRequest(BaseImageRequest):
+    """
+    이미지 생성 요청 — 기본값은 Qwen Image 2512 네이티브 설정
+    (모델별 권장값은 /api/models/presets 응답에서 프런트가 로드)
+    """
+    prompt: str
+    negative_prompt: str = ""
+    sampler: str = "euler"  # Qwen Image 권장 (SD는 dpmpp_2m 권장 — 프리셋으로 override)
+    scheduler: str = "simple"  # Qwen Image 권장
+    width: int = Field(default=1328, ge=256, le=2048)  # Qwen 네이티브 해상도
+    height: int = Field(default=1328, ge=256, le=2048)
     batch_size: int = Field(default=1, ge=1, le=4)
     mode: str = "qwen_image"  # qwen_image | txt2img | img2img | inpaint
 
+    def to_history_fields(self) -> dict:
+        """생성 모드 히스토리 필드"""
+        base = super().to_history_fields()
+        base.update({
+            "prompt": self.prompt,
+            "sampler": self.sampler,
+            "scheduler": self.scheduler,
+            "width": self.width,
+            "height": self.height,
+        })
+        return base
 
-class EditRequest(BaseModel):
-    """이미지 수정 요청 (Qwen Image Edit)"""
+
+class EditRequest(BaseImageRequest):
+    """이미지 수정 요청 (Qwen Image Edit) — BaseImageRequest 기본값(steps=50, cfg=4.0)을 그대로 사용"""
     source_image: str  # 업로드된 이미지 파일명 또는 서버 내 생성 이미지 경로
     edit_prompt: str  # 수정 지시 프롬프트
-    auto_enhance: bool = True  # AI 프롬프트 보강 여부
-    checkpoint: str = ""  # 체크포인트 이름 (빈 문자열이면 워크플로우 기본값)
-    loras: list[LoraConfig] = []  # LoRA 설정 목록
-    vae: str = ""  # VAE 이름 (빈 문자열이면 기본값)
-    steps: int = Field(default=50, ge=1, le=150)
-    cfg: float = Field(default=4.0, ge=1.0, le=30.0)
-    seed: int = -1  # -1 = 랜덤
+    negative_prompt: str = ""  # 부정 프롬프트 (TextEncodeQwenImageEdit Negative 노드)
+
+    def to_history_fields(self) -> dict:
+        """수정 모드 히스토리 필드 — 원본 edit_prompt를 prompt로 저장"""
+        base = super().to_history_fields()
+        base.update({
+            "prompt": self.edit_prompt,
+            # 수정 모드는 샘플러/크기 워크플로우 기본값 사용
+            "sampler": "euler",
+            "scheduler": "simple",
+            "width": 1024,
+            "height": 1024,
+        })
+        return base
 
 
 class GenerateResponse(BaseModel):

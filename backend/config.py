@@ -56,6 +56,15 @@ class Settings(BaseSettings):
         """ComfyUI WebSocket URL 생성"""
         return self.comfyui_url.replace("http", "ws")
 
+    @property
+    def frontend_origins(self) -> list[str]:
+        """
+        CORS 허용 origin 리스트 — frontend_url을 comma-separated로 파싱
+        개발 시 여러 포트(3000, 3001) 병행 지원
+        예: frontend_url="http://localhost:3000,http://localhost:3001"
+        """
+        return [url.strip() for url in self.frontend_url.split(",") if url.strip()]
+
     def ensure_data_dirs(self) -> None:
         """데이터 디렉토리 자동 생성"""
         Path(self.output_image_path).mkdir(parents=True, exist_ok=True)

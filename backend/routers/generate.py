@@ -22,6 +22,7 @@ from models.schemas import (
     GenerateResponse,
 )
 from services.comfyui_client import comfyui_client
+from services.image_path import resolve_image_path
 from services.process_manager import process_manager
 from services.prompt_engine import prompt_engine
 from services.task_manager import Task, task_manager
@@ -211,51 +212,8 @@ async def upload_image(file: UploadFile):
 
 
 # ─────────────────────────────────────────────
-# 소스 이미지 경로 해석 헬퍼
-# ─────────────────────────────────────────────
-
-def _resolve_source_image(source_image: str) -> Path | None:
-    """
-    소스 이미지 경로를 해석하여 실제 파일 경로 반환.
-    - data/uploads/ 또는 data/images/ 내 경로 허용
-    - path traversal 방지: resolve() 후 허용 디렉토리 내인지 검증
-    - 존재하지 않는 파일이면 None 반환
-    """
-    upload_dir = Path(settings.upload_path).resolve()
-    images_dir = Path(settings.output_image_path).resolve()
-
-    # 1) uploads/ 디렉토리에서 먼저 탐색 (기존 동작 호환)
-    upload_path = (Path(settings.upload_path) / source_image).resolve()
-    if upload_path.is_file() and _is_within(upload_path, upload_dir):
-        return upload_path
-
-    # 2) images/ 디렉토리에서 탐색 (생성된 이미지 경로 지원)
-    #    source_image가 "data/images/2026-04-11/xxx.png" 형태일 수 있음
-    images_path = (Path(settings.output_image_path) / source_image).resolve()
-    if images_path.is_file() and _is_within(images_path, images_dir):
-        return images_path
-
-    # 3) 상대 경로 그대로 시도 (data/images/... 전체 경로 전달 시)
-    direct_path = Path(source_image).resolve()
-    if direct_path.is_file() and (
-        _is_within(direct_path, upload_dir) or _is_within(direct_path, images_dir)
-    ):
-        return direct_path
-
-    return None
-
-
-def _is_within(path: Path, parent: Path) -> bool:
-    """path가 parent 디렉토리 내에 있는지 검증 (path traversal 방지)"""
-    try:
-        path.relative_to(parent)
-        return True
-    except ValueError:
-        return False
-
-
-# ─────────────────────────────────────────────
 # 이미지 수정 (Edit) 엔드포인트
+# 소스 이미지 경로 해석은 services/image_path.resolve_image_path 사용
 # ─────────────────────────────────────────────
 
 async def _run_edit_generation(task_id: str) -> None:
@@ -279,7 +237,7 @@ async def _run_edit_generation(task_id: str) -> None:
 
         # 2단계: 소스 이미지를 ComfyUI input 디렉토리에 업로드
         task.status = "generating"
-        local_path = _resolve_source_image(request.source_image)
+        local_path = resolve_image_path(request.source_image)
 
         if local_path is None:
             task.status = "error"
@@ -292,6 +250,7 @@ async def _run_edit_generation(task_id: str) -> None:
 
         # 2.5단계: AI 프롬프트 보강 (auto_enhance가 True인 경우)
         enhanced_edit_prompt = request.edit_prompt
+        enhanced_negative = request.negative_prompt
         if request.auto_enhance:
             task.status = "enhancing"
             try:
@@ -300,14 +259,18 @@ async def _run_edit_generation(task_id: str) -> None:
                     image_path=str(local_path),
                 )
                 enhanced_edit_prompt = vision_result.enhanced
+                enhanced_negative = vision_result.negative
                 task.enhanced_prompt = enhanced_edit_prompt
-                task.negative_prompt = vision_result.negative
+                task.negative_prompt = enhanced_negative
             except Exception as exc:
                 logger.warning("수정 모드 프롬프트 보강 실패, 원본 사용: %s", exc)
 
-        # 보강된 프롬프트로 요청 업데이트
+        # 보강된 프롬프트/네거티브로 요청 업데이트 (build_edit_prompt가 실제 워크플로우에 주입)
         request_copy = request.model_copy(
-            update={"edit_prompt": enhanced_edit_prompt}
+            update={
+                "edit_prompt": enhanced_edit_prompt,
+                "negative_prompt": enhanced_negative,
+            }
         )
 
         # 3단계: 수정 워크플로우 빌드
@@ -381,204 +344,268 @@ async def get_task_status(task_id: str):
 # WebSocket 진행률 스트리밍
 # ─────────────────────────────────────────────
 
+# 준비 단계 폴링 설정 (매직넘버 상수화)
+_WS_PREP_POLL_MAX_ITERATIONS: int = 300  # 최대 반복 (300 * 0.5초 = 150초)
+_WS_PREP_POLL_INTERVAL: float = 0.5  # 폴링 간격 (초)
+
+
+async def _receive_task_id(websocket: WebSocket) -> str | None:
+    """WS 클라이언트로부터 task_id 수신. 잘못된 JSON이면 에러 전송 후 None 반환."""
+    raw = await websocket.receive_text()
+    try:
+        msg = json.loads(raw)
+    except json.JSONDecodeError:
+        await websocket.send_json(
+            {"type": "error", "message": "잘못된 JSON 형식입니다."}
+        )
+        return None
+    return msg.get("task_id")
+
+
+async def _wait_for_prompt_id(
+    task: Task,
+    task_id: str,
+    websocket: WebSocket,
+) -> bool:
+    """
+    백그라운드 태스크의 prompt_id가 설정될 때까지 폴링하며 상태 전송.
+    반환: True면 준비 완료, False면 에러/취소/타임아웃 (에러는 이미 전송됨)
+    """
+    for _ in range(_WS_PREP_POLL_MAX_ITERATIONS):
+        status = task.status
+
+        # 에러/취소면 즉시 알림 후 종료
+        if status in ("error", "cancelled"):
+            await websocket.send_json({
+                "type": "error" if status == "error" else "cancelled",
+                "task_id": task_id,
+                "message": task.error or "생성이 취소되었습니다.",
+            })
+            return False
+
+        # 현재 상태 전송
+        await websocket.send_json({
+            "type": "status",
+            "task_id": task_id,
+            "status": status,
+            "progress": 0,
+            "enhanced_prompt": task.enhanced_prompt,
+            "negative_prompt": task.negative_prompt,
+        })
+
+        # prompt_id가 설정됐으면 성공
+        if task.prompt_id:
+            return True
+
+        await asyncio.sleep(_WS_PREP_POLL_INTERVAL)
+
+    # 타임아웃
+    await websocket.send_json({
+        "type": "error",
+        "task_id": task_id,
+        "message": "생성 준비 타임아웃",
+    })
+    return False
+
+
+async def _stream_comfyui_progress(
+    task: Task,
+    task_id: str,
+    websocket: WebSocket,
+) -> bool:
+    """
+    ComfyUI WS 메시지를 프론트로 릴레이.
+    반환: True면 실행 정상 완료, False면 에러/중단 (에러는 이미 전송됨)
+    """
+    execution_done = False
+    try:
+        async for ws_msg in comfyui_client.connect_ws(task_id):
+            msg_type = ws_msg.get("type", "")
+
+            if msg_type == "progress":
+                progress = ws_msg.get("data", {})
+                current = progress.get("value", 0)
+                total = progress.get("max", 1)
+                pct = int((current / total) * 100) if total > 0 else 0
+                task.progress = pct
+                await websocket.send_json({
+                    "type": "progress",
+                    "task_id": task_id,
+                    "progress": pct,
+                    "current": current,
+                    "total": total,
+                })
+
+            elif msg_type == "executing":
+                node = ws_msg.get("data", {}).get("node")
+                if node is None:
+                    execution_done = True
+                    break  # 실행 완료
+                await websocket.send_json({
+                    "type": "executing",
+                    "task_id": task_id,
+                    "node": node,
+                })
+
+            elif msg_type == "execution_error":
+                error_msg = ws_msg.get("data", {}).get(
+                    "exception_message", "알 수 없는 오류"
+                )
+                task.status = "error"
+                task.error = error_msg
+                await websocket.send_json({
+                    "type": "error",
+                    "task_id": task_id,
+                    "message": error_msg,
+                })
+                return False
+
+            elif msg_type == "connection_closed":
+                # ComfyUI WS 조기 종료 — execution_done이 아니면 에러 처리
+                if not execution_done:
+                    error_msg = ws_msg.get("data", {}).get(
+                        "message", "ComfyUI 연결이 예기치 않게 종료되었습니다."
+                    )
+                    task.status = "error"
+                    task.error = error_msg
+                    await websocket.send_json({
+                        "type": "error",
+                        "task_id": task_id,
+                        "message": error_msg,
+                    })
+                    return False
+
+    except Exception as exc:
+        if not execution_done:
+            # WS 스트리밍 중 실제 오류 — 에러 전송 후 실패 반환
+            logger.error("ComfyUI WS 스트리밍 오류: %s", exc)
+            try:
+                await websocket.send_json({
+                    "type": "error",
+                    "task_id": task_id,
+                    "message": f"진행률 수신 오류: {exc}",
+                })
+            except Exception:
+                logger.error("프론트 WS 전송도 실패 — 연결 끊김")
+            return False
+        # 실행 완료 후 WS 정리 중 예외 — 무시하고 다운로드 단계로
+        logger.info("WS 정리 중 예외 (무시): %s", exc)
+
+    return execution_done
+
+
+async def _persist_history(task: Task, task_id: str, saved: list) -> None:
+    """DB에 생성 이력 저장 — to_history_fields()로 모드별 필드 통합 (실패는 경고만)"""
+    try:
+        fields = task.request.to_history_fields()
+        await save_generation(
+            generation_id=task_id,
+            prompt=fields["prompt"],
+            enhanced_prompt=task.enhanced_prompt,
+            negative_prompt=task.negative_prompt,
+            checkpoint=fields["checkpoint"],
+            loras=json.dumps(fields["loras"]),
+            sampler=fields["sampler"],
+            scheduler=fields["scheduler"],
+            width=fields["width"],
+            height=fields["height"],
+            steps=fields["steps"],
+            cfg=fields["cfg"],
+            seed=saved[0]["seed"] if saved else fields["seed"],
+            images=json.dumps(saved),
+        )
+        logger.info("태스크 %s: 히스토리 DB 저장 완료", task_id)
+    except Exception as db_exc:
+        logger.warning("히스토리 DB 저장 실패 (무시): %s", db_exc)
+
+
+async def _finalize_generation(
+    task: Task,
+    task_id: str,
+    prompt_id: str,
+    websocket: WebSocket,
+) -> None:
+    """이미지 다운로드 + DB 저장 + completed 전송 + 유휴 타이머 시작"""
+    try:
+        saved = await comfyui_client.download_and_save_images(prompt_id)
+        task.images = saved
+        task.status = "completed"
+        task.progress = 100
+        logger.info(
+            "태스크 %s: 이미지 %d개 저장 완료, completed 전송 시도",
+            task_id, len(saved),
+        )
+        await websocket.send_json({
+            "type": "completed",
+            "task_id": task_id,
+            "images": saved,
+        })
+        logger.info("태스크 %s: completed 전송 성공", task_id)
+
+        # DB 저장 + 유휴 타이머
+        await _persist_history(task, task_id, saved)
+        process_manager.mark_generation_complete()
+
+    except Exception as exc:
+        logger.error("이미지 다운로드 실패: %s", exc, exc_info=True)
+        task.status = "error"
+        task.error = f"이미지 저장 실패: {exc}"
+        try:
+            await websocket.send_json({
+                "type": "error",
+                "task_id": task_id,
+                "message": f"이미지 저장 실패: {exc}",
+            })
+        except Exception:
+            logger.error("에러 메시지 전송도 실패 — 프론트 WS 끊김")
+
+
 @router.websocket("/api/ws/generate")
 async def ws_generate(websocket: WebSocket):
     """
-    WebSocket으로 생성 전체 라이프사이클 스트리밍
-    1. 클라이언트 연결 → task_id 수신
-    2. 태스크 상태 변화 폴링 (warming_up → enhancing → generating)
-    3. ComfyUI WS 연결 → 진행률 릴레이
-    4. 이미지 다운로드 → completed 전송
+    WebSocket으로 생성 전체 라이프사이클 스트리밍.
+    단계별 헬퍼 함수로 분해되어 복잡도 감소:
+    1. _receive_task_id: 클라이언트에서 task_id 수신
+    2. _wait_for_prompt_id: 백그라운드 워커의 prompt_id 준비 대기
+    3. _stream_comfyui_progress: ComfyUI WS 진행률 릴레이
+    4. _finalize_generation: 이미지 다운로드 + DB 저장 + completed 전송
     """
     await websocket.accept()
     logger.info("WebSocket 클라이언트 연결")
 
     try:
         while True:
-            # 클라이언트로부터 태스크 ID 수신
-            raw = await websocket.receive_text()
-            try:
-                msg = json.loads(raw)
-            except json.JSONDecodeError:
-                await websocket.send_json(
-                    {"type": "error", "message": "잘못된 JSON 형식입니다."}
-                )
+            # 1. 태스크 ID 수신 + 유효성 확인
+            task_id = await _receive_task_id(websocket)
+            if task_id is None:
                 continue
 
-            task_id = msg.get("task_id")
-            task = await task_manager.get_task(task_id) if task_id else None
+            task = await task_manager.get_task(task_id)
             if not task:
                 await websocket.send_json(
                     {"type": "error", "message": "유효하지 않은 태스크 ID입니다."}
                 )
                 continue
 
-            # ── 단계 1: 태스크가 generating 상태가 될 때까지 폴링 ──
-            for _ in range(300):  # 최대 150초 대기
-                status = task.status
-
-                # 에러/취소면 즉시 알림
-                if status in ("error", "cancelled"):
-                    await websocket.send_json({
-                        "type": "error" if status == "error" else "cancelled",
-                        "task_id": task_id,
-                        "message": task.error or "생성이 취소되었습니다.",
-                    })
-                    break
-
-                # 현재 상태 전송
-                await websocket.send_json({
-                    "type": "status",
-                    "task_id": task_id,
-                    "status": status,
-                    "progress": 0,
-                    "enhanced_prompt": task.enhanced_prompt,
-                    "negative_prompt": task.negative_prompt,
-                })
-
-                # prompt_id가 설정되었으면 ComfyUI WS 단계로 이동
-                if task.prompt_id:
-                    break
-
-                await asyncio.sleep(0.5)
-            else:
-                await websocket.send_json({
-                    "type": "error",
-                    "task_id": task_id,
-                    "message": "생성 준비 타임아웃",
-                })
-                continue
-
-            # 에러/취소로 종료된 경우 다음 메시지 대기
-            if task.status in ("error", "cancelled"):
+            # 2. prompt_id 준비 대기 (warming_up → enhancing → generating)
+            if not await _wait_for_prompt_id(task, task_id, websocket):
                 continue
 
             prompt_id = task.prompt_id
+            assert prompt_id is not None, "_wait_for_prompt_id=True면 prompt_id 설정됨"
 
-            # ── 단계 2: ComfyUI WebSocket으로 생성 진행률 수신 ──
-            execution_done = False  # 실행 정상 완료 여부 추적
-            try:
-                async for ws_msg in comfyui_client.connect_ws(task_id):
-                    msg_type = ws_msg.get("type", "")
+            # 3. ComfyUI 실행 진행률 릴레이
+            if not await _stream_comfyui_progress(task, task_id, websocket):
+                continue
 
-                    if msg_type == "progress":
-                        progress = ws_msg.get("data", {})
-                        current = progress.get("value", 0)
-                        total = progress.get("max", 1)
-                        pct = int((current / total) * 100) if total > 0 else 0
-                        task.progress = pct
-                        await websocket.send_json({
-                            "type": "progress",
-                            "task_id": task_id,
-                            "progress": pct,
-                            "current": current,
-                            "total": total,
-                        })
-
-                    elif msg_type == "executing":
-                        node = ws_msg.get("data", {}).get("node")
-                        if node is None:
-                            execution_done = True
-                            break  # 실행 완료
-                        await websocket.send_json({
-                            "type": "executing",
-                            "task_id": task_id,
-                            "node": node,
-                        })
-
-                    elif msg_type == "execution_error":
-                        error_msg = ws_msg.get("data", {}).get(
-                            "exception_message", "알 수 없는 오류"
-                        )
-                        task.status = "error"
-                        task.error = error_msg
-                        await websocket.send_json({
-                            "type": "error",
-                            "task_id": task_id,
-                            "message": error_msg,
-                        })
-                        break
-
-            except Exception as exc:
-                if not execution_done:
-                    # WS 스트리밍 중 실제 오류 — 에러 전송 후 다음 태스크 대기
-                    logger.error("ComfyUI WS 스트리밍 오류: %s", exc)
-                    try:
-                        await websocket.send_json({
-                            "type": "error",
-                            "task_id": task_id,
-                            "message": f"진행률 수신 오류: {exc}",
-                        })
-                    except Exception:
-                        logger.error("프론트 WS 전송도 실패 — 연결 끊김")
-                    continue
-                # 실행 완료 후 WS 정리 중 예외 — 무시하고 이미지 다운로드 진행
-                logger.info("WS 정리 중 예외 (무시): %s", exc)
-
-            # ── 단계 3: 이미지 다운로드 및 완료 전송 ──
             logger.info(
-                "태스크 %s: WS 루프 종료 (execution_done=%s, status=%s, prompt_id=%s)",
-                task_id, execution_done, task.status, prompt_id,
+                "태스크 %s: WS 스트리밍 완료 (status=%s, prompt_id=%s)",
+                task_id, task.status, prompt_id,
             )
 
+            # 4. 이미지 다운로드 + 완료 전송 (에러 상태면 스킵)
             if task.status != "error":
-                try:
-                    saved = await comfyui_client.download_and_save_images(
-                        prompt_id
-                    )
-                    task.images = saved
-                    task.status = "completed"
-                    task.progress = 100
-                    logger.info(
-                        "태스크 %s: 이미지 %d개 저장 완료, completed 전송 시도",
-                        task_id, len(saved),
-                    )
-                    await websocket.send_json({
-                        "type": "completed",
-                        "task_id": task_id,
-                        "images": saved,
-                    })
-                    logger.info("태스크 %s: completed 전송 성공", task_id)
-
-                    # ── DB에 히스토리 저장 ──
-                    raw_req = task.request
-                    is_edit = isinstance(raw_req, EditRequest)
-                    try:
-                        await save_generation(
-                            generation_id=task_id,
-                            prompt=raw_req.edit_prompt if is_edit else raw_req.prompt,
-                            enhanced_prompt=task.enhanced_prompt,
-                            negative_prompt=task.negative_prompt,
-                            checkpoint=raw_req.checkpoint if hasattr(raw_req, "checkpoint") else "",
-                            loras=json.dumps([lora.model_dump() for lora in raw_req.loras]) if hasattr(raw_req, "loras") else "[]",
-                            sampler=raw_req.sampler if hasattr(raw_req, "sampler") else "euler",
-                            scheduler=raw_req.scheduler if hasattr(raw_req, "scheduler") else "simple",
-                            width=raw_req.width if hasattr(raw_req, "width") else 1024,
-                            height=raw_req.height if hasattr(raw_req, "height") else 1024,
-                            steps=raw_req.steps,
-                            cfg=raw_req.cfg,
-                            seed=saved[0]["seed"] if saved else raw_req.seed,
-                            images=json.dumps(saved),
-                        )
-                        logger.info("태스크 %s: 히스토리 DB 저장 완료", task_id)
-                    except Exception as db_exc:
-                        logger.warning("히스토리 DB 저장 실패 (무시): %s", db_exc)
-
-                    # 유휴 자동 종료 타이머 시작
-                    process_manager.mark_generation_complete()
-
-                except Exception as exc:
-                    logger.error("이미지 다운로드 실패: %s", exc, exc_info=True)
-                    task.status = "error"
-                    task.error = f"이미지 저장 실패: {exc}"
-                    try:
-                        await websocket.send_json({
-                            "type": "error",
-                            "task_id": task_id,
-                            "message": f"이미지 저장 실패: {exc}",
-                        })
-                    except Exception:
-                        logger.error("에러 메시지 전송도 실패 — 프론트 WS 끊김")
+                await _finalize_generation(task, task_id, prompt_id, websocket)
 
     except WebSocketDisconnect:
         logger.info("WebSocket 클라이언트 연결 해제")

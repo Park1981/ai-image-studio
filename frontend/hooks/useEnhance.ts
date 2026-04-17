@@ -85,22 +85,27 @@ export function useEnhance() {
         setEnhancePending(true)
         setGenerationStatus('idle')
       } else {
-        // 실패 시 이전 보강 결과 초기화
-        setEnhancedPrompt('')
-        setEnhancedNegative('')
-        useAppStore.getState().setEnhancedCategories([])
-        setGenerationStatus('idle')
+        // 실패 시 — 이전 보강 세션 상태가 남아있을 수 있으므로 명시적 초기화
+        resetEnhanceState()
         setErrorMessage(response.error || '프롬프트 보강에 실패했습니다.')
       }
     } catch {
-      // 에러 시 이전 보강 결과 초기화
-      setEnhancedPrompt('')
-      setEnhancedNegative('')
-      useAppStore.getState().setEnhancedCategories([])
-      setGenerationStatus('idle')
+      // 에러 시 — 동일하게 상태 정리
+      resetEnhanceState()
       setErrorMessage('프롬프트 보강 중 오류가 발생했습니다.')
     } finally {
       busyRef.current = false
+    }
+
+    // 성공/실패 분기 공통 상태 정리 헬퍼
+    function resetEnhanceState() {
+      setEnhancedPrompt('')
+      setEnhancedNegative('')
+      setEnhanceFallback(false)
+      setEnhancePending(false)  // 보강 대기 상태 해제 (UI 오염 방지)
+      useAppStore.getState().setEnhancedCategories([])
+      useAppStore.getState().setEnhanceProvider('ollama')
+      setGenerationStatus('idle')
     }
   }, [
     prompt, setGenerationStatus, setProgress, setErrorMessage,

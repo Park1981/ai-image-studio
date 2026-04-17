@@ -37,6 +37,8 @@ class ProcessManager:
         self._comfyui_started_at: float | None = None
         # 마지막 이미지 생성 완료 시각 (유휴 자동 종료용)
         self._last_generation_at: float | None = None
+        # ComfyUI start/stop 경로 직렬화 락 (동시 기동 경쟁 방지)
+        self._comfyui_lifecycle_lock = asyncio.Lock()
 
     # ─────────────────────────────────────────────
     # Ollama 헬스체크
@@ -75,57 +77,76 @@ class ProcessManager:
         - 실행 파일 경로를 설정에서 가져옴
         - 헬스체크 폴링으로 기동 완료 대기
         - 이미 실행 중이면 True 반환
+        - asyncio.Lock으로 동시 기동 경쟁 방지 (double-check 패턴)
         """
-        # 이미 실행 중인지 확인
-        if await self.check_comfyui():
-            logger.info("ComfyUI 이미 실행 중")
-            return True
+        # 락 내부에서 재확인하는 double-check 패턴 (GPU 프로세스 중복 실행 방지)
+        async with self._comfyui_lifecycle_lock:
+            # 락 획득 후 재확인 (다른 태스크가 이미 기동했을 수 있음)
+            if await self.check_comfyui():
+                logger.info("ComfyUI 이미 실행 중")
+                return True
 
-        executable = settings.comfyui_executable
-        if not executable:
-            logger.error("comfyui_executable 미설정 — .env 파일 확인 필요")
-            return False
+            executable = settings.comfyui_executable
+            if not executable:
+                logger.error("comfyui_executable 미설정 — .env 파일 확인 필요")
+                return False
 
-        exe_path = Path(executable)
-        if not exe_path.exists():
-            logger.error("ComfyUI 실행 파일 없음: %s", exe_path)
-            return False
+            exe_path = Path(executable)
+            if not exe_path.exists():
+                logger.error("ComfyUI 실행 파일 없음: %s", exe_path)
+                return False
 
-        logger.info("ComfyUI 시작 중: %s", exe_path)
+            logger.info("ComfyUI 시작 중: %s", exe_path)
 
-        try:
-            # Windows: 별도 콘솔 없이 백그라운드 실행 + 출력 버퍼 차단 방지
-            creation_flags = 0
-            if sys.platform == "win32":
-                creation_flags = (
-                    subprocess.CREATE_NO_WINDOW
-                    | subprocess.CREATE_NEW_PROCESS_GROUP
+            try:
+                # Windows: 별도 콘솔 없이 백그라운드 실행 + 출력 버퍼 차단 방지
+                creation_flags = 0
+                if sys.platform == "win32":
+                    creation_flags = (
+                        subprocess.CREATE_NO_WINDOW
+                        | subprocess.CREATE_NEW_PROCESS_GROUP
+                    )
+
+                # shell=False 필수 (보안), DEVNULL로 출력 버퍼 막힘 방지
+                self._comfyui_process = subprocess.Popen(
+                    [str(exe_path)],
+                    cwd=str(exe_path.parent),
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    shell=False,  # 보안: 명시적 False
+                    creationflags=creation_flags,
                 )
+            except OSError as exc:
+                logger.error("ComfyUI 프로세스 생성 실패: %s", exc)
+                return False
 
-            # shell=False 필수 (보안), DEVNULL로 출력 버퍼 막힘 방지
-            self._comfyui_process = subprocess.Popen(
-                [str(exe_path)],
-                cwd=str(exe_path.parent),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                shell=False,  # 보안: 명시적 False
-                creationflags=creation_flags,
-            )
-        except OSError as exc:
-            logger.error("ComfyUI 프로세스 생성 실패: %s", exc)
-            return False
+            # 헬스체크 폴링으로 기동 완료 대기
+            started = await self._wait_for_comfyui_ready()
+            if started:
+                self._comfyui_started_at = time.time()
+                logger.info("ComfyUI 기동 완료 (PID: %d)", self._comfyui_process.pid)
+            else:
+                logger.error("ComfyUI 기동 타임아웃 (%.0f초)", _STARTUP_TIMEOUT)
+                # 락 내부에서 stop_comfyui 호출하면 재진입 데드락 → 직접 정리
+                self._force_cleanup_comfyui()
 
-        # 헬스체크 폴링으로 기동 완료 대기
-        started = await self._wait_for_comfyui_ready()
-        if started:
-            self._comfyui_started_at = time.time()
-            logger.info("ComfyUI 기동 완료 (PID: %d)", self._comfyui_process.pid)
-        else:
-            logger.error("ComfyUI 기동 타임아웃 (%.0f초)", _STARTUP_TIMEOUT)
-            await self.stop_comfyui()
+            return started
 
-        return started
+    def _force_cleanup_comfyui(self) -> None:
+        """락 내부용 강제 정리 — stop_comfyui의 락 재획득을 피하기 위해 분리"""
+        if self._comfyui_process is None:
+            return
+        pid = self._comfyui_process.pid
+        try:
+            self._comfyui_process.kill()
+            self._comfyui_process.wait(timeout=_SHUTDOWN_TIMEOUT)
+            logger.info("ComfyUI 강제 정리 완료 (PID: %d)", pid)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            logger.error("ComfyUI 강제 정리 오류 (PID: %d): %s", pid, exc)
+        finally:
+            self._comfyui_process = None
+            self._comfyui_started_at = None
 
     async def _wait_for_comfyui_ready(self) -> bool:
         """ComfyUI /system_stats 응답 대기 (폴링)"""
@@ -152,43 +173,44 @@ class ProcessManager:
 
     async def stop_comfyui(self) -> bool:
         """
-        ComfyUI 프로세스 종료
+        ComfyUI 프로세스 종료 — start_comfyui와 같은 락 사용 (동시 start/stop 직렬화)
         - terminate()로 우아한 종료 시도
         - 타임아웃 후 kill()로 강제 종료
         """
-        if self._comfyui_process is None:
-            logger.info("ComfyUI 프로세스 핸들 없음 — 종료 불필요")
-            return True
+        async with self._comfyui_lifecycle_lock:
+            if self._comfyui_process is None:
+                logger.info("ComfyUI 프로세스 핸들 없음 — 종료 불필요")
+                return True
 
-        pid = self._comfyui_process.pid
-        logger.info("ComfyUI 종료 요청 (PID: %d)", pid)
+            pid = self._comfyui_process.pid
+            logger.info("ComfyUI 종료 요청 (PID: %d)", pid)
 
-        try:
-            # 우아한 종료 시도
-            self._comfyui_process.terminate()
-
-            # 종료 대기
             try:
-                await asyncio.to_thread(
-                    self._comfyui_process.wait, timeout=_SHUTDOWN_TIMEOUT
-                )
-                logger.info("ComfyUI 정상 종료 완료 (PID: %d)", pid)
-            except subprocess.TimeoutExpired:
-                # 타임아웃 → 강제 종료
-                logger.warning(
-                    "ComfyUI 정상 종료 타임아웃 — 강제 종료 (PID: %d)", pid
-                )
-                self._comfyui_process.kill()
-                await asyncio.to_thread(self._comfyui_process.wait)
+                # 우아한 종료 시도
+                self._comfyui_process.terminate()
 
-        except OSError as exc:
-            logger.error("ComfyUI 종료 중 오류: %s", exc)
-            return False
-        finally:
-            self._comfyui_process = None
-            self._comfyui_started_at = None
+                # 종료 대기
+                try:
+                    await asyncio.to_thread(
+                        self._comfyui_process.wait, timeout=_SHUTDOWN_TIMEOUT
+                    )
+                    logger.info("ComfyUI 정상 종료 완료 (PID: %d)", pid)
+                except subprocess.TimeoutExpired:
+                    # 타임아웃 → 강제 종료
+                    logger.warning(
+                        "ComfyUI 정상 종료 타임아웃 — 강제 종료 (PID: %d)", pid
+                    )
+                    self._comfyui_process.kill()
+                    await asyncio.to_thread(self._comfyui_process.wait)
 
-        return True
+            except OSError as exc:
+                logger.error("ComfyUI 종료 중 오류: %s", exc)
+                return False
+            finally:
+                self._comfyui_process = None
+                self._comfyui_started_at = None
+
+            return True
 
     # ─────────────────────────────────────────────
     # ComfyUI 보장 (필요 시 시작)
@@ -230,14 +252,16 @@ class ProcessManager:
     # VRAM 사용량 조회 (nvidia-smi)
     # ─────────────────────────────────────────────
 
-    def get_vram_usage(self) -> dict:
+    async def get_vram_usage(self) -> dict:
         """
-        nvidia-smi로 GPU VRAM 사용량 조회.
+        nvidia-smi로 GPU VRAM 사용량 조회 (async — 이벤트 루프 블로킹 방지).
         반환: {"used_gb": float, "total_gb": float}
         nvidia-smi 없거나 실패 시 기본값 반환.
         """
         try:
-            result = subprocess.run(
+            # subprocess.run은 동기 호출 (최대 5초) — asyncio.to_thread로 async 컨텍스트에서 비차단
+            result = await asyncio.to_thread(
+                subprocess.run,
                 [
                     "nvidia-smi",
                     "--query-gpu=memory.used,memory.total",
