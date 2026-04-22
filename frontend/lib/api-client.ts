@@ -92,6 +92,22 @@ function resolveSeed(seed: number): number {
 }
 
 /**
+ * 백엔드가 반환한 imageRef 를 절대 URL 로 정규화.
+ * - "/images/..." → `${STUDIO_BASE}/images/...` (기본 http://localhost:8001)
+ * - 나머지 (data:, blob:, http(s):, mock-seed:, etc.) 는 그대로.
+ * 이 처리를 api-client 에 모아두면 ImageTile 은 절대 URL 만 받음.
+ */
+function normalizeImageRef(ref: string): string {
+  if (ref.startsWith("/")) return `${STUDIO_BASE}${ref}`;
+  return ref;
+}
+
+/** HistoryItem 의 imageRef 필드를 정규화해서 반환 */
+function normalizeItem(item: HistoryItem): HistoryItem {
+  return { ...item, imageRef: normalizeImageRef(item.imageRef) };
+}
+
+/**
  * SSE 스트림 파서 — fetch 의 ReadableStream 을 `event: X\ndata: {...}\n\n` 단위로 끊어서 yield.
  */
 async function* parseSSE(
@@ -177,7 +193,7 @@ async function* realGenerateStream(
     }
     if (evt.event === "done") {
       const payload = evt.data as { item: HistoryItem };
-      yield { type: "done", item: payload.item };
+      yield { type: "done", item: normalizeItem(payload.item) };
       return;
     }
     if (evt.event === "stage") {
@@ -294,7 +310,7 @@ async function* realEditStream(
     }
     if (evt.event === "done") {
       const payload = evt.data as { item: HistoryItem };
-      yield { type: "done", item: payload.item };
+      yield { type: "done", item: normalizeItem(payload.item) };
       return;
     }
     if (evt.event === "step") {

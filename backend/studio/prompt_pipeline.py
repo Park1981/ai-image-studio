@@ -20,7 +20,9 @@ import httpx
 log = logging.getLogger(__name__)
 
 OLLAMA_URL = "http://localhost:11434"
-DEFAULT_TIMEOUT = 20.0  # 초 (업그레이드 기본값 · 조사 컨텍스트 포함 시 + 10)
+# 16GB VRAM 환경에서 gemma4-un(25.2B) 첫 로드 30~60s 여유 필요.
+# 이후 호출은 빠름. 환경에 따라 .env 로 조정 가능하도록 추후 이동.
+DEFAULT_TIMEOUT = 120.0
 
 # 시스템 프롬프트 (영문 — gemma 영문 출력 잘함)
 SYSTEM_GENERATE = """You are a prompt engineer specialized in Qwen Image 2512 (a photorealistic text-to-image model).
