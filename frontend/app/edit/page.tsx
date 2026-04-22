@@ -94,7 +94,9 @@ export default function EditPage() {
   const items = useHistoryStore((s) => s.items);
   const addItem = useHistoryStore((s) => s.add);
   const selectHistory = useHistoryStore((s) => s.select);
-  const historyForRight = items.slice(0, 12);
+  // 수정 모드 우측 그리드는 edit 결과만 (generate 섞이면 Before/After 슬라이더가 엉뚱하게 매칭됨)
+  const editResults = items.filter((x) => x.mode === "edit");
+  const historyForRight = editResults.slice(0, 12);
   const [afterId, setAfterId] = useState<string | null>(
     historyForRight[0]?.id ?? null,
   );
