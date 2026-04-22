@@ -361,7 +361,10 @@ export default function EditPage() {
                         }}
                         title={it.label}
                       >
-                        <ImageTile seed={it.id} aspect="1/1" />
+                        <ImageTile
+                          seed={it.imageRef || it.id}
+                          aspect="1/1"
+                        />
                       </button>
                     ))}
                   </div>
@@ -877,7 +880,7 @@ export default function EditPage() {
             {historyForRight.map((it) => (
               <ImageTile
                 key={it.id}
-                seed={it.id}
+                seed={it.imageRef || it.id}
                 label={it.label}
                 onClick={() => {
                   setAfterId(it.id);

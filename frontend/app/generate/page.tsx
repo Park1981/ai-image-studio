@@ -605,7 +605,10 @@ export default function GeneratePage() {
                 boxShadow: "var(--shadow-sm)",
               }}
             >
-              <ImageTile seed={selectedItem.id} aspect="1/1" />
+              <ImageTile
+                seed={selectedItem.imageRef || selectedItem.id}
+                aspect="1/1"
+              />
               <div
                 style={{
                   display: "flex",
@@ -696,7 +699,7 @@ export default function GeneratePage() {
               {genItems.map((it) => (
                 <ImageTile
                   key={it.id}
-                  seed={it.id}
+                  seed={it.imageRef || it.id}
                   label={it.label}
                   onClick={() => selectItem(it.id)}
                   style={{
