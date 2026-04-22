@@ -86,6 +86,8 @@ export default function EditPage() {
   const resetPipeline = useEditStore((s) => s.resetPipeline);
 
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
+  const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
+  const visionModelSel = useSettingsStore((s) => s.visionModel);
 
   const items = useHistoryStore((s) => s.items);
   const addItem = useHistoryStore((s) => s.add);
@@ -158,6 +160,8 @@ export default function EditPage() {
         sourceImage,
         prompt,
         lightning,
+        ollamaModel: ollamaModelSel,
+        visionModel: visionModelSel,
       })) {
         if (evt.type === "step") {
           setStep(evt.step, evt.done);

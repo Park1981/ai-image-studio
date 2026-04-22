@@ -52,6 +52,9 @@ export interface GenerateRequest {
   seed: number;
   lightning: boolean;
   research: boolean;
+  /** 설정 override (없으면 백엔드 기본값) */
+  ollamaModel?: string;
+  visionModel?: string;
 }
 
 export interface EditRequest {
@@ -59,6 +62,8 @@ export interface EditRequest {
   sourceImage: string | File;
   prompt: string;
   lightning: boolean;
+  ollamaModel?: string;
+  visionModel?: string;
 }
 
 export type GenStage =
@@ -291,7 +296,12 @@ async function* realEditStream(
   }
   form.append(
     "meta",
-    JSON.stringify({ prompt: req.prompt, lightning: req.lightning }),
+    JSON.stringify({
+      prompt: req.prompt,
+      lightning: req.lightning,
+      ollamaModel: req.ollamaModel,
+      visionModel: req.visionModel,
+    }),
   );
 
   const createRes = await fetch(`${STUDIO_BASE}/api/studio/edit`, {

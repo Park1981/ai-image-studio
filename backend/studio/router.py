@@ -33,6 +33,7 @@ from pydantic import BaseModel, Field
 
 from .presets import (
     ASPECT_RATIOS,
+    DEFAULT_OLLAMA_ROLES,
     EDIT_MODEL,
     GENERATE_MODEL,
     get_aspect,
@@ -88,6 +89,12 @@ class GenerateBody(BaseModel):
     seed: int = GENERATE_MODEL.defaults.seed
     lightning: bool = False
     research: bool = False
+    # 설정에서 override 가능 (None 이면 프리셋 기본값)
+    ollama_model: str | None = Field(default=None, alias="ollamaModel")
+    vision_model: str | None = Field(default=None, alias="visionModel")
+
+    class Config:
+        populate_by_name = True
 
 
 class ResearchBody(BaseModel):
@@ -241,6 +248,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
         )
         upgrade = await upgrade_generate_prompt(
             prompt=body.prompt,
+            model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
             research_context="\n".join(research_hints) if research_hints else None,
         )
 
@@ -416,6 +424,9 @@ async def create_edit_task(
     if not prompt:
         raise HTTPException(400, "prompt required")
     lightning = bool(meta_obj.get("lightning", False))
+    # 설정에서 override (없으면 프리셋 기본값)
+    ollama_model_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
+    vision_model_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
 
     image_bytes = await image.read()
     if not image_bytes:
@@ -423,7 +434,15 @@ async def create_edit_task(
 
     task = _new_task()
     asyncio.create_task(
-        _run_edit_pipeline(task, image_bytes, prompt, lightning, image.filename or "input.png")
+        _run_edit_pipeline(
+            task,
+            image_bytes,
+            prompt,
+            lightning,
+            image.filename or "input.png",
+            ollama_model_override,
+            vision_model_override,
+        )
     )
     return TaskCreated(
         task_id=task.task_id,
@@ -452,11 +471,18 @@ async def _run_edit_pipeline(
     prompt: str,
     lightning: bool,
     filename: str,
+    ollama_model_override: str | None = None,
+    vision_model_override: str | None = None,
 ) -> None:
     try:
         # Step 1: vision analysis
         await task.emit("step", {"step": 1, "done": False})
-        vision = await run_vision_pipeline(image_bytes, prompt)
+        vision = await run_vision_pipeline(
+            image_bytes,
+            prompt,
+            vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
+            text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
+        )
         await task.emit(
             "step",
             {

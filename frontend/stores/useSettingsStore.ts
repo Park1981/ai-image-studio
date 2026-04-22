@@ -68,7 +68,7 @@ export const useSettingsStore = create<SettingsState>()(
       generateModel: GENERATE_MODEL.displayName,
       editModel: EDIT_MODEL.displayName,
       ollamaModel: "gemma4-un:latest",
-      visionModel: "gemma4-heretic:vision-q4km",
+      visionModel: "qwen2.5vl:7b",
 
       showUpgradeStep: true,
       lightningByDefault: false,

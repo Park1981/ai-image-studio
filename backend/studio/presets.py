@@ -190,7 +190,7 @@ class OllamaRoles:
 
 DEFAULT_OLLAMA_ROLES = OllamaRoles(
     text="gemma4-un:latest",
-    vision="gemma4-heretic:vision-q4km",
+    vision="qwen2.5vl:7b",  # 표준 vision 모델 (Ollama 0.20.2 llama.cpp 지원)
 )
 
 

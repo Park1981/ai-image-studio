@@ -77,6 +77,8 @@ export default function GeneratePage() {
 
   const showUpgradeStep = useSettingsStore((s) => s.showUpgradeStep);
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
+  const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
+  const visionModelSel = useSettingsStore((s) => s.visionModel);
   const ollamaStatus = useProcessStore((s) => s.ollama);
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
@@ -122,6 +124,8 @@ export default function GeneratePage() {
         seed,
         lightning,
         research,
+        ollamaModel: ollamaModelSel,
+        visionModel: visionModelSel,
       })) {
         if (evt.type === "done") {
           addItem(evt.item);
