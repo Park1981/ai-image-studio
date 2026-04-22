@@ -395,6 +395,33 @@ export async function setProcessStatus(
    ───────────────────────────────── */
 
 /* ─────────────────────────────────
+   Ollama 모델 목록 (설치된 것)
+   ───────────────────────────────── */
+
+export interface OllamaModel {
+  name: string;
+  size_gb: number;
+  modified_at: string;
+}
+
+export async function listOllamaModels(): Promise<OllamaModel[]> {
+  if (USE_MOCK) {
+    return [
+      { name: "gemma4-un:latest", size_gb: 16, modified_at: "" },
+      { name: "gemma4-heretic:text-q4km", size_gb: 16, modified_at: "" },
+      { name: "qwen2.5vl:7b", size_gb: 5.5, modified_at: "" },
+    ];
+  }
+  try {
+    const res = await fetch(`${STUDIO_BASE}/api/studio/ollama/models`);
+    if (!res.ok) return [];
+    return (await res.json()) as OllamaModel[];
+  } catch {
+    return [];
+  }
+}
+
+/* ─────────────────────────────────
    History (서버 영속)
    ───────────────────────────────── */
 

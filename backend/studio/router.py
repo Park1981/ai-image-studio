@@ -602,6 +602,22 @@ async def list_models():
 # ─────────────────────────────────────────────
 
 
+@router.get("/ollama/models")
+async def list_ollama_models():
+    """설치된 Ollama 모델 목록 (Settings drawer 드롭다운용).
+
+    Returns:
+        [{name, size_gb, modified_at}, ...] — 이름순 정렬.
+    """
+    if _proc_mgr is None:
+        return []
+    try:
+        return await _proc_mgr.list_ollama_models()
+    except Exception as e:
+        log.warning("list_ollama_models failed: %s", e)
+        return []
+
+
 @router.get("/process/status")
 async def process_status():
     """실 process_manager 로부터 Ollama·ComfyUI 상태 + VRAM 조회."""

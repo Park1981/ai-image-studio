@@ -16,7 +16,13 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore, type ProcStatus } from "@/stores/useProcessStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
-import { setProcessStatus, clearHistory as apiClearHistory } from "@/lib/api-client";
+import {
+  setProcessStatus,
+  clearHistory as apiClearHistory,
+  listOllamaModels,
+  type OllamaModel,
+} from "@/lib/api-client";
+import { useEffect, useState } from "react";
 import { useSettings } from "./SettingsContext";
 
 /* ─────────────────────────────────
@@ -328,13 +334,8 @@ function ProcessSection() {
    2. Model Selector
    ───────────────────────────────── */
 
-const OLLAMA_OPTIONS = [
-  "gemma4-un:latest",
-  "gemma4-heretic:text-q4km",
-  "super-sis:latest",
-  "my-sister-26b:latest",
-  "gemma4:26b",
-];
+// 알려진 vision-capable 모델 prefix (name 에 포함되면 비전 후보로 간주)
+const VISION_HINTS = ["vision", "llava", "vl:", "qwen2.5vl", "bakllava", "moondream"];
 
 function ModelSection() {
   const {
@@ -347,6 +348,36 @@ function ModelSection() {
     setOllamaModel,
     setVisionModel,
   } = useSettingsStore();
+
+  const [ollamaList, setOllamaList] = useState<OllamaModel[]>([]);
+
+  // 드로어가 마운트되면 한 번 Ollama 설치 모델 조회
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const models = await listOllamaModels();
+      if (!cancelled) setOllamaList(models);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const allNames = ollamaList.length
+    ? ollamaList.map((m) => m.name)
+    : // 폴백 — API 실패 시 자주 쓰는 후보 고정 목록
+      ["gemma4-un:latest", "qwen2.5vl:7b", "llava:13b"];
+
+  const visionCandidates = allNames.filter((n) =>
+    VISION_HINTS.some((h) => n.toLowerCase().includes(h.toLowerCase())),
+  );
+  const textCandidates = allNames.filter(
+    (n) => !visionCandidates.includes(n),
+  );
+
+  // 선택된 게 목록에 없어도 상단에 유지 (사용자가 직접 설정한 값 존중)
+  const ensureIn = (list: string[], value: string) =>
+    list.includes(value) ? list : [value, ...list];
 
   return (
     <Section title="모델" desc="각 역할에서 사용할 로컬 모델 선택">
@@ -365,15 +396,49 @@ function ModelSection() {
       <SelectRow
         label="텍스트 LLM (프롬프트 업그레이드)"
         value={ollamaModel}
-        options={OLLAMA_OPTIONS}
+        options={ensureIn(
+          textCandidates.length ? textCandidates : allNames,
+          ollamaModel,
+        )}
         onChange={setOllamaModel}
       />
       <SelectRow
         label="비전 LLM (수정 모드 이미지 분석)"
         value={visionModel}
-        options={["gemma4-heretic:vision-q4km"]}
+        options={ensureIn(
+          visionCandidates.length ? visionCandidates : allNames,
+          visionModel,
+        )}
         onChange={setVisionModel}
       />
+      {ollamaList.length === 0 && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--ink-4)",
+            background: "var(--bg-2)",
+            padding: "8px 10px",
+            borderRadius: 8,
+          }}
+        >
+          Ollama 모델 목록 조회 실패. 서버 상태 확인.
+        </div>
+      )}
+      {visionCandidates.length === 0 && (
+        <div
+          style={{
+            fontSize: 11,
+            color: "var(--amber-ink)",
+            background: "var(--amber-soft)",
+            padding: "8px 10px",
+            borderRadius: 8,
+            border: "1px solid rgba(250,173,20,.35)",
+          }}
+        >
+          ⚠ 설치된 비전 모델이 없어. 추천: <code>ollama pull qwen2.5vl:7b</code> (5.5GB) 또는{" "}
+          <code>llama3.2-vision:11b</code> (7.8GB).
+        </div>
+      )}
     </Section>
   );
 }
