@@ -150,14 +150,18 @@ class ComfyUITransport:
         client_id: str,
         prompt_id: str,
         *,
-        ws_timeout: float = 300.0,
+        idle_timeout: float = 600.0,
+        hard_timeout: float = 1800.0,
     ) -> AsyncIterator[ComfyProgress]:
         """prompt_id 의 완료까지 WebSocket 이벤트 스트림.
 
+        - idle_timeout: 아무 메시지도 안 오는 상태가 이만큼 지속되면 timeout (기본 10분)
+          → 모델 로드 중엔 메시지가 주기적으로 와서 리셋됨. 실제 "멈춤" 만 잡음.
+        - hard_timeout: 총 상한 (기본 30분). 안전망.
+
         종료 조건:
-        - `execution_success` 이벤트 수신 (성공)
-        - `execution_error` 이벤트 수신 (실패 — ComfyProgress 로 yield 후 루프 종료)
-        - ws_timeout 초과 (외부에서 asyncio.wait_for 로 래핑)
+        - `execution_success` / `execution_error` 이벤트 수신
+        - idle 또는 hard timeout
         """
         ws_url = (
             self.base_url.replace("http://", "ws://").replace(
@@ -173,11 +177,28 @@ class ComfyUITransport:
                 close_timeout=5.0,
             ) as ws:
                 start = asyncio.get_event_loop().time()
+                last_msg_at = start
                 while True:
-                    if asyncio.get_event_loop().time() - start > ws_timeout:
-                        raise TimeoutError("ComfyUI WS listen timeout")
+                    now = asyncio.get_event_loop().time()
+                    if now - start > hard_timeout:
+                        raise TimeoutError(
+                            f"ComfyUI WS hard timeout ({hard_timeout:.0f}s)"
+                        )
 
-                    msg = await ws.recv()
+                    # 남은 idle 예산만큼 wait_for 로 recv 대기 → 초과 시 idle timeout
+                    remaining = idle_timeout - (now - last_msg_at)
+                    if remaining <= 0:
+                        raise TimeoutError(
+                            f"ComfyUI WS idle timeout ({idle_timeout:.0f}s · 메시지 무응답)"
+                        )
+                    try:
+                        msg = await asyncio.wait_for(ws.recv(), timeout=remaining)
+                    except asyncio.TimeoutError as e:
+                        raise TimeoutError(
+                            f"ComfyUI WS idle timeout ({idle_timeout:.0f}s · 메시지 무응답)"
+                        ) from e
+
+                    last_msg_at = asyncio.get_event_loop().time()
                     if isinstance(msg, bytes):
                         # 바이너리 프리뷰 프레임 — 스킵 (지금은 프리뷰 안 씀)
                         continue
