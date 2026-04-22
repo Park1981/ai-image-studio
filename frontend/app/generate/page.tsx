@@ -16,6 +16,7 @@ import {
   ModelBadge,
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
+import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
 import {
@@ -129,6 +130,18 @@ export default function GeneratePage() {
             "생성 완료",
             `${evt.item.width}×${evt.item.height} · seed ${evt.item.seed}`,
           );
+          // 에러/폴백 상세 토스트 (백엔드가 item 에 실어 보내는 힌트)
+          if (evt.item.comfyError) {
+            toast.error(
+              "ComfyUI 오류 (Mock 폴백 적용)",
+              evt.item.comfyError.slice(0, 160),
+            );
+          } else if (evt.item.promptProvider === "fallback") {
+            toast.warn(
+              "gemma4 업그레이드 실패",
+              "원본 프롬프트로 생성됨. Ollama 상태 확인 또는 설정에서 재시작해봐.",
+            );
+          }
           return;
         }
         setRunning(true, evt.progress, evt.stageLabel);
@@ -621,7 +634,12 @@ export default function GeneratePage() {
                 </div>
               </div>
             </div>
-          ) : (
+          ) : null}
+
+          {/* AI 보강 결과 카드 (선택된 아이템에 한해) */}
+          {selectedItem && <AiEnhanceCard item={selectedItem} />}
+
+          {!selectedItem && (
             <div
               style={{
                 padding: "28px 20px",

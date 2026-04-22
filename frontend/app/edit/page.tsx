@@ -23,6 +23,7 @@ import {
   ModelBadge,
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
+import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
 import {
@@ -165,6 +166,17 @@ export default function EditPage() {
           addItem(evt.item);
           setAfterId(evt.item.id);
           toast.success("수정 완료", evt.item.label);
+          if (evt.item.comfyError) {
+            toast.error(
+              "ComfyUI 오류 (Mock 폴백 적용)",
+              evt.item.comfyError.slice(0, 160),
+            );
+          } else if (evt.item.promptProvider === "fallback") {
+            toast.warn(
+              "gemma4 업그레이드 실패",
+              "Ollama 상태 확인 필요",
+            );
+          }
           return;
         }
       }
@@ -760,17 +772,20 @@ export default function EditPage() {
 
           {/* Before/After */}
           {sourceImage && afterItem ? (
-            <BeforeAfter
-              beforeSrc={sourceImage}
-              afterSeed={afterItem.id}
-              compareX={compareX}
-              setCompareX={setCompareX}
-              aspectRatio={
-                sourceWidth && sourceHeight
-                  ? `${sourceWidth} / ${sourceHeight}`
-                  : "16 / 10"
-              }
-            />
+            <>
+              <BeforeAfter
+                beforeSrc={sourceImage}
+                afterSeed={afterItem.imageRef || afterItem.id}
+                compareX={compareX}
+                setCompareX={setCompareX}
+                aspectRatio={
+                  sourceWidth && sourceHeight
+                    ? `${sourceWidth} / ${sourceHeight}`
+                    : "16 / 10"
+                }
+              />
+              <AiEnhanceCard item={afterItem} />
+            </>
           ) : (
             <div
               style={{

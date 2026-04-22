@@ -245,6 +245,16 @@ async function* mockGenerateStream(
     model: GENERATE_MODEL.displayName,
     createdAt: Date.now(),
     imageRef: `mock-seed://${uid("img")}`,
+    // Mock 에서도 AI 보강 결과 필드 채워서 UI 검증 가능
+    upgradedPrompt: `${req.prompt}, cinematic lighting, 35mm film, shallow depth of field, highly detailed, editorial photo aesthetic`,
+    promptProvider: "mock",
+    researchHints: req.research
+      ? [
+          "이 모델은 디테일한 재질·필름 그레인 키워드에 강하게 반응합니다.",
+          "조명 방향·시간대를 명시하면 원하는 분위기가 훨씬 잘 잡힙니다.",
+          "프롬프트 끝에 스타일 앵커 (editorial, 35mm 등)를 붙이세요.",
+        ]
+      : undefined,
   };
   yield { type: "done", item };
 }
@@ -350,6 +360,10 @@ async function* mockEditStream(
       typeof req.sourceImage === "string"
         ? req.sourceImage
         : "mock-seed://edit",
+    visionDescription:
+      "A subject in a minimalist studio setting, soft window light, neutral tones, photographed with shallow depth of field.",
+    upgradedPrompt: `${req.prompt}, keep the exact same face, identical face, same person, same identity, realistic skin texture, no skin smoothing, photorealistic, highly detailed face, natural lighting`,
+    promptProvider: "mock",
   };
   yield { type: "done", item };
 }
