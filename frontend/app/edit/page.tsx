@@ -102,11 +102,13 @@ export default function EditPage() {
   // 수정 모드 우측 그리드는 edit 결과만 (generate 섞이면 Before/After 슬라이더가 엉뚱하게 매칭됨)
   const editResults = items.filter((x) => x.mode === "edit");
   const historyForRight = editResults.slice(0, 12);
-  const [afterId, setAfterId] = useState<string | null>(
-    historyForRight[0]?.id ?? null,
-  );
-  const afterItem =
-    historyForRight.find((x) => x.id === afterId) ?? historyForRight[0];
+  // afterId 는 기본 null. 새 수정이 완료되면 setAfterId 로 지정됨.
+  // 히스토리 썸네일 클릭 시에도 사용자 의도대로 지정됨.
+  const [afterId, setAfterId] = useState<string | null>(null);
+  // fallback 제거: afterId 에 해당하는 아이템 없으면 undefined 리턴 → 슬라이더 placeholder 표시
+  const afterItem = afterId
+    ? historyForRight.find((x) => x.id === afterId)
+    : undefined;
 
   const [drag, setDrag] = useState(false);
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
@@ -128,6 +130,17 @@ export default function EditPage() {
     const t = setTimeout(() => setProgressOpen(false), 1200);
     return () => clearTimeout(t);
   }, [running, progressOpen]);
+
+  /* ── sourceImage 변경 시 afterId 리셋 ──
+     과거 edit 결과가 엉뚱한 Before/After 매칭으로 나타나는 현상 방지.
+     새 수정이 완료되면 handleGenerate 의 done 핸들러에서 다시 setAfterId 해줌. */
+  const prevSourceRef = useRef<string | null>(sourceImage);
+  useEffect(() => {
+    if (prevSourceRef.current !== sourceImage) {
+      prevSourceRef.current = sourceImage;
+      setAfterId(null);
+    }
+  }, [sourceImage]);
 
   /* ── 진입 시 Lightning 기본값 ── */
   const appliedRef = useRef(false);
@@ -919,7 +932,7 @@ export default function EditPage() {
             >
               {!sourceImage
                 ? "왼쪽에서 원본 이미지부터 올려봐"
-                : "아직 수정 결과가 없어. [수정 생성] 누르면 여기에 Before/After 로 표시돼."}
+                : "아직 이 원본의 수정 결과가 없어. [수정 생성] 또는 아래 히스토리에서 선택하면 표시돼."}
             </div>
           )}
 
