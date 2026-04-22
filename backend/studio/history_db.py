@@ -1,0 +1,194 @@
+"""
+history_db.py - studio_history 테이블 (SQLite · aiosqlite).
+
+프론트 HistoryItem 과 1:1 대응. 레거시 `generations` 테이블과 분리.
+같은 DB 파일(settings.history_db_path)에 테이블만 별개로 추가.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import time
+from typing import Any
+
+import aiosqlite
+
+try:
+    from config import settings  # type: ignore
+
+    _DB_PATH = settings.history_db_path
+except Exception:
+    _DB_PATH = "./data/history.db"
+
+
+log = logging.getLogger(__name__)
+
+
+CREATE_TABLE = """
+CREATE TABLE IF NOT EXISTS studio_history (
+  id TEXT PRIMARY KEY,
+  mode TEXT NOT NULL CHECK(mode IN ('generate','edit')),
+  prompt TEXT NOT NULL,
+  label TEXT NOT NULL,
+  width INTEGER,
+  height INTEGER,
+  seed INTEGER,
+  steps INTEGER,
+  cfg REAL,
+  lightning INTEGER,
+  model TEXT,
+  created_at INTEGER NOT NULL,
+  image_ref TEXT NOT NULL,
+  upgraded_prompt TEXT,
+  prompt_provider TEXT,
+  research_hints TEXT,
+  vision_description TEXT,
+  comfy_error TEXT
+);
+"""
+CREATE_IDX_CREATED = (
+    "CREATE INDEX IF NOT EXISTS idx_studio_history_created "
+    "ON studio_history(created_at DESC)"
+)
+CREATE_IDX_MODE = (
+    "CREATE INDEX IF NOT EXISTS idx_studio_history_mode "
+    "ON studio_history(mode, created_at DESC)"
+)
+
+
+async def init_studio_history_db() -> None:
+    """테이블/인덱스 생성 (idempotent)."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(CREATE_TABLE)
+        await db.execute(CREATE_IDX_CREATED)
+        await db.execute(CREATE_IDX_MODE)
+        await db.commit()
+    log.info("studio_history DB ready at %s", _DB_PATH)
+
+
+async def insert_item(item: dict[str, Any]) -> None:
+    """생성/수정 완료 아이템 저장."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        await db.execute(
+            """INSERT OR REPLACE INTO studio_history
+            (id, mode, prompt, label, width, height, seed, steps, cfg, lightning,
+             model, created_at, image_ref, upgraded_prompt, prompt_provider,
+             research_hints, vision_description, comfy_error)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (
+                item["id"],
+                item["mode"],
+                item["prompt"],
+                item["label"],
+                item.get("width"),
+                item.get("height"),
+                item.get("seed"),
+                item.get("steps"),
+                item.get("cfg"),
+                1 if item.get("lightning") else 0,
+                item.get("model"),
+                int(item.get("createdAt", time.time() * 1000)),
+                item["imageRef"],
+                item.get("upgradedPrompt"),
+                item.get("promptProvider"),
+                json.dumps(item.get("researchHints") or [], ensure_ascii=False),
+                item.get("visionDescription"),
+                item.get("comfyError"),
+            ),
+        )
+        await db.commit()
+
+
+async def list_items(
+    mode: str | None = None,
+    limit: int = 50,
+    before_ts: int | None = None,
+) -> list[dict[str, Any]]:
+    """최신순 목록. before_ts 가 있으면 그보다 이전 것만 (pagination cursor)."""
+    where = []
+    params: list[Any] = []
+    if mode in ("generate", "edit"):
+        where.append("mode = ?")
+        params.append(mode)
+    if before_ts:
+        where.append("created_at < ?")
+        params.append(int(before_ts))
+    where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+    sql = (
+        f"SELECT * FROM studio_history {where_sql} "
+        "ORDER BY created_at DESC LIMIT ?"
+    )
+    params.append(int(limit))
+
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(sql, params)
+        rows = await cur.fetchall()
+    return [_row_to_item(r) for r in rows]
+
+
+async def get_item(item_id: str) -> dict[str, Any] | None:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT * FROM studio_history WHERE id = ?", (item_id,)
+        )
+        row = await cur.fetchone()
+    return _row_to_item(row) if row else None
+
+
+async def delete_item(item_id: str) -> bool:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "DELETE FROM studio_history WHERE id = ?", (item_id,)
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
+async def clear_all() -> int:
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute("DELETE FROM studio_history")
+        await db.commit()
+        return cur.rowcount
+
+
+async def count_items(mode: str | None = None) -> int:
+    where_sql = "WHERE mode = ?" if mode in ("generate", "edit") else ""
+    params = [mode] if mode in ("generate", "edit") else []
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            f"SELECT COUNT(*) FROM studio_history {where_sql}", params
+        )
+        row = await cur.fetchone()
+    return int(row[0]) if row else 0
+
+
+def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
+    """row → 프론트 HistoryItem shape."""
+    hints_raw = row["research_hints"]
+    try:
+        hints = json.loads(hints_raw) if hints_raw else []
+    except Exception:
+        hints = []
+    return {
+        "id": row["id"],
+        "mode": row["mode"],
+        "prompt": row["prompt"],
+        "label": row["label"],
+        "width": row["width"],
+        "height": row["height"],
+        "seed": row["seed"],
+        "steps": row["steps"],
+        "cfg": row["cfg"],
+        "lightning": bool(row["lightning"]),
+        "model": row["model"],
+        "createdAt": row["created_at"],
+        "imageRef": row["image_ref"],
+        "upgradedPrompt": row["upgraded_prompt"],
+        "promptProvider": row["prompt_provider"],
+        "researchHints": hints,
+        "visionDescription": row["vision_description"],
+        "comfyError": row["comfy_error"],
+    }

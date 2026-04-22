@@ -1,0 +1,216 @@
+/**
+ * Icon - 수기(手記) 느낌의 라인 아이콘 세트
+ * Claude Design handoff 의 icons.jsx 를 TypeScript 포팅
+ * mono-weight, square style, 24x24 viewBox 기준
+ */
+
+import type { CSSProperties } from "react";
+
+export type IconName =
+  | "gear"
+  | "image"
+  | "edit"
+  | "film"
+  | "arrow-left"
+  | "arrow-right"
+  | "chevron-down"
+  | "chevron-right"
+  | "sparkle"
+  | "search"
+  | "upload"
+  | "check"
+  | "clock"
+  | "grid"
+  | "zoom-in"
+  | "download"
+  | "refresh"
+  | "cpu"
+  | "copy"
+  | "x"
+  | "dot"
+  | "wand";
+
+interface IconProps {
+  name: IconName;
+  size?: number;
+  stroke?: number;
+  style?: CSSProperties;
+  className?: string;
+}
+
+export default function Icon({ name, size = 16, stroke = 1.5, style, className }: IconProps) {
+  // 공통 SVG 속성
+  const common = {
+    width: size,
+    height: size,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: stroke,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    style,
+    className,
+  };
+
+  switch (name) {
+    case "gear":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3" />
+          <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9c.3.6.9 1 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z" />
+        </svg>
+      );
+    case "image":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <circle cx="9" cy="9" r="1.5" />
+          <path d="m21 15-4.5-4.5L6 21" />
+        </svg>
+      );
+    case "edit":
+      return (
+        <svg {...common}>
+          <path d="M12 20h9" />
+          <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+        </svg>
+      );
+    case "film":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="18" height="18" rx="2" />
+          <path d="M3 8h18M3 16h18M8 3v18M16 3v18" />
+        </svg>
+      );
+    case "arrow-left":
+      return (
+        <svg {...common}>
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+      );
+    case "arrow-right":
+      return (
+        <svg {...common}>
+          <path d="M5 12h14M12 5l7 7-7 7" />
+        </svg>
+      );
+    case "chevron-down":
+      return (
+        <svg {...common}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      );
+    case "chevron-right":
+      return (
+        <svg {...common}>
+          <path d="m9 18 6-6-6-6" />
+        </svg>
+      );
+    case "sparkle":
+      return (
+        <svg {...common}>
+          <path d="M12 3v4M12 17v4M3 12h4M17 12h4" />
+          <path d="m5.6 5.6 2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8" />
+        </svg>
+      );
+    case "search":
+      return (
+        <svg {...common}>
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3" />
+        </svg>
+      );
+    case "upload":
+      return (
+        <svg {...common}>
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <path d="M17 8l-5-5-5 5" />
+          <path d="M12 3v12" />
+        </svg>
+      );
+    case "check":
+      return (
+        <svg {...common}>
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+      );
+    case "clock":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 7v5l3 2" />
+        </svg>
+      );
+    case "grid":
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="7" height="7" />
+          <rect x="14" y="3" width="7" height="7" />
+          <rect x="3" y="14" width="7" height="7" />
+          <rect x="14" y="14" width="7" height="7" />
+        </svg>
+      );
+    case "zoom-in":
+      return (
+        <svg {...common}>
+          <circle cx="11" cy="11" r="7" />
+          <path d="m21 21-4.3-4.3M11 8v6M8 11h6" />
+        </svg>
+      );
+    case "download":
+      return (
+        <svg {...common}>
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <path d="m7 10 5 5 5-5" />
+          <path d="M12 15V3" />
+        </svg>
+      );
+    case "refresh":
+      return (
+        <svg {...common}>
+          <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
+          <path d="M21 3v5h-5" />
+          <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
+          <path d="M3 21v-5h5" />
+        </svg>
+      );
+    case "cpu":
+      return (
+        <svg {...common}>
+          <rect x="4" y="4" width="16" height="16" rx="2" />
+          <rect x="9" y="9" width="6" height="6" />
+          <path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2" />
+        </svg>
+      );
+    case "copy":
+      return (
+        <svg {...common}>
+          <rect x="9" y="9" width="13" height="13" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      );
+    case "x":
+      return (
+        <svg {...common}>
+          <path d="M18 6 6 18M6 6l12 12" />
+        </svg>
+      );
+    case "dot":
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="3" fill="currentColor" />
+        </svg>
+      );
+    case "wand":
+      return (
+        <svg {...common}>
+          <path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8l1.4 1.4M17.8 6.2l1.4-1.4" />
+          <path d="m3 21 9-9" />
+          <path d="m12.5 11.5 3 3" />
+        </svg>
+      );
+    default:
+      return null;
+  }
+}
