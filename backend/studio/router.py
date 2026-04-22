@@ -47,6 +47,12 @@ from .comfy_api_builder import (
 from .comfy_transport import ComfyUITransport, extract_output_images
 from . import history_db
 
+# 레거시 process_manager 재활용 (실 프로세스 제어 + VRAM 조회)
+try:
+    from services.process_manager import process_manager as _proc_mgr  # type: ignore
+except Exception:  # pragma: no cover - 테스트 환경
+    _proc_mgr = None
+
 # ComfyUI 가 실제로 안 돌고 있어서 /prompt 가 실패해도 UI 는 Mock 이미지로 완주되게 할지.
 # False 면 에러를 프론트로 올리고 토스트. True 면 폴백해서 mock-seed:// 리턴.
 COMFY_MOCK_FALLBACK = True
@@ -596,14 +602,24 @@ async def list_models():
 # ─────────────────────────────────────────────
 
 
-_PROC_STATUS = {"ollama": True, "comfyui": False}  # 간단 mock 상태 저장
-
-
 @router.get("/process/status")
 async def process_status():
+    """실 process_manager 로부터 Ollama·ComfyUI 상태 + VRAM 조회."""
+    if _proc_mgr is None:
+        return {
+            "ollama": {"running": False},
+            "comfyui": {"running": False},
+        }
+    ollama_ok = await _proc_mgr.check_ollama()
+    comfyui_ok = await _proc_mgr.check_comfyui()
+    vram: dict[str, Any] = {}
+    try:
+        vram = await _proc_mgr.get_vram_usage()
+    except Exception:
+        vram = {}
     return {
-        "ollama": {"running": _PROC_STATUS["ollama"]},
-        "comfyui": {"running": _PROC_STATUS["comfyui"]},
+        "ollama": {"running": ollama_ok},
+        "comfyui": {"running": comfyui_ok, **(vram or {})},
     }
 
 
@@ -656,6 +672,21 @@ async def process_action(name: str, action: str):
         raise HTTPException(400, f"unknown process: {name}")
     if action not in ("start", "stop"):
         raise HTTPException(400, f"unknown action: {action}")
+    if _proc_mgr is None:
+        raise HTTPException(503, "process_manager unavailable")
 
-    _PROC_STATUS[name] = action == "start"
-    return ProcessAction(ok=True, message=f"{name} {action} (mock)")
+    fn_name = f"{action}_{name}"
+    fn = getattr(_proc_mgr, fn_name, None)
+    if fn is None:
+        raise HTTPException(400, f"no action {fn_name}")
+
+    try:
+        ok = await fn()
+    except Exception as e:
+        log.exception("process action failed")
+        raise HTTPException(500, f"{fn_name} failed: {e}") from e
+
+    return ProcessAction(
+        ok=bool(ok),
+        message=f"{name} {action} {'OK' if ok else 'FAILED'}",
+    )
