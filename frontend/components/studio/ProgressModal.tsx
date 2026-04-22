@@ -18,6 +18,8 @@
 import { useEffect, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
+import { interruptCurrent } from "@/lib/api-client";
+import { toast } from "@/stores/useToastStore";
 import {
   useGenerateStore,
   type StageEvent,
@@ -67,6 +69,15 @@ export default function ProgressModal({
   mode: "generate" | "edit";
   onClose: () => void;
 }) {
+  const handleCancel = async () => {
+    const ok = await interruptCurrent();
+    if (ok) {
+      toast.warn("ComfyUI 인터럽트 전송", "현재 샘플링 중단 시도됨");
+    } else {
+      toast.error("인터럽트 실패", "백엔드 상태 확인");
+    }
+  };
+
   return (
     <div
       role="dialog"
@@ -100,6 +111,7 @@ export default function ProgressModal({
         <Header
           title={mode === "generate" ? "이미지 생성 중" : "이미지 수정 중"}
           onClose={onClose}
+          onCancel={handleCancel}
         />
         <div
           style={{
@@ -116,7 +128,15 @@ export default function ProgressModal({
 }
 
 /* ── 공통 헤더 ── */
-function Header({ title, onClose }: { title: string; onClose: () => void }) {
+function Header({
+  title,
+  onClose,
+  onCancel,
+}: {
+  title: string;
+  onClose: () => void;
+  onCancel: () => void;
+}) {
   return (
     <header
       style={{
@@ -140,24 +160,44 @@ function Header({ title, onClose }: { title: string; onClose: () => void }) {
           {title}
         </h2>
       </div>
-      <button
-        type="button"
-        onClick={onClose}
-        style={{
-          all: "unset",
-          cursor: "pointer",
-          width: 28,
-          height: 28,
-          borderRadius: 8,
-          display: "grid",
-          placeItems: "center",
-          color: "var(--ink-3)",
-        }}
-        title="닫기 (생성은 계속됨)"
-        aria-label="닫기"
-      >
-        <Icon name="x" size={16} />
-      </button>
+      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        <button
+          type="button"
+          onClick={onCancel}
+          style={{
+            all: "unset",
+            cursor: "pointer",
+            fontSize: 11.5,
+            fontWeight: 500,
+            padding: "5px 10px",
+            borderRadius: 6,
+            border: "1px solid rgba(192,57,43,.32)",
+            background: "#FCEDEC",
+            color: "#C0392B",
+          }}
+          title="ComfyUI 인터럽트 (샘플링 중단)"
+        >
+          취소
+        </button>
+        <button
+          type="button"
+          onClick={onClose}
+          style={{
+            all: "unset",
+            cursor: "pointer",
+            width: 28,
+            height: 28,
+            borderRadius: 8,
+            display: "grid",
+            placeItems: "center",
+            color: "var(--ink-3)",
+          }}
+          title="모달 닫기 (생성은 계속됨)"
+          aria-label="닫기"
+        >
+          <Icon name="x" size={16} />
+        </button>
+      </div>
     </header>
   );
 }

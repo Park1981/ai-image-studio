@@ -17,6 +17,7 @@ import {
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
+import HistoryTile from "@/components/studio/HistoryTile";
 import ProgressModal from "@/components/studio/ProgressModal";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
@@ -780,22 +781,11 @@ export default function GeneratePage() {
               }}
             >
               {genItems.map((it) => (
-                <ImageTile
+                <HistoryTile
                   key={it.id}
-                  seed={it.imageRef || it.id}
-                  label={it.label}
+                  item={it}
+                  selected={selectedId === it.id}
                   onClick={() => selectItem(it.id)}
-                  style={{
-                    border:
-                      selectedId === it.id
-                        ? "2px solid var(--accent)"
-                        : "2px solid transparent",
-                    transition: "transform .15s",
-                    boxShadow:
-                      selectedId === it.id
-                        ? "0 0 0 4px rgba(74,158,255,.15)"
-                        : "none",
-                  }}
                 />
               ))}
             </div>

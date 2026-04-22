@@ -398,6 +398,19 @@ async function* mockEditStream(
    Process control
    ───────────────────────────────── */
 
+/** 현재 실행 중인 ComfyUI 작업 인터럽트 (전역). */
+export async function interruptCurrent(): Promise<boolean> {
+  if (USE_MOCK) return true;
+  try {
+    const res = await fetch(`${STUDIO_BASE}/api/studio/interrupt`, {
+      method: "POST",
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export async function setProcessStatus(
   name: "ollama" | "comfyui",
   action: "start" | "stop",

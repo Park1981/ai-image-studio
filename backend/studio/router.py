@@ -628,6 +628,18 @@ async def list_models():
 # ─────────────────────────────────────────────
 
 
+@router.post("/interrupt")
+async def interrupt_current():
+    """현재 실행 중인 ComfyUI job 인터럽트 (전역). ComfyUI 는 client_id 관계없이 즉시 중단."""
+    try:
+        async with ComfyUITransport() as comfy:
+            await comfy.interrupt()
+        return {"ok": True, "message": "interrupted"}
+    except Exception as e:
+        log.warning("interrupt failed: %s", e)
+        raise HTTPException(500, f"interrupt failed: {e}") from e
+
+
 @router.get("/ollama/models")
 async def list_ollama_models():
     """설치된 Ollama 모델 목록 (Settings drawer 드롭다운용).
