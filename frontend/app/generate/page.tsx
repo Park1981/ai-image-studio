@@ -17,6 +17,7 @@ import {
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
+import ProgressModal from "@/components/studio/ProgressModal";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
 import {
@@ -69,6 +70,7 @@ export default function GeneratePage() {
   const stage = useGenerateStore((s) => s.stage);
   const setRunning = useGenerateStore((s) => s.setRunning);
   const resetRunning = useGenerateStore((s) => s.resetRunning);
+  const pushStage = useGenerateStore((s) => s.pushStage);
 
   const addItem = useHistoryStore((s) => s.add);
   const items = useHistoryStore((s) => s.items);
@@ -88,6 +90,19 @@ export default function GeneratePage() {
     [items],
   );
   const selectedItem = genItems.find((i) => i.id === selectedId);
+
+  /* ── 진행 모달 open 상태 ── */
+  const [progressOpen, setProgressOpen] = useState(false);
+  useEffect(() => {
+    if (generating) setProgressOpen(true);
+  }, [generating]);
+  // 생성 끝나고 1.2초 후 자동 close (단, 사용자가 이미 닫았다면 무시)
+  useEffect(() => {
+    if (generating) return;
+    if (!progressOpen) return;
+    const t = setTimeout(() => setProgressOpen(false), 1200);
+    return () => clearTimeout(t);
+  }, [generating, progressOpen]);
 
   /* ── 진입 시 Lightning 기본값 적용 (1회) ── */
   const appliedRef = useRef(false);
@@ -130,6 +145,7 @@ export default function GeneratePage() {
         if (evt.type === "done") {
           addItem(evt.item);
           resetRunning();
+          // 모달은 훅에서 자동 close. running=false 로 바뀌면 닫힘
           toast.success(
             "생성 완료",
             `${evt.item.width}×${evt.item.height} · seed ${evt.item.seed}`,
@@ -149,6 +165,11 @@ export default function GeneratePage() {
           return;
         }
         setRunning(true, evt.progress, evt.stageLabel);
+        pushStage({
+          type: evt.type,
+          label: evt.stageLabel,
+          progress: evt.progress,
+        });
       }
     } catch (err) {
       resetRunning();
@@ -180,6 +201,9 @@ export default function GeneratePage() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {progressOpen && (
+        <ProgressModal mode="generate" onClose={() => setProgressOpen(false)} />
+      )}
       <TopBar
         left={
           <>

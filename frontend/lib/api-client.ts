@@ -81,7 +81,17 @@ export type GenStage =
   | { type: "done"; item: HistoryItem };
 
 export type EditStage =
-  | { type: "step"; step: 1 | 2 | 3 | 4; done: boolean }
+  | {
+      type: "step";
+      step: 1 | 2 | 3 | 4;
+      done: boolean;
+      /** step 1 done 에서 도착하는 비전 설명 */
+      description?: string;
+      /** step 2 done 에서 도착하는 최종 프롬프트 */
+      finalPrompt?: string;
+      /** step 2 provider (ollama/fallback) */
+      provider?: string;
+    }
   | { type: "done"; item: HistoryItem };
 
 /* ─────────────────────────────────
@@ -334,7 +344,13 @@ async function* realEditStream(
       return;
     }
     if (evt.event === "step") {
-      const payload = evt.data as { step: 1 | 2 | 3 | 4; done: boolean };
+      const payload = evt.data as {
+        step: 1 | 2 | 3 | 4;
+        done: boolean;
+        description?: string;
+        finalPrompt?: string;
+        provider?: string;
+      };
       yield { type: "step", ...payload };
     }
   }

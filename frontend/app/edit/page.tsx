@@ -24,6 +24,7 @@ import {
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
+import ProgressModal from "@/components/studio/ProgressModal";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
 import {
@@ -81,6 +82,7 @@ export default function EditPage() {
   const currentStep = useEditStore((s) => s.currentStep);
   const stepDone = useEditStore((s) => s.stepDone);
   const setStep = useEditStore((s) => s.setStep);
+  const recordStepDetail = useEditStore((s) => s.recordStepDetail);
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
   const resetPipeline = useEditStore((s) => s.resetPipeline);
@@ -102,6 +104,18 @@ export default function EditPage() {
   const [drag, setDrag] = useState(false);
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* ── 진행 모달 open 상태 ── */
+  const [progressOpen, setProgressOpen] = useState(false);
+  useEffect(() => {
+    if (running) setProgressOpen(true);
+  }, [running]);
+  useEffect(() => {
+    if (running) return;
+    if (!progressOpen) return;
+    const t = setTimeout(() => setProgressOpen(false), 1200);
+    return () => clearTimeout(t);
+  }, [running, progressOpen]);
 
   /* ── 진입 시 Lightning 기본값 ── */
   const appliedRef = useRef(false);
@@ -165,6 +179,24 @@ export default function EditPage() {
       })) {
         if (evt.type === "step") {
           setStep(evt.step, evt.done);
+          if (!evt.done) {
+            // step 시작 시점 기록
+            recordStepDetail({
+              n: evt.step,
+              startedAt: Date.now(),
+              doneAt: null,
+            });
+          } else {
+            // step 완료 + 상세 데이터 병합
+            recordStepDetail({
+              n: evt.step,
+              startedAt: Date.now(), // merge 시 기존 값 유지됨
+              doneAt: Date.now(),
+              description: evt.description,
+              finalPrompt: evt.finalPrompt,
+              provider: evt.provider,
+            });
+          }
         } else if (evt.type === "done") {
           resetPipeline();
           addItem(evt.item);
@@ -195,6 +227,9 @@ export default function EditPage() {
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {progressOpen && (
+        <ProgressModal mode="edit" onClose={() => setProgressOpen(false)} />
+      )}
       <TopBar
         left={
           <>

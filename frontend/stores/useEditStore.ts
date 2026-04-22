@@ -8,6 +8,18 @@
 
 import { create } from "zustand";
 
+export interface EditStepDetail {
+  n: 1 | 2 | 3 | 4;
+  startedAt: number;
+  doneAt: number | null;
+  /** step 1 에서 받은 vision 설명 */
+  description?: string;
+  /** step 2 에서 받은 최종 프롬프트 */
+  finalPrompt?: string;
+  /** step 2 provider (ollama/fallback) */
+  provider?: string;
+}
+
 export interface EditState {
   /** data URL (업로드) 또는 히스토리 imageRef */
   sourceImage: string | null;
@@ -25,6 +37,8 @@ export interface EditState {
   /** 현재 완료된 step (0 = 시작 전, 1~4 = 각 단계 완료) */
   stepDone: number;
   currentStep: 1 | 2 | 3 | 4 | null;
+  /** 진행 모달용 상세 타임라인 */
+  stepHistory: EditStepDetail[];
 
   // 비교 슬라이더
   compareX: number;
@@ -40,6 +54,7 @@ export interface EditState {
   setLightning: (v: boolean) => void;
   setRunning: (running: boolean) => void;
   setStep: (step: 1 | 2 | 3 | 4 | null, done: boolean) => void;
+  recordStepDetail: (detail: EditStepDetail) => void;
   setCompareX: (v: number) => void;
   resetPipeline: () => void;
 }
@@ -56,6 +71,7 @@ export const useEditStore = create<EditState>((set) => ({
   running: false,
   stepDone: 0,
   currentStep: null,
+  stepHistory: [],
 
   compareX: 50,
 
@@ -69,13 +85,35 @@ export const useEditStore = create<EditState>((set) => ({
   setPrompt: (v) => set({ prompt: v }),
   setLightning: (v) => set({ lightning: v }),
   setRunning: (running) =>
-    set(running ? { running, stepDone: 0, currentStep: 1 } : { running }),
+    set(
+      running
+        ? { running, stepDone: 0, currentStep: 1, stepHistory: [] }
+        : { running },
+    ),
   setStep: (step, done) =>
     set({
       currentStep: step,
       stepDone: done ? (step ?? 0) : step ? step - 1 : 0,
     }),
+  recordStepDetail: (detail) =>
+    set((s) => {
+      const existing = s.stepHistory.find((x) => x.n === detail.n);
+      if (existing) {
+        // done 도착 시 완료 시각 + 상세 merge
+        return {
+          stepHistory: s.stepHistory.map((x) =>
+            x.n === detail.n ? { ...x, ...detail } : x,
+          ),
+        };
+      }
+      return { stepHistory: [...s.stepHistory, detail] };
+    }),
   setCompareX: (v) => set({ compareX: v }),
   resetPipeline: () =>
-    set({ running: false, stepDone: 0, currentStep: null }),
+    set({
+      running: false,
+      stepDone: 0,
+      currentStep: null,
+      stepHistory: [],
+    }),
 }));

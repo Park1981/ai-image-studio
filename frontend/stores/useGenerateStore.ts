@@ -10,6 +10,16 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import { GENERATE_MODEL, type AspectRatioLabel } from "@/lib/model-presets";
 
+export interface StageEvent {
+  type: string;
+  /** UI 라벨 (예: "gemma4 업그레이드") */
+  label: string;
+  /** 0-100 */
+  progress: number;
+  /** 도착 시점 (ms since epoch) */
+  arrivedAt: number;
+}
+
 export interface GenerateState {
   prompt: string;
   aspect: AspectRatioLabel;
@@ -23,6 +33,8 @@ export interface GenerateState {
   generating: boolean;
   progress: number;
   stage: string;
+  /** 진행 모달용 stage 이벤트 타임라인 */
+  stageHistory: StageEvent[];
 
   // actions
   setPrompt: (v: string) => void;
@@ -34,6 +46,7 @@ export interface GenerateState {
   setSeed: (v: number) => void;
   setRunning: (generating: boolean, progress?: number, stage?: string) => void;
   resetRunning: () => void;
+  pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
 
   /** Lightning 토글 시 steps/CFG 자동 스위치 (defaults ↔ lightning) */
   applyLightning: (on: boolean) => void;
@@ -56,6 +69,7 @@ export const useGenerateStore = create<GenerateState>()(
       generating: false,
       progress: 0,
       stage: "",
+      stageHistory: [],
 
       setPrompt: (v) => set({ prompt: v }),
       setAspect: (v) => set({ aspect: v }),
@@ -65,8 +79,23 @@ export const useGenerateStore = create<GenerateState>()(
       setCfg: (v) => set({ cfg: v }),
       setSeed: (v) => set({ seed: v }),
       setRunning: (generating, progress = 0, stage = "") =>
-        set({ generating, progress, stage }),
-      resetRunning: () => set({ generating: false, progress: 0, stage: "" }),
+        set((s) => ({
+          generating,
+          progress,
+          stage,
+          // 새 세션 시작(generating=true + progress=0) 이면 히스토리 초기화
+          stageHistory:
+            generating && progress === 0 ? [] : s.stageHistory,
+        })),
+      resetRunning: () =>
+        set({ generating: false, progress: 0, stage: "" }),
+      pushStage: (evt) =>
+        set((s) => ({
+          stageHistory: [
+            ...s.stageHistory,
+            { ...evt, arrivedAt: Date.now() },
+          ],
+        })),
 
       applyLightning: (on) => {
         if (on) {
