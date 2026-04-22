@@ -55,6 +55,44 @@ export interface GenerateRequest {
   /** 설정 override (없으면 백엔드 기본값) */
   ollamaModel?: string;
   visionModel?: string;
+  /** showUpgradeStep 사용 시: 모달에서 사용자가 확정한 영문 프롬프트 */
+  preUpgradedPrompt?: string;
+}
+
+export interface UpgradeOnlyResult {
+  upgradedPrompt: string;
+  provider: string;
+  fallback: boolean;
+  researchHints: string[];
+}
+
+/** gemma4 업그레이드 + 선택적 Claude 조사만 수행 (ComfyUI 호출 없음) */
+export async function upgradeOnly(params: {
+  prompt: string;
+  research: boolean;
+  ollamaModel?: string;
+}): Promise<UpgradeOnlyResult> {
+  if (USE_MOCK) {
+    await sleep(800 + Math.random() * 600);
+    return {
+      upgradedPrompt: `${params.prompt}, cinematic lighting, 35mm film, shallow depth of field, editorial photo aesthetic`,
+      provider: "mock",
+      fallback: false,
+      researchHints: params.research
+        ? [
+            "이 모델은 디테일한 재질·필름 그레인 키워드에 반응합니다.",
+            "조명 방향·시간대 명시 권장.",
+          ]
+        : [],
+    };
+  }
+  const res = await fetch(`${STUDIO_BASE}/api/studio/upgrade-only`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`upgrade-only failed: ${res.status}`);
+  return (await res.json()) as UpgradeOnlyResult;
 }
 
 export interface EditRequest {
@@ -179,7 +217,7 @@ export async function* generateImageStream(
 async function* realGenerateStream(
   req: GenerateRequest,
 ): AsyncGenerator<GenStage, void, unknown> {
-  // 1. POST /generate → task_id
+  // 1. POST /generate → task_id (preUpgradedPrompt 있으면 백엔드에서 gemma4 단계 skip)
   const createRes = await fetch(`${STUDIO_BASE}/api/studio/generate`, {
     method: "POST",
     headers: { "content-type": "application/json" },

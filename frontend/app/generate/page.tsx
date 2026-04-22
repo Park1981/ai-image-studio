@@ -20,6 +20,7 @@ import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import HistoryTile from "@/components/studio/HistoryTile";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
+import UpgradeConfirmModal from "@/components/studio/UpgradeConfirmModal";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
 import {
@@ -42,7 +43,12 @@ import {
   getAspect,
   type AspectRatioLabel,
 } from "@/lib/model-presets";
-import { generateImageStream, researchPrompt } from "@/lib/api-client";
+import {
+  generateImageStream,
+  researchPrompt,
+  upgradeOnly,
+  type UpgradeOnlyResult,
+} from "@/lib/api-client";
 import {
   downloadImage,
   copyImageToClipboard,
@@ -101,6 +107,13 @@ export default function GeneratePage() {
   );
   const selectedItem = genItems.find((i) => i.id === selectedId);
 
+  /* ── Upgrade 확인 모달 상태 ── */
+  const [upgradeOpen, setUpgradeOpen] = useState(false);
+  const [upgradeLoading, setUpgradeLoading] = useState(false);
+  const [upgradeResult, setUpgradeResult] = useState<UpgradeOnlyResult | null>(
+    null,
+  );
+
   /* ── Lightbox + 그리드 컬럼 토글 ── */
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
@@ -131,20 +144,8 @@ export default function GeneratePage() {
   const { width, height } = getAspect(aspect);
   const sizeLabel = `${width}×${height}`;
 
-  /* ── 생성 실행 ── */
-  const handleGenerate = async () => {
-    if (generating) return;
-    if (!prompt.trim()) {
-      toast.warn("프롬프트를 입력해줘");
-      return;
-    }
-    if (comfyuiStatus === "stopped") {
-      toast.warn(
-        "ComfyUI 정지 상태",
-        "설정에서 시작해도 되고, Mock 은 그대로 돌아가.",
-      );
-    }
-
+  /* ── 실제 생성 스트림 실행 (preUpgraded 유무 분기) ── */
+  const runGenerateStream = async (preUpgraded?: string) => {
     setRunning(true, 0, "초기화");
     try {
       for await (const evt of generateImageStream({
@@ -157,6 +158,7 @@ export default function GeneratePage() {
         research,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
+        preUpgradedPrompt: preUpgraded,
       })) {
         if (evt.type === "done") {
           addItem(evt.item);
@@ -196,6 +198,75 @@ export default function GeneratePage() {
     }
   };
 
+  /* ── 생성 실행 진입점 (showUpgradeStep 따라 모달 우회) ── */
+  const handleGenerate = async () => {
+    if (generating) return;
+    if (!prompt.trim()) {
+      toast.warn("프롬프트를 입력해줘");
+      return;
+    }
+    if (comfyuiStatus === "stopped") {
+      toast.warn(
+        "ComfyUI 정지 상태",
+        "설정에서 시작해도 되고, Mock 은 그대로 돌아가.",
+      );
+    }
+
+    if (showUpgradeStep) {
+      // 업그레이드 확인 모달 경유 — upgrade-only 먼저 호출
+      setUpgradeOpen(true);
+      setUpgradeLoading(true);
+      setUpgradeResult(null);
+      try {
+        const result = await upgradeOnly({
+          prompt,
+          research,
+          ollamaModel: ollamaModelSel,
+        });
+        setUpgradeResult(result);
+      } catch (err) {
+        toast.error(
+          "업그레이드 실패",
+          err instanceof Error ? err.message : "원본으로 바로 생성할게",
+        );
+        setUpgradeOpen(false);
+        // 폴백: 업그레이드 없이 바로 생성
+        await runGenerateStream();
+      } finally {
+        setUpgradeLoading(false);
+      }
+      return;
+    }
+
+    // 기본 플로우 — 바로 생성
+    await runGenerateStream();
+  };
+
+  const handleUpgradeConfirm = async (p: {
+    finalPrompt: string;
+    researchHints: string[];
+  }) => {
+    setUpgradeOpen(false);
+    void p.researchHints; // 현재 미사용 (모달에서만 표시)
+    await runGenerateStream(p.finalPrompt);
+  };
+
+  const handleUpgradeRerun = async () => {
+    setUpgradeLoading(true);
+    try {
+      const result = await upgradeOnly({
+        prompt,
+        research,
+        ollamaModel: ollamaModelSel,
+      });
+      setUpgradeResult(result);
+    } catch (err) {
+      toast.error("재업그레이드 실패", err instanceof Error ? err.message : "");
+    } finally {
+      setUpgradeLoading(false);
+    }
+  };
+
   /* ── "조사 필요" 단독 실행 (모달 대신 토스트 힌트) ── */
   const handleResearchNow = async () => {
     toast.info("Claude CLI 호출 중…", "최신 팁을 조사하는 중이야");
@@ -220,6 +291,18 @@ export default function GeneratePage() {
       {progressOpen && (
         <ProgressModal mode="generate" onClose={() => setProgressOpen(false)} />
       )}
+      <UpgradeConfirmModal
+        open={upgradeOpen}
+        loading={upgradeLoading}
+        original={prompt}
+        result={upgradeResult}
+        onConfirm={handleUpgradeConfirm}
+        onRerun={handleUpgradeRerun}
+        onCancel={() => {
+          setUpgradeOpen(false);
+          toast.info("생성 취소됨");
+        }}
+      />
       <ImageLightbox
         src={lightboxSrc}
         alt={selectedItem?.label}

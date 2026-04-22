@@ -92,6 +92,22 @@ class GenerateBody(BaseModel):
     # 설정에서 override 가능 (None 이면 프리셋 기본값)
     ollama_model: str | None = Field(default=None, alias="ollamaModel")
     vision_model: str | None = Field(default=None, alias="visionModel")
+    # 사용자가 "업그레이드 확인" 모달에서 미리 확정한 프롬프트
+    # (있으면 gemma4 upgrade/ research 단계 생략)
+    pre_upgraded_prompt: str | None = Field(
+        default=None, alias="preUpgradedPrompt"
+    )
+
+    class Config:
+        populate_by_name = True
+
+
+class UpgradeOnlyBody(BaseModel):
+    """gemma4 업그레이드 + 선택적 조사만 수행 · ComfyUI 디스패치 없음."""
+
+    prompt: str = Field(..., min_length=1)
+    research: bool = False
+    ollama_model: str | None = Field(default=None, alias="ollamaModel")
 
     class Config:
         populate_by_name = True
@@ -237,20 +253,39 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             if research.ok:
                 research_hints = research.hints
 
-        # 3. gemma4 업그레이드
-        await task.emit(
-            "stage",
-            {
-                "type": "gemma4-upgrade",
-                "progress": 45,
-                "stageLabel": "gemma4 업그레이드",
-            },
-        )
-        upgrade = await upgrade_generate_prompt(
-            prompt=body.prompt,
-            model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
-            research_context="\n".join(research_hints) if research_hints else None,
-        )
+        # 3. gemma4 업그레이드 (또는 사전 확정된 프롬프트 사용)
+        if body.pre_upgraded_prompt:
+            # 사용자가 모달에서 이미 확인/수정한 프롬프트 — 재호출 스킵
+            await task.emit(
+                "stage",
+                {
+                    "type": "gemma4-upgrade",
+                    "progress": 50,
+                    "stageLabel": "업그레이드 완료 (사전 확정)",
+                },
+            )
+            from .prompt_pipeline import UpgradeResult
+
+            upgrade = UpgradeResult(
+                upgraded=body.pre_upgraded_prompt,
+                fallback=False,
+                provider="pre-confirmed",
+                original=body.prompt,
+            )
+        else:
+            await task.emit(
+                "stage",
+                {
+                    "type": "gemma4-upgrade",
+                    "progress": 45,
+                    "stageLabel": "gemma4 업그레이드",
+                },
+            )
+            upgrade = await upgrade_generate_prompt(
+                prompt=body.prompt,
+                model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
+                research_context="\n".join(research_hints) if research_hints else None,
+            )
 
         # 4. API 포맷 조립
         await task.emit(
@@ -590,6 +625,31 @@ async def _run_edit_pipeline(
 # ─────────────────────────────────────────────
 # Research (sync)
 # ─────────────────────────────────────────────
+
+
+@router.post("/upgrade-only")
+async def upgrade_only(body: UpgradeOnlyBody):
+    """프롬프트 업그레이드 전용 (ComfyUI 미호출).
+
+    showUpgradeStep 프리퍼런스 ON 일 때 프론트가 호출 → 모달에서 사용자 확인 →
+    /generate 로 preUpgradedPrompt 와 함께 재요청.
+    """
+    research_hints: list[str] = []
+    if body.research:
+        research = await research_prompt(body.prompt, GENERATE_MODEL.display_name)
+        if research.ok:
+            research_hints = research.hints
+    upgrade = await upgrade_generate_prompt(
+        prompt=body.prompt,
+        model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
+        research_context="\n".join(research_hints) if research_hints else None,
+    )
+    return {
+        "upgradedPrompt": upgrade.upgraded,
+        "provider": upgrade.provider,
+        "fallback": upgrade.fallback,
+        "researchHints": research_hints,
+    }
 
 
 @router.post("/research")
