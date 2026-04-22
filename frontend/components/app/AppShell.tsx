@@ -10,6 +10,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { SettingsProvider } from "@/components/settings/SettingsContext";
 import SettingsDrawer from "@/components/settings/SettingsDrawer";
 import ToastHost from "@/components/ui/ToastHost";
+import HistoryBootstrap from "./HistoryBootstrap";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { toast } from "@/stores/useToastStore";
@@ -37,6 +38,7 @@ export default function AppShell({ children }: { children: ReactNode }) {
   return (
     <SettingsProvider>
       <AutoStartBoot />
+      <HistoryBootstrap />
       {children}
       <SettingsDrawer />
       <ToastHost />

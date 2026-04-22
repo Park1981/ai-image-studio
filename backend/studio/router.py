@@ -45,6 +45,7 @@ from .comfy_api_builder import (
     build_edit_from_request,
 )
 from .comfy_transport import ComfyUITransport, extract_output_images
+from . import history_db
 
 # ComfyUI 가 실제로 안 돌고 있어서 /prompt 가 실패해도 UI 는 Mock 이미지로 완주되게 할지.
 # False 면 에러를 프론트로 올리고 토스트. True 면 폴백해서 mock-seed:// 리턴.
@@ -306,6 +307,10 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             "researchHints": research_hints,
             "comfyError": comfy_error,
         }
+        try:
+            await history_db.insert_item(item)
+        except Exception as db_err:
+            log.warning("history_db insert failed: %s", db_err)
         await task.emit("done", {"item": item})
     except Exception as e:
         log.exception("Generate pipeline error")
@@ -538,6 +543,10 @@ async def _run_edit_pipeline(
             "visionDescription": vision.image_description,
             "comfyError": comfy_err,
         }
+        try:
+            await history_db.insert_item(item)
+        except Exception as db_err:
+            log.warning("history_db insert failed: %s", db_err)
         await task.emit("done", {"item": item})
     except Exception as e:
         log.exception("Edit pipeline error")
@@ -596,6 +605,46 @@ async def process_status():
         "ollama": {"running": _PROC_STATUS["ollama"]},
         "comfyui": {"running": _PROC_STATUS["comfyui"]},
     }
+
+
+@router.get("/history")
+async def list_history(
+    mode: str | None = None,
+    limit: int = 50,
+    before: int | None = None,
+):
+    """히스토리 조회 (최신순, mode 필터, cursor pagination)."""
+    items = await history_db.list_items(
+        mode=mode if mode in ("generate", "edit") else None,
+        limit=max(1, min(limit, 200)),
+        before_ts=before,
+    )
+    total = await history_db.count_items(
+        mode if mode in ("generate", "edit") else None
+    )
+    return {"items": items, "total": total}
+
+
+@router.get("/history/{item_id}")
+async def get_history(item_id: str):
+    item = await history_db.get_item(item_id)
+    if item is None:
+        raise HTTPException(404, "not found")
+    return item
+
+
+@router.delete("/history/{item_id}")
+async def delete_history(item_id: str):
+    ok = await history_db.delete_item(item_id)
+    if not ok:
+        raise HTTPException(404, "not found")
+    return {"ok": True, "id": item_id}
+
+
+@router.delete("/history")
+async def clear_history():
+    count = await history_db.clear_all()
+    return {"ok": True, "deleted": count}
 
 
 @router.post(

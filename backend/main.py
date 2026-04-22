@@ -17,6 +17,7 @@ from database import init_db
 from routers import generate, history, models, process, prompt
 from services.process_manager import process_manager
 from studio.router import router as studio_router
+from studio.history_db import init_studio_history_db
 
 # 로깅 설정
 logging.basicConfig(
@@ -45,6 +46,8 @@ async def lifespan(app: FastAPI):
     # ── 시작 ──
     settings.ensure_data_dirs()
     await init_db()
+    # 재설계 studio_history 테이블 (같은 DB 파일, 별도 테이블)
+    await init_studio_history_db()
 
     # ComfyUI 자동 시작 (앱과 함께 실행)
     comfyui_ok = await process_manager.check_comfyui()

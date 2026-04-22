@@ -16,7 +16,7 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore, type ProcStatus } from "@/stores/useProcessStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
-import { setProcessStatus } from "@/lib/api-client";
+import { setProcessStatus, clearHistory as apiClearHistory } from "@/lib/api-client";
 import { useSettings } from "./SettingsContext";
 
 /* ─────────────────────────────────
@@ -555,13 +555,22 @@ function HistorySection() {
   const count = useHistoryStore((s) => s.items.length);
   const clear = useHistoryStore((s) => s.clear);
 
-  const handleClear = () => {
+  const handleClear = async () => {
     if (count === 0) return;
     if (typeof window !== "undefined") {
       const ok = window.confirm(
         `히스토리 ${count}개를 모두 삭제할까요? (되돌릴 수 없음)`,
       );
       if (!ok) return;
+    }
+    // 서버에도 전파 (USE_MOCK=true 면 no-op)
+    try {
+      await apiClearHistory();
+    } catch (e) {
+      toast.warn(
+        "서버 히스토리 삭제 실패",
+        e instanceof Error ? e.message : "로컬만 비움",
+      );
     }
     clear();
     toast.success("히스토리 비워짐");
