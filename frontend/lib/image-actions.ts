@@ -81,3 +81,36 @@ export function filenameFromRef(
   const m = ref.match(/\/([^\/?#]+\.(png|jpg|jpeg|webp))(\?|#|$)/i);
   return m ? m[1] : fallback;
 }
+
+/**
+ * 이미지 URL 을 data URL 로 변환 (CORS 허용 범위 내).
+ * edit 모드로 전송 · 템플릿 저장 등 브라우저 로컬 처리를 위해 사용.
+ *
+ * 반환: {dataUrl, width, height} · 실패 시 null.
+ */
+export async function urlToDataUrl(
+  url: string,
+): Promise<{ dataUrl: string; width: number; height: number } | null> {
+  if (!url || url.startsWith("mock-seed://")) return null;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    const dataUrl = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    // 이미지 크기 측정
+    const dims = await new Promise<{ w: number; h: number }>((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve({ w: img.naturalWidth, h: img.naturalHeight });
+      img.onerror = () => resolve({ w: 0, h: 0 });
+      img.src = dataUrl;
+    });
+    return { dataUrl, width: dims.w, height: dims.h };
+  } catch {
+    return null;
+  }
+}

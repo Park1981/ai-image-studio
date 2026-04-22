@@ -25,7 +25,9 @@ import {
 import SettingsButton from "@/components/settings/SettingsButton";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import HistoryTile from "@/components/studio/HistoryTile";
+import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
+import { useProcessStore } from "@/stores/useProcessStore";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
 import {
@@ -92,6 +94,7 @@ export default function EditPage() {
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
   const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
   const visionModelSel = useSettingsStore((s) => s.visionModel);
+  const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
   const items = useHistoryStore((s) => s.items);
   const addItem = useHistoryStore((s) => s.add);
@@ -108,6 +111,12 @@ export default function EditPage() {
   const [drag, setDrag] = useState(false);
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* ── Lightbox ── */
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
+  const cycleGrid = () =>
+    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
   /* ── 진행 모달 open 상태 ── */
   const [progressOpen, setProgressOpen] = useState(false);
@@ -234,6 +243,30 @@ export default function EditPage() {
       {progressOpen && (
         <ProgressModal mode="edit" onClose={() => setProgressOpen(false)} />
       )}
+      <ImageLightbox
+        src={lightboxSrc}
+        alt={afterItem?.label}
+        filename={
+          afterItem
+            ? filenameFromRef(
+                afterItem.imageRef,
+                `ais-edit-${afterItem.id}.png`,
+              )
+            : undefined
+        }
+        onClose={() => setLightboxSrc(null)}
+        onDownload={() => {
+          if (afterItem) {
+            downloadImage(
+              afterItem.imageRef,
+              filenameFromRef(
+                afterItem.imageRef,
+                `ais-edit-${afterItem.id}.png`,
+              ),
+            );
+          }
+        }}
+      />
       <TopBar
         left={
           <>
@@ -242,7 +275,11 @@ export default function EditPage() {
           </>
         }
         center={
-          <ModelBadge name={EDIT_MODEL.displayName} tag={EDIT_MODEL.tag} />
+          <ModelBadge
+            name={EDIT_MODEL.displayName}
+            tag={EDIT_MODEL.tag}
+            status={comfyuiStatus === "running" ? "ready" : "loading"}
+          />
         }
         right={
           <>
@@ -812,6 +849,15 @@ export default function EditPage() {
             </div>
             <div style={{ display: "flex", gap: 6 }}>
               <SmallBtn
+                icon="zoom-in"
+                onClick={() => {
+                  if (!afterItem) return;
+                  setLightboxSrc(afterItem.imageRef);
+                }}
+              >
+                크게
+              </SmallBtn>
+              <SmallBtn
                 icon="download"
                 onClick={() => {
                   if (!afterItem) return;
@@ -902,7 +948,7 @@ export default function EditPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(3, 1fr)",
+              gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
               gap: 12,
             }}
           >
@@ -915,6 +961,7 @@ export default function EditPage() {
                   setAfterId(it.id);
                   selectHistory(it.id);
                 }}
+                onDoubleClick={() => setLightboxSrc(it.imageRef)}
                 onAfterDelete={() => {
                   if (afterId === it.id) setAfterId(null);
                 }}

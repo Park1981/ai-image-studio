@@ -18,6 +18,7 @@ import {
 import SettingsButton from "@/components/settings/SettingsButton";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import HistoryTile from "@/components/studio/HistoryTile";
+import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
@@ -46,7 +47,9 @@ import {
   downloadImage,
   copyImageToClipboard,
   filenameFromRef,
+  urlToDataUrl,
 } from "@/lib/image-actions";
+import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -97,6 +100,12 @@ export default function GeneratePage() {
     [items],
   );
   const selectedItem = genItems.find((i) => i.id === selectedId);
+
+  /* ── Lightbox + 그리드 컬럼 토글 ── */
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
+  const cycleGrid = () =>
+    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
   /* ── 진행 모달 open 상태 ── */
   const [progressOpen, setProgressOpen] = useState(false);
@@ -211,6 +220,30 @@ export default function GeneratePage() {
       {progressOpen && (
         <ProgressModal mode="generate" onClose={() => setProgressOpen(false)} />
       )}
+      <ImageLightbox
+        src={lightboxSrc}
+        alt={selectedItem?.label}
+        filename={
+          selectedItem
+            ? filenameFromRef(
+                selectedItem.imageRef,
+                `ais-${selectedItem.id}.png`,
+              )
+            : undefined
+        }
+        onClose={() => setLightboxSrc(null)}
+        onDownload={() => {
+          if (selectedItem) {
+            downloadImage(
+              selectedItem.imageRef,
+              filenameFromRef(
+                selectedItem.imageRef,
+                `ais-${selectedItem.id}.png`,
+              ),
+            );
+          }
+        }}
+      />
       <TopBar
         left={
           <>
@@ -625,8 +658,22 @@ export default function GeneratePage() {
               </span>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <IconBtn icon="grid" title="그리드" />
-              <IconBtn icon="zoom-in" title="크게 보기" />
+              <IconBtn
+                icon="grid"
+                title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
+                onClick={cycleGrid}
+              />
+              <IconBtn
+                icon="zoom-in"
+                title="크게 보기"
+                onClick={() => {
+                  if (selectedItem?.imageRef) {
+                    setLightboxSrc(selectedItem.imageRef);
+                  } else {
+                    toast.warn("선택된 이미지가 없어");
+                  }
+                }}
+              />
             </div>
           </div>
 
@@ -697,7 +744,14 @@ export default function GeneratePage() {
                   k="LoRA"
                   v={`${activeLoras(GENERATE_MODEL, selectedItem.lightning).length} 적용 (+${countExtraLoras(GENERATE_MODEL)})`}
                 />
-                <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "1fr 1fr",
+                    gap: 6,
+                    marginTop: "auto",
+                  }}
+                >
                   <SmallBtn
                     icon="download"
                     onClick={() =>
@@ -719,7 +773,30 @@ export default function GeneratePage() {
                     복사
                   </SmallBtn>
                   <SmallBtn
-                    icon="refresh"
+                    icon="edit"
+                    onClick={async () => {
+                      // 이미지를 data URL 로 변환 → useEditStore 에 source 로 저장 → /edit 이동
+                      toast.info("수정으로 전송 중…");
+                      const res = await urlToDataUrl(selectedItem.imageRef);
+                      if (!res) {
+                        toast.error("전송 실패", "이미지를 불러올 수 없음");
+                        return;
+                      }
+                      useEditStore
+                        .getState()
+                        .setSource(
+                          res.dataUrl,
+                          `${selectedItem.label} · ${res.width}×${res.height}`,
+                          res.width,
+                          res.height,
+                        );
+                      router.push("/edit");
+                    }}
+                  >
+                    수정으로
+                  </SmallBtn>
+                  <SmallBtn
+                    icon="sparkle"
                     onClick={() => {
                       // 프롬프트/종횡비/시드/옵션을 현재 폼에 로드
                       setPrompt(selectedItem.prompt);
@@ -776,7 +853,7 @@ export default function GeneratePage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(3, 1fr)",
+                gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
                 gap: 12,
               }}
             >
@@ -786,6 +863,7 @@ export default function GeneratePage() {
                   item={it}
                   selected={selectedId === it.id}
                   onClick={() => selectItem(it.id)}
+                  onDoubleClick={() => setLightboxSrc(it.imageRef)}
                 />
               ))}
             </div>

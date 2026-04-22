@@ -20,6 +20,8 @@ interface Props {
   onClick: () => void;
   /** 삭제 후 부모에서 처리할 추가 로직 (예: selected=null) */
   onAfterDelete?: () => void;
+  /** 더블클릭 시 콜백 (라이트박스 열기 등) */
+  onDoubleClick?: () => void;
   aspect?: string;
   style?: CSSProperties;
 }
@@ -29,6 +31,7 @@ export default function HistoryTile({
   selected,
   onClick,
   onAfterDelete,
+  onDoubleClick,
   aspect = "1/1",
   style,
 }: Props) {
@@ -56,6 +59,7 @@ export default function HistoryTile({
       style={{ position: "relative", ...style }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onDoubleClick={onDoubleClick}
     >
       <ImageTile
         seed={item.imageRef || item.id}
