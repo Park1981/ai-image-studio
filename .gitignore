@@ -64,3 +64,6 @@ temp/
 # bkit/PDCA docs (개발 도구)
 docs/.pdca-status.json
 docs/.bkit-memory.json
+backend/docs/.pdca-status.json
+backend/docs/.bkit-memory.json
+backend/docs/
