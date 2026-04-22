@@ -1,30 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { Sora } from "next/font/google";
+import AppShell from "@/components/app/AppShell";
 import "./globals.css";
 
-// UI 기본 폰트
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-// 기술 데이터용 모노 폰트
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-// 헤딩/디스플레이 폰트
-const sora = Sora({
-  variable: "--font-sora",
-  subsets: ["latin"],
-  weight: ["400", "600", "700"],
-});
+// Pretendard Variable + JetBrains Mono 은 globals.css 에서 CDN/로컬 폰트 로드
+// next/font 대신 link preload 방식을 layout 에서 사용
 
 export const metadata: Metadata = {
   title: "AI Image Studio",
-  description: "Local AI-Powered Image Generation WebUI",
+  description: "Local AI-Powered Image Generation WebUI · gemma4 + ComfyUI",
 };
 
 export default function RootLayout({
@@ -33,12 +16,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="ko"
-      className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col noise">
-        {children}
+    <html lang="ko">
+      <head>
+        {/* 한글 우선 타이포그래피: Pretendard + Noto Sans KR */}
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap"
+          rel="stylesheet"
+        />
+        <link
+          rel="stylesheet"
+          href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css"
+        />
+      </head>
+      <body>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
