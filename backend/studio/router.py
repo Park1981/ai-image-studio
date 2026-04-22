@@ -40,12 +40,28 @@ from .presets import (
 from .prompt_pipeline import upgrade_generate_prompt
 from .claude_cli import research_prompt
 from .vision_pipeline import run_vision_pipeline
-from .workflow_runner import (
-    GenerateInjection,
-    EditInjection,
-    build_generate_prompt,
-    build_edit_prompt,
+from .comfy_api_builder import (
+    build_generate_from_request,
+    build_edit_from_request,
 )
+from .comfy_transport import ComfyUITransport, extract_output_images
+
+# ComfyUI 가 실제로 안 돌고 있어서 /prompt 가 실패해도 UI 는 Mock 이미지로 완주되게 할지.
+# False 면 에러를 프론트로 올리고 토스트. True 면 폴백해서 mock-seed:// 리턴.
+COMFY_MOCK_FALLBACK = True
+
+# 생성된 이미지를 저장할 디렉토리 (main.py 가 backend/output/images 를 /images 로 static mount)
+from pathlib import Path as _Path
+try:
+    from config import settings  # type: ignore
+
+    STUDIO_OUTPUT_DIR = _Path(settings.output_image_path) / "studio"
+    STUDIO_URL_PREFIX = "/images/studio"
+except Exception:
+    # 폴백 (테스트 환경 등)
+    STUDIO_OUTPUT_DIR = _Path("backend/output/images/studio")
+    STUDIO_URL_PREFIX = "/images/studio"
+STUDIO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 log = logging.getLogger(__name__)
 
@@ -178,7 +194,7 @@ async def generate_stream(task_id: str):
 
 
 async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
-    """백그라운드 실행 — 단계별로 task.emit() 으로 SSE 방출."""
+    """백그라운드 실행 — 단계별로 task.emit() 으로 SSE 방출. 실 ComfyUI 디스패치 포함."""
     try:
         # 1. prompt-parse
         await task.emit(
@@ -190,7 +206,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             },
         )
 
-        # 2. gemma4 upgrade (optional research context preload)
+        # 2. (선택) Claude 조사
         research_hints: list[str] = []
         if body.research:
             await task.emit(
@@ -207,6 +223,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             if research.ok:
                 research_hints = research.hints
 
+        # 3. gemma4 업그레이드
         await task.emit(
             "stage",
             {
@@ -220,49 +237,45 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             research_context="\n".join(research_hints) if research_hints else None,
         )
 
-        # 3. workflow 주입
+        # 4. API 포맷 조립
         await task.emit(
             "stage",
             {
                 "type": "workflow-dispatch",
-                "progress": 65,
+                "progress": 60,
                 "stageLabel": "워크플로우 전달",
             },
         )
 
         aspect = get_aspect(body.aspect)
-        lightning_lora = next(
-            (l.name for l in GENERATE_MODEL.loras if l.role == "lightning"),
-            "",
-        )
-        inj = GenerateInjection(
-            text=upgrade.upgraded,
-            width=aspect.width,
-            height=aspect.height,
-            enable_turbo_mode=body.lightning,
-            seed=body.seed if body.seed > 0 else int(time.time() * 1000),
-            unet_name=GENERATE_MODEL.files.unet,
-            clip_name=GENERATE_MODEL.files.clip,
-            vae_name=GENERATE_MODEL.files.vae,
-            lora_name=lightning_lora,
-        )
-        _wf, _api = build_generate_prompt(
-            GENERATE_MODEL.workflow, GENERATE_MODEL.subgraph_id, inj
-        )
-        # ⚠️ 실 ComfyUI 디스패치는 Sub-Phase 2D 에서.
-        # 지금은 주입만 확인하고 mock 대기.
+        actual_seed = body.seed if body.seed > 0 else int(time.time() * 1000)
 
-        # 4. comfyui-sampling (mock 대기)
+        api_prompt = build_generate_from_request(
+            prompt=upgrade.upgraded,
+            aspect_label=body.aspect,
+            steps=body.steps,
+            cfg=body.cfg,
+            seed=actual_seed,
+            lightning=body.lightning,
+        )
+
+        # 5. ComfyUI 디스패치
         await task.emit(
             "stage",
             {
                 "type": "comfyui-sampling",
-                "progress": 88,
-                "stageLabel": "ComfyUI 샘플링 (mock)",
+                "progress": 70,
+                "stageLabel": "ComfyUI 샘플링",
             },
         )
-        await asyncio.sleep(0.8)
+        image_ref, comfy_error = await _dispatch_to_comfy(
+            task,
+            api_prompt,
+            progress_start=70,
+            progress_end=95,
+        )
 
+        # 6. 후처리
         await task.emit(
             "stage",
             {
@@ -271,9 +284,9 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
                 "stageLabel": "후처리",
             },
         )
-        await asyncio.sleep(0.3)
+        await asyncio.sleep(0.15)
 
-        # 5. done — HistoryItem
+        # 7. done
         item = {
             "id": f"gen-{uuid.uuid4().hex[:8]}",
             "mode": "generate",
@@ -281,16 +294,17 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             "label": body.prompt[:28] + ("…" if len(body.prompt) > 28 else ""),
             "width": aspect.width,
             "height": aspect.height,
-            "seed": inj.seed,
+            "seed": actual_seed,
             "steps": body.steps,
             "cfg": body.cfg,
             "lightning": body.lightning,
             "model": GENERATE_MODEL.display_name,
             "createdAt": int(time.time() * 1000),
-            "imageRef": f"mock-seed://{uuid.uuid4().hex}",
+            "imageRef": image_ref,
             "upgradedPrompt": upgrade.upgraded,
             "promptProvider": upgrade.provider,
             "researchHints": research_hints,
+            "comfyError": comfy_error,
         }
         await task.emit("done", {"item": item})
     except Exception as e:
@@ -298,6 +312,77 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
         await task.emit("error", {"message": str(e)})
     finally:
         await task.close()
+
+
+async def _dispatch_to_comfy(
+    task: Task,
+    api_prompt: dict[str, Any],
+    *,
+    progress_start: int,
+    progress_end: int,
+) -> tuple[str, str | None]:
+    """ComfyUI 에 API prompt 제출 + WS 진행 수신 + 결과 이미지 다운로드.
+
+    Returns:
+        (imageRef, error_message) — error_message 는 ComfyUI 실패 시 설명. 성공 시 None.
+        imageRef 는 성공 시 "/images/studio/xxx.png", 실패+fallback 시 "mock-seed://...".
+    """
+    client_id = f"ais-{uuid.uuid4().hex[:10]}"
+    try:
+        async with ComfyUITransport() as comfy:
+            prompt_id = await comfy.submit(api_prompt, client_id)
+            log.info("ComfyUI submitted prompt_id=%s", prompt_id)
+
+            # WebSocket 진행 수신 — progress 이벤트만 SSE 에 진행률 반영
+            span = progress_end - progress_start
+            async for evt in comfy.listen(client_id, prompt_id):
+                if evt.kind == "execution_error":
+                    error = evt.data.get("exception_message", "unknown")
+                    return (_mock_ref_or_raise(error), error)
+                if evt.kind == "progress":
+                    pct = evt.percent or 0.0
+                    progress = progress_start + int(span * pct)
+                    await task.emit(
+                        "stage",
+                        {
+                            "type": "comfyui-sampling",
+                            "progress": progress,
+                            "stageLabel": f"ComfyUI 샘플링 {int(pct * 100)}%",
+                        },
+                    )
+                # execution_success 면 루프 종료 (listen 내부에서 return)
+
+            # 결과 이미지 가져오기
+            history = await comfy.get_history(prompt_id)
+            images = extract_output_images(history)
+            if not images:
+                return (_mock_ref_or_raise("no output images"), "no output images")
+
+            img_info = images[0]
+            raw = await comfy.download_image(
+                filename=img_info["filename"],
+                subfolder=img_info["subfolder"],
+                image_type=img_info["type"],
+            )
+
+        # 로컬 저장
+        save_name = f"{uuid.uuid4().hex}.png"
+        save_path = STUDIO_OUTPUT_DIR / save_name
+        save_path.write_bytes(raw)
+        image_ref = f"{STUDIO_URL_PREFIX}/{save_name}"
+        log.info("ComfyUI image saved: %s", image_ref)
+        return (image_ref, None)
+
+    except Exception as e:
+        log.warning("ComfyUI dispatch failed: %s", e)
+        return (_mock_ref_or_raise(str(e)), str(e))
+
+
+def _mock_ref_or_raise(reason: str) -> str:
+    """COMFY_MOCK_FALLBACK 설정에 따라 mock ref 반환 또는 예외."""
+    if COMFY_MOCK_FALLBACK:
+        return f"mock-seed://{uuid.uuid4().hex}"
+    raise RuntimeError(reason)
 
 
 # ─────────────────────────────────────────────
@@ -388,26 +473,50 @@ async def _run_edit_pipeline(
         await asyncio.sleep(0.15)
         await task.emit("step", {"step": 3, "done": True})
 
-        # Step 4: ComfyUI dispatch (mock)
+        # Step 4: ComfyUI dispatch — 업로드 → 프롬프트 제출 → 결과 수신
         await task.emit("step", {"step": 4, "done": False})
-        lightning_lora = next(
-            (l.name for l in EDIT_MODEL.loras if l.role == "lightning"),
-            "",
-        )
-        inj = EditInjection(
-            prompt=vision.final_prompt,
-            enable_turbo_mode=lightning,
-            seed=int(time.time() * 1000),
-            unet_name=EDIT_MODEL.files.unet,
-            clip_name=EDIT_MODEL.files.clip,
-            vae_name=EDIT_MODEL.files.vae,
-            lora_name=lightning_lora,
-            image_filename=filename,
-        )
-        _wf, _api = build_edit_prompt(
-            EDIT_MODEL.workflow, EDIT_MODEL.subgraph_id, inj
-        )
-        await asyncio.sleep(0.8)
+
+        actual_seed = int(time.time() * 1000)
+        image_ref: str
+        comfy_err: str | None = None
+        client_id = f"ais-e-{uuid.uuid4().hex[:10]}"
+
+        try:
+            async with ComfyUITransport() as comfy:
+                # 업로드 (ComfyUI input/ 폴더)
+                uploaded = await comfy.upload_image(image_bytes, filename or "input.png")
+                api_prompt = build_edit_from_request(
+                    prompt=vision.final_prompt,
+                    source_filename=uploaded,
+                    seed=actual_seed,
+                    lightning=lightning,
+                )
+                prompt_id = await comfy.submit(api_prompt, client_id)
+                async for evt in comfy.listen(client_id, prompt_id):
+                    if evt.kind == "execution_error":
+                        comfy_err = evt.data.get("exception_message", "unknown")
+                        break
+                if comfy_err is None:
+                    history = await comfy.get_history(prompt_id)
+                    images = extract_output_images(history)
+                    if not images:
+                        raise RuntimeError("no output images")
+                    img = images[0]
+                    raw = await comfy.download_image(
+                        filename=img["filename"],
+                        subfolder=img["subfolder"],
+                        image_type=img["type"],
+                    )
+                    save_name = f"{uuid.uuid4().hex}.png"
+                    (STUDIO_OUTPUT_DIR / save_name).write_bytes(raw)
+                    image_ref = f"{STUDIO_URL_PREFIX}/{save_name}"
+                else:
+                    image_ref = _mock_ref_or_raise(comfy_err)
+        except Exception as e:
+            log.warning("Edit ComfyUI dispatch failed: %s", e)
+            comfy_err = str(e)
+            image_ref = _mock_ref_or_raise(comfy_err)
+
         await task.emit("step", {"step": 4, "done": True})
 
         # Done
@@ -416,17 +525,18 @@ async def _run_edit_pipeline(
             "mode": "edit",
             "prompt": prompt,
             "label": prompt[:28] + ("…" if len(prompt) > 28 else ""),
-            "width": 1024,  # TODO: 실 이미지 사이즈
+            "width": 1024,  # TODO: 원본 해상도 추출
             "height": 1024,
-            "seed": inj.seed,
+            "seed": actual_seed,
             "steps": EDIT_MODEL.lightning.steps if lightning else EDIT_MODEL.defaults.steps,
             "cfg": EDIT_MODEL.lightning.cfg if lightning else EDIT_MODEL.defaults.cfg,
             "lightning": lightning,
             "model": EDIT_MODEL.display_name,
             "createdAt": int(time.time() * 1000),
-            "imageRef": f"mock-seed://{uuid.uuid4().hex}",
+            "imageRef": image_ref,
             "upgradedPrompt": vision.final_prompt,
             "visionDescription": vision.image_description,
+            "comfyError": comfy_err,
         }
         await task.emit("done", {"item": item})
     except Exception as e:
