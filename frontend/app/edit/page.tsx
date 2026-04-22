@@ -114,9 +114,8 @@ export default function EditPage() {
 
   /* ── Lightbox ── */
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
-  const cycleGrid = () =>
-    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
+  // 수정 히스토리 그리드는 3 컬럼 고정 (edit 은 결과 수가 적어 토글 불필요)
+  const gridCols = 3;
 
   /* ── 진행 모달 open 상태 ── */
   const [progressOpen, setProgressOpen] = useState(false);

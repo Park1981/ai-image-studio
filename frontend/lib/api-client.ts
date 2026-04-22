@@ -182,7 +182,7 @@ async function* parseSSE(
       buffer = buffer.slice(boundary + 2);
 
       let eventName = "message";
-      let dataLines: string[] = [];
+      const dataLines: string[] = [];
       for (const line of block.split("\n")) {
         if (line.startsWith("event:")) eventName = line.slice(6).trim();
         else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());

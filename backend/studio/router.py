@@ -404,26 +404,9 @@ async def _dispatch_to_comfy(
                             "stageLabel": f"ComfyUI 샘플링 {int(pct * 100)}%",
                         },
                     )
-                # execution_success 면 루프 종료 (listen 내부에서 return)
+                # execution_success 면 listen 내부에서 종료
 
-            # 결과 이미지 가져오기
-            history = await comfy.get_history(prompt_id)
-            images = extract_output_images(history)
-            if not images:
-                return (_mock_ref_or_raise("no output images"), "no output images")
-
-            img_info = images[0]
-            raw = await comfy.download_image(
-                filename=img_info["filename"],
-                subfolder=img_info["subfolder"],
-                image_type=img_info["type"],
-            )
-
-        # 로컬 저장
-        save_name = f"{uuid.uuid4().hex}.png"
-        save_path = STUDIO_OUTPUT_DIR / save_name
-        save_path.write_bytes(raw)
-        image_ref = f"{STUDIO_URL_PREFIX}/{save_name}"
+            image_ref = await _save_comfy_output(comfy, prompt_id)
         log.info("ComfyUI image saved: %s", image_ref)
         return (image_ref, None)
 
@@ -437,6 +420,54 @@ def _mock_ref_or_raise(reason: str) -> str:
     if COMFY_MOCK_FALLBACK:
         return f"mock-seed://{uuid.uuid4().hex}"
     raise RuntimeError(reason)
+
+
+async def _save_comfy_output(comfy: ComfyUITransport, prompt_id: str) -> str:
+    """ComfyUI 완료 prompt 의 첫 이미지를 다운로드해서 로컬에 저장, URL 반환."""
+    history = await comfy.get_history(prompt_id)
+    images = extract_output_images(history)
+    if not images:
+        raise RuntimeError("no output images")
+    img = images[0]
+    raw = await comfy.download_image(
+        filename=img["filename"],
+        subfolder=img["subfolder"],
+        image_type=img["type"],
+    )
+    save_name = f"{uuid.uuid4().hex}.png"
+    (STUDIO_OUTPUT_DIR / save_name).write_bytes(raw)
+    return f"{STUDIO_URL_PREFIX}/{save_name}"
+
+
+async def _dispatch_edit_to_comfy(
+    *,
+    api_prompt_factory,
+    image_bytes: bytes,
+    upload_filename: str,
+) -> tuple[str, str | None]:
+    """Edit 파이프라인 ComfyUI 디스패치 헬퍼.
+
+    Returns:
+        (imageRef, error_message) — 실패 시 error 채워지고 COMFY_MOCK_FALLBACK=True 면 mock-seed 반환.
+    """
+    client_id = f"ais-e-{uuid.uuid4().hex[:10]}"
+    try:
+        async with ComfyUITransport() as comfy:
+            uploaded = await comfy.upload_image(image_bytes, upload_filename)
+            api_prompt = api_prompt_factory(uploaded)
+            prompt_id = await comfy.submit(api_prompt, client_id)
+            comfy_err: str | None = None
+            async for evt in comfy.listen(client_id, prompt_id):
+                if evt.kind == "execution_error":
+                    comfy_err = evt.data.get("exception_message", "unknown")
+                    break
+            if comfy_err:
+                return (_mock_ref_or_raise(comfy_err), comfy_err)
+            image_ref = await _save_comfy_output(comfy, prompt_id)
+            return (image_ref, None)
+    except Exception as e:
+        log.warning("Edit ComfyUI dispatch failed: %s", e)
+        return (_mock_ref_or_raise(str(e)), str(e))
 
 
 # ─────────────────────────────────────────────
@@ -549,45 +580,18 @@ async def _run_edit_pipeline(
         await task.emit("step", {"step": 4, "done": False})
 
         actual_seed = int(time.time() * 1000)
-        image_ref: str
-        comfy_err: str | None = None
-        client_id = f"ais-e-{uuid.uuid4().hex[:10]}"
+        api_prompt_factory = lambda uploaded_name: build_edit_from_request(
+            prompt=vision.final_prompt,
+            source_filename=uploaded_name,
+            seed=actual_seed,
+            lightning=lightning,
+        )
 
-        try:
-            async with ComfyUITransport() as comfy:
-                # 업로드 (ComfyUI input/ 폴더)
-                uploaded = await comfy.upload_image(image_bytes, filename or "input.png")
-                api_prompt = build_edit_from_request(
-                    prompt=vision.final_prompt,
-                    source_filename=uploaded,
-                    seed=actual_seed,
-                    lightning=lightning,
-                )
-                prompt_id = await comfy.submit(api_prompt, client_id)
-                async for evt in comfy.listen(client_id, prompt_id):
-                    if evt.kind == "execution_error":
-                        comfy_err = evt.data.get("exception_message", "unknown")
-                        break
-                if comfy_err is None:
-                    history = await comfy.get_history(prompt_id)
-                    images = extract_output_images(history)
-                    if not images:
-                        raise RuntimeError("no output images")
-                    img = images[0]
-                    raw = await comfy.download_image(
-                        filename=img["filename"],
-                        subfolder=img["subfolder"],
-                        image_type=img["type"],
-                    )
-                    save_name = f"{uuid.uuid4().hex}.png"
-                    (STUDIO_OUTPUT_DIR / save_name).write_bytes(raw)
-                    image_ref = f"{STUDIO_URL_PREFIX}/{save_name}"
-                else:
-                    image_ref = _mock_ref_or_raise(comfy_err)
-        except Exception as e:
-            log.warning("Edit ComfyUI dispatch failed: %s", e)
-            comfy_err = str(e)
-            image_ref = _mock_ref_or_raise(comfy_err)
+        image_ref, comfy_err = await _dispatch_edit_to_comfy(
+            api_prompt_factory=api_prompt_factory,
+            image_bytes=image_bytes,
+            upload_filename=filename or "input.png",
+        )
 
         await task.emit("step", {"step": 4, "done": True})
 

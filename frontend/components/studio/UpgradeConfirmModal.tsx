@@ -44,12 +44,34 @@ export default function UpgradeConfirmModal({
   onRerun,
   onCancel,
 }: Props) {
-  const [edit, setEdit] = useState("");
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  // 사용자가 수정한 프롬프트 → edit state. result 가 새로 오면 reset (key 로 리셋).
+  // setState in effect 안티패턴 피하려고 key 기반 remount 방식.
+  const resultKey = result?.upgradedPrompt ?? "";
+  return (
+    <EditorShell
+      open={open}
+      loading={loading}
+      original={original}
+      result={result}
+      key={resultKey}
+      onConfirm={onConfirm}
+      onRerun={onRerun}
+      onCancel={onCancel}
+    />
+  );
+}
 
-  useEffect(() => {
-    if (result) setEdit(result.upgradedPrompt);
-  }, [result]);
+function EditorShell({
+  open,
+  loading,
+  original,
+  result,
+  onConfirm,
+  onRerun,
+  onCancel,
+}: Props) {
+  const [edit, setEdit] = useState(result?.upgradedPrompt ?? "");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // ESC = cancel
   useEffect(() => {

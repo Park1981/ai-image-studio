@@ -37,7 +37,13 @@ interface Props {
   onDownload?: () => void;
 }
 
-export default function ImageLightbox({
+export default function ImageLightbox(props: Props) {
+  if (!props.src) return null;
+  // key 로 src 변경 시 내부 state 리셋 (setState-in-effect 안티패턴 회피)
+  return <LightboxInner key={props.src} {...props} />;
+}
+
+function LightboxInner({
   src,
   alt = "",
   filename,
@@ -46,12 +52,12 @@ export default function ImageLightbox({
 }: Props) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
-  const panStart = useRef({ x: 0, y: 0, ox: 0, oy: 0, dragging: false });
+  const [dragging, setDragging] = useState(false);
+  const panStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
   /** ESC 키 + 숫자 key */
   useEffect(() => {
-    if (!src) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       if (e.key === "+" || e.key === "=") setZoom((z) => clamp(z + ZOOM_STEP));
@@ -63,13 +69,7 @@ export default function ImageLightbox({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [src, onClose]);
-
-  /** src 바뀌면 상태 초기화 */
-  useEffect(() => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  }, [src]);
+  }, [onClose]);
 
   const handleWheel = useCallback((e: WheelEvent<HTMLDivElement>) => {
     // 휠 네이티브 스크롤 막고 커스텀 zoom
@@ -86,18 +86,17 @@ export default function ImageLightbox({
       y: e.clientY,
       ox: pan.x,
       oy: pan.y,
-      dragging: true,
     };
+    setDragging(true);
     document.body.style.userSelect = "none";
     const move = (ev: globalThis.MouseEvent) => {
-      if (!panStart.current.dragging) return;
       setPan({
         x: panStart.current.ox + (ev.clientX - panStart.current.x),
         y: panStart.current.oy + (ev.clientY - panStart.current.y),
       });
     };
     const up = () => {
-      panStart.current.dragging = false;
+      setDragging(false);
       document.body.style.userSelect = "";
       window.removeEventListener("mousemove", move);
       window.removeEventListener("mouseup", up);
@@ -114,8 +113,6 @@ export default function ImageLightbox({
       setZoom(2);
     }
   };
-
-  if (!src) return null;
 
   return (
     <div
@@ -206,11 +203,9 @@ export default function ImageLightbox({
         onMouseDown={startDrag}
         onDoubleClick={handleDouble}
         style={{
-          cursor: zoom > 1 ? "grab" : "zoom-in",
+          cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "zoom-in",
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transition: panStart.current.dragging
-            ? "none"
-            : "transform .15s ease",
+          transition: dragging ? "none" : "transform .15s ease",
         }}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}

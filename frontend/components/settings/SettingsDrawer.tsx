@@ -519,7 +519,7 @@ function TemplatesSection() {
           }}
         >
           저장된 템플릿이 없어요. 생성 화면의 프롬프트 입력창 옆
-          <b> "템플릿 저장" </b>버튼을 눌러서 추가해봐.
+          <b>&ldquo;템플릿 저장&rdquo;</b> 버튼을 눌러서 추가해봐.
         </div>
       )}
       {templates.map((t) => (
