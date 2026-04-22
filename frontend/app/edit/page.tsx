@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/primitives";
 import { EDIT_MODEL, countExtraLoras } from "@/lib/model-presets";
 import { editImageStream } from "@/lib/api-client";
+import { downloadImage, filenameFromRef } from "@/lib/image-actions";
 import { useEditStore } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -809,8 +810,33 @@ export default function EditPage() {
               </span>
             </div>
             <div style={{ display: "flex", gap: 6 }}>
-              <SmallBtn icon="download">저장</SmallBtn>
-              <SmallBtn icon="refresh">다시</SmallBtn>
+              <SmallBtn
+                icon="download"
+                onClick={() => {
+                  if (!afterItem) return;
+                  downloadImage(
+                    afterItem.imageRef,
+                    filenameFromRef(
+                      afterItem.imageRef,
+                      `ais-edit-${afterItem.id}.png`,
+                    ),
+                  );
+                }}
+              >
+                저장
+              </SmallBtn>
+              <SmallBtn
+                icon="refresh"
+                onClick={() => {
+                  if (!afterItem) return;
+                  // 수정 지시 + Lightning 설정 복원
+                  setPrompt(afterItem.prompt);
+                  setLightning(afterItem.lightning);
+                  toast.info("수정 설정 복원", "[수정 생성] 눌러");
+                }}
+              >
+                다시
+              </SmallBtn>
             </div>
           </div>
 

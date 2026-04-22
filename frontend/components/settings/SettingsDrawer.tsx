@@ -15,6 +15,7 @@ import { GENERATE_MODEL, EDIT_MODEL } from "@/lib/model-presets";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore, type ProcStatus } from "@/stores/useProcessStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
+import { useGenerateStore } from "@/stores/useGenerateStore";
 import { toast } from "@/stores/useToastStore";
 import {
   setProcessStatus,
@@ -492,14 +493,21 @@ function SelectRow({
 function TemplatesSection() {
   const templates = useSettingsStore((s) => s.templates);
   const removeTemplate = useSettingsStore((s) => s.removeTemplate);
+  const { closeSettings } = useSettings();
 
   const remove = (id: string) => {
     removeTemplate(id);
     toast.info("템플릿 삭제됨");
   };
 
+  const loadIntoGenerate = (t: PromptTemplateLike) => {
+    useGenerateStore.getState().setPrompt(t.text);
+    closeSettings();
+    toast.success("템플릿 불러옴", `"${t.name}" 프롬프트로 세팅됨`);
+  };
+
   return (
-    <Section title="프롬프트 템플릿" desc="자주 쓰는 프롬프트 저장·불러오기">
+    <Section title="프롬프트 템플릿" desc="클릭해서 생성 화면에 불러오기">
       {templates.length === 0 && (
         <div
           style={{
@@ -510,13 +518,18 @@ function TemplatesSection() {
             borderRadius: 8,
           }}
         >
-          저장된 템플릿이 없어요. 생성 화면 프롬프트에서 저장해보세요.
+          저장된 템플릿이 없어요. 생성 화면의 프롬프트 입력창 옆
+          <b> "템플릿 저장" </b>버튼을 눌러서 추가해봐.
         </div>
       )}
       {templates.map((t) => (
-        <div
+        <button
           key={t.id}
+          type="button"
+          onClick={() => loadIntoGenerate(t)}
           style={{
+            all: "unset",
+            cursor: "pointer",
             padding: "10px 12px",
             background: "var(--surface)",
             border: "1px solid var(--line)",
@@ -524,6 +537,18 @@ function TemplatesSection() {
             display: "flex",
             flexDirection: "column",
             gap: 4,
+            transition: "all .15s",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLElement).style.borderColor =
+              "var(--accent)";
+            (e.currentTarget as HTMLElement).style.background =
+              "var(--accent-soft)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLElement).style.borderColor = "var(--line)";
+            (e.currentTarget as HTMLElement).style.background =
+              "var(--surface)";
           }}
         >
           <div
@@ -534,22 +559,34 @@ function TemplatesSection() {
               gap: 8,
             }}
           >
-            <span style={{ fontSize: 12.5, fontWeight: 500 }}>{t.name}</span>
-            <button
-              type="button"
-              onClick={() => remove(t.id)}
+            <span
               style={{
-                all: "unset",
-                cursor: "pointer",
+                fontSize: 12.5,
+                fontWeight: 500,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+              }}
+            >
+              <Icon name="arrow-right" size={11} />
+              {t.name}
+            </span>
+            <span
+              onClick={(e) => {
+                e.stopPropagation();
+                remove(t.id);
+              }}
+              style={{
                 fontSize: 10.5,
                 color: "var(--ink-4)",
                 padding: "2px 6px",
                 borderRadius: 4,
+                cursor: "pointer",
               }}
               title="삭제"
             >
               <Icon name="x" size={11} />
-            </button>
+            </span>
           </div>
           <div
             style={{
@@ -564,10 +601,16 @@ function TemplatesSection() {
           >
             {t.text}
           </div>
-        </div>
+        </button>
       ))}
     </Section>
   );
+}
+
+interface PromptTemplateLike {
+  id: string;
+  name: string;
+  text: string;
 }
 
 /* ─────────────────────────────────

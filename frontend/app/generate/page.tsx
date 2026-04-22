@@ -41,6 +41,11 @@ import {
   type AspectRatioLabel,
 } from "@/lib/model-presets";
 import { generateImageStream, researchPrompt } from "@/lib/api-client";
+import {
+  downloadImage,
+  copyImageToClipboard,
+  filenameFromRef,
+} from "@/lib/image-actions";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -81,6 +86,7 @@ export default function GeneratePage() {
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
   const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
   const visionModelSel = useSettingsStore((s) => s.visionModel);
+  const addTemplate = useSettingsStore((s) => s.addTemplate);
   const ollamaStatus = useProcessStore((s) => s.ollama);
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
@@ -324,24 +330,56 @@ export default function GeneratePage() {
                 }}
               >
                 <div style={{ display: "flex", gap: 6 }}>
-                  <Pill mini>설정 &gt; 템플릿</Pill>
                   <Pill mini>Shift+Enter 생성</Pill>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setPrompt("")}
-                  style={{
-                    all: "unset",
-                    cursor: "pointer",
-                    fontSize: 11,
-                    color: "var(--ink-3)",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 4,
-                  }}
-                >
-                  <Icon name="x" size={11} /> 비우기
-                </button>
+                <div style={{ display: "flex", gap: 10 }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!prompt.trim()) {
+                        toast.warn("저장할 프롬프트가 없어");
+                        return;
+                      }
+                      const name =
+                        typeof window !== "undefined"
+                          ? window.prompt("템플릿 이름?", prompt.slice(0, 20))
+                          : null;
+                      if (!name) return;
+                      addTemplate({ name: name.trim(), text: prompt });
+                      toast.success(
+                        "템플릿 저장됨",
+                        "⚙️ 설정 > 프롬프트 템플릿에서 불러오기",
+                      );
+                    }}
+                    style={{
+                      all: "unset",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      color: "var(--accent-ink)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                    title="현재 프롬프트를 템플릿으로 저장"
+                  >
+                    <Icon name="sparkle" size={11} /> 템플릿 저장
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrompt("")}
+                    style={{
+                      all: "unset",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      color: "var(--ink-3)",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 4,
+                    }}
+                  >
+                    <Icon name="x" size={11} /> 비우기
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -659,9 +697,54 @@ export default function GeneratePage() {
                   v={`${activeLoras(GENERATE_MODEL, selectedItem.lightning).length} 적용 (+${countExtraLoras(GENERATE_MODEL)})`}
                 />
                 <div style={{ display: "flex", gap: 6, marginTop: "auto" }}>
-                  <SmallBtn icon="download">저장</SmallBtn>
-                  <SmallBtn icon="copy">복사</SmallBtn>
-                  <SmallBtn icon="refresh">재생성</SmallBtn>
+                  <SmallBtn
+                    icon="download"
+                    onClick={() =>
+                      downloadImage(
+                        selectedItem.imageRef,
+                        filenameFromRef(
+                          selectedItem.imageRef,
+                          `ais-${selectedItem.id}.png`,
+                        ),
+                      )
+                    }
+                  >
+                    저장
+                  </SmallBtn>
+                  <SmallBtn
+                    icon="copy"
+                    onClick={() => copyImageToClipboard(selectedItem.imageRef)}
+                  >
+                    복사
+                  </SmallBtn>
+                  <SmallBtn
+                    icon="refresh"
+                    onClick={() => {
+                      // 프롬프트/종횡비/시드/옵션을 현재 폼에 로드
+                      setPrompt(selectedItem.prompt);
+                      // 종횡비 역추출 (width:height 비율 → label)
+                      const ratio = ASPECT_RATIOS.find(
+                        (r) =>
+                          Math.abs(
+                            r.width / r.height -
+                              selectedItem.width / selectedItem.height,
+                          ) < 0.01,
+                      );
+                      if (ratio) setAspect(ratio.label);
+                      setSeed(selectedItem.seed);
+                      setSteps(selectedItem.steps);
+                      setCfg(selectedItem.cfg);
+                      if (selectedItem.lightning !== lightning) {
+                        applyLightning(selectedItem.lightning);
+                      }
+                      toast.info(
+                        "재생성 준비",
+                        "같은 설정으로 로드됨 · [생성] 눌러",
+                      );
+                    }}
+                  >
+                    재생성
+                  </SmallBtn>
                 </div>
               </div>
             </div>
