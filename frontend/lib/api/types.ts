@@ -165,6 +165,12 @@ export interface VideoRequest {
   prompt: string;
   ollamaModel?: string;
   visionModel?: string;
+  /**
+   * 성인 모드 토글 (2026-04-24 · v8).
+   * true 면 gemma4 시스템 프롬프트에 NSFW clause 주입 + eros LoRA 체인 포함.
+   * false 면 distilled LoRA 만 로드 (SFW, 얼굴 보존 안정).
+   */
+  adult?: boolean;
 }
 
 export type VideoStage =

@@ -890,7 +890,7 @@ async def create_video_task(
 ):
     """영상 생성 요청 (multipart: image 파일 + meta JSON).
 
-    meta = { prompt, ollamaModel?, visionModel? }
+    meta = { prompt, adult?, ollamaModel?, visionModel? }
     """
     try:
         meta_obj = json.loads(meta)
@@ -903,6 +903,7 @@ async def create_video_task(
 
     ollama_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
     vision_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
+    adult = bool(meta_obj.get("adult", False))
 
     image_bytes = await image.read()
     if not image_bytes:
@@ -923,6 +924,7 @@ async def create_video_task(
             image.filename or "input.png",
             ollama_override,
             vision_override,
+            adult,
         )
     )
     return TaskCreated(
@@ -953,6 +955,7 @@ async def _run_video_pipeline_task(
     filename: str,
     ollama_model_override: str | None = None,
     vision_model_override: str | None = None,
+    adult: bool = False,
 ) -> None:
     """Video i2v 파이프라인 백그라운드 실행 (5 step).
 
@@ -976,6 +979,7 @@ async def _run_video_pipeline_task(
             prompt,
             vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
             text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
+            adult=adult,
         )
 
         await task.emit(
@@ -1035,6 +1039,7 @@ async def _run_video_pipeline_task(
                 source_filename=uploaded_name,
                 seed=actual_seed,
                 unet_override=unet_override,
+                adult=adult,
             )
 
         await task.emit("step", {"step": 3, "done": True})

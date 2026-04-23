@@ -108,7 +108,8 @@ export default function ImageTile({
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "cover",
+            // contain: 영상 원본 비율 유지 (letterbox). cover 는 잘림 발생.
+            objectFit: "contain",
             display: "block",
           }}
         />

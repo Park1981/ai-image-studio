@@ -21,6 +21,7 @@ import {
 import VramBadge from "@/components/chrome/VramBadge";
 import SettingsButton from "@/components/settings/SettingsButton";
 import HistoryTile from "@/components/studio/HistoryTile";
+import ImageLightbox from "@/components/studio/ImageLightbox";
 import PipelineSteps, {
   type PipelineStepMeta,
 } from "@/components/studio/PipelineSteps";
@@ -32,6 +33,7 @@ import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
 import { useVideoPipeline } from "@/hooks/useVideoPipeline";
 import { filenameFromRef } from "@/lib/image-actions";
+import type { HistoryItem } from "@/lib/api-client";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -58,6 +60,8 @@ export default function VideoPage() {
   const setSource = useVideoStore((s) => s.setSource);
   const prompt = useVideoStore((s) => s.prompt);
   const setPrompt = useVideoStore((s) => s.setPrompt);
+  const adult = useVideoStore((s) => s.adult);
+  const setAdult = useVideoStore((s) => s.setAdult);
   const running = useVideoStore((s) => s.running);
   const currentStep = useVideoStore((s) => s.currentStep);
   const stepDone = useVideoStore((s) => s.stepDone);
@@ -87,6 +91,8 @@ export default function VideoPage() {
 
   /* ── 진행 모달 open 상태 ── */
   const [progressOpen, setProgressOpen] = useState(false);
+  /* ── Lightbox (자세히 누르면 오픈) ── */
+  const [lightboxItem, setLightboxItem] = useState<HistoryItem | null>(null);
   useEffect(() => {
     if (running) setProgressOpen(true);
   }, [running]);
@@ -126,7 +132,16 @@ export default function VideoPage() {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {progressOpen && (
-        <ProgressModal mode="edit" onClose={() => setProgressOpen(false)} />
+        <ProgressModal mode="video" onClose={() => setProgressOpen(false)} />
+      )}
+      {lightboxItem && (
+        <ImageLightbox
+          src={lightboxItem.imageRef}
+          alt={lightboxItem.label}
+          filename={filenameFromRef(lightboxItem.imageRef, "ais-video.mp4")}
+          item={lightboxItem}
+          onClose={() => setLightboxItem(null)}
+        />
       )}
       <TopBar
         left={
@@ -291,6 +306,106 @@ export default function VideoPage() {
               )}
             </div>
           </div>
+
+          {/* 성인 모드 토글 — ON: gemma4 NSFW clause + eros LoRA 체인 포함 */}
+          <button
+            type="button"
+            onClick={() => setAdult(!adult)}
+            aria-pressed={adult}
+            title={
+              adult
+                ? "성인 모드 ON — gemma4 가 에로틱 모션 프롬프트를 만들고 eros LoRA 가 적용됨"
+                : "성인 모드 OFF — SFW 프롬프트 + distilled LoRA 만"
+            }
+            style={{
+              all: "unset",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: adult
+                ? "1px solid rgba(220, 80, 100, .5)"
+                : "1px solid var(--line)",
+              background: adult
+                ? "linear-gradient(135deg, rgba(220,80,100,.12), rgba(220,80,100,.04))"
+                : "var(--surface)",
+              transition: "all .18s",
+            }}
+            onMouseEnter={(e) => {
+              if (!adult)
+                (e.currentTarget as HTMLButtonElement).style.borderColor =
+                  "var(--line-2)";
+            }}
+            onMouseLeave={(e) => {
+              if (!adult)
+                (e.currentTarget as HTMLButtonElement).style.borderColor =
+                  "var(--line)";
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span
+                style={{
+                  fontSize: 16,
+                  filter: adult ? "none" : "grayscale(.8) opacity(.5)",
+                  transition: "filter .2s",
+                }}
+              >
+                🔥
+              </span>
+              <div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: adult ? "#B23A58" : "var(--ink)",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  성인 모드
+                </div>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    color: "var(--ink-4)",
+                    marginTop: 2,
+                  }}
+                >
+                  {adult
+                    ? "에로틱 모션 + NSFW LoRA 적용"
+                    : "SFW · 얼굴 보존 안정"}
+                </div>
+              </div>
+            </div>
+            {/* 스위치 인디케이터 */}
+            <div
+              style={{
+                width: 36,
+                height: 20,
+                borderRadius: 999,
+                background: adult ? "#B23A58" : "var(--line-2)",
+                position: "relative",
+                transition: "background .2s",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: adult ? 18 : 2,
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: "#fff",
+                  boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+                  transition: "left .2s",
+                }}
+              />
+            </div>
+          </button>
 
           {/* Pipeline (5단계 초록박스) */}
           <PipelineSteps
@@ -517,12 +632,7 @@ export default function VideoPage() {
                       // 플레이어에 지정 — 세션 state (lastVideoRef) 로
                       useVideoStore.getState().setLastVideoRef(it.imageRef);
                     }}
-                    onExpand={() => {
-                      // 새 탭에서 원본 mp4 오픈 (Lightbox 는 v2)
-                      if (typeof window !== "undefined") {
-                        window.open(it.imageRef, "_blank", "noopener");
-                      }
-                    }}
+                    onExpand={() => setLightboxItem(it)}
                   />
                 ))}
               </div>

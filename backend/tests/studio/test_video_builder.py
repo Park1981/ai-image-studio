@@ -106,22 +106,57 @@ def test_build_video_has_all_required_classes() -> None:
     assert not missing, f"누락된 class: {missing}"
 
 
-def test_build_video_total_node_count() -> None:
-    """예상 에센셜 노드 38개.
+def test_build_video_total_node_count_sfw() -> None:
+    """성인 모드 OFF (기본) — distilled LoRA 2개만 → 37 nodes.
     (Primitive/MathExpression/Reroute 조력 노드는 Python 에서 미리 계산해 제거)
     """
     api = build_video_from_request(
         prompt="x", source_filename="x.png", seed=1
     )
-    assert len(api) == 38, f"노드 수 불일치: {len(api)} (expected 38)"
+    assert len(api) == 37, f"노드 수 불일치: {len(api)} (expected 37, adult=False)"
 
 
-def test_build_video_lora_chain_count() -> None:
+def test_build_video_total_node_count_adult() -> None:
+    """성인 모드 ON — distilled 2개 + eros 1개 → 38 nodes."""
+    api = build_video_from_request(
+        prompt="x", source_filename="x.png", seed=1, adult=True
+    )
+    assert len(api) == 38, f"노드 수 불일치: {len(api)} (expected 38, adult=True)"
+
+
+def test_build_video_lora_chain_count_sfw() -> None:
+    """성인 모드 OFF — distilled 2개만 체인에 포함."""
     api = build_video_from_request(
         prompt="x", source_filename="x.png", seed=1
     )
     counts = Counter(_classes(api))
+    assert counts["LoraLoaderModelOnly"] == 2
+    lora_nodes = [n for n in api.values() if n["class_type"] == "LoraLoaderModelOnly"]
+    # eros LoRA 는 체인에 없어야 함
+    assert not any(
+        "eros" in n["inputs"]["lora_name"].lower() for n in lora_nodes
+    ), "성인 모드 OFF 인데 eros LoRA 가 체인에 포함됨"
+
+
+def test_build_video_lora_chain_count_adult() -> None:
+    """성인 모드 ON — distilled 2개 + eros 1개 체인에 포함."""
+    api = build_video_from_request(
+        prompt="x", source_filename="x.png", seed=1, adult=True
+    )
+    counts = Counter(_classes(api))
     assert counts["LoraLoaderModelOnly"] == 3
+    lora_nodes = [n for n in api.values() if n["class_type"] == "LoraLoaderModelOnly"]
+    assert any(
+        "eros" in n["inputs"]["lora_name"].lower() for n in lora_nodes
+    ), "성인 모드 ON 인데 eros LoRA 가 체인에 없음"
+
+
+def test_build_video_sampling_counts() -> None:
+    """2-stage sampling 의 노드 수는 adult 토글과 무관."""
+    api = build_video_from_request(
+        prompt="x", source_filename="x.png", seed=1
+    )
+    counts = Counter(_classes(api))
     # 2-stage sampling: 각 stage 마다 Noise/Sampler/Sigmas/Guider/Sample/Separate
     assert counts["RandomNoise"] == 2
     assert counts["KSamplerSelect"] == 2

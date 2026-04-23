@@ -31,6 +31,17 @@ const MAX_ZOOM = 8;
 const ZOOM_STEP = 0.15;
 const INFO_PANEL_WIDTH = 340;
 
+/** 비디오 확장자 판별 (mp4/webm/mov/data:video) */
+function isVideoSrc(src: string): boolean {
+  if (src.startsWith("data:video/")) return true;
+  const clean = src.split(/[?#]/)[0].toLowerCase();
+  return (
+    clean.endsWith(".mp4") ||
+    clean.endsWith(".webm") ||
+    clean.endsWith(".mov")
+  );
+}
+
 interface Props {
   src: string | null;
   alt?: string;
@@ -68,6 +79,8 @@ function LightboxInner({
   const panStart = useRef({ x: 0, y: 0, ox: 0, oy: 0 });
   const containerRef = useRef<HTMLDivElement>(null);
 
+  const isVideo = src ? isVideoSrc(src) : false;
+
   /** ESC 키 + 숫자 key */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -83,12 +96,17 @@ function LightboxInner({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const handleWheel = useCallback((e: WheelEvent<HTMLDivElement>) => {
-    // 휠 네이티브 스크롤 막고 커스텀 zoom
-    e.stopPropagation();
-    const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
-    setZoom((z) => clamp(z + delta));
-  }, []);
+  const handleWheel = useCallback(
+    (e: WheelEvent<HTMLDivElement>) => {
+      // 비디오는 줌/팬 비활성 — 컨트롤로 재생만 제공
+      if (isVideo) return;
+      // 휠 네이티브 스크롤 막고 커스텀 zoom
+      e.stopPropagation();
+      const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+      setZoom((z) => clamp(z + delta));
+    },
+    [isVideo],
+  );
 
   const startDrag = (e: MouseEvent<HTMLDivElement>) => {
     if (zoom <= 1) return;
@@ -180,27 +198,31 @@ function LightboxInner({
           {filename || alt || "이미지"}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          <ToolBtn
-            onClick={() => setZoom((z) => clamp(z - ZOOM_STEP))}
-            title="축소 (-)"
-          >
-            −
-          </ToolBtn>
-          <ToolBtn
-            onClick={() => {
-              setZoom(1);
-              setPan({ x: 0, y: 0 });
-            }}
-            title="원래 크기 (0)"
-          >
-            {Math.round(zoom * 100)}%
-          </ToolBtn>
-          <ToolBtn
-            onClick={() => setZoom((z) => clamp(z + ZOOM_STEP))}
-            title="확대 (+)"
-          >
-            +
-          </ToolBtn>
+          {!isVideo && (
+            <>
+              <ToolBtn
+                onClick={() => setZoom((z) => clamp(z - ZOOM_STEP))}
+                title="축소 (-)"
+              >
+                −
+              </ToolBtn>
+              <ToolBtn
+                onClick={() => {
+                  setZoom(1);
+                  setPan({ x: 0, y: 0 });
+                }}
+                title="원래 크기 (0)"
+              >
+                {Math.round(zoom * 100)}%
+              </ToolBtn>
+              <ToolBtn
+                onClick={() => setZoom((z) => clamp(z + ZOOM_STEP))}
+                title="확대 (+)"
+              >
+                +
+              </ToolBtn>
+            </>
+          )}
           {onUseAsSource && (
             <ToolBtn
               onClick={() => {
@@ -225,31 +247,59 @@ function LightboxInner({
         </div>
       </div>
 
-      {/* Image */}
-      <div
-        onMouseDown={startDrag}
-        onDoubleClick={handleDouble}
-        style={{
-          cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "zoom-in",
-          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-          transition: dragging ? "none" : "transform .15s ease",
-        }}
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={src ?? undefined}
-          alt={alt}
-          draggable={false}
+      {/* Media — 비디오면 <video controls>, 아니면 확대/팬 가능한 <img> */}
+      {isVideo ? (
+        <div
+          onClick={(e) => e.stopPropagation()}
           style={{
+            display: "grid",
+            placeItems: "center",
             maxWidth: "95vw",
             maxHeight: "90vh",
-            objectFit: "contain",
-            display: "block",
-            boxShadow: "0 20px 60px rgba(0,0,0,.5)",
-            pointerEvents: "none",
           }}
-        />
-      </div>
+        >
+          <video
+            src={src ?? undefined}
+            controls
+            autoPlay
+            loop
+            playsInline
+            style={{
+              maxWidth: "95vw",
+              maxHeight: "90vh",
+              display: "block",
+              background: "#000",
+              borderRadius: 4,
+              boxShadow: "0 20px 60px rgba(0,0,0,.5)",
+            }}
+          />
+        </div>
+      ) : (
+        <div
+          onMouseDown={startDrag}
+          onDoubleClick={handleDouble}
+          style={{
+            cursor: zoom > 1 ? (dragging ? "grabbing" : "grab") : "zoom-in",
+            transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+            transition: dragging ? "none" : "transform .15s ease",
+          }}
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={src ?? undefined}
+            alt={alt}
+            draggable={false}
+            style={{
+              maxWidth: "95vw",
+              maxHeight: "90vh",
+              objectFit: "contain",
+              display: "block",
+              boxShadow: "0 20px 60px rgba(0,0,0,.5)",
+              pointerEvents: "none",
+            }}
+          />
+        </div>
+      )}
 
       {/* Footer hint — 정보 패널 있을 땐 좌측 기준 정렬 (패널에 겹치지 않게) */}
       <div
@@ -270,7 +320,9 @@ function LightboxInner({
         }}
         className="mono"
       >
-        WHEEL zoom · DRAG pan · DBL reset · ESC close
+        {isVideo
+          ? "SPACE play/pause · ESC close"
+          : "WHEEL zoom · DRAG pan · DBL reset · ESC close"}
       </div>
 
       {/* Info Panel — item 전달된 경우만 렌더 */}

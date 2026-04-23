@@ -30,6 +30,7 @@ export function useVideoPipeline(
   // 입력
   const sourceImage = useVideoStore((s) => s.sourceImage);
   const prompt = useVideoStore((s) => s.prompt);
+  const adult = useVideoStore((s) => s.adult);
   // 실행 상태
   const running = useVideoStore((s) => s.running);
   const setRunning = useVideoStore((s) => s.setRunning);
@@ -69,6 +70,7 @@ export function useVideoPipeline(
       for await (const evt of videoImageStream({
         sourceImage,
         prompt,
+        adult,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
       })) {

@@ -31,7 +31,9 @@ except Exception:  # pragma: no cover - 테스트/독립 실행 환경
 
 # 16GB VRAM 환경에서 gemma4-un(25.2B) 첫 로드 30~60s 여유 필요.
 # 이후 호출은 빠름. 환경에 따라 .env 로 조정 가능하도록 추후 이동.
-DEFAULT_TIMEOUT = 120.0
+# 2026-04-24: 120 → 240 로 상향 — cold start + num_predict=800 조합에서
+# 간혹 ReadTimeout 으로 fallback 빠지는 이슈 대응.
+DEFAULT_TIMEOUT = 240.0
 
 # 시스템 프롬프트 — v3 (2026-04-23 후속):
 # gemma4-un 이 JSON 모드 + 긴 출력 결합 시 loop 에 빠지는 이슈 회피를 위해 2-call 전환.
@@ -66,7 +68,7 @@ RULES:
 - If user wrote Korean, translate intent to English.
 - Never repeat words or phrases."""
 
-SYSTEM_VIDEO = """You are a cinematic prompt engineer for LTX-2.3 video generation.
+SYSTEM_VIDEO_BASE = """You are a cinematic prompt engineer for LTX-2.3 video generation.
 
 You receive:
 1. A brief description of the reference image (from a vision model).
@@ -88,13 +90,39 @@ IDENTITY PRESERVATION (CRITICAL for i2v):
    no skin smoothing, no face swap, photorealistic, highly detailed face,
    natural lighting"
 - Do NOT describe the subject as a different person or morph their features.
-  Motion/camera/mood may change — the person MUST NOT.
+  Motion/camera/mood may change — the person MUST NOT."""
+
+# 성인 모드 ON 시 주입되는 추가 지침 — 강도는 사용자 지시에 비례.
+SYSTEM_VIDEO_ADULT_CLAUSE = """
+
+ADULT MODE (NSFW INTIMATE MOTION — user explicitly enabled):
+- The scene MAY include explicit erotic/intimate motion: seductive posing,
+  sensual body movement, clothing adjustment, intimate touching, teasing
+  gestures, erotic facial expressions, slow body sway, chest/hip movement,
+  lip parting, breath emphasis.
+- Keep it cinematic and aesthetic — not clinical, not vulgar.
+- Preserve the identity clause above verbatim regardless of NSFW content."""
+
+SYSTEM_VIDEO_RULES = """
 
 RULES:
 - Output ONLY the final English paragraph — no preamble, no bullets, no markdown.
 - Avoid cartoon / game / childish aesthetics.
 - If the user wrote Korean, translate intent to English.
 - Never repeat phrases (except the identity clause above, which is required)."""
+
+
+def build_system_video(adult: bool = False) -> str:
+    """Video 시스템 프롬프트 구성. adult=True 면 NSFW clause 주입."""
+    return (
+        SYSTEM_VIDEO_BASE
+        + (SYSTEM_VIDEO_ADULT_CLAUSE if adult else "")
+        + SYSTEM_VIDEO_RULES
+    )
+
+
+# 하위 호환: SYSTEM_VIDEO 레퍼런스 유지 (adult=False 기본값).
+SYSTEM_VIDEO = build_system_video(adult=False)
 
 SYSTEM_TRANSLATE_KO = """You are a professional Korean translator.
 Translate the given English image-generation prompt into natural, readable Korean.
@@ -324,11 +352,16 @@ async def upgrade_video_prompt(
     timeout: float = DEFAULT_TIMEOUT,
     ollama_url: str | None = None,
     include_translation: bool = True,
+    adult: bool = False,
 ) -> UpgradeResult:
     """Video i2v 용 프롬프트 업그레이드 (v3: 2-call).
 
     Edit 의 upgrade_edit_prompt 와 거의 동일 구조. 시스템 프롬프트만
     LTX-2.3 특화 (SYSTEM_VIDEO · motion/camera/audio 키워드).
+
+    Args:
+        adult: 성인 모드 토글. True 면 system prompt 에 NSFW clause 주입 →
+            gemma4-un 이 sensual/seductive/intimate 모션 자연스럽게 포함.
     """
     if not user_direction.strip():
         return UpgradeResult(
@@ -348,7 +381,7 @@ async def upgrade_video_prompt(
         upgraded_raw = await _call_ollama_chat(
             ollama_url=resolved_url,
             model=model,
-            system=SYSTEM_VIDEO,
+            system=build_system_video(adult=adult),
             user=user_msg,
             timeout=timeout,
         )

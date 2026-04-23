@@ -20,7 +20,12 @@ from studio.history_db import (
     _needs_video_mode_migration,
     _migrate_add_video_mode,
 )
-from studio.prompt_pipeline import SYSTEM_VIDEO, UpgradeResult, upgrade_video_prompt
+from studio.prompt_pipeline import (
+    SYSTEM_VIDEO,
+    UpgradeResult,
+    build_system_video,
+    upgrade_video_prompt,
+)
 from studio.video_pipeline import VideoPipelineResult, run_video_pipeline
 
 
@@ -106,7 +111,7 @@ def test_upgrade_video_empty_direction() -> None:
 
 
 def test_upgrade_video_uses_system_video_prompt() -> None:
-    """호출 시 SYSTEM_VIDEO 를 system prompt 로 전달했는지."""
+    """adult=False (기본) 호출 시 SFW SYSTEM_VIDEO 전달."""
     chat_mock = AsyncMock(return_value="out")
     translate_mock = AsyncMock(return_value=None)
     with (
@@ -121,6 +126,44 @@ def test_upgrade_video_uses_system_video_prompt() -> None:
         )
     _, kwargs = chat_mock.call_args
     assert kwargs["system"] == SYSTEM_VIDEO
+    # SFW 에선 ADULT_CLAUSE 미포함
+    assert "ADULT MODE" not in kwargs["system"]
+
+
+def test_upgrade_video_adult_injects_nsfw_clause() -> None:
+    """adult=True 시 시스템 프롬프트에 ADULT MODE clause 주입."""
+    chat_mock = AsyncMock(return_value="out")
+    translate_mock = AsyncMock(return_value=None)
+    with (
+        patch("studio.prompt_pipeline._call_ollama_chat", new=chat_mock),
+        patch("studio.prompt_pipeline.translate_to_korean", new=translate_mock),
+    ):
+        asyncio.run(
+            upgrade_video_prompt(
+                user_direction="move",
+                image_description="desc",
+                adult=True,
+            )
+        )
+    _, kwargs = chat_mock.call_args
+    sys_prompt = kwargs["system"]
+    assert "ADULT MODE" in sys_prompt
+    # 핵심 키워드들 — gemma4 가 이 지침대로 답하는지가 핵심
+    for cue in ("sensual", "seductive", "intimate", "erotic"):
+        assert cue in sys_prompt.lower(), f"missing cue: {cue}"
+    # identity clause 는 adult 토글과 무관하게 보존되어야 함
+    assert "identical face" in sys_prompt.lower()
+
+
+def test_build_system_video_sfw_vs_adult_divergence() -> None:
+    """SFW 버전은 ADULT 블록이 없고, 나머지는 동일 패턴 유지."""
+    sfw = build_system_video(adult=False)
+    nsfw = build_system_video(adult=True)
+    assert "ADULT MODE" not in sfw
+    assert "ADULT MODE" in nsfw
+    # 둘 다 RULES 섹션은 끝에 있어야 함
+    assert sfw.rstrip().endswith("required).")
+    assert nsfw.rstrip().endswith("required).")
 
 
 # ═════════════════════════════════════════════

@@ -77,8 +77,16 @@ class ComfyUITransport:
 
     async def __aexit__(self, *exc) -> None:
         if self._http:
-            await self._http.aclose()
-            self._http = None
+            try:
+                await self._http.aclose()
+            except (ConnectionResetError, ConnectionAbortedError):
+                # Windows asyncio proactor 종료 시 간헐적으로 발생하는 무해한 소켓 종료.
+                # 응답은 이미 완료된 시점이라 데이터 유실 없음. 로그만 남기고 통과.
+                log.debug(
+                    "httpx aclose 중 소켓 reset (Windows proactor 특이사항 — 무시)"
+                )
+            finally:
+                self._http = None
 
     # ─────────── HTTP ───────────
 

@@ -42,10 +42,34 @@ async def _idle_shutdown_loop() -> None:
             logger.warning("유휴 종료 체크 오류: %s", exc)
 
 
+def _silence_proactor_reset(loop: asyncio.AbstractEventLoop) -> None:
+    """Windows ProactorEventLoop 의 소켓 teardown 시 발생하는
+    ConnectionResetError/ConnectionAbortedError 트레이스백을 조용히 처리.
+
+    응답은 이미 완료된 상태에서 proactor 가 소켓을 뒤늦게 닫으며 발생 — 무해함.
+    httpx/websockets 레벨에서 잡기 어려워서 loop exception handler 로 일괄 차단.
+    (Python issue 39010 · Windows-only 주기적 발생)
+    """
+    default_handler = loop.get_exception_handler()
+
+    def _handler(l: asyncio.AbstractEventLoop, context: dict) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, (ConnectionResetError, ConnectionAbortedError)):
+            logger.debug("proactor 소켓 reset 무시: %s", exc)
+            return
+        if default_handler is None:
+            l.default_exception_handler(context)
+        else:
+            default_handler(l, context)
+
+    loop.set_exception_handler(_handler)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """앱 시작/종료 시 리소스 관리"""
     # ── 시작 ──
+    _silence_proactor_reset(asyncio.get_running_loop())
     settings.ensure_data_dirs()
     await init_db()
     # 재설계 studio_history 테이블 (같은 DB 파일, 별도 테이블)

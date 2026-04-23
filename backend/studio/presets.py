@@ -47,12 +47,15 @@ class LoraEntry:
 
 
 # ── Video 전용 LoRA 엔트리 ──
-# Qwen 의 lightning/extra 분류와 달리, LTX-2.3 은 LoRA 체인을 순차 적용 후
-# base+upscale 두 샘플링에서 같은 체인을 공유. role 구분 의미 없고 순서만 중요.
+# LTX-2.3 의 LoRA 체인:
+#  - distilled (2개): base 샘플링 + upscale 샘플링에서 상시 필요 (품질 확보)
+#  - adult (옵션): 성인 모드 토글 ON 시에만 체인에 포함
+# 2026-04-24 · v2: role 필드 추가로 adult 토글 동적 분기 지원.
 @dataclass(frozen=True)
 class VideoLoraEntry:
     name: str
     strength: float
+    role: Literal["distilled", "adult"] = "distilled"
     note: str = ""  # 워크플로우상 역할 메모 (예: "distilled base", "extra")
 
 
@@ -304,23 +307,27 @@ VIDEO_MODEL = VideoModelPreset(
         text_encoder="gemma_3_12B_it_fp4_mixed.safetensors",
         upscaler="ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
     ),
-    # 워크플로우 체인 순서 그대로 (model ← lora3 ← lora2 ← lora1 ← checkpoint):
-    #   Checkpoint → 285(distilled) → 325(distilled) → 324(eros) → CFGGuider
+    # 워크플로우 체인 순서 (model ← lora_last ← ... ← lora_first ← checkpoint).
+    #  - distilled 2개: 상시 (base·upscale 샘플링 품질 확보)
+    #  - adult (eros): 성인 모드 토글 ON 시에만 체인 포함
     loras=[
         VideoLoraEntry(
             name="ltx-2.3-22b-distilled-lora-384.safetensors",
             strength=0.5,
+            role="distilled",
             note="distilled · base",
         ),
         VideoLoraEntry(
             name="ltx-2.3-22b-distilled-lora-384.safetensors",
             strength=0.5,
+            role="distilled",
             note="distilled · upscale",
         ),
         VideoLoraEntry(
             name="ltx2310eros_beta.safetensors",
             strength=0.5,
-            note="extra",
+            role="adult",
+            note="erotic motion (adult mode only)",
         ),
     ],
     sampling=VideoSampling(),
@@ -353,3 +360,16 @@ def active_loras(loras: list[LoraEntry], lightning_on: bool) -> list[LoraEntry]:
 
 def count_extra_loras(loras: list[LoraEntry]) -> int:
     return sum(1 for lo in loras if lo.role == "extra")
+
+
+def active_video_loras(
+    loras: list[VideoLoraEntry], adult: bool
+) -> list[VideoLoraEntry]:
+    """성인 모드 토글에 따라 활성 Video LoRA 체인 반환.
+
+    - adult=False: role == "distilled" 만 (기본 2개)
+    - adult=True : 전부 (distilled 2개 + adult 1개)
+    """
+    if adult:
+        return list(loras)
+    return [lo for lo in loras if lo.role != "adult"]

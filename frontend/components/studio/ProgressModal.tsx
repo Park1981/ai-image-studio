@@ -25,6 +25,7 @@ import {
   type StageEvent,
 } from "@/stores/useGenerateStore";
 import { useEditStore } from "@/stores/useEditStore";
+import { useVideoStore } from "@/stores/useVideoStore";
 
 const GEN_STAGE_ORDER = [
   { type: "prompt-parse", label: "프롬프트 해석" },
@@ -62,13 +63,52 @@ const EDIT_STEP_META = [
   },
 ] as const;
 
+const VIDEO_STEP_META = [
+  {
+    n: 1,
+    label: "이미지 비전 분석",
+    model: "qwen2.5vl:7b",
+    desc: "원본 이미지를 모델이 해석해서 설명 생성",
+  },
+  {
+    n: 2,
+    label: "영상 프롬프트 통합",
+    model: "gemma4-un",
+    desc: "비전 설명 + 영상 지시 → LTX 프롬프트",
+  },
+  {
+    n: 3,
+    label: "워크플로우 구성",
+    model: "LTX i2v builder",
+    desc: "38-node flat API 형식 구성",
+  },
+  {
+    n: 4,
+    label: "ComfyUI 샘플링",
+    model: "ltx-2.3-22b-fp8",
+    desc: "base + upscale 2-stage 샘플링",
+  },
+  {
+    n: 5,
+    label: "MP4 저장",
+    model: "CreateVideo + SaveVideo",
+    desc: "h264 인코딩 후 서버 저장",
+  },
+] as const;
+
 export default function ProgressModal({
   mode,
   onClose,
 }: {
-  mode: "generate" | "edit";
+  mode: "generate" | "edit" | "video";
   onClose: () => void;
 }) {
+  const headerTitle =
+    mode === "generate"
+      ? "이미지 생성 중"
+      : mode === "edit"
+        ? "이미지 수정 중"
+        : "영상 생성 중";
   const handleCancel = async () => {
     const ok = await interruptCurrent();
     if (ok) {
@@ -109,7 +149,7 @@ export default function ProgressModal({
         }}
       >
         <Header
-          title={mode === "generate" ? "이미지 생성 중" : "이미지 수정 중"}
+          title={headerTitle}
           onClose={onClose}
           onCancel={handleCancel}
         />
@@ -121,7 +161,13 @@ export default function ProgressModal({
             padding: "16px 22px 22px",
           }}
         >
-          {mode === "generate" ? <GenerateTimeline /> : <EditTimeline />}
+          {mode === "generate" ? (
+            <GenerateTimeline />
+          ) : mode === "edit" ? (
+            <EditTimeline />
+          ) : (
+            <VideoTimeline />
+          )}
         </div>
       </section>
     </div>
@@ -134,7 +180,7 @@ export default function ProgressModal({
  *
  * 500ms 간격으로 tick — 경과 시간 즉시성 유지.
  */
-function StatusBar({ mode }: { mode: "generate" | "edit" }) {
+function StatusBar({ mode }: { mode: "generate" | "edit" | "video" }) {
   // mode 별 store 에서 startedAt / sampling 정보 pull
   const genStartedAt = useGenerateStore((s) => s.startedAt);
   const genSamplingStep = useGenerateStore((s) => s.samplingStep);
@@ -148,14 +194,44 @@ function StatusBar({ mode }: { mode: "generate" | "edit" }) {
   const editRunning = useEditStore((s) => s.running);
   const editStepDone = useEditStore((s) => s.stepDone);
 
-  const startedAt = mode === "generate" ? genStartedAt : editStartedAt;
-  const samplingStep = mode === "generate" ? genSamplingStep : editSamplingStep;
+  const videoStartedAt = useVideoStore((s) => s.startedAt);
+  const videoSamplingStep = useVideoStore((s) => s.samplingStep);
+  const videoSamplingTotal = useVideoStore((s) => s.samplingTotal);
+  const videoRunning = useVideoStore((s) => s.running);
+  const videoProgress = useVideoStore((s) => s.pipelineProgress);
+
+  const startedAt =
+    mode === "generate"
+      ? genStartedAt
+      : mode === "edit"
+        ? editStartedAt
+        : videoStartedAt;
+  const samplingStep =
+    mode === "generate"
+      ? genSamplingStep
+      : mode === "edit"
+        ? editSamplingStep
+        : videoSamplingStep;
   const samplingTotal =
-    mode === "generate" ? genSamplingTotal : editSamplingTotal;
-  const running = mode === "generate" ? genRunning : editRunning;
-  // 에디트는 4-step 진행도, 제너레이트는 stage progress 0~100
+    mode === "generate"
+      ? genSamplingTotal
+      : mode === "edit"
+        ? editSamplingTotal
+        : videoSamplingTotal;
+  const running =
+    mode === "generate"
+      ? genRunning
+      : mode === "edit"
+        ? editRunning
+        : videoRunning;
+  // 에디트는 4-step 진행도, 제너레이트는 stage progress 0~100,
+  // 비디오는 pipelineProgress (백엔드 계산 0~100) 사용
   const progress =
-    mode === "generate" ? genProgress : Math.round((editStepDone / 4) * 100);
+    mode === "generate"
+      ? genProgress
+      : mode === "edit"
+        ? Math.round((editStepDone / 4) * 100)
+        : videoProgress;
 
   // 경과 시간 500ms tick
   const [nowTick, setNowTick] = useState(() => Date.now());
@@ -494,6 +570,111 @@ function EditTimeline() {
             )}
           </div>
         );
+        })}
+      </ol>
+    </>
+  );
+}
+
+/* ── Video 타임라인 (5-step · LTX-2.3 i2v) ── */
+function VideoTimeline() {
+  const running = useVideoStore((s) => s.running);
+  const stepDone = useVideoStore((s) => s.stepDone);
+  const currentStep = useVideoStore((s) => s.currentStep);
+  const stepHistory = useVideoStore((s) => s.stepHistory);
+  const pipelineProgress = useVideoStore((s) => s.pipelineProgress);
+  const pipelineLabel = useVideoStore((s) => s.pipelineLabel);
+
+  return (
+    <>
+      {/* 전체 진행 % — Step 4 ComfyUI 2-stage 샘플링 중에도 실시간으로 움직임 */}
+      <div style={{ marginBottom: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 11,
+            color: "var(--ink-3)",
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ letterSpacing: "-0.005em" }}>
+            {pipelineLabel || (running ? "대기" : "-")}
+          </span>
+          <span className="mono" style={{ letterSpacing: ".04em" }}>
+            {pipelineProgress}%
+          </span>
+        </div>
+        <div
+          style={{
+            height: 6,
+            background: "var(--line-2)",
+            borderRadius: 3,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${Math.min(100, Math.max(0, pipelineProgress))}%`,
+              background: "var(--accent)",
+              transition: "width .25s ease",
+            }}
+          />
+        </div>
+      </div>
+      <ol
+        style={{
+          listStyle: "none",
+          padding: 0,
+          margin: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        {VIDEO_STEP_META.map((m) => {
+          const detail = stepHistory.find((x) => x.n === m.n);
+          const isDone = stepDone >= m.n;
+          const isRunning = running && currentStep === m.n && !isDone;
+
+          const elapsed =
+            detail?.startedAt && detail?.doneAt
+              ? ((detail.doneAt - detail.startedAt) / 1000).toFixed(1)
+              : null;
+
+          return (
+            <div key={m.n} style={{ display: "flex", flexDirection: "column" }}>
+              <TimelineRow
+                n={m.n}
+                label={m.label}
+                subLabel={m.model}
+                state={isDone ? "done" : isRunning ? "running" : "pending"}
+                elapsed={elapsed}
+              />
+              {/* step 1 비전 설명 */}
+              {m.n === 1 && detail?.description && isDone && (
+                <DetailBox kind="info" title="비전 설명">
+                  {detail.description}
+                </DetailBox>
+              )}
+              {/* step 2 최종 LTX 프롬프트 (영문) */}
+              {m.n === 2 && detail?.finalPrompt && isDone && (
+                <DetailBox
+                  kind={detail.provider === "fallback" ? "warn" : "info"}
+                  title={`LTX 프롬프트 (${detail.provider})`}
+                >
+                  {detail.finalPrompt}
+                </DetailBox>
+              )}
+              {/* step 2 한국어 번역 */}
+              {m.n === 2 && detail?.finalPromptKo && isDone && (
+                <DetailBox kind="muted" title="한국어 번역">
+                  {detail.finalPromptKo}
+                </DetailBox>
+              )}
+            </div>
+          );
         })}
       </ol>
     </>

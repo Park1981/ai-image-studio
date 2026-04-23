@@ -32,6 +32,12 @@ export interface VideoState {
   sourceHeight: number | null;
 
   prompt: string;
+  /**
+   * 성인 모드 토글 (2026-04-24 · v8).
+   * ON  → gemma4 시스템 프롬프트에 NSFW clause 주입 + eros LoRA 체인 포함
+   * OFF → distilled LoRA 만 · SFW 프롬프트 (얼굴 보존 안정)
+   */
+  adult: boolean;
 
   /* 파이프라인 상태 (세션 한정) */
   running: boolean;
@@ -55,6 +61,7 @@ export interface VideoState {
     h?: number,
   ) => void;
   setPrompt: (v: string) => void;
+  setAdult: (v: boolean) => void;
   setRunning: (running: boolean) => void;
   setStep: (step: 1 | 2 | 3 | 4 | 5 | null, done: boolean) => void;
   recordStepDetail: (detail: VideoStepDetail) => void;
@@ -71,6 +78,7 @@ export const useVideoStore = create<VideoState>((set) => ({
   sourceHeight: null,
 
   prompt: "피사체는 그대로 유지. 부드러운 창가 빛과 느린 달리 인, 잔잔한 앰비언스.",
+  adult: false,
 
   running: false,
   currentStep: null,
@@ -93,6 +101,8 @@ export const useVideoStore = create<VideoState>((set) => ({
     }),
 
   setPrompt: (v) => set({ prompt: v }),
+
+  setAdult: (v) => set({ adult: v }),
 
   setRunning: (running) =>
     set(

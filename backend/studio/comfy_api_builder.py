@@ -35,6 +35,7 @@ from .presets import (
     LoraEntry,
     VIDEO_MODEL,
     VideoLoraEntry,
+    active_video_loras,
     get_aspect,
     resolve_video_unet_name,
 )
@@ -557,6 +558,7 @@ def build_video_from_request(
     seed: int,
     negative_prompt: str | None = None,
     unet_override: str | None = None,
+    adult: bool = False,
 ) -> ApiPrompt:
     """LTX-2.3 i2v 워크플로우 API 포맷 조립.
 
@@ -566,6 +568,8 @@ def build_video_from_request(
         seed: base stage RandomNoise 시드 (upscale stage 는 런타임 random)
         negative_prompt: 기본은 VIDEO_MODEL.negative_prompt
         unet_override: VRAM 16GB 대응용 · Kijai transformer_only 등 파일명
+        adult: 성인 모드 토글. True 면 eros LoRA 체인 포함,
+            False 면 distilled LoRA 만 로드.
 
     Returns:
         ComfyUI /prompt 용 flat dict (35개 에센셜 노드).
@@ -646,11 +650,12 @@ def build_video_from_request(
         "inputs": {"model_name": VIDEO_MODEL.files.upscaler},
     }
 
-    # ── 5. LoRA 체인 (순차 3단) ──
+    # ── 5. LoRA 체인 (순차 · adult 토글에 따라 2~3단) ──
+    active_loras = active_video_loras(VIDEO_MODEL.loras, adult=adult)
     model_ref = _build_video_lora_chain(
         api, nid,
         base_model=[ckpt_id, 0],
-        loras=VIDEO_MODEL.loras,
+        loras=active_loras,
     )
 
     # ── 6. CLIPTextEncode (positive · negative) ──

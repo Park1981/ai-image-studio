@@ -60,6 +60,7 @@ async function* realVideoStream(
     "meta",
     JSON.stringify({
       prompt: req.prompt,
+      adult: req.adult ?? false,
       ollamaModel: req.ollamaModel,
       visionModel: req.visionModel,
     }),

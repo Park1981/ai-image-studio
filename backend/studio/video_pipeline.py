@@ -50,6 +50,7 @@ async def run_video_pipeline(
     text_model: str | None = None,
     timeout: float = DEFAULT_TIMEOUT,
     ollama_url: str | None = None,
+    adult: bool = False,
 ) -> VideoPipelineResult:
     """영상 생성용 2단계 체이닝 실행.
 
@@ -58,6 +59,8 @@ async def run_video_pipeline(
         user_direction: 사용자 영상 지시 (한/영)
         vision_model: 비전 모델 (없으면 DEFAULT_OLLAMA_ROLES.vision)
         text_model: 텍스트 모델 (없으면 DEFAULT_OLLAMA_ROLES.text)
+        adult: 성인 모드 토글 — upgrade_video_prompt 로 전달되어
+            NSFW clause 가 시스템 프롬프트에 주입됨.
     """
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
     resolved_vision = vision_model or DEFAULT_OLLAMA_ROLES.vision
@@ -80,6 +83,7 @@ async def run_video_pipeline(
         model=resolved_text,
         timeout=timeout,
         ollama_url=resolved_url,
+        adult=adult,
     )
 
     return VideoPipelineResult(
