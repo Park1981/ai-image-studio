@@ -39,6 +39,9 @@ export interface EditState {
   currentStep: 1 | 2 | 3 | 4 | null;
   /** 진행 모달용 상세 타임라인 */
   stepHistory: EditStepDetail[];
+  /** 백엔드 stage.progress (0~100) — ProgressModal 상단 진행바가 이 값을 그대로 표시 */
+  pipelineProgress: number;
+  pipelineLabel: string;
 
   // 비교 슬라이더
   compareX: number;
@@ -56,6 +59,7 @@ export interface EditState {
   setStep: (step: 1 | 2 | 3 | 4 | null, done: boolean) => void;
   recordStepDetail: (detail: EditStepDetail) => void;
   setCompareX: (v: number) => void;
+  setPipelineProgress: (progress: number, label?: string) => void;
   resetPipeline: () => void;
 }
 
@@ -72,6 +76,8 @@ export const useEditStore = create<EditState>((set) => ({
   stepDone: 0,
   currentStep: null,
   stepHistory: [],
+  pipelineProgress: 0,
+  pipelineLabel: "",
 
   compareX: 50,
 
@@ -87,7 +93,14 @@ export const useEditStore = create<EditState>((set) => ({
   setRunning: (running) =>
     set(
       running
-        ? { running, stepDone: 0, currentStep: 1, stepHistory: [] }
+        ? {
+            running,
+            stepDone: 0,
+            currentStep: 1,
+            stepHistory: [],
+            pipelineProgress: 0,
+            pipelineLabel: "초기화",
+          }
         : { running },
     ),
   setStep: (step, done) =>
@@ -109,11 +122,18 @@ export const useEditStore = create<EditState>((set) => ({
       return { stepHistory: [...s.stepHistory, detail] };
     }),
   setCompareX: (v) => set({ compareX: v }),
+  setPipelineProgress: (progress, label) =>
+    set((s) => ({
+      pipelineProgress: progress,
+      pipelineLabel: label ?? s.pipelineLabel,
+    })),
   resetPipeline: () =>
     set({
       running: false,
       stepDone: 0,
       currentStep: null,
       stepHistory: [],
+      pipelineProgress: 0,
+      pipelineLabel: "",
     }),
 }));

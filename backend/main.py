@@ -8,7 +8,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -97,6 +97,24 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# StaticFiles mount 응답에 CORS 헤더 직접 주입
+# 이유: CORSMiddleware는 FastAPI 라우터에는 자동 반응하지만,
+#       app.mount() 로 얹은 StaticFiles sub-ASGI 응답에는 헤더가 확실히 안 붙는 경우가 있어
+#       브라우저 fetch() 가 "No 'Access-Control-Allow-Origin' header" 로 차단됨.
+#       histiry 이미지 → Edit 모드 전송 (urlToDataUrl) 시 재현됨.
+@app.middleware("http")
+async def ensure_cors_for_static_images(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/images/"):
+        origin = request.headers.get("origin")
+        if origin and origin in settings.frontend_origins:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Vary"] = "Origin"
+    return response
+
 
 # 정적 파일 서빙 (생성된 이미지)
 images_dir = Path(settings.output_image_path)

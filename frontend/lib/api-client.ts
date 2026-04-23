@@ -47,6 +47,9 @@ export interface HistoryItem {
 export interface GenerateRequest {
   prompt: string;
   aspect: string;
+  /** 사용자가 픽셀 직접 지정 — 주어지면 백엔드가 aspect 프리셋 대신 사용 */
+  width?: number;
+  height?: number;
   steps: number;
   cfg: number;
   seed: number;
@@ -57,6 +60,9 @@ export interface GenerateRequest {
   visionModel?: string;
   /** showUpgradeStep 사용 시: 모달에서 사용자가 확정한 영문 프롬프트 */
   preUpgradedPrompt?: string;
+  /** upgrade-only 단계에서 이미 얻은 Claude 힌트 — 빈 배열 [] 도 "조사 완료" 로 간주됨.
+   *  undefined 이면 백엔드가 research 플래그대로 조사 실행. */
+  preResearchHints?: string[];
 }
 
 export interface UpgradeOnlyResult {
@@ -129,6 +135,18 @@ export type EditStage =
       finalPrompt?: string;
       /** step 2 provider (ollama/fallback) */
       provider?: string;
+    }
+  /**
+   * 백엔드가 emit 하는 전체 파이프라인 진행률 (0~100) + 단계 라벨.
+   * Generate 의 GenStage 와 동일한 의미로 통일 — ProgressModal 의 상단 진행바는 이 값만 사용.
+   */
+  | {
+      type: "stage";
+      stageType: string;
+      progress: number;
+      stageLabel: string;
+      samplingStep?: number;
+      samplingTotal?: number;
     }
   | { type: "done"; item: HistoryItem };
 
@@ -332,12 +350,32 @@ async function* realEditStream(
   // multipart: image 파일 + meta JSON
   const form = new FormData();
   if (typeof req.sourceImage === "string") {
-    // data URL → Blob 변환
-    if (req.sourceImage.startsWith("data:")) {
-      const blob = await (await fetch(req.sourceImage)).blob();
-      form.append("image", blob, "upload.png");
-    } else {
-      throw new Error("non-dataURL string sources not supported yet");
+    const src = req.sourceImage;
+    // Mock 결과는 실 이미지가 없어서 수정 대상이 될 수 없음
+    if (src.startsWith("mock-seed://")) {
+      throw new Error(
+        "Mock 결과 이미지는 수정에 사용 불가. 실제 생성 후 재시도해줘.",
+      );
+    }
+    // data:/blob: / http(s): 모두 fetch 로 통일 처리.
+    // 히스토리 이미지(/images/studio/... 절대 URL)는 CORS 허용된 백엔드 응답을 전제 —
+    // backend/main.py 의 ensure_cors_for_static_images 미들웨어에서 Access-Control-Allow-Origin 주입됨.
+    try {
+      const res = await fetch(src);
+      if (!res.ok) {
+        throw new Error(`image fetch ${res.status}: ${src.slice(0, 80)}`);
+      }
+      const blob = await res.blob();
+      const guessedName = src.startsWith("data:")
+        ? "upload.png"
+        : src.split("/").pop()?.split("?")[0] || "source.png";
+      form.append("image", blob, guessedName);
+    } catch (err) {
+      throw new Error(
+        `원본 이미지 로드 실패: ${
+          err instanceof Error ? err.message : String(err)
+        }`,
+      );
     }
   } else {
     form.append("image", req.sourceImage);
@@ -390,6 +428,23 @@ async function* realEditStream(
         provider?: string;
       };
       yield { type: "step", ...payload };
+    }
+    if (evt.event === "stage") {
+      const payload = evt.data as {
+        type: string;
+        progress: number;
+        stageLabel: string;
+        samplingStep?: number;
+        samplingTotal?: number;
+      };
+      yield {
+        type: "stage",
+        stageType: payload.type,
+        progress: payload.progress,
+        stageLabel: payload.stageLabel,
+        samplingStep: payload.samplingStep,
+        samplingTotal: payload.samplingTotal,
+      };
     }
   }
 }

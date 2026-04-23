@@ -44,6 +44,7 @@ from .vision_pipeline import run_vision_pipeline
 from .comfy_api_builder import (
     build_generate_from_request,
     build_edit_from_request,
+    _snap_dimension,
 )
 from .comfy_transport import ComfyUITransport, extract_output_images
 from . import history_db
@@ -84,6 +85,10 @@ router = APIRouter(prefix="/api/studio", tags=["studio"])
 class GenerateBody(BaseModel):
     prompt: str = Field(..., min_length=1)
     aspect: str = "1:1"
+    # 사용자가 직접 픽셀 지정한 경우 (둘 다 주어져야 사용됨, 아니면 aspect 프리셋 사용)
+    # 8의 배수 + 256~2048 범위 제약은 comfy_api_builder 에서 최종 clamp.
+    width: int | None = Field(default=None, ge=256, le=2048)
+    height: int | None = Field(default=None, ge=256, le=2048)
     steps: int = GENERATE_MODEL.defaults.steps
     cfg: float = GENERATE_MODEL.defaults.cfg
     seed: int = GENERATE_MODEL.defaults.seed
@@ -93,9 +98,15 @@ class GenerateBody(BaseModel):
     ollama_model: str | None = Field(default=None, alias="ollamaModel")
     vision_model: str | None = Field(default=None, alias="visionModel")
     # 사용자가 "업그레이드 확인" 모달에서 미리 확정한 프롬프트
-    # (있으면 gemma4 upgrade/ research 단계 생략)
+    # (있으면 gemma4 upgrade 단계 생략)
     pre_upgraded_prompt: str | None = Field(
         default=None, alias="preUpgradedPrompt"
+    )
+    # 업그레이드 모달에서 이미 Claude 조사를 수행한 경우 힌트를 전달해서
+    # 백엔드가 조사를 재실행하지 않게 한다. None 이면 평소처럼 research 플래그대로 동작.
+    # 빈 배열 [] 도 "조사 완료 (힌트 없음)" 으로 간주해 재호출 안 함.
+    pre_research_hints: list[str] | None = Field(
+        default=None, alias="preResearchHints"
     )
 
     class Config:
@@ -237,21 +248,35 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
         )
 
         # 2. (선택) Claude 조사
+        # research=true 가 외측 조건. 이 플래그가 꺼져 있으면 단계 자체 스킵 (이벤트 없음).
+        # research=true 이면서 pre_research_hints 가 주어지면 (빈 배열 포함) 프론트가
+        # upgrade-only 단계에서 이미 조사한 결과를 재사용 → 백엔드 재호출 안 함.
         research_hints: list[str] = []
         if body.research:
-            await task.emit(
-                "stage",
-                {
-                    "type": "claude-research",
-                    "progress": 25,
-                    "stageLabel": "Claude 조사 중",
-                },
-            )
-            research = await research_prompt(
-                body.prompt, GENERATE_MODEL.display_name
-            )
-            if research.ok:
-                research_hints = research.hints
+            if body.pre_research_hints is not None:
+                research_hints = body.pre_research_hints
+                await task.emit(
+                    "stage",
+                    {
+                        "type": "claude-research",
+                        "progress": 25,
+                        "stageLabel": "조사 완료 (사전 확정)",
+                    },
+                )
+            else:
+                await task.emit(
+                    "stage",
+                    {
+                        "type": "claude-research",
+                        "progress": 25,
+                        "stageLabel": "Claude 조사 중",
+                    },
+                )
+                research = await research_prompt(
+                    body.prompt, GENERATE_MODEL.display_name
+                )
+                if research.ok:
+                    research_hints = research.hints
 
         # 3. gemma4 업그레이드 (또는 사전 확정된 프롬프트 사용)
         if body.pre_upgraded_prompt:
@@ -300,6 +325,15 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
         aspect = get_aspect(body.aspect)
         actual_seed = body.seed if body.seed > 0 else int(time.time() * 1000)
 
+        # 사용자가 width/height 직접 지정했으면 그걸, 아니면 aspect 프리셋 사용.
+        # snap/clamp 를 미리 하고 히스토리에도 같은 값으로 저장.
+        if body.width is not None and body.height is not None:
+            resolved_w = _snap_dimension(body.width)
+            resolved_h = _snap_dimension(body.height)
+        else:
+            resolved_w = aspect.width
+            resolved_h = aspect.height
+
         api_prompt = build_generate_from_request(
             prompt=upgrade.upgraded,
             aspect_label=body.aspect,
@@ -307,6 +341,8 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             cfg=body.cfg,
             seed=actual_seed,
             lightning=body.lightning,
+            width=resolved_w,
+            height=resolved_h,
         )
 
         # 5. ComfyUI 디스패치
@@ -342,8 +378,8 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             "mode": "generate",
             "prompt": body.prompt,
             "label": body.prompt[:28] + ("…" if len(body.prompt) > 28 else ""),
-            "width": aspect.width,
-            "height": aspect.height,
+            "width": resolved_w,
+            "height": resolved_h,
             "seed": actual_seed,
             "steps": body.steps,
             "cfg": body.cfg,
@@ -441,11 +477,18 @@ async def _save_comfy_output(comfy: ComfyUITransport, prompt_id: str) -> str:
 
 async def _dispatch_edit_to_comfy(
     *,
+    task: "Task",
     api_prompt_factory,
     image_bytes: bytes,
     upload_filename: str,
+    progress_start: int = 70,
+    progress_span: int = 25,
 ) -> tuple[str, str | None]:
     """Edit 파이프라인 ComfyUI 디스패치 헬퍼.
+
+    progress_start ~ progress_start+progress_span 구간을 ComfyUI 샘플링 실시간 % 에 매핑해서
+    task.emit("stage", ...) 로 방출 → 프론트 ProgressModal 의 상단 진행바가 부드럽게 움직임.
+    (Generate 파이프라인과 동일한 0~100 pipelineProgress 체계 유지.)
 
     Returns:
         (imageRef, error_message) — 실패 시 error 채워지고 COMFY_MOCK_FALLBACK=True 면 mock-seed 반환.
@@ -461,6 +504,18 @@ async def _dispatch_edit_to_comfy(
                 if evt.kind == "execution_error":
                     comfy_err = evt.data.get("exception_message", "unknown")
                     break
+                if evt.kind == "progress":
+                    pct = evt.percent or 0.0
+                    await task.emit(
+                        "stage",
+                        {
+                            "type": "comfyui-sampling",
+                            "progress": progress_start + int(progress_span * pct),
+                            "stageLabel": f"ComfyUI 샘플링 {int(pct * 100)}%",
+                            "samplingStep": evt.data.get("value"),
+                            "samplingTotal": evt.data.get("max"),
+                        },
+                    )
             if comfy_err:
                 return (_mock_ref_or_raise(comfy_err), comfy_err)
             image_ref = await _save_comfy_output(comfy, prompt_id)
@@ -541,7 +596,8 @@ async def _run_edit_pipeline(
     vision_model_override: str | None = None,
 ) -> None:
     try:
-        # Step 1: vision analysis
+        # Step 1: vision analysis — pipelineProgress 10 → 30
+        await task.emit("stage", {"type": "vision-analyze", "progress": 10, "stageLabel": "비전 분석"})
         await task.emit("step", {"step": 1, "done": False})
         vision = await run_vision_pipeline(
             image_bytes,
@@ -557,8 +613,10 @@ async def _run_edit_pipeline(
                 "description": vision.image_description,
             },
         )
+        await task.emit("stage", {"type": "vision-analyze", "progress": 30, "stageLabel": "비전 분석 완료"})
 
-        # Step 2: prompt merge (already done inside vision pipeline)
+        # Step 2: prompt merge (이미 vision 파이프라인에서 완료) — 40 → 50
+        await task.emit("stage", {"type": "prompt-merge", "progress": 40, "stageLabel": "프롬프트 병합"})
         await task.emit("step", {"step": 2, "done": False})
         await asyncio.sleep(0.2)
         await task.emit(
@@ -570,13 +628,17 @@ async def _run_edit_pipeline(
                 "provider": vision.upgrade.provider,
             },
         )
+        await task.emit("stage", {"type": "prompt-merge", "progress": 50, "stageLabel": "프롬프트 병합 완료"})
 
-        # Step 3: size/style auto-extraction (mock — 원본 사이즈 그대로 사용)
+        # Step 3: size/style auto-extraction — 55 → 65
+        await task.emit("stage", {"type": "param-extract", "progress": 55, "stageLabel": "파라미터 추출"})
         await task.emit("step", {"step": 3, "done": False})
         await asyncio.sleep(0.15)
         await task.emit("step", {"step": 3, "done": True})
+        await task.emit("stage", {"type": "param-extract", "progress": 65, "stageLabel": "파라미터 확정"})
 
-        # Step 4: ComfyUI dispatch — 업로드 → 프롬프트 제출 → 결과 수신
+        # Step 4: ComfyUI dispatch — 70 → 95 (샘플링 실시간 %)
+        await task.emit("stage", {"type": "comfyui-sampling", "progress": 70, "stageLabel": "ComfyUI 샘플링 대기"})
         await task.emit("step", {"step": 4, "done": False})
 
         actual_seed = int(time.time() * 1000)
@@ -588,12 +650,16 @@ async def _run_edit_pipeline(
         )
 
         image_ref, comfy_err = await _dispatch_edit_to_comfy(
+            task=task,
             api_prompt_factory=api_prompt_factory,
             image_bytes=image_bytes,
             upload_filename=filename or "input.png",
+            progress_start=70,
+            progress_span=25,
         )
 
         await task.emit("step", {"step": 4, "done": True})
+        await task.emit("stage", {"type": "save-output", "progress": 98, "stageLabel": "결과 저장"})
 
         # Done
         item = {

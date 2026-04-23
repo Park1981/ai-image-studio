@@ -22,9 +22,12 @@ import httpx
 import websockets
 import websockets.exceptions
 
+from config import settings
+
 log = logging.getLogger(__name__)
 
-DEFAULT_COMFY_URL = "http://127.0.0.1:8000"
+# settings 가 import 실패 시에만 쓰이는 폴백 (정상 실행 경로에선 settings.comfyui_url 사용)
+_FALLBACK_COMFY_URL = "http://127.0.0.1:8000"
 HTTP_TIMEOUT = 30.0
 
 
@@ -59,8 +62,10 @@ class ComfyUITransport:
             history = await comfy.get_history(prompt_id)
     """
 
-    def __init__(self, base_url: str = DEFAULT_COMFY_URL) -> None:
-        self.base_url = base_url.rstrip("/")
+    def __init__(self, base_url: str | None = None) -> None:
+        # 기본값은 settings.comfyui_url (env/.env 반영). 명시 주입이 최우선.
+        resolved = base_url or settings.comfyui_url or _FALLBACK_COMFY_URL
+        self.base_url = resolved.rstrip("/")
         self._http: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> ComfyUITransport:
