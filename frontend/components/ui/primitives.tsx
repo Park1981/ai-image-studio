@@ -276,6 +276,7 @@ export function SmallBtn({
         background: "var(--bg)",
         flex: 1,
         justifyContent: "center",
+        whiteSpace: "nowrap",
       }}
     >
       <Icon name={icon} size={11} />
