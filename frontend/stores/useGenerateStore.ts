@@ -71,7 +71,6 @@ export interface GenerateState {
   setHeight: (v: number) => void;
   setAspectLocked: (v: boolean) => void;
   setResearch: (v: boolean) => void;
-  setLightning: (v: boolean) => void;
   setSteps: (v: number) => void;
   setCfg: (v: number) => void;
   setSeed: (v: number) => void;
@@ -139,7 +138,8 @@ export const useGenerateStore = create<GenerateState>()(
         }),
       setAspectLocked: (v) => set({ aspectLocked: v }),
       setResearch: (v) => set({ research: v }),
-      setLightning: (v) => set({ lightning: v }),
+      // setLightning 는 제거됨 (2026-04-23 Opus 리뷰) — applyLightning 만 사용.
+      // 단독 setLightning 은 Lightning LoRA + steps/cfg 동기화를 깨서 위험.
       setSteps: (v) => set({ steps: v }),
       setCfg: (v) => set({ cfg: v }),
       setSeed: (v) => set({ seed: v }),
