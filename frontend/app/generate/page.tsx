@@ -16,21 +16,20 @@ import {
   ModelBadge,
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
+import VramBadge from "@/components/chrome/VramBadge";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import HistoryTile from "@/components/studio/HistoryTile";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import ResearchBanner from "@/components/studio/ResearchBanner";
+import SelectedItemPreview from "@/components/studio/SelectedItemPreview";
 import UpgradeConfirmModal from "@/components/studio/UpgradeConfirmModal";
 import Icon from "@/components/ui/Icon";
-import ImageTile from "@/components/ui/ImageTile";
 import {
   Pill,
   Field,
-  SegControl,
   Range,
-  Meta,
-  SmallBtn,
   Spinner,
   Toggle,
   inputStyle,
@@ -39,22 +38,15 @@ import {
 import {
   ASPECT_RATIOS,
   GENERATE_MODEL,
-  activeLoras,
-  countExtraLoras,
   type AspectRatioLabel,
 } from "@/lib/model-presets";
-import {
-  generateImageStream,
-  researchPrompt,
-  upgradeOnly,
-  type UpgradeOnlyResult,
-} from "@/lib/api-client";
 import {
   downloadImage,
   copyImageToClipboard,
   filenameFromRef,
   urlToDataUrl,
 } from "@/lib/image-actions";
+import { useGeneratePipeline } from "@/hooks/useGeneratePipeline";
 import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore, type AspectValue } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -74,6 +66,7 @@ export default function GeneratePage() {
   const height = useGenerateStore((s) => s.height);
   const setWidth = useGenerateStore((s) => s.setWidth);
   const setHeight = useGenerateStore((s) => s.setHeight);
+  const setDimensions = useGenerateStore((s) => s.setDimensions);
   const aspectLocked = useGenerateStore((s) => s.aspectLocked);
   const setAspectLocked = useGenerateStore((s) => s.setAspectLocked);
   const research = useGenerateStore((s) => s.research);
@@ -89,23 +82,21 @@ export default function GeneratePage() {
   const generating = useGenerateStore((s) => s.generating);
   const progress = useGenerateStore((s) => s.progress);
   const stage = useGenerateStore((s) => s.stage);
-  const setRunning = useGenerateStore((s) => s.setRunning);
-  const resetRunning = useGenerateStore((s) => s.resetRunning);
-  const pushStage = useGenerateStore((s) => s.pushStage);
-  const setSampling = useGenerateStore((s) => s.setSampling);
 
-  const addItem = useHistoryStore((s) => s.add);
   const items = useHistoryStore((s) => s.items);
   const selectedId = useHistoryStore((s) => s.selectedId);
   const selectItem = useHistoryStore((s) => s.select);
 
-  const showUpgradeStep = useSettingsStore((s) => s.showUpgradeStep);
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
-  const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
-  const visionModelSel = useSettingsStore((s) => s.visionModel);
   const addTemplate = useSettingsStore((s) => s.addTemplate);
-  const ollamaStatus = useProcessStore((s) => s.ollama);
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
+
+  /* ── 파이프라인 훅 (스트림 + 업그레이드 모달 + 조사) ── */
+  const pipeline = useGeneratePipeline();
+  const handleGenerate = pipeline.generate;
+  const handleUpgradeConfirm = pipeline.upgrade.confirm;
+  const handleUpgradeRerun = pipeline.upgrade.rerun;
+  const handleResearchNow = pipeline.researchNow;
 
   /* ── 생성 모드에서만 보이는 히스토리 필터 ── */
   const genItems = useMemo(
@@ -113,13 +104,6 @@ export default function GeneratePage() {
     [items],
   );
   const selectedItem = genItems.find((i) => i.id === selectedId);
-
-  /* ── Upgrade 확인 모달 상태 ── */
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeLoading, setUpgradeLoading] = useState(false);
-  const [upgradeResult, setUpgradeResult] = useState<UpgradeOnlyResult | null>(
-    null,
-  );
 
   /* ── Lightbox + 그리드 컬럼 토글 ── */
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -150,178 +134,19 @@ export default function GeneratePage() {
 
   const sizeLabel = `${width}×${height}`;
 
-  /* ── 실제 생성 스트림 실행 (preUpgraded / preResearchHints 유무 분기) ── */
-  const runGenerateStream = async (
-    preUpgraded?: string,
-    preResearchHints?: string[],
-  ) => {
-    setRunning(true, 0, "초기화");
-    try {
-      for await (const evt of generateImageStream({
-        prompt,
-        aspect,
-        width,
-        height,
-        steps,
-        cfg,
-        seed,
-        lightning,
-        research,
-        ollamaModel: ollamaModelSel,
-        visionModel: visionModelSel,
-        preUpgradedPrompt: preUpgraded,
-        preResearchHints,
-      })) {
-        if (evt.type === "done") {
-          addItem(evt.item);
-          resetRunning();
-          // 모달은 훅에서 자동 close. running=false 로 바뀌면 닫힘
-          toast.success(
-            "생성 완료",
-            `${evt.item.width}×${evt.item.height} · seed ${evt.item.seed}`,
-          );
-          // 에러/폴백 상세 토스트 (백엔드가 item 에 실어 보내는 힌트)
-          if (evt.item.comfyError) {
-            toast.error(
-              "ComfyUI 오류 (Mock 폴백 적용)",
-              evt.item.comfyError.slice(0, 160),
-            );
-          } else if (evt.item.promptProvider === "fallback") {
-            toast.warn(
-              "gemma4 업그레이드 실패",
-              "원본 프롬프트로 생성됨. Ollama 상태 확인 또는 설정에서 재시작해봐.",
-            );
-          }
-          return;
-        }
-        setRunning(true, evt.progress, evt.stageLabel);
-        pushStage({
-          type: evt.type,
-          label: evt.stageLabel,
-          progress: evt.progress,
-        });
-        // ComfyUI 샘플링 스텝 정보 (있는 경우만)
-        if (evt.type === "comfyui-sampling") {
-          setSampling(evt.samplingStep ?? null, evt.samplingTotal ?? null);
-        }
-      }
-    } catch (err) {
-      resetRunning();
-      toast.error(
-        "생성 실패",
-        err instanceof Error ? err.message : "알 수 없는 오류",
-      );
-    }
-  };
-
-  /* ── 생성 실행 진입점 (showUpgradeStep 따라 모달 우회) ── */
-  const handleGenerate = async () => {
-    if (generating) return;
-    if (!prompt.trim()) {
-      toast.warn("프롬프트를 입력해줘");
-      return;
-    }
-    if (comfyuiStatus === "stopped") {
-      toast.warn(
-        "ComfyUI 정지 상태",
-        "설정에서 시작해도 되고, Mock 은 그대로 돌아가.",
-      );
-    }
-
-    if (showUpgradeStep) {
-      // 업그레이드 확인 모달 경유 — upgrade-only 먼저 호출
-      setUpgradeOpen(true);
-      setUpgradeLoading(true);
-      setUpgradeResult(null);
-      try {
-        const result = await upgradeOnly({
-          prompt,
-          research,
-          ollamaModel: ollamaModelSel,
-        });
-        setUpgradeResult(result);
-      } catch (err) {
-        toast.error(
-          "업그레이드 실패",
-          err instanceof Error ? err.message : "원본으로 바로 생성할게",
-        );
-        setUpgradeOpen(false);
-        // 폴백: 업그레이드 없이 바로 생성
-        await runGenerateStream();
-      } finally {
-        setUpgradeLoading(false);
-      }
-      return;
-    }
-
-    // 기본 플로우 — 바로 생성
-    await runGenerateStream();
-  };
-
-  const handleUpgradeConfirm = async (p: {
-    finalPrompt: string;
-    researchHints: string[];
-  }) => {
-    setUpgradeOpen(false);
-    // research 토글 ON + upgrade-only 단계에서 이미 조사된 힌트가 있으면 재호출 방지.
-    // 토글 OFF 면 힌트 자체를 보내지 않아 백엔드가 research 단계를 스킵.
-    await runGenerateStream(
-      p.finalPrompt,
-      research ? p.researchHints : undefined,
-    );
-  };
-
-  const handleUpgradeRerun = async () => {
-    setUpgradeLoading(true);
-    try {
-      const result = await upgradeOnly({
-        prompt,
-        research,
-        ollamaModel: ollamaModelSel,
-      });
-      setUpgradeResult(result);
-    } catch (err) {
-      toast.error("재업그레이드 실패", err instanceof Error ? err.message : "");
-    } finally {
-      setUpgradeLoading(false);
-    }
-  };
-
-  /* ── "조사 필요" 단독 실행 (모달 대신 토스트 힌트) ── */
-  const handleResearchNow = async () => {
-    toast.info("Claude CLI 호출 중…", "최신 팁을 조사하는 중이야");
-    try {
-      const { hints } = await researchPrompt(prompt, GENERATE_MODEL.displayName);
-      toast.success("조사 완료", hints.slice(0, 2).join(" · "));
-    } catch (err) {
-      toast.error(
-        "조사 실패",
-        err instanceof Error ? err.message : "",
-      );
-    }
-  };
-
-  /* ── 프리퍼런스 showUpgradeStep 은 Phase 2 에서 모달로 연결 예정.
-        지금은 토스트로 일시 안내만. */
-  void showUpgradeStep;
-  void ollamaStatus;
-
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {progressOpen && (
         <ProgressModal mode="generate" onClose={() => setProgressOpen(false)} />
       )}
       <UpgradeConfirmModal
-        open={upgradeOpen}
-        loading={upgradeLoading}
+        open={pipeline.upgrade.open}
+        loading={pipeline.upgrade.loading}
         original={prompt}
-        result={upgradeResult}
+        result={pipeline.upgrade.result}
         onConfirm={handleUpgradeConfirm}
         onRerun={handleUpgradeRerun}
-        onCancel={() => {
-          setUpgradeOpen(false);
-          toast.info("생성 취소됨");
-        }}
+        onCancel={pipeline.upgrade.cancel}
       />
       <ImageLightbox
         src={lightboxSrc}
@@ -363,17 +188,7 @@ export default function GeneratePage() {
         }
         right={
           <>
-            <div
-              className="mono"
-              style={{
-                fontSize: 10.5,
-                color: "var(--ink-4)",
-                letterSpacing: ".05em",
-                marginRight: 4,
-              }}
-            >
-              VRAM 11.4 / 24 GB
-            </div>
+            <VramBadge />
             <SettingsButton />
           </>
         }
@@ -442,6 +257,13 @@ export default function GeneratePage() {
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  // Shift+Enter — 즉시 생성 (툴팁 ⇧↵ 배지와 일치)
+                  if (e.key === "Enter" && e.shiftKey) {
+                    e.preventDefault();
+                    if (!generating && prompt.trim()) handleGenerate();
+                  }
+                }}
                 placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."
                 rows={5}
                 style={{
@@ -527,91 +349,11 @@ export default function GeneratePage() {
           </div>
 
           {/* 조사 필요 배너 */}
-          <label
-            style={{
-              display: "flex",
-              gap: 12,
-              padding: "14px 16px",
-              background: "var(--amber-soft)",
-              border: "1px solid rgba(250,173,20,.35)",
-              borderRadius: 10,
-              cursor: "pointer",
-              alignItems: "flex-start",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={research}
-              onChange={(e) => setResearch(e.target.checked)}
-              style={{
-                marginTop: 3,
-                accentColor: "var(--amber-ink)",
-                width: 15,
-                height: 15,
-              }}
-            />
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--amber-ink)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  letterSpacing: "-0.005em",
-                }}
-              >
-                <Icon name="search" size={13} />
-                조사 필요{" "}
-                <span
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: 500,
-                    background: "#FFF",
-                    border: "1px solid rgba(250,173,20,.35)",
-                    borderRadius: 4,
-                    padding: "1px 6px",
-                    color: "var(--amber-ink)",
-                  }}
-                >
-                  퀄리티 업
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleResearchNow();
-                  }}
-                  style={{
-                    marginLeft: "auto",
-                    all: "unset",
-                    cursor: "pointer",
-                    fontSize: 10.5,
-                    color: "var(--amber-ink)",
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                    border: "1px solid rgba(250,173,20,.35)",
-                    background: "#fff",
-                  }}
-                  title="지금 바로 조사만 실행"
-                >
-                  미리보기
-                </button>
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--ink-2)",
-                  marginTop: 4,
-                  lineHeight: 1.55,
-                }}
-              >
-                Claude CLI로 최신 모델 정보·프롬프트 스타일을 조사한 뒤 반영합니다.
-                <span style={{ color: "var(--ink-4)" }}> 약 +15s</span>
-              </div>
-            </div>
-          </label>
+          <ResearchBanner
+            checked={research}
+            onChange={setResearch}
+            onPreview={handleResearchNow}
+          />
 
           {/* 고급 accordion */}
           <AdvancedAccordion
@@ -806,155 +548,54 @@ export default function GeneratePage() {
           </div>
 
           {/* 선택 프리뷰 */}
-          {selectedItem ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0,1fr) 220px",
-                gap: 16,
-                padding: 16,
-                background: "var(--surface)",
-                border: "1px solid var(--line)",
-                borderRadius: 14,
-                boxShadow: "var(--shadow-sm)",
+          {selectedItem && (
+            <SelectedItemPreview
+              item={selectedItem}
+              onDownload={() =>
+                downloadImage(
+                  selectedItem.imageRef,
+                  filenameFromRef(
+                    selectedItem.imageRef,
+                    `ais-${selectedItem.id}.png`,
+                  ),
+                )
+              }
+              onCopy={() => copyImageToClipboard(selectedItem.imageRef)}
+              onSendToEdit={async () => {
+                // 이미지를 data URL 로 변환 → useEditStore 에 source 로 저장 → /edit 이동
+                toast.info("수정으로 전송 중…");
+                const res = await urlToDataUrl(selectedItem.imageRef);
+                if (!res) {
+                  toast.error("전송 실패", "이미지를 불러올 수 없음");
+                  return;
+                }
+                useEditStore
+                  .getState()
+                  .setSource(
+                    res.dataUrl,
+                    `${selectedItem.label} · ${res.width}×${res.height}`,
+                    res.width,
+                    res.height,
+                  );
+                router.push("/edit");
               }}
-            >
-              <ImageTile
-                seed={selectedItem.imageRef || selectedItem.id}
-                aspect="1/1"
-              />
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  minWidth: 0,
-                }}
-              >
-                <div>
-                  <div
-                    className="mono"
-                    style={{
-                      fontSize: 10,
-                      color: "var(--ink-4)",
-                      letterSpacing: ".08em",
-                    }}
-                  >
-                    #{selectedItem.id.slice(-6).toUpperCase()}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      marginTop: 4,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {selectedItem.label}
-                  </div>
-                </div>
-                <Meta k="모델" v={selectedItem.model} />
-                <Meta
-                  k="사이즈"
-                  v={`${selectedItem.width}×${selectedItem.height}`}
-                />
-                <Meta
-                  k="스텝/CFG"
-                  v={`${selectedItem.steps} · ${selectedItem.cfg}${selectedItem.lightning ? " ⚡" : ""}`}
-                />
-                <Meta
-                  k="Seed"
-                  v={<span className="mono">{selectedItem.seed}</span>}
-                />
-                <Meta
-                  k="LoRA"
-                  v={`${activeLoras(GENERATE_MODEL, selectedItem.lightning).length} 적용 (+${countExtraLoras(GENERATE_MODEL)})`}
-                />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 6,
-                    marginTop: "auto",
-                  }}
-                >
-                  <SmallBtn
-                    icon="download"
-                    onClick={() =>
-                      downloadImage(
-                        selectedItem.imageRef,
-                        filenameFromRef(
-                          selectedItem.imageRef,
-                          `ais-${selectedItem.id}.png`,
-                        ),
-                      )
-                    }
-                  >
-                    저장
-                  </SmallBtn>
-                  <SmallBtn
-                    icon="copy"
-                    onClick={() => copyImageToClipboard(selectedItem.imageRef)}
-                  >
-                    복사
-                  </SmallBtn>
-                  <SmallBtn
-                    icon="edit"
-                    onClick={async () => {
-                      // 이미지를 data URL 로 변환 → useEditStore 에 source 로 저장 → /edit 이동
-                      toast.info("수정으로 전송 중…");
-                      const res = await urlToDataUrl(selectedItem.imageRef);
-                      if (!res) {
-                        toast.error("전송 실패", "이미지를 불러올 수 없음");
-                        return;
-                      }
-                      useEditStore
-                        .getState()
-                        .setSource(
-                          res.dataUrl,
-                          `${selectedItem.label} · ${res.width}×${res.height}`,
-                          res.width,
-                          res.height,
-                        );
-                      router.push("/edit");
-                    }}
-                  >
-                    수정으로
-                  </SmallBtn>
-                  <SmallBtn
-                    icon="sparkle"
-                    onClick={() => {
-                      // 프롬프트/종횡비/시드/옵션을 현재 폼에 로드
-                      setPrompt(selectedItem.prompt);
-                      // 종횡비 역추출 (width:height 비율 → label)
-                      const ratio = ASPECT_RATIOS.find(
-                        (r) =>
-                          Math.abs(
-                            r.width / r.height -
-                              selectedItem.width / selectedItem.height,
-                          ) < 0.01,
-                      );
-                      if (ratio) setAspect(ratio.label);
-                      setSeed(selectedItem.seed);
-                      setSteps(selectedItem.steps);
-                      setCfg(selectedItem.cfg);
-                      if (selectedItem.lightning !== lightning) {
-                        applyLightning(selectedItem.lightning);
-                      }
-                      toast.info(
-                        "재생성 준비",
-                        "같은 설정으로 로드됨 · [생성] 눌러",
-                      );
-                    }}
-                  >
-                    재생성
-                  </SmallBtn>
-                </div>
-              </div>
-            </div>
-          ) : null}
+              onReuse={() => {
+                // 프롬프트/사이즈/시드/옵션을 현재 폼에 완전 복원 (픽셀 기준 권위)
+                setPrompt(selectedItem.prompt);
+                setDimensions(selectedItem.width, selectedItem.height);
+                setSeed(selectedItem.seed);
+                setSteps(selectedItem.steps);
+                setCfg(selectedItem.cfg);
+                if (selectedItem.lightning !== lightning) {
+                  applyLightning(selectedItem.lightning);
+                }
+                toast.info(
+                  "재생성 준비",
+                  `${selectedItem.width}×${selectedItem.height} · [생성] 눌러`,
+                );
+              }}
+            />
+          )}
 
           {/* AI 보강 결과 카드 (선택된 아이템에 한해) */}
           {selectedItem && <AiEnhanceCard item={selectedItem} />}

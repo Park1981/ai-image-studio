@@ -69,9 +69,10 @@ export interface GenerateState {
   /** 픽셀 직접 수정 — aspectLocked 상태를 참고해 반대편 자동 갱신 */
   setWidth: (v: number) => void;
   setHeight: (v: number) => void;
+  /** 두 픽셀값을 원자적으로 지정 (재생성 등 복원 용) — aspectLocked 의 자동 갱신 무시 */
+  setDimensions: (w: number, h: number) => void;
   setAspectLocked: (v: boolean) => void;
   setResearch: (v: boolean) => void;
-  setLightning: (v: boolean) => void;
   setSteps: (v: number) => void;
   setCfg: (v: number) => void;
   setSeed: (v: number) => void;
@@ -137,9 +138,15 @@ export const useGenerateStore = create<GenerateState>()(
           const newW = snapDimension(newH * ratio);
           return { width: newW, height: newH };
         }),
+      setDimensions: (w, h) => {
+        const newW = snapDimension(w);
+        const newH = snapDimension(h);
+        set({ width: newW, height: newH, aspect: matchAspect(newW, newH) });
+      },
       setAspectLocked: (v) => set({ aspectLocked: v }),
       setResearch: (v) => set({ research: v }),
-      setLightning: (v) => set({ lightning: v }),
+      // setLightning 는 제거됨 (2026-04-23 Opus 리뷰) — applyLightning 만 사용.
+      // 단독 setLightning 은 Lightning LoRA + steps/cfg 동기화를 깨서 위험.
       setSteps: (v) => set({ steps: v }),
       setCfg: (v) => set({ cfg: v }),
       setSeed: (v) => set({ seed: v }),
