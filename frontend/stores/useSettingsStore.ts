@@ -9,7 +9,11 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { GENERATE_MODEL, EDIT_MODEL } from "@/lib/model-presets";
+import {
+  DEFAULT_OLLAMA_MODELS,
+  EDIT_MODEL,
+  GENERATE_MODEL,
+} from "@/lib/model-presets";
 
 export interface PromptTemplate {
   id: string;
@@ -67,8 +71,10 @@ export const useSettingsStore = create<SettingsState>()(
     (set) => ({
       generateModel: GENERATE_MODEL.displayName,
       editModel: EDIT_MODEL.displayName,
-      ollamaModel: "gemma4-un:latest",
-      visionModel: "qwen2.5vl:7b",
+      // 백엔드 backend/studio/presets.py::DEFAULT_OLLAMA_ROLES 와 싱크 유지.
+      // 상수 분리 이후 여기 직접 문자열 하드코딩 금지 (Opus S4).
+      ollamaModel: DEFAULT_OLLAMA_MODELS.text,
+      visionModel: DEFAULT_OLLAMA_MODELS.vision,
 
       showUpgradeStep: true,
       lightningByDefault: false,
