@@ -8,6 +8,7 @@
 
 "use client";
 
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BackBtn,
@@ -26,7 +27,7 @@ import { useVisionPipeline } from "@/hooks/useVisionPipeline";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
-import { useVisionStore } from "@/stores/useVisionStore";
+import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
 
 export default function VisionPage() {
   const router = useRouter();
@@ -46,6 +47,11 @@ export default function VisionPage() {
 
   const visionModel = useSettingsStore((s) => s.visionModel);
   const ollamaStatus = useProcessStore((s) => s.ollama);
+
+  /* ── 갤러리 컬럼 토글 (2/3/4) — Generate/Edit 와 동일 ── */
+  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
+  const cycleGrid = () =>
+    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
   /* ── 파이프라인 훅 ── */
   const { analyze, analyzing } = useVisionPipeline();
@@ -289,6 +295,9 @@ export default function VisionPage() {
             onSelect={loadEntry}
             onDelete={removeEntry}
             onClear={clearEntries}
+            gridCols={gridCols}
+            onCycleGrid={cycleGrid}
+            maxEntries={MAX_VISION_HISTORY}
           />
         </section>
       </div>
