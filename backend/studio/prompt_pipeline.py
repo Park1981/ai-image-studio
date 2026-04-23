@@ -79,12 +79,22 @@ the video generation. Include:
 - Lighting changes, atmosphere, ambient sound cues
 - Style anchors (cinematic, filmic, 35mm, shallow DoF, etc.)
 
+IDENTITY PRESERVATION (CRITICAL for i2v):
+- The first frame of the output video MUST match the reference image exactly.
+- ALWAYS embed this identity clause verbatim into the paragraph:
+  "keep the exact same face, identical face, same person, same identity,
+   same facial features, same eye shape, same nose, same lips,
+   same body proportion, same hair, same skin tone, realistic skin texture,
+   no skin smoothing, no face swap, photorealistic, highly detailed face,
+   natural lighting"
+- Do NOT describe the subject as a different person or morph their features.
+  Motion/camera/mood may change — the person MUST NOT.
+
 RULES:
 - Output ONLY the final English paragraph — no preamble, no bullets, no markdown.
-- Keep the first-frame identity consistent with the reference image.
 - Avoid cartoon / game / childish aesthetics.
 - If the user wrote Korean, translate intent to English.
-- Never repeat phrases."""
+- Never repeat phrases (except the identity clause above, which is required)."""
 
 SYSTEM_TRANSLATE_KO = """You are a professional Korean translator.
 Translate the given English image-generation prompt into natural, readable Korean.
