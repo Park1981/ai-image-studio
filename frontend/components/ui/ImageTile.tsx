@@ -53,6 +53,20 @@ function isImageRef(seed: string): boolean {
   );
 }
 
+/** 비디오 확장자 판별 — isImageRef 가 true 여도 확장자가 video 면 video 로 렌더 */
+function isVideoRef(seed: string): boolean {
+  // data URL 은 mime 로 판별
+  if (seed.startsWith("data:video/")) return true;
+  // 쿼리/프래그먼트 제거 후 확장자 체크
+  const clean = seed.split(/[?#]/)[0].toLowerCase();
+  return (
+    clean.endsWith(".mp4") ||
+    clean.endsWith(".webm") ||
+    clean.endsWith(".mov") ||
+    clean.endsWith(".gif")
+  );
+}
+
 export default function ImageTile({
   seed = "a",
   label,
@@ -61,6 +75,89 @@ export default function ImageTile({
   overlay,
   onClick,
 }: ImageTileProps) {
+  // Video 면 <video muted preload="metadata"> 로 썸네일(+호버 시 autoPlay loop).
+  if (isImageRef(seed) && isVideoRef(seed)) {
+    return (
+      <div
+        onClick={onClick}
+        style={{
+          position: "relative",
+          aspectRatio: aspect,
+          borderRadius: 10,
+          overflow: "hidden",
+          background: "#0a0a0a",
+          cursor: onClick ? "pointer" : "default",
+          ...style,
+        }}
+      >
+        <video
+          src={seed}
+          muted
+          loop
+          playsInline
+          preload="metadata"
+          // hover 시 자동 재생 (미리보기 느낌). 클릭 시 onClick 이 리프트.
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLVideoElement).play().catch(() => {});
+          }}
+          onMouseLeave={(e) => {
+            const el = e.currentTarget as HTMLVideoElement;
+            el.pause();
+            el.currentTime = 0;
+          }}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "cover",
+            display: "block",
+          }}
+        />
+        {/* 영상 표시 뱃지 */}
+        <div
+          style={{
+            position: "absolute",
+            left: 8,
+            bottom: 8,
+            fontSize: 10,
+            padding: "2px 6px",
+            borderRadius: 4,
+            background: "rgba(0,0,0,.6)",
+            color: "rgba(255,255,255,.95)",
+            letterSpacing: ".04em",
+            pointerEvents: "none",
+          }}
+          className="mono"
+        >
+          ▶ VIDEO
+        </div>
+        {label && (
+          <div
+            className="mono"
+            style={{
+              position: "absolute",
+              right: 8,
+              bottom: 8,
+              fontSize: 10,
+              letterSpacing: ".04em",
+              color: "rgba(255,255,255,.92)",
+              background: "rgba(0,0,0,.4)",
+              padding: "2px 6px",
+              borderRadius: 4,
+              backdropFilter: "blur(4px)",
+              maxWidth: "60%",
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {label}
+          </div>
+        )}
+        {overlay}
+      </div>
+    );
+  }
+
   // 실 이미지면 <img> 렌더 + object-fit:contain 으로 잘림 없이 letterbox.
   if (isImageRef(seed)) {
     return (

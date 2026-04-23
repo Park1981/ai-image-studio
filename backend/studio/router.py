@@ -31,6 +31,7 @@ import asyncio
 import io
 import json
 import logging
+import os
 import time
 import uuid
 from dataclasses import asdict
@@ -47,17 +48,24 @@ from .presets import (
     DEFAULT_OLLAMA_ROLES,
     EDIT_MODEL,
     GENERATE_MODEL,
+    VIDEO_MODEL,
     get_aspect,
 )
 from .prompt_pipeline import upgrade_generate_prompt
 from .claude_cli import research_prompt
 from .vision_pipeline import analyze_image_detailed, run_vision_pipeline
+from .video_pipeline import run_video_pipeline
 from .comfy_api_builder import (
     build_generate_from_request,
     build_edit_from_request,
+    build_video_from_request,
     _snap_dimension,
 )
-from .comfy_transport import ComfyUITransport, extract_output_images
+from .comfy_transport import (
+    ComfyUITransport,
+    extract_output_files,
+    extract_output_images,
+)
 from . import history_db
 
 # 레거시 process_manager 재활용 (실 프로세스 제어 + VRAM 조회)
@@ -493,6 +501,12 @@ class ComfyDispatchResult(BaseModel):
     comfy_error: str | None = None
 
 
+SaveOutputFn = Callable[
+    [ComfyUITransport, str], Awaitable[tuple[str, int, int]]
+]
+"""save_output 콜백 타입. 반환: (url, width, height) · video 는 0,0 반환 가능."""
+
+
 async def _dispatch_to_comfy(
     task: Task,
     api_prompt_factory: Callable[[str | None], dict[str, Any]],
@@ -502,8 +516,11 @@ async def _dispatch_to_comfy(
     client_prefix: str = "ais",
     upload_bytes: bytes | None = None,
     upload_filename: str | None = None,
+    save_output: SaveOutputFn | None = None,
+    idle_timeout: float = 600.0,
+    hard_timeout: float = 1800.0,
 ) -> ComfyDispatchResult:
-    """ComfyUI 에 API prompt 제출 + WS 진행 수신 + 결과 이미지 다운로드 (generate/edit 공통).
+    """ComfyUI 에 API prompt 제출 + WS 진행 수신 + 결과 다운로드 (공용).
 
     Edit 플로우 (upload_bytes != None): 먼저 `/upload/image` 로 소스 이미지 업로드 →
     업로드된 파일명을 api_prompt_factory 에 넘겨 최종 api_prompt 조립.
@@ -512,13 +529,17 @@ async def _dispatch_to_comfy(
     Args:
         task: 진행률/에러 emit 대상
         api_prompt_factory: (uploaded_filename_or_None) -> api_prompt_dict
-        progress_start/progress_span: pipelineProgress 에 매핑할 범위 (ComfyUI 샘플링 구간)
-        upload_bytes/upload_filename: Edit 전용, 둘 다 있어야 업로드 수행
+        progress_start/progress_span: pipelineProgress 에 매핑할 범위
+        upload_bytes/upload_filename: Edit/Video 전용, 둘 다 있어야 업로드 수행
+        save_output: 결과 저장 콜백. None 이면 _save_comfy_output (이미지).
+            Video 는 _save_comfy_video 주입.
+        idle_timeout/hard_timeout: WS listen timeout. Video 는 연장 필요.
 
     Returns:
         ComfyDispatchResult(image_ref, width, height, comfy_error)
     """
     client_id = f"{client_prefix}-{uuid.uuid4().hex[:10]}"
+    save_fn = save_output or _save_comfy_output
     try:
         async with ComfyUITransport() as comfy:
             uploaded_name: str | None = None
@@ -531,7 +552,10 @@ async def _dispatch_to_comfy(
             log.info("ComfyUI submitted prompt_id=%s", prompt_id)
 
             comfy_err: str | None = None
-            async for evt in comfy.listen(client_id, prompt_id):
+            async for evt in comfy.listen(
+                client_id, prompt_id,
+                idle_timeout=idle_timeout, hard_timeout=hard_timeout,
+            ):
                 if evt.kind == "execution_error":
                     comfy_err = evt.data.get("exception_message", "unknown")
                     break
@@ -554,9 +578,9 @@ async def _dispatch_to_comfy(
                     image_ref=_mock_ref_or_raise(comfy_err), comfy_error=comfy_err
                 )
 
-            image_ref, width, height = await _save_comfy_output(comfy, prompt_id)
-        log.info("ComfyUI image saved: %s (%dx%d)", image_ref, width, height)
-        return ComfyDispatchResult(image_ref=image_ref, width=width, height=height)
+            output_ref, width, height = await save_fn(comfy, prompt_id)
+        log.info("ComfyUI output saved: %s (%dx%d)", output_ref, width, height)
+        return ComfyDispatchResult(image_ref=output_ref, width=width, height=height)
 
     except asyncio.CancelledError:
         # 클라이언트가 끊었거나 interrupt 호출 — 상위로 재-raise 해서 파이프라인 정리
@@ -573,6 +597,36 @@ def _mock_ref_or_raise(reason: str) -> str:
     if COMFY_MOCK_FALLBACK:
         return f"mock-seed://{uuid.uuid4().hex}"
     raise RuntimeError(reason)
+
+
+async def _save_comfy_video(
+    comfy: ComfyUITransport, prompt_id: str
+) -> tuple[str, int, int]:
+    """ComfyUI 완료 prompt 의 영상 파일을 다운로드·저장.
+
+    SaveVideo 노드의 outputs 키는 ComfyUI 버전마다 다름 —
+    extract_output_files 가 videos/gifs/animated/files/images 순서 탐색.
+    width/height 는 PIL 로 못 읽어서 (mp4 이므로) 0 반환. 프론트가 표기 생략.
+    """
+    history = await comfy.get_history(prompt_id)
+    files = extract_output_files(history)
+    if not files:
+        raise RuntimeError("no video output in history")
+    # 영상 확장자 우선 선택 (PNG 프리뷰가 섞여있을 수 있음)
+    video_candidates = [
+        f for f in files
+        if f["filename"].lower().endswith((".mp4", ".webm", ".mov", ".gif"))
+    ]
+    chosen = video_candidates[0] if video_candidates else files[0]
+    raw = await comfy.download_file(
+        filename=chosen["filename"],
+        subfolder=chosen["subfolder"],
+        file_type=chosen["type"],
+    )
+    ext = os.path.splitext(chosen["filename"])[1] or ".mp4"
+    save_name = f"{uuid.uuid4().hex}{ext}"
+    (STUDIO_OUTPUT_DIR / save_name).write_bytes(raw)
+    return (f"{STUDIO_URL_PREFIX}/{save_name}", 0, 0)
 
 
 async def _save_comfy_output(
@@ -818,6 +872,249 @@ async def upgrade_only(body: UpgradeOnlyBody):
         "fallback": upgrade.fallback,
         "researchHints": research_hints,
     }
+
+
+# ─────────────────────────────────────────────
+# Video i2v (LTX-2.3)
+# ─────────────────────────────────────────────
+
+
+# 20 MB — Edit 와 동일 상한 (영상 생성 input 이미지)
+_VIDEO_MAX_IMAGE_BYTES = 20 * 1024 * 1024
+
+
+@router.post("/video", response_model=TaskCreated)
+async def create_video_task(
+    image: UploadFile = File(...),
+    meta: str = Form(...),
+):
+    """영상 생성 요청 (multipart: image 파일 + meta JSON).
+
+    meta = { prompt, ollamaModel?, visionModel? }
+    """
+    try:
+        meta_obj = json.loads(meta)
+    except json.JSONDecodeError as e:
+        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+
+    prompt = meta_obj.get("prompt", "").strip()
+    if not prompt:
+        raise HTTPException(400, "prompt required")
+
+    ollama_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
+    vision_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
+
+    image_bytes = await image.read()
+    if not image_bytes:
+        raise HTTPException(400, "empty image")
+    if len(image_bytes) > _VIDEO_MAX_IMAGE_BYTES:
+        raise HTTPException(
+            413,
+            f"image too large: {len(image_bytes)} bytes "
+            f"(max {_VIDEO_MAX_IMAGE_BYTES})",
+        )
+
+    task = await _new_task()
+    task.worker = _spawn(
+        _run_video_pipeline_task(
+            task,
+            image_bytes,
+            prompt,
+            image.filename or "input.png",
+            ollama_override,
+            vision_override,
+        )
+    )
+    return TaskCreated(
+        task_id=task.task_id,
+        stream_url=f"/api/studio/video/stream/{task.task_id}",
+    )
+
+
+@router.get("/video/stream/{task_id}")
+async def video_stream(task_id: str, request: Request):
+    task = TASKS.get(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    return StreamingResponse(
+        _stream_task(task, request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+async def _run_video_pipeline_task(
+    task: Task,
+    image_bytes: bytes,
+    prompt: str,
+    filename: str,
+    ollama_model_override: str | None = None,
+    vision_model_override: str | None = None,
+) -> None:
+    """Video i2v 파이프라인 백그라운드 실행 (5 step).
+
+    Progress 구간 배분:
+      step 1 vision-analyze    0   → 20
+      step 2 prompt-merge      20  → 30
+      step 3 workflow-dispatch 30  → 35
+      step 4 comfyui-sampling  35  → 92  (2-stage 내부 통합)
+      step 5 save-output       92  → 98
+    """
+    try:
+        # ── Step 1: vision ── (0 → 20)
+        await task.emit(
+            "stage",
+            {"type": "vision-analyze", "progress": 5, "stageLabel": "비전 분석"},
+        )
+        await task.emit("step", {"step": 1, "done": False})
+
+        video_res = await run_video_pipeline(
+            image_bytes,
+            prompt,
+            vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
+            text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
+        )
+
+        await task.emit(
+            "step",
+            {
+                "step": 1,
+                "done": True,
+                "description": video_res.image_description,
+            },
+        )
+        await task.emit(
+            "stage",
+            {"type": "vision-analyze", "progress": 20, "stageLabel": "비전 분석 완료"},
+        )
+
+        # ── Step 2: prompt-merge ── (20 → 30)
+        await task.emit(
+            "stage",
+            {"type": "prompt-merge", "progress": 25, "stageLabel": "프롬프트 병합"},
+        )
+        await task.emit("step", {"step": 2, "done": False})
+        await task.emit(
+            "step",
+            {
+                "step": 2,
+                "done": True,
+                "finalPrompt": video_res.final_prompt,
+                "finalPromptKo": video_res.upgrade.translation,
+                "provider": video_res.upgrade.provider,
+            },
+        )
+        await task.emit(
+            "stage",
+            {"type": "prompt-merge", "progress": 30, "stageLabel": "프롬프트 병합 완료"},
+        )
+
+        # ── Step 3: workflow-dispatch ── (30 → 35)
+        await task.emit(
+            "stage",
+            {
+                "type": "workflow-dispatch",
+                "progress": 33,
+                "stageLabel": "워크플로우 전달",
+            },
+        )
+        await task.emit("step", {"step": 3, "done": False})
+
+        actual_seed = int(time.time() * 1000) & 0xFFFFFFFF  # uint32 범위
+        # .env 의 LTX_UNET_NAME override (config.settings.ltx_unet_name)
+        unet_override = getattr(settings, "ltx_unet_name", None)
+
+        def _make_video_prompt(uploaded_name: str | None) -> dict[str, Any]:
+            if uploaded_name is None:
+                raise RuntimeError("Video pipeline requires uploaded image")
+            return build_video_from_request(
+                prompt=video_res.final_prompt,
+                source_filename=uploaded_name,
+                seed=actual_seed,
+                unet_override=unet_override,
+            )
+
+        await task.emit("step", {"step": 3, "done": True})
+
+        # ── Step 4: ComfyUI sampling ── (35 → 92)
+        await task.emit(
+            "stage",
+            {
+                "type": "comfyui-sampling",
+                "progress": 35,
+                "stageLabel": "ComfyUI 샘플링 대기",
+            },
+        )
+        await task.emit("step", {"step": 4, "done": False})
+
+        dispatch = await _dispatch_to_comfy(
+            task,
+            _make_video_prompt,
+            progress_start=35,
+            progress_span=57,
+            client_prefix="ais-v",
+            upload_bytes=image_bytes,
+            upload_filename=filename,
+            save_output=_save_comfy_video,
+            # LTX 는 긴 작업 — idle 15분, hard 1시간
+            idle_timeout=900.0,
+            hard_timeout=3600.0,
+        )
+        video_ref = dispatch.image_ref  # .mp4 URL
+        comfy_err = dispatch.comfy_error
+
+        await task.emit("step", {"step": 4, "done": True})
+
+        # ── Step 5: save-output ── (92 → 98)
+        await task.emit(
+            "stage",
+            {"type": "save-output", "progress": 95, "stageLabel": "영상 저장"},
+        )
+        await task.emit("step", {"step": 5, "done": True})
+
+        # ── Done ──
+        s = VIDEO_MODEL.sampling
+        item = {
+            "id": f"vid-{uuid.uuid4().hex[:8]}",
+            "mode": "video",
+            "prompt": prompt,
+            "label": prompt[:28] + ("…" if len(prompt) > 28 else ""),
+            # video 는 프레임 해상도 정확 계산 어려움 — 0 유지, 프론트가 fps/frames 쓰도록
+            "width": 0,
+            "height": 0,
+            "seed": actual_seed,
+            "steps": 0,  # LTX 는 ManualSigmas 기반 — 전통 step 개념 없음
+            "cfg": s.base_cfg,
+            "lightning": False,
+            "model": VIDEO_MODEL.display_name,
+            "createdAt": int(time.time() * 1000),
+            "imageRef": video_ref,
+            "upgradedPrompt": video_res.final_prompt,
+            "upgradedPromptKo": video_res.upgrade.translation,
+            "visionDescription": video_res.image_description,
+            "promptProvider": video_res.upgrade.provider,
+            "comfyError": comfy_err,
+            # video 전용 메타
+            "fps": s.fps,
+            "frameCount": s.frame_count,
+            "durationSec": s.seconds,
+        }
+        saved_to_history = await _persist_history(item)
+        await task.emit(
+            "done", {"item": item, "savedToHistory": saved_to_history}
+        )
+
+    except asyncio.CancelledError:
+        log.info("Video pipeline cancelled: %s", task.task_id)
+        raise
+    except Exception as e:
+        log.exception("Video pipeline error")
+        await task.emit("error", {"message": str(e)})
+    finally:
+        await task.close()
 
 
 # ─────────────────────────────────────────────

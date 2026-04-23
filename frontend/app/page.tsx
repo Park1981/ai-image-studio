@@ -122,10 +122,9 @@ export default function MainMenuPage() {
           <MenuCard
             icon="film"
             title="영상 생성"
-            desc="이미지 또는 프롬프트로부터 짧은 클립을 생성합니다. 다음 버전에서 제공됩니다."
+            desc="이미지 한 장에서 LTX-2.3 로 5초 · 25fps 오디오+영상 MP4 를 생성합니다."
             bgImage="/menu/video.png"
-            tag="준비 중 · v2"
-            disabled
+            tag="NEW · LTX-2.3"
             onClick={() => router.push("/video")}
           />
         </div>

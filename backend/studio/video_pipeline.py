@@ -1,0 +1,90 @@
+"""
+video_pipeline.py — LTX-2.3 i2v 용 2단계 프롬프트 체이닝.
+
+흐름:
+  1. 이미지 + "이 이미지를 간결하게 설명" → qwen2.5vl
+     → 이미지 설명 (영문)
+  2. 이미지 설명 + 사용자 영상 지시 → gemma4-un (SYSTEM_VIDEO)
+     → 최종 영상 프롬프트 (LTX-2.3 용)
+
+vision 모델 실패 시 → 빈 설명으로 upgrade 진행 (폴백).
+Edit 의 run_vision_pipeline 과 구조 동일, upgrade 만 video 용으로 교체.
+"""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+
+from .presets import DEFAULT_OLLAMA_ROLES
+from .prompt_pipeline import (
+    _DEFAULT_OLLAMA_URL,
+    DEFAULT_TIMEOUT,
+    UpgradeResult,
+    upgrade_video_prompt,
+)
+from .vision_pipeline import _describe_image  # 기존 비전 헬퍼 재사용
+
+log = logging.getLogger(__name__)
+
+
+@dataclass
+class VideoPipelineResult:
+    """비전 → 영상 프롬프트 파이프라인 최종 결과."""
+
+    image_description: str
+    """1단계 vision 모델 출력 (영문). 실패 시 빈 문자열."""
+
+    final_prompt: str
+    """2단계 gemma4 통합 출력 (LTX-2.3 용 영문)."""
+
+    vision_ok: bool
+    upgrade: UpgradeResult
+
+
+async def run_video_pipeline(
+    image_path: Path | str | bytes,
+    user_direction: str,
+    vision_model: str | None = None,
+    text_model: str | None = None,
+    timeout: float = DEFAULT_TIMEOUT,
+    ollama_url: str | None = None,
+) -> VideoPipelineResult:
+    """영상 생성용 2단계 체이닝 실행.
+
+    Args:
+        image_path: 로컬 파일 경로 (Path/str) 또는 raw bytes
+        user_direction: 사용자 영상 지시 (한/영)
+        vision_model: 비전 모델 (없으면 DEFAULT_OLLAMA_ROLES.vision)
+        text_model: 텍스트 모델 (없으면 DEFAULT_OLLAMA_ROLES.text)
+    """
+    resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
+    resolved_vision = vision_model or DEFAULT_OLLAMA_ROLES.vision
+    resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text
+
+    description = await _describe_image(
+        image_path,
+        vision_model=resolved_vision,
+        timeout=timeout,
+        ollama_url=resolved_url,
+    )
+    vision_ok = bool(description.strip())
+    if not vision_ok:
+        # 비전 실패 — 업그레이드가 최소 정보라도 가지고 진행하도록
+        description = "(vision model unavailable — relying on user direction only)"
+
+    upgrade = await upgrade_video_prompt(
+        user_direction=user_direction,
+        image_description=description,
+        model=resolved_text,
+        timeout=timeout,
+        ollama_url=resolved_url,
+    )
+
+    return VideoPipelineResult(
+        image_description=description,
+        final_prompt=upgrade.upgraded,
+        vision_ok=vision_ok,
+        upgrade=upgrade,
+    )
