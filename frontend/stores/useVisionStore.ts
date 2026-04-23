@@ -12,7 +12,9 @@
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 
-const MAX_VISION_HISTORY = 20;
+// 2026-04-24 G1: 20 → 100. entry 의 imageRef 를 256px JPEG 썸네일로 저장하므로
+// 용량 부담은 100건 × 약 50KB = 5MB (localStorage 10MB 한계 내 여유).
+const MAX_VISION_HISTORY = 100;
 
 export interface VisionEntry {
   id: string; // `vis-${Date.now().toString(36)}`
