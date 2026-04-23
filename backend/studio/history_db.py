@@ -28,7 +28,7 @@ log = logging.getLogger(__name__)
 CREATE_TABLE = """
 CREATE TABLE IF NOT EXISTS studio_history (
   id TEXT PRIMARY KEY,
-  mode TEXT NOT NULL CHECK(mode IN ('generate','edit')),
+  mode TEXT NOT NULL CHECK(mode IN ('generate','edit','video')),
   prompt TEXT NOT NULL,
   label TEXT NOT NULL,
   width INTEGER,
@@ -58,6 +58,64 @@ CREATE_IDX_MODE = (
 )
 
 
+async def _needs_video_mode_migration(db: aiosqlite.Connection) -> bool:
+    """기존 테이블 CHECK 제약이 'video' 를 포함하는지 sqlite_master 의
+    CREATE SQL 로 확인.
+
+    PRAGMA table_info 는 CHECK 표현식을 노출하지 않아 신뢰 못함.
+    sqlite_master.sql 의 원문에서 'video' 토큰 존재 여부를 본다.
+    """
+    cur = await db.execute(
+        "SELECT sql FROM sqlite_master WHERE type='table' AND name='studio_history'"
+    )
+    row = await cur.fetchone()
+    if not row or not row[0]:
+        return False  # 테이블 자체 없음 → CREATE_TABLE 이 생성 (마이그레이션 불필요)
+    create_sql = row[0]
+    return "'video'" not in create_sql
+
+
+async def _migrate_add_video_mode(db: aiosqlite.Connection) -> None:
+    """CHECK 제약을 'generate'/'edit'/'video' 로 확장하는 원자적 마이그레이션.
+
+    SQLite 는 ALTER TABLE ... DROP CHECK 를 지원하지 않아 재생성 필요.
+    순서:
+      1) BEGIN IMMEDIATE — write lock 확보
+      2) studio_history_new (확장된 CHECK) 생성
+      3) SELECT * → INSERT 로 데이터 복사
+      4) DROP old + RENAME new
+      5) 인덱스 재생성
+      6) COMMIT
+    실패 시 ROLLBACK — 기존 테이블 무손실 유지.
+    """
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        # CREATE_TABLE 상수를 재사용하되 이름만 new 로
+        create_new_sql = CREATE_TABLE.replace(
+            "CREATE TABLE IF NOT EXISTS studio_history",
+            "CREATE TABLE studio_history_new",
+        )
+        await db.execute(create_new_sql)
+        # 데이터 복사 (컬럼 순서 기준 SELECT *)
+        await db.execute(
+            "INSERT INTO studio_history_new SELECT * FROM studio_history"
+        )
+        await db.execute("DROP TABLE studio_history")
+        await db.execute(
+            "ALTER TABLE studio_history_new RENAME TO studio_history"
+        )
+        # 인덱스는 DROP TABLE 시 함께 삭제 → 재생성
+        await db.execute(CREATE_IDX_CREATED)
+        await db.execute(CREATE_IDX_MODE)
+        await db.commit()
+        log.info(
+            "Migrated studio_history: CHECK 제약에 'video' 모드 추가 완료"
+        )
+    except Exception:
+        await db.execute("ROLLBACK")
+        raise
+
+
 async def init_studio_history_db() -> None:
     """테이블/인덱스 생성 (idempotent) + 증분 마이그레이션."""
     async with aiosqlite.connect(_DB_PATH) as db:
@@ -74,6 +132,9 @@ async def init_studio_history_db() -> None:
             # 이미 존재하거나 최초 CREATE 직후면 에러 — 정상
             pass
         await db.commit()
+        # v3 (2026-04-24): CHECK(mode IN ...) 에 'video' 추가
+        if await _needs_video_mode_migration(db):
+            await _migrate_add_video_mode(db)
     log.info("studio_history DB ready at %s", _DB_PATH)
 
 

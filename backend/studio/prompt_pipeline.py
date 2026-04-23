@@ -66,6 +66,26 @@ RULES:
 - If user wrote Korean, translate intent to English.
 - Never repeat words or phrases."""
 
+SYSTEM_VIDEO = """You are a cinematic prompt engineer for LTX-2.3 video generation.
+
+You receive:
+1. A brief description of the reference image (from a vision model).
+2. The user's direction for the video (what should happen / mood / style).
+
+Your job: compose ONE polished English paragraph (60-150 words) that guides
+the video generation. Include:
+- Subject motion / action timing
+- Camera work (pan / zoom / dolly / static)
+- Lighting changes, atmosphere, ambient sound cues
+- Style anchors (cinematic, filmic, 35mm, shallow DoF, etc.)
+
+RULES:
+- Output ONLY the final English paragraph — no preamble, no bullets, no markdown.
+- Keep the first-frame identity consistent with the reference image.
+- Avoid cartoon / game / childish aesthetics.
+- If the user wrote Korean, translate intent to English.
+- Never repeat phrases."""
+
 SYSTEM_TRANSLATE_KO = """You are a professional Korean translator.
 Translate the given English image-generation prompt into natural, readable Korean.
 
@@ -283,6 +303,70 @@ async def upgrade_edit_prompt(
         fallback=False,
         provider="ollama",
         original=edit_instruction,
+        translation=ko,
+    )
+
+
+async def upgrade_video_prompt(
+    user_direction: str,
+    image_description: str,
+    model: str = "gemma4-un:latest",
+    timeout: float = DEFAULT_TIMEOUT,
+    ollama_url: str | None = None,
+    include_translation: bool = True,
+) -> UpgradeResult:
+    """Video i2v 용 프롬프트 업그레이드 (v3: 2-call).
+
+    Edit 의 upgrade_edit_prompt 와 거의 동일 구조. 시스템 프롬프트만
+    LTX-2.3 특화 (SYSTEM_VIDEO · motion/camera/audio 키워드).
+    """
+    if not user_direction.strip():
+        return UpgradeResult(
+            upgraded=user_direction,
+            fallback=True,
+            provider="fallback",
+            original=user_direction,
+        )
+
+    resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
+    user_msg = (
+        f"[Image description]\n{image_description.strip()}\n\n"
+        f"[User direction]\n{user_direction.strip()}"
+    )
+
+    try:
+        upgraded_raw = await _call_ollama_chat(
+            ollama_url=resolved_url,
+            model=model,
+            system=SYSTEM_VIDEO,
+            user=user_msg,
+            timeout=timeout,
+        )
+        en = _strip_repeat_noise(upgraded_raw.strip()).strip()
+        if not en:
+            raise ValueError("Empty response from Ollama")
+    except Exception as e:
+        log.warning("Video prompt upgrade failed: %s", e)
+        return UpgradeResult(
+            upgraded=user_direction,
+            fallback=True,
+            provider="fallback",
+            original=user_direction,
+            translation=None,
+        )
+
+    # 번역 (옵션 · 실패해도 en 은 살아남음)
+    ko = None
+    if include_translation:
+        ko = await translate_to_korean(
+            en, model=model, timeout=60.0, ollama_url=resolved_url
+        )
+
+    return UpgradeResult(
+        upgraded=en,
+        fallback=False,
+        provider="ollama",
+        original=user_direction,
         translation=ko,
     )
 
