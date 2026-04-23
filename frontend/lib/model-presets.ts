@@ -158,6 +158,21 @@ export const EDIT_MODEL = {
 } as const;
 
 /* ──────────────────────────────────────────────────────
+   Ollama 기본 모델 — Settings 초기값과 백엔드 DEFAULT_OLLAMA_ROLES 싱크
+   ────────────────────────────────────────────────────── */
+/**
+ * 프론트 Settings 의 초기값 단일 진입점.
+ * 백엔드 `backend/studio/presets.py::DEFAULT_OLLAMA_ROLES` 와 일치해야 함.
+ * 여기서 변경 시 백엔드도 반드시 같이 수정할 것.
+ */
+export const DEFAULT_OLLAMA_MODELS = {
+  /** 텍스트 업그레이드 + 번역 (gemma4 계열) */
+  text: "gemma4-un:latest",
+  /** 이미지 비전 설명 (Edit 모드 파이프라인 step 1) */
+  vision: "qwen2.5vl:7b",
+} as const;
+
+/* ──────────────────────────────────────────────────────
    공용 유틸
    ────────────────────────────────────────────────────── */
 
