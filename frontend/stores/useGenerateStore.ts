@@ -195,6 +195,15 @@ export const useGenerateStore = create<GenerateState>()(
       name: "ais:generate",
       storage: createJSONStorage(() => localStorage),
       version: 2,
+      // v1 → v2: width/height/aspectLocked 신규 필드 추가
+      migrate: (persistedState: unknown, version: number) => {
+        if (version < 2) {
+          const s = persistedState as { aspect?: AspectRatioLabel };
+          const preset = getAspect(s.aspect ?? GENERATE_MODEL.defaults.aspect);
+          return { ...s, width: preset.width, height: preset.height, aspectLocked: true };
+        }
+        return persistedState;
+      },
       // 진행 상태 제외 (영속 X)
       partialize: (s) => ({
         prompt: s.prompt,
