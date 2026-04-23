@@ -16,6 +16,7 @@ import {
   ModelBadge,
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
+import VramBadge from "@/components/chrome/VramBadge";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import HistoryTile from "@/components/studio/HistoryTile";
 import ImageLightbox from "@/components/studio/ImageLightbox";
@@ -365,17 +366,7 @@ export default function GeneratePage() {
         }
         right={
           <>
-            <div
-              className="mono"
-              style={{
-                fontSize: 10.5,
-                color: "var(--ink-4)",
-                letterSpacing: ".05em",
-                marginRight: 4,
-              }}
-            >
-              VRAM 11.4 / 24 GB
-            </div>
+            <VramBadge />
             <SettingsButton />
           </>
         }

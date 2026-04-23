@@ -541,6 +541,42 @@ async function* mockEditStream(
    Process control
    ───────────────────────────────── */
 
+/**
+ * 백엔드 /process/status 폴링 — Ollama/ComfyUI 실행 상태 + VRAM 사용량.
+ * Mock 모드에선 현재 상태 유지 가정 (서버 쿼리 없음).
+ */
+export interface ProcessStatusSnapshot {
+  ollamaRunning: boolean;
+  comfyuiRunning: boolean;
+  /** nvidia-smi 실패 시 null. total_gb=0 이거나 쿼리 실패면 null 반환. */
+  vram: { usedGb: number; totalGb: number } | null;
+}
+
+export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null> {
+  if (USE_MOCK) {
+    return null; // Mock 에선 store 기본값 유지
+  }
+  try {
+    const res = await fetch(`${STUDIO_BASE}/api/studio/process/status`);
+    if (!res.ok) return null;
+    const data = (await res.json()) as {
+      ollama?: { running?: boolean };
+      comfyui?: { running?: boolean; used_gb?: number; total_gb?: number };
+    };
+    const usedGb = data.comfyui?.used_gb ?? 0;
+    const totalGb = data.comfyui?.total_gb ?? 0;
+    // total_gb=0 은 nvidia-smi 쿼리 실패 → VRAM 숨김
+    const vram = totalGb > 0 ? { usedGb, totalGb } : null;
+    return {
+      ollamaRunning: !!data.ollama?.running,
+      comfyuiRunning: !!data.comfyui?.running,
+      vram,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /** 현재 실행 중인 ComfyUI 작업 인터럽트 (전역). */
 export async function interruptCurrent(): Promise<boolean> {
   if (USE_MOCK) return true;
