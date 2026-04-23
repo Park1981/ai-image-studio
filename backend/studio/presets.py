@@ -373,3 +373,45 @@ def active_video_loras(
     if adult:
         return list(loras)
     return [lo for lo in loras if lo.role != "adult"]
+
+
+# ── Video 해상도 슬라이더 범위 (2026-04-24 · v9) ──
+# 긴 변 픽셀 기준. LTX-2.3 은 공간 해상도 8배수 요구 + spatial-upscaler x2 이후 단계적 요구사항.
+# max 1536 = VRAM 16GB 한계 + 공식 템플릿 기본값. min 512 = 품질 급락 마지노선.
+# step 128 은 LTX 패치 크기(32×8=256) 배수/2 → latent 스페이스에서 깔끔하게 떨어짐.
+VIDEO_LONGER_EDGE_MIN = 512
+VIDEO_LONGER_EDGE_MAX = 1536
+VIDEO_LONGER_EDGE_STEP = 128
+VIDEO_LONGER_EDGE_DEFAULT = 1536
+
+
+def compute_video_resize(
+    source_width: int, source_height: int, longer_edge: int
+) -> tuple[int, int]:
+    """원본 비율을 유지한 채 긴 변을 longer_edge 로 맞춘 (w, h) 반환.
+
+    - 가로 >= 세로: w = longer_edge, h = longer_edge * (h/w)
+    - 세로 > 가로 : h = longer_edge, w = longer_edge * (w/h)
+    - 결과는 LTX-2.3 공간 요구사항에 맞춰 **8배수 스냅** (버림, 최소 8).
+
+    Args:
+        source_width: 원본 너비 (px · PIL 측정값)
+        source_height: 원본 높이
+        longer_edge: 사용자 지정 긴 변 픽셀 (VIDEO_LONGER_EDGE_MIN~MAX)
+
+    Returns:
+        (pre_resize_width, pre_resize_height) — ResizeImageMaskNode 입력값.
+    """
+    if source_width <= 0 or source_height <= 0:
+        # 원본 dims 를 못 잡은 경우 기본 포트레이트 박스로 폴백
+        return 512, 768
+    if source_width >= source_height:
+        w = longer_edge
+        h = round(longer_edge * source_height / source_width)
+    else:
+        h = longer_edge
+        w = round(longer_edge * source_width / source_height)
+    # 8 배수 스냅 (최소 8)
+    w = max(8, (w // 8) * 8)
+    h = max(8, (h // 8) * 8)
+    return w, h

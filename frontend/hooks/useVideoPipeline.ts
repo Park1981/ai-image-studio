@@ -31,6 +31,7 @@ export function useVideoPipeline(
   const sourceImage = useVideoStore((s) => s.sourceImage);
   const prompt = useVideoStore((s) => s.prompt);
   const adult = useVideoStore((s) => s.adult);
+  const longerEdge = useVideoStore((s) => s.longerEdge);
   // 실행 상태
   const running = useVideoStore((s) => s.running);
   const setRunning = useVideoStore((s) => s.setRunning);
@@ -71,6 +72,7 @@ export function useVideoPipeline(
         sourceImage,
         prompt,
         adult,
+        longerEdge,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
       })) {

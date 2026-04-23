@@ -882,6 +882,22 @@ async def upgrade_only(body: UpgradeOnlyBody):
 # 20 MB — Edit 와 동일 상한 (영상 생성 input 이미지)
 _VIDEO_MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
+# 해상도 슬라이더 범위 (presets.py 와 동일)
+from .presets import (  # noqa: E402 — 유도 import (모듈 상단 import 체인은 이미 무거움)
+    VIDEO_LONGER_EDGE_MAX as _video_longer_max,
+    VIDEO_LONGER_EDGE_MIN as _video_longer_min,
+)
+
+
+def _extract_image_dims(image_bytes: bytes) -> tuple[int, int]:
+    """업로드 바이트에서 (width, height) 추출. 실패 시 (0, 0)."""
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as im:
+            return im.size  # (w, h)
+    except Exception as exc:  # pragma: no cover — PIL 내부 에러 다양
+        log.warning("image dims 추출 실패: %s", exc)
+        return 0, 0
+
 
 @router.post("/video", response_model=TaskCreated)
 async def create_video_task(
@@ -904,6 +920,20 @@ async def create_video_task(
     ollama_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
     vision_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
     adult = bool(meta_obj.get("adult", False))
+    # longerEdge: 사용자 지정 긴 변 픽셀. 누락/0 이면 기본값.
+    longer_edge_raw = meta_obj.get("longerEdge") or meta_obj.get("longer_edge")
+    longer_edge: int | None = None
+    if longer_edge_raw is not None:
+        try:
+            longer_edge = int(longer_edge_raw)
+        except (TypeError, ValueError):
+            longer_edge = None
+        else:
+            # presets.py 범위로 clamp + 8배수 스냅
+            longer_edge = max(
+                _video_longer_min,
+                min(_video_longer_max, (longer_edge // 8) * 8),
+            )
 
     image_bytes = await image.read()
     if not image_bytes:
@@ -915,6 +945,9 @@ async def create_video_task(
             f"(max {_VIDEO_MAX_IMAGE_BYTES})",
         )
 
+    # PIL 로 원본 dims 추출 → 비율 유지 리사이즈 계산에 사용
+    source_w, source_h = _extract_image_dims(image_bytes)
+
     task = await _new_task()
     task.worker = _spawn(
         _run_video_pipeline_task(
@@ -925,6 +958,9 @@ async def create_video_task(
             ollama_override,
             vision_override,
             adult,
+            source_w,
+            source_h,
+            longer_edge,
         )
     )
     return TaskCreated(
@@ -956,6 +992,9 @@ async def _run_video_pipeline_task(
     ollama_model_override: str | None = None,
     vision_model_override: str | None = None,
     adult: bool = False,
+    source_width: int = 0,
+    source_height: int = 0,
+    longer_edge: int | None = None,
 ) -> None:
     """Video i2v 파이프라인 백그라운드 실행 (5 step).
 
@@ -1040,6 +1079,9 @@ async def _run_video_pipeline_task(
                 seed=actual_seed,
                 unet_override=unet_override,
                 adult=adult,
+                source_width=source_width or None,
+                source_height=source_height or None,
+                longer_edge=longer_edge,
             )
 
         await task.emit("step", {"step": 3, "done": True})

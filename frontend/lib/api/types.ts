@@ -171,6 +171,13 @@ export interface VideoRequest {
    * false 면 distilled LoRA 만 로드 (SFW, 얼굴 보존 안정).
    */
   adult?: boolean;
+  /**
+   * 영상 해상도 · 긴 변 픽셀 (2026-04-24 · v9).
+   * 512~1536 (step 128). 원본 비율 유지하며 긴 변만 이 값으로 스케일.
+   * 작을수록 빠름 (시간 ~ 픽셀수 제곱에 비례).
+   * 누락 시 백엔드 기본값 (1536) 사용.
+   */
+  longerEdge?: number;
 }
 
 export type VideoStage =

@@ -132,9 +132,8 @@ $null = Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action { Clea
 
 try {
     Write-Host ""
-    Write-Host "+--------------------------------------------+" -ForegroundColor Green
-    Write-Host "|       AI Image Studio - 빠른 시작          |" -ForegroundColor Green
-    Write-Host "+--------------------------------------------+" -ForegroundColor Green
+    Write-Host "AI Image Studio — 빠른 시작" -ForegroundColor Green
+    Write-Host "─────────────────────────────────────────────" -ForegroundColor DarkGray
     Write-Host ("프로젝트: {0}" -f $Root) -ForegroundColor DarkGray
 
     # venv 검증

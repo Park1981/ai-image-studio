@@ -33,9 +33,11 @@ from .presets import (
     EDIT_MODEL,
     GENERATE_MODEL,
     LoraEntry,
+    VIDEO_LONGER_EDGE_DEFAULT,
     VIDEO_MODEL,
     VideoLoraEntry,
     active_video_loras,
+    compute_video_resize,
     get_aspect,
     resolve_video_unet_name,
 )
@@ -559,6 +561,9 @@ def build_video_from_request(
     negative_prompt: str | None = None,
     unet_override: str | None = None,
     adult: bool = False,
+    source_width: int | None = None,
+    source_height: int | None = None,
+    longer_edge: int | None = None,
 ) -> ApiPrompt:
     """LTX-2.3 i2v 워크플로우 API 포맷 조립.
 
@@ -570,6 +575,11 @@ def build_video_from_request(
         unet_override: VRAM 16GB 대응용 · Kijai transformer_only 등 파일명
         adult: 성인 모드 토글. True 면 eros LoRA 체인 포함,
             False 면 distilled LoRA 만 로드.
+        source_width: 원본 이미지 너비 (px). 제공되면 원본 비율 유지 리사이즈 계산.
+            None 이면 레거시 포트레이트 박스 (500×800) fit 로 폴백.
+        source_height: 원본 이미지 높이.
+        longer_edge: 사용자 지정 긴 변 픽셀 (512~1536, step 128). 기본 1536.
+            source_width/height 둘 다 제공될 때만 적용됨.
 
     Returns:
         ComfyUI /prompt 용 flat dict (35개 에센셜 노드).
@@ -580,6 +590,24 @@ def build_video_from_request(
     neg = negative_prompt or VIDEO_MODEL.negative_prompt
     unet_name = resolve_video_unet_name(unet_override)
 
+    # ── 해상도 계산 (2026-04-24 · v9): 원본 비율 유지 + 사용자 longer_edge ──
+    # 원본 dims 가 들어오면 비율 유지 리사이즈 계산 → pre_resize/longer 둘 다 정렬.
+    # 없으면 레거시 포트레이트 박스 (500×800, longer=1536) 로 폴백.
+    resolved_longer = longer_edge or VIDEO_LONGER_EDGE_DEFAULT
+    if source_width and source_height:
+        pre_w, pre_h = compute_video_resize(
+            source_width, source_height, resolved_longer
+        )
+        # longer_edge 는 compute_video_resize 결과의 긴 변과 같음 (8배수 스냅 후).
+        final_longer = max(pre_w, pre_h)
+    else:
+        pre_w, pre_h = s.pre_resize_width, s.pre_resize_height
+        final_longer = s.longer_edge
+
+    # latent 크기는 pre_resize 의 절반 — LTX-2.3 spatial downsample 스펙.
+    latent_w = max(8, pre_w // 2)
+    latent_h = max(8, pre_h // 2)
+
     # ── 0. Image input (사용자 업로드) ──
     load_id = nid()
     api[load_id] = {
@@ -587,18 +615,16 @@ def build_video_from_request(
         "inputs": {"image": source_filename, "upload": "image"},
     }
 
-    # ── 1. Pre-resize (ResizeImageMaskNode · 포트레이트 박스 fit) ──
-    # resize_type 은 DYNAMICCOMBO — 선택값에 따라 서브필드 추가.
-    # "scale dimensions" 는 width/height/crop 3 서브필드 요구.
-    # scale_method 는 독립 top-level 필드.
+    # ── 1. Pre-resize (ResizeImageMaskNode) ──
+    # 원본 비율 유지: compute_video_resize(원본 w×h, longer_edge) 결과값 주입.
     resize1_id = nid()
     api[resize1_id] = {
         "class_type": "ResizeImageMaskNode",
         "inputs": {
             "input": [load_id, 0],
             "resize_type": s.pre_resize_mode,
-            "resize_type.width": s.pre_resize_width,
-            "resize_type.height": s.pre_resize_height,
+            "resize_type.width": pre_w,
+            "resize_type.height": pre_h,
             "resize_type.crop": s.pre_resize_crop,
             "scale_method": s.pre_resize_scale_method,
         },
@@ -610,7 +636,7 @@ def build_video_from_request(
         "class_type": "ResizeImagesByLongerEdge",
         "inputs": {
             "images": [resize1_id, 0],
-            "longer_edge": s.longer_edge,
+            "longer_edge": final_longer,
         },
     }
 
@@ -684,12 +710,13 @@ def build_video_from_request(
     }
 
     # ── 8. Empty latents (video · audio) ──
+    # latent 크기는 pre_resize 의 1/2 (원본 비율 유지로 동적 계산됨).
     empty_vid_id = nid()
     api[empty_vid_id] = {
         "class_type": "EmptyLTXVLatentVideo",
         "inputs": {
-            "width": s.latent_width,
-            "height": s.latent_height,
+            "width": latent_w,
+            "height": latent_h,
             "length": s.frame_count,
             "batch_size": s.batch_size,
         },

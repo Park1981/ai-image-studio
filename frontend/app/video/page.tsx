@@ -38,7 +38,13 @@ import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
-import { useVideoStore } from "@/stores/useVideoStore";
+import {
+  computeVideoResize,
+  useVideoStore,
+  VIDEO_LONGER_EDGE_MAX,
+  VIDEO_LONGER_EDGE_MIN,
+  VIDEO_LONGER_EDGE_STEP,
+} from "@/stores/useVideoStore";
 
 /* LTX-2.3 i2v 파이프라인 5단계 — qwen2.5vl + gemma4 + ComfyUI 2-stage + save */
 const PIPELINE_META: PipelineStepMeta[] = [
@@ -62,6 +68,8 @@ export default function VideoPage() {
   const setPrompt = useVideoStore((s) => s.setPrompt);
   const adult = useVideoStore((s) => s.adult);
   const setAdult = useVideoStore((s) => s.setAdult);
+  const longerEdge = useVideoStore((s) => s.longerEdge);
+  const setLongerEdge = useVideoStore((s) => s.setLongerEdge);
   const running = useVideoStore((s) => s.running);
   const currentStep = useVideoStore((s) => s.currentStep);
   const stepDone = useVideoStore((s) => s.stepDone);
@@ -306,6 +314,14 @@ export default function VideoPage() {
               )}
             </div>
           </div>
+
+          {/* 영상 해상도 슬라이더 — 긴 변 픽셀, 원본 비율 유지 */}
+          <VideoResolutionSlider
+            longerEdge={longerEdge}
+            setLongerEdge={setLongerEdge}
+            sourceWidth={sourceWidth}
+            sourceHeight={sourceHeight}
+          />
 
           {/* 성인 모드 토글 — ON: gemma4 NSFW clause + eros LoRA 체인 포함 */}
           <button
@@ -644,5 +660,140 @@ export default function VideoPage() {
       </div>
     </div>
   );
+}
+
+/* ────────────────────────────────────────────────
+   영상 해상도 슬라이더
+   - 긴 변을 512~1536 (step 128) 범위로 선택
+   - 원본 비율 유지: 예상 출력 해상도 실시간 계산
+   - 이미지 없으면 disabled (비율 계산 불가)
+   ──────────────────────────────────────────────── */
+function VideoResolutionSlider({
+  longerEdge,
+  setLongerEdge,
+  sourceWidth,
+  sourceHeight,
+}: {
+  longerEdge: number;
+  setLongerEdge: (v: number) => void;
+  sourceWidth: number | null;
+  sourceHeight: number | null;
+}) {
+  const hasSource = !!(sourceWidth && sourceHeight);
+  const expected = hasSource
+    ? computeVideoResize(sourceWidth!, sourceHeight!, longerEdge)
+    : { width: 0, height: 0 };
+  // 시간 가중치 — 1536 기준 대비 (픽셀수 제곱 근사)
+  const timeFactor = Math.pow(longerEdge / VIDEO_LONGER_EDGE_MAX, 2);
+  const speedLabel =
+    timeFactor > 0.8
+      ? "고품질"
+      : timeFactor > 0.4
+        ? "표준"
+        : timeFactor > 0.18
+          ? "빠름"
+          : "매우 빠름";
+  // 비율 표시 (근사치)
+  const ratio = hasSource
+    ? simplifyRatio(sourceWidth!, sourceHeight!)
+    : "—";
+
+  return (
+    <div
+      style={{
+        padding: "12px 14px",
+        borderRadius: 10,
+        border: "1px solid var(--line)",
+        background: "var(--surface)",
+        opacity: hasSource ? 1 : 0.55,
+        transition: "opacity .2s",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          marginBottom: 8,
+        }}
+      >
+        <label
+          style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}
+        >
+          영상 해상도
+        </label>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10.5,
+            color: "var(--ink-4)",
+            letterSpacing: ".04em",
+          }}
+        >
+          긴 변 {longerEdge}px · {speedLabel}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={VIDEO_LONGER_EDGE_MIN}
+        max={VIDEO_LONGER_EDGE_MAX}
+        step={VIDEO_LONGER_EDGE_STEP}
+        value={longerEdge}
+        disabled={!hasSource}
+        onChange={(e) => setLongerEdge(Number(e.target.value))}
+        style={{
+          width: "100%",
+          accentColor: "var(--accent)",
+          cursor: hasSource ? "pointer" : "not-allowed",
+        }}
+      />
+      {/* 눈금 + 예상 해상도 */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 10,
+          color: "var(--ink-4)",
+          marginTop: 2,
+        }}
+        className="mono"
+      >
+        <span>{VIDEO_LONGER_EDGE_MIN}</span>
+        <span>{VIDEO_LONGER_EDGE_MAX}</span>
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 11,
+          color: "var(--ink-3)",
+          lineHeight: 1.5,
+        }}
+      >
+        {hasSource ? (
+          <>
+            원본 <span className="mono">{sourceWidth}×{sourceHeight}</span>
+            {" → "}
+            출력 <span
+              className="mono"
+              style={{ color: "var(--accent-ink)", fontWeight: 600 }}
+            >
+              {expected.width}×{expected.height}
+            </span>
+            {" "}
+            <span style={{ color: "var(--ink-4)" }}>({ratio})</span>
+          </>
+        ) : (
+          "원본 이미지를 올리면 예상 출력 해상도가 표시돼."
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 정수 비율 근사 — "16:9" / "3:4" 등 */
+function simplifyRatio(w: number, h: number): string {
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  const g = gcd(w, h);
+  return `${w / g}:${h / g}`;
 }
 

@@ -15,7 +15,15 @@ from collections import Counter
 import pytest
 
 from studio.comfy_api_builder import build_video_from_request
-from studio.presets import VIDEO_MODEL, VideoLoraEntry, resolve_video_unet_name
+from studio.presets import (
+    VIDEO_LONGER_EDGE_DEFAULT,
+    VIDEO_LONGER_EDGE_MAX,
+    VIDEO_LONGER_EDGE_MIN,
+    VIDEO_MODEL,
+    VideoLoraEntry,
+    compute_video_resize,
+    resolve_video_unet_name,
+)
 
 
 # ───────── preset 값 검증 ─────────
@@ -167,6 +175,109 @@ def test_build_video_sampling_counts() -> None:
     assert counts["LTXVConcatAVLatent"] == 2
     assert counts["LTXVImgToVideoInplace"] == 2
     assert counts["CLIPTextEncode"] == 2
+
+
+def test_compute_video_resize_landscape_keeps_ratio() -> None:
+    """가로 이미지 — 긴 변 = longer, 짧은 변 = 비율 유지 + 8배수."""
+    w, h = compute_video_resize(1920, 1080, 1024)
+    assert w == 1024
+    # 1024 * 1080/1920 = 576 (8배수)
+    assert h == 576
+
+
+def test_compute_video_resize_portrait_keeps_ratio() -> None:
+    """세로 이미지 — 긴 변 = longer (h), 짧은 변 = 비율 유지."""
+    w, h = compute_video_resize(1080, 1920, 1024)
+    assert h == 1024
+    assert w == 576
+
+
+def test_compute_video_resize_square() -> None:
+    """정사각 — w == h == longer."""
+    w, h = compute_video_resize(1024, 1024, 768)
+    assert w == 768
+    assert h == 768
+
+
+def test_compute_video_resize_snap_to_8() -> None:
+    """8 배수 스냅 (버림)."""
+    # 1500 × 1000 → longer=1024 → (1024, round(1024*1000/1500)=683) → 680 스냅
+    w, h = compute_video_resize(1500, 1000, 1024)
+    assert w == 1024
+    assert h % 8 == 0
+    assert h == 680  # round(682.666) = 683 → 683//8*8 = 680
+
+
+def test_compute_video_resize_zero_dims_fallback() -> None:
+    """원본 dims 0 → 포트레이트 폴백."""
+    w, h = compute_video_resize(0, 0, 1024)
+    assert (w, h) == (512, 768)
+
+
+def test_build_video_uses_source_dims_for_resize() -> None:
+    """source_width/height 전달 시 pre_resize 가 원본 비율 유지."""
+    api = build_video_from_request(
+        prompt="x",
+        source_filename="x.png",
+        seed=1,
+        source_width=1920,
+        source_height=1080,
+        longer_edge=1024,
+    )
+    resize_nodes = [
+        n for n in api.values() if n["class_type"] == "ResizeImageMaskNode"
+    ]
+    assert len(resize_nodes) == 1
+    inp = resize_nodes[0]["inputs"]
+    assert inp["resize_type.width"] == 1024
+    assert inp["resize_type.height"] == 576  # 1080 * 1024/1920
+
+    # longer-edge resizer 도 동적 longer 반영
+    longer_nodes = [
+        n for n in api.values() if n["class_type"] == "ResizeImagesByLongerEdge"
+    ]
+    assert longer_nodes[0]["inputs"]["longer_edge"] == 1024
+
+    # latent 도 pre_resize / 2 로 동적 계산 (최소 8)
+    lv = [n for n in api.values() if n["class_type"] == "EmptyLTXVLatentVideo"]
+    assert lv[0]["inputs"]["width"] == 512   # 1024 / 2
+    assert lv[0]["inputs"]["height"] == 288  # 576 / 2
+
+
+def test_build_video_no_dims_uses_legacy_portrait_box() -> None:
+    """source_width/height 미전달 시 레거시 500×800 포트레이트 폴백."""
+    api = build_video_from_request(
+        prompt="x", source_filename="x.png", seed=1
+    )
+    resize_nodes = [
+        n for n in api.values() if n["class_type"] == "ResizeImageMaskNode"
+    ]
+    inp = resize_nodes[0]["inputs"]
+    assert inp["resize_type.width"] == VIDEO_MODEL.sampling.pre_resize_width
+    assert inp["resize_type.height"] == VIDEO_MODEL.sampling.pre_resize_height
+
+
+def test_build_video_longer_edge_default_1536() -> None:
+    """longer_edge 기본값은 1536 (VIDEO_LONGER_EDGE_DEFAULT)."""
+    api = build_video_from_request(
+        prompt="x",
+        source_filename="x.png",
+        seed=1,
+        source_width=1920,
+        source_height=1080,
+        # longer_edge 생략 → 1536 기본
+    )
+    resize_nodes = [
+        n for n in api.values() if n["class_type"] == "ResizeImageMaskNode"
+    ]
+    assert resize_nodes[0]["inputs"]["resize_type.width"] == VIDEO_LONGER_EDGE_DEFAULT
+
+
+def test_video_longer_edge_range_constants() -> None:
+    """슬라이더 범위 상수값 검증."""
+    assert VIDEO_LONGER_EDGE_MIN == 512
+    assert VIDEO_LONGER_EDGE_MAX == 1536
+    assert VIDEO_LONGER_EDGE_DEFAULT == 1536
 
 
 def test_build_video_load_image_uses_source_filename() -> None:
