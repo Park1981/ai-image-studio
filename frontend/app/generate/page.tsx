@@ -214,7 +214,16 @@ export default function GeneratePage() {
             background: "var(--bg)",
           }}
         >
-          <div>
+          <div
+            style={{
+              // 프롬프트 영역을 좌측 패널의 남는 공간 전부 차지하도록 (반응형 확장)
+              // 조사배너 · 고급아코디언 · CTA 가 자연스레 자리 잡고, 남은 높이는 이 박스가 흡수.
+              flex: 1,
+              minHeight: 220,
+              display: "flex",
+              flexDirection: "column",
+            }}
+          >
             <div
               style={{
                 display: "flex",
@@ -248,6 +257,11 @@ export default function GeneratePage() {
                 borderRadius: 12,
                 transition: "border .15s",
                 boxShadow: "var(--shadow-sm)",
+                // 라벨 아래 남은 공간 전부 차지 → textarea 가 full-height 로 늘어남
+                flex: 1,
+                display: "flex",
+                flexDirection: "column",
+                minHeight: 180,
               }}
             >
               {/* 숨김 스프링 프롬프트 히스토리 메뉴 (우상단) */}
@@ -266,7 +280,6 @@ export default function GeneratePage() {
                   }
                 }}
                 placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."
-                rows={5}
                 style={{
                   width: "100%",
                   border: "none",
@@ -279,6 +292,9 @@ export default function GeneratePage() {
                   lineHeight: 1.6,
                   color: "var(--ink)",
                   borderRadius: 12,
+                  // 컨테이너 full-fill — rows 속성 제거, flex 로 높이 확보
+                  flex: 1,
+                  minHeight: 140,
                 }}
               />
               <div
