@@ -518,7 +518,7 @@ export default function EditPage() {
                 onClick={() => { if (!sourceImage) fileInputRef.current?.click(); }}
                 style={{
                   position: "relative",
-                  height: 170,
+                  height: 256,
                   borderRadius: 12,
                   overflow: "hidden",
                   background: sourceImage
