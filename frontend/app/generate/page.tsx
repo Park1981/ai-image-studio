@@ -1118,6 +1118,7 @@ function AdvancedAccordion({
             gap: "16px 20px",
           }}
         >
+          <div style={{ gridColumn: "1 / -1" }}>
           <Field
             label={`사이즈 · ${sizeLabel}${aspect === "custom" ? "" : ` · ${aspect}`}`}
           >
@@ -1210,6 +1211,8 @@ function AdvancedAccordion({
               })}
             </div>
           </Field>
+          </div>
+          <div style={{ gridColumn: "1 / -1" }}>
           <Field label="Lightning 모드">
             <Toggle
               checked={lightning}
@@ -1222,6 +1225,7 @@ function AdvancedAccordion({
               }
             />
           </Field>
+          </div>
           <Field label={`스텝 · ${steps}`}>
             <Range min={4} max={50} value={steps} onChange={onSteps} />
           </Field>

@@ -123,17 +123,19 @@ export const useGenerateStore = create<GenerateState>()(
         set((s) => {
           const newW = snapDimension(v);
           if (!s.aspectLocked) return { width: newW, aspect: matchAspect(newW, s.height) };
+          // 비율 잠금: aspect 는 그대로 유지 (snap 오차로 "custom" 되는 것 방지)
           const ratio = s.width / s.height || 1;
           const newH = snapDimension(newW / ratio);
-          return { width: newW, height: newH, aspect: matchAspect(newW, newH) };
+          return { width: newW, height: newH };
         }),
       setHeight: (v) =>
         set((s) => {
           const newH = snapDimension(v);
           if (!s.aspectLocked) return { height: newH, aspect: matchAspect(s.width, newH) };
+          // 비율 잠금: aspect 는 그대로 유지
           const ratio = s.width / s.height || 1;
           const newW = snapDimension(newH * ratio);
-          return { width: newW, height: newH, aspect: matchAspect(newW, newH) };
+          return { width: newW, height: newH };
         }),
       setAspectLocked: (v) => set({ aspectLocked: v }),
       setResearch: (v) => set({ research: v }),
