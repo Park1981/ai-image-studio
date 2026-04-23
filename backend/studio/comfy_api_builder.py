@@ -26,12 +26,141 @@ ComfyUI `/prompt` 엔드포인트는 다음 형식의 dict 를 기대한다:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+from itertools import count
+from typing import Any, Callable
 
 from .presets import EDIT_MODEL, GENERATE_MODEL, LoraEntry, get_aspect
 
 
 ApiPrompt = dict[str, dict[str, Any]]
+NodeRef = list[Any]  # [node_id, output_slot] — ComfyUI API 형식
+
+
+# ─────────────────────────────────
+# 공통 빌더 Helpers
+# ─────────────────────────────────
+
+
+def _make_id_gen(start: int = 1) -> Callable[[], str]:
+    """단조 증가 문자열 ID 생성기. itertools.count 기반."""
+    counter = count(start)
+    return lambda: str(next(counter))
+
+
+def _snap_dimension(v: int) -> int:
+    """Qwen/ComfyUI 권장 — 사이즈는 8의 배수 + 256~2048 clamp."""
+    v = max(256, min(2048, int(v)))
+    return (v // 8) * 8
+
+
+def _build_loaders(
+    api: ApiPrompt,
+    nid: Callable[[], str],
+    *,
+    unet_name: str,
+    clip_name: str,
+    vae_name: str,
+) -> tuple[str, str, str]:
+    """UNETLoader + CLIPLoader(qwen_image) + VAELoader 3개 노드 생성.
+
+    Returns:
+        (unet_id, clip_id, vae_id)
+    """
+    unet_id = nid()
+    api[unet_id] = {
+        "class_type": "UNETLoader",
+        "inputs": {"unet_name": unet_name, "weight_dtype": "default"},
+    }
+    clip_id = nid()
+    api[clip_id] = {
+        "class_type": "CLIPLoader",
+        "inputs": {
+            "clip_name": clip_name,
+            "type": "qwen_image",
+            "device": "default",
+        },
+    }
+    vae_id = nid()
+    api[vae_id] = {
+        "class_type": "VAELoader",
+        "inputs": {"vae_name": vae_name},
+    }
+    return unet_id, clip_id, vae_id
+
+
+def _build_lora_chain(
+    api: ApiPrompt,
+    nid: Callable[[], str],
+    *,
+    base_model: NodeRef,
+    lightning: bool,
+    lightning_lora_name: str | None,
+    extra_loras: list[LoraEntry],
+) -> NodeRef:
+    """Lightning (optional) + extras 체인을 base_model 위에 쌓아 최종 NodeRef 반환.
+
+    체인 순서:
+        base_model → [LightningLoRA 1.0] → [Extra LoRA n (strength 각각)] → ...
+    """
+    model_ref: NodeRef = base_model
+    if lightning and lightning_lora_name:
+        light_id = nid()
+        api[light_id] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "model": model_ref,
+                "lora_name": lightning_lora_name,
+                "strength_model": 1.0,
+            },
+        }
+        model_ref = [light_id, 0]
+    for extra in extra_loras:
+        ex_id = nid()
+        api[ex_id] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "model": model_ref,
+                "lora_name": extra.name,
+                "strength_model": float(extra.strength),
+            },
+        }
+        model_ref = [ex_id, 0]
+    return model_ref
+
+
+def _apply_model_sampling(
+    api: ApiPrompt,
+    nid: Callable[[], str],
+    *,
+    model_ref: NodeRef,
+    shift: float,
+) -> NodeRef:
+    """ModelSamplingAuraFlow 노드를 얹어 새 model_ref 반환."""
+    shift_id = nid()
+    api[shift_id] = {
+        "class_type": "ModelSamplingAuraFlow",
+        "inputs": {"model": model_ref, "shift": float(shift)},
+    }
+    return [shift_id, 0]
+
+
+def _save_image_node(
+    api: ApiPrompt,
+    nid: Callable[[], str],
+    *,
+    decoded_ref: NodeRef,
+    filename_prefix: str,
+) -> str:
+    """VAEDecode 결과를 받아 SaveImage 노드 생성, id 반환."""
+    save_id = nid()
+    api[save_id] = {
+        "class_type": "SaveImage",
+        "inputs": {
+            "filename_prefix": filename_prefix,
+            "images": decoded_ref,
+        },
+    }
+    return save_id
 
 
 # ─────────────────────────────────
@@ -75,64 +204,23 @@ class GenerateApiInput:
 def build_generate_api(v: GenerateApiInput) -> ApiPrompt:
     """Generate 워크플로우를 API 포맷 dict 로 조립."""
     api: ApiPrompt = {}
-    nid = _IdGen()
+    nid = _make_id_gen()
 
-    # 1. Loaders
-    unet_id = nid()
-    api[unet_id] = {
-        "class_type": "UNETLoader",
-        "inputs": {"unet_name": v.unet_name, "weight_dtype": "default"},
-    }
-    clip_id = nid()
-    api[clip_id] = {
-        "class_type": "CLIPLoader",
-        "inputs": {
-            "clip_name": v.clip_name,
-            "type": "qwen_image",
-            "device": "default",
-        },
-    }
-    vae_id = nid()
-    api[vae_id] = {
-        "class_type": "VAELoader",
-        "inputs": {"vae_name": v.vae_name},
-    }
+    # 1. Loaders + 2. LoRA 체인 + 3. ModelSamplingAuraFlow (공통 헬퍼)
+    unet_id, clip_id, vae_id = _build_loaders(
+        api, nid,
+        unet_name=v.unet_name, clip_name=v.clip_name, vae_name=v.vae_name,
+    )
+    model_ref = _build_lora_chain(
+        api, nid,
+        base_model=[unet_id, 0],
+        lightning=v.lightning,
+        lightning_lora_name=v.lightning_lora_name,
+        extra_loras=v.extra_loras,
+    )
+    model_ref = _apply_model_sampling(api, nid, model_ref=model_ref, shift=v.shift)
 
-    # 2. 모델 LoRA 체인
-    model_ref: list[Any] = [unet_id, 0]
-    if v.lightning and v.lightning_lora_name:
-        light_id = nid()
-        api[light_id] = {
-            "class_type": "LoraLoaderModelOnly",
-            "inputs": {
-                "model": model_ref,
-                "lora_name": v.lightning_lora_name,
-                "strength_model": 1.0,
-            },
-        }
-        model_ref = [light_id, 0]
-
-    for extra in v.extra_loras:
-        ex_id = nid()
-        api[ex_id] = {
-            "class_type": "LoraLoaderModelOnly",
-            "inputs": {
-                "model": model_ref,
-                "lora_name": extra.name,
-                "strength_model": float(extra.strength),
-            },
-        }
-        model_ref = [ex_id, 0]
-
-    # 3. ModelSamplingAuraFlow (shift)
-    shift_id = nid()
-    api[shift_id] = {
-        "class_type": "ModelSamplingAuraFlow",
-        "inputs": {"model": model_ref, "shift": float(v.shift)},
-    }
-    model_ref = [shift_id, 0]
-
-    # 4. CLIPTextEncode × 2
+    # 4. CLIPTextEncode × 2 (pos/neg)
     pos_id = nid()
     api[pos_id] = {
         "class_type": "CLIPTextEncode",
@@ -181,22 +269,9 @@ def build_generate_api(v: GenerateApiInput) -> ApiPrompt:
         "class_type": "VAEDecode",
         "inputs": {"samples": [ksam_id, 0], "vae": [vae_id, 0]},
     }
-    save_id = nid()
-    api[save_id] = {
-        "class_type": "SaveImage",
-        "inputs": {
-            "filename_prefix": v.filename_prefix,
-            "images": [dec_id, 0],
-        },
-    }
+    _save_image_node(api, nid, decoded_ref=[dec_id, 0], filename_prefix=v.filename_prefix)
 
     return api
-
-
-def _snap_dimension(v: int) -> int:
-    """Qwen/ComfyUI 권장 — 사이즈는 8의 배수 + 256~2048 clamp."""
-    v = max(256, min(2048, int(v)))
-    return (v // 8) * 8
 
 
 def build_generate_from_request(
@@ -280,28 +355,13 @@ class EditApiInput:
 def build_edit_api(v: EditApiInput) -> ApiPrompt:
     """Edit 워크플로우 API 포맷 조립 (Qwen Image Edit 2511)."""
     api: ApiPrompt = {}
-    nid = _IdGen()
+    nid = _make_id_gen()
 
-    # Loaders
-    unet_id = nid()
-    api[unet_id] = {
-        "class_type": "UNETLoader",
-        "inputs": {"unet_name": v.unet_name, "weight_dtype": "default"},
-    }
-    clip_id = nid()
-    api[clip_id] = {
-        "class_type": "CLIPLoader",
-        "inputs": {
-            "clip_name": v.clip_name,
-            "type": "qwen_image",
-            "device": "default",
-        },
-    }
-    vae_id = nid()
-    api[vae_id] = {
-        "class_type": "VAELoader",
-        "inputs": {"vae_name": v.vae_name},
-    }
+    # Loaders (공통 헬퍼)
+    unet_id, clip_id, vae_id = _build_loaders(
+        api, nid,
+        unet_name=v.unet_name, clip_name=v.clip_name, vae_name=v.vae_name,
+    )
 
     # LoadImage + FluxKontextImageScale (원본 이미지 자동 스케일)
     load_id = nid()
@@ -316,37 +376,16 @@ def build_edit_api(v: EditApiInput) -> ApiPrompt:
     }
 
     # Model chain: UNET → (Lightning LoRA?) → (extra LoRAs) → ModelSamplingAuraFlow → CFGNorm
-    model_ref: list[Any] = [unet_id, 0]
-    if v.lightning and v.lightning_lora_name:
-        light_id = nid()
-        api[light_id] = {
-            "class_type": "LoraLoaderModelOnly",
-            "inputs": {
-                "model": model_ref,
-                "lora_name": v.lightning_lora_name,
-                "strength_model": 1.0,
-            },
-        }
-        model_ref = [light_id, 0]
-    for extra in v.extra_loras:
-        ex_id = nid()
-        api[ex_id] = {
-            "class_type": "LoraLoaderModelOnly",
-            "inputs": {
-                "model": model_ref,
-                "lora_name": extra.name,
-                "strength_model": float(extra.strength),
-            },
-        }
-        model_ref = [ex_id, 0]
+    model_ref = _build_lora_chain(
+        api, nid,
+        base_model=[unet_id, 0],
+        lightning=v.lightning,
+        lightning_lora_name=v.lightning_lora_name,
+        extra_loras=v.extra_loras,
+    )
+    model_ref = _apply_model_sampling(api, nid, model_ref=model_ref, shift=v.shift)
 
-    shift_id = nid()
-    api[shift_id] = {
-        "class_type": "ModelSamplingAuraFlow",
-        "inputs": {"model": model_ref, "shift": float(v.shift)},
-    }
-    model_ref = [shift_id, 0]
-
+    # Edit 모드 전용: CFGNorm 추가 (guidance 안정화)
     cfgnorm_id = nid()
     api[cfgnorm_id] = {
         "class_type": "CFGNorm",
@@ -428,14 +467,7 @@ def build_edit_api(v: EditApiInput) -> ApiPrompt:
         "class_type": "VAEDecode",
         "inputs": {"samples": [ksam_id, 0], "vae": [vae_id, 0]},
     }
-    save_id = nid()
-    api[save_id] = {
-        "class_type": "SaveImage",
-        "inputs": {
-            "filename_prefix": v.filename_prefix,
-            "images": [dec_id, 0],
-        },
-    }
+    _save_image_node(api, nid, decoded_ref=[dec_id, 0], filename_prefix=v.filename_prefix)
 
     return api
 
@@ -474,19 +506,3 @@ def build_edit_from_request(
         lightning_lora_name=lightning_lora.name if lightning_lora else None,
     )
     return build_edit_api(inp)
-
-
-# ─────────────────────────────────
-# Helpers
-# ─────────────────────────────────
-
-
-class _IdGen:
-    """단조 증가 노드 ID 생성기 (문자열 반환)."""
-
-    def __init__(self, start: int = 1) -> None:
-        self._n = start - 1
-
-    def __call__(self) -> str:
-        self._n += 1
-        return str(self._n)

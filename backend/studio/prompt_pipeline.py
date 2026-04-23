@@ -12,7 +12,6 @@ prompt_pipeline.py - gemma4 기반 프롬프트 업그레이드 (Ollama 연동).
 
 from __future__ import annotations
 
-import json
 import logging
 import re
 from dataclasses import dataclass
@@ -21,7 +20,15 @@ import httpx
 
 log = logging.getLogger(__name__)
 
-OLLAMA_URL = "http://localhost:11434"
+# Ollama URL 은 .env/config.py 에서만 읽는다 (하드코딩 금지 규칙).
+# 테스트 환경에서 config import 가 실패할 수 있으므로 try/except 폴백만 허용.
+try:
+    from config import settings  # type: ignore
+
+    _DEFAULT_OLLAMA_URL: str = settings.ollama_url
+except Exception:  # pragma: no cover - 테스트/독립 실행 환경
+    _DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
+
 # 16GB VRAM 환경에서 gemma4-un(25.2B) 첫 로드 30~60s 여유 필요.
 # 이후 호출은 빠름. 환경에 따라 .env 로 조정 가능하도록 추후 이동.
 DEFAULT_TIMEOUT = 120.0
@@ -123,78 +130,11 @@ def _strip_repeat_noise(s: str) -> str:
     return s.rstrip()
 
 
-def _extract_broken_json_fields(text: str) -> tuple[str, str | None]:
-    """JSON 이 끊겼거나 깨졌을 때 "en"/"ko" 값만 정규식으로 뽑아냄.
-
-    gemma4 가 `{"en": "...중간에 끊김` 처럼 답변을 끝내지 못했을 때 사용.
-    """
-    # "en": "..." 패턴 — 마지막 따옴표 없어도 가능하면 추출
-    en_match = re.search(
-        r'"en"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', text, re.DOTALL
-    )
-    ko_match = re.search(
-        r'"ko"\s*:\s*"((?:[^"\\]|\\.)*?)(?:"|$)', text, re.DOTALL
-    )
-    en = en_match.group(1) if en_match else ""
-    ko = ko_match.group(1) if ko_match else ""
-    # JSON 이스케이프 간이 복원
-    en = en.replace('\\"', '"').replace("\\n", "\n").replace("\\\\", "\\")
-    ko = ko.replace('\\"', '"').replace("\\n", "\n").replace("\\\\", "\\")
-    # 반복 노이즈 제거
-    en = _strip_repeat_noise(en).strip()
-    ko = _strip_repeat_noise(ko).strip()
-    return en, ko or None
-
-
-def _parse_bilingual_response(raw: str) -> tuple[str, str | None]:
-    """gemma4 응답에서 {"en": ..., "ko": ...} JSON 파싱.
-
-    반환: (en_prompt, ko_translation_or_None)
-    여러 단계 폴백 체인:
-      1) 깨끗한 JSON 파싱 → 성공 시 그대로
-      2) 반복 노이즈 제거 후 JSON 재시도
-      3) 정규식으로 "en"/"ko" 값만 추출 (끊긴 JSON 대응)
-      4) 전부 실패 시 raw 전체를 en 으로, ko=None
-    """
-    if not raw or not raw.strip():
-        return "", None
-    text = raw.strip()
-    # 코드 펜스 제거 (```json ... ```)
-    if text.startswith("```"):
-        text = re.sub(r"^```(?:json)?\s*", "", text)
-        text = re.sub(r"\s*```$", "", text)
-
-    # 1) 반복 노이즈 선제 제거 (pipe/hyphen loop)
-    cleaned = _strip_repeat_noise(text)
-
-    # 2) JSON 블록 추출해서 파싱 시도
-    match = re.search(r"\{.*\}", cleaned, re.DOTALL)
-    if match:
-        try:
-            obj = json.loads(match.group(0))
-            en = _strip_repeat_noise((obj.get("en") or "").strip()).strip()
-            ko = _strip_repeat_noise((obj.get("ko") or "").strip()).strip() or None
-            if en:
-                return en, ko
-        except json.JSONDecodeError as e:
-            log.info("bilingual parse: JSON decode failed (%s), trying regex", e)
-
-    # 3) 정규식으로 "en"/"ko" 값만 추출 (끊긴 JSON 에서도 가능)
-    en_rx, ko_rx = _extract_broken_json_fields(cleaned)
-    if en_rx:
-        log.info("bilingual parse: recovered from broken JSON via regex")
-        return en_rx, ko_rx
-
-    # 4) 최종 폴백: raw 전체를 en 으로
-    log.warning("bilingual parse: all strategies failed, using raw as en")
-    return _strip_repeat_noise(text), None
-
-
 async def translate_to_korean(
     text: str,
     model: str = "gemma4-un:latest",
     timeout: float = 45.0,
-    ollama_url: str = OLLAMA_URL,
+    ollama_url: str | None = None,
 ) -> str | None:
     """영문 텍스트를 한국어로 번역 (짧은 단일 호출).
 
@@ -205,12 +145,11 @@ async def translate_to_korean(
         return None
     try:
         raw = await _call_ollama_chat(
-            ollama_url=ollama_url,
+            ollama_url=ollama_url or _DEFAULT_OLLAMA_URL,
             model=model,
             system=SYSTEM_TRANSLATE_KO,
             user=text.strip(),
             timeout=timeout,
-            json_mode=False,
         )
         cleaned = _strip_repeat_noise(raw.strip())
         return cleaned if cleaned else None
@@ -224,7 +163,7 @@ async def upgrade_generate_prompt(
     model: str = "gemma4-un:latest",
     research_context: str | None = None,
     timeout: float = DEFAULT_TIMEOUT,
-    ollama_url: str = OLLAMA_URL,
+    ollama_url: str | None = None,
     include_translation: bool = True,
 ) -> UpgradeResult:
     """생성용 프롬프트 업그레이드 (v3: 2-call — en 먼저, 그다음 ko 번역).
@@ -242,6 +181,7 @@ async def upgrade_generate_prompt(
             upgraded=prompt, fallback=True, provider="fallback", original=prompt
         )
 
+    resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
     system = SYSTEM_GENERATE
     if research_context:
         system += (
@@ -252,12 +192,11 @@ async def upgrade_generate_prompt(
     try:
         # Call 1: 영문 업그레이드 (plain text)
         upgraded_raw = await _call_ollama_chat(
-            ollama_url=ollama_url,
+            ollama_url=resolved_url,
             model=model,
             system=system,
             user=prompt,
             timeout=timeout,
-            json_mode=False,
         )
         en = _strip_repeat_noise(upgraded_raw.strip()).strip()
         if not en:
@@ -276,7 +215,7 @@ async def upgrade_generate_prompt(
     ko = None
     if include_translation:
         ko = await translate_to_korean(
-            en, model=model, timeout=60.0, ollama_url=ollama_url
+            en, model=model, timeout=60.0, ollama_url=resolved_url
         )
 
     return UpgradeResult(
@@ -293,7 +232,7 @@ async def upgrade_edit_prompt(
     image_description: str,
     model: str = "gemma4-un:latest",
     timeout: float = DEFAULT_TIMEOUT,
-    ollama_url: str = OLLAMA_URL,
+    ollama_url: str | None = None,
     include_translation: bool = True,
 ) -> UpgradeResult:
     """수정용 프롬프트 업그레이드 (v3: 2-call)."""
@@ -305,6 +244,7 @@ async def upgrade_edit_prompt(
             original=edit_instruction,
         )
 
+    resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
     user_msg = (
         f"[Image description]\n{image_description.strip()}\n\n"
         f"[Edit instruction]\n{edit_instruction.strip()}"
@@ -312,12 +252,11 @@ async def upgrade_edit_prompt(
 
     try:
         upgraded_raw = await _call_ollama_chat(
-            ollama_url=ollama_url,
+            ollama_url=resolved_url,
             model=model,
             system=SYSTEM_EDIT,
             user=user_msg,
             timeout=timeout,
-            json_mode=False,
         )
         en = _strip_repeat_noise(upgraded_raw.strip()).strip()
         if not en:
@@ -336,7 +275,7 @@ async def upgrade_edit_prompt(
     ko = None
     if include_translation:
         ko = await translate_to_korean(
-            en, model=model, timeout=60.0, ollama_url=ollama_url
+            en, model=model, timeout=60.0, ollama_url=resolved_url
         )
 
     return UpgradeResult(
@@ -355,13 +294,9 @@ async def _call_ollama_chat(
     system: str,
     user: str,
     timeout: float,
-    json_mode: bool = False,
 ) -> str:
-    """Ollama /api/chat 호출 (non-streaming).
-
-    json_mode=True 면 Ollama 의 format=json 모드로 JSON 출력 강제.
-    """
-    # v3: plain text 에도 repeat_penalty 적용 — gemma4-un 이 긴 출력에서 loop 빠지는 이슈 대응.
+    """Ollama /api/chat 호출 (non-streaming)."""
+    # v3: plain text 에 repeat_penalty 적용 — gemma4-un 이 긴 출력에서 loop 빠지는 이슈 대응.
     options: dict = {
         "num_ctx": 8192,
         "temperature": 0.6,
@@ -369,14 +304,6 @@ async def _call_ollama_chat(
         "repeat_penalty": 1.18,
         "num_predict": 800,
     }
-    if json_mode:
-        # JSON 모드는 이제 translate_to_korean 이외 비권장 — 남겨두긴 함
-        options.update(
-            {
-                "temperature": 0.5,
-                "num_predict": 1200,
-            }
-        )
 
     payload: dict = {
         "model": model,
@@ -390,8 +317,6 @@ async def _call_ollama_chat(
         "think": False,
         "options": options,
     }
-    if json_mode:
-        payload["format"] = "json"
     async with httpx.AsyncClient(timeout=timeout) as client:
         res = await client.post(f"{ollama_url}/api/chat", json=payload)
         res.raise_for_status()

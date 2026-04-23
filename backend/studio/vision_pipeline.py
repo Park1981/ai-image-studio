@@ -20,7 +20,7 @@ from pathlib import Path
 import httpx
 
 from .prompt_pipeline import (
-    OLLAMA_URL,
+    _DEFAULT_OLLAMA_URL,
     DEFAULT_TIMEOUT,
     UpgradeResult,
     upgrade_edit_prompt,
@@ -55,16 +55,18 @@ async def run_vision_pipeline(
     vision_model: str = "gemma4-heretic:vision-q4km",
     text_model: str = "gemma4-un:latest",
     timeout: float = DEFAULT_TIMEOUT,
-    ollama_url: str = OLLAMA_URL,
+    ollama_url: str | None = None,
 ) -> VisionPipelineResult:
     """수정 모드 2단계 체이닝 실행.
 
     Args:
         image_path: 로컬 파일 경로 (Path/str) 또는 raw bytes
         edit_instruction: 사용자 수정 요청 (한/영)
+        ollama_url: 미지정 시 settings.ollama_url 사용
     """
+    resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
     description = await _describe_image(
-        image_path, vision_model, timeout, ollama_url
+        image_path, vision_model, timeout, resolved_url
     )
     vision_ok = bool(description.strip())
 
@@ -77,7 +79,7 @@ async def run_vision_pipeline(
         image_description=description,
         model=text_model,
         timeout=timeout,
-        ollama_url=ollama_url,
+        ollama_url=resolved_url,
     )
     return VisionPipelineResult(
         image_description=description,

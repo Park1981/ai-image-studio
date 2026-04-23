@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any, AsyncIterator
 
@@ -81,15 +82,26 @@ class ComfyUITransport:
 
     # ─────────── HTTP ───────────
 
+    def _require_http(self) -> httpx.AsyncClient:
+        """self._http 가 세팅됐는지 확인 후 반환. `async with` 바깥에서 호출 방지.
+
+        assert 는 `python -O` 에서 제거되므로 raise 로 강제.
+        """
+        if self._http is None:
+            raise RuntimeError(
+                "ComfyUITransport must be used inside `async with` context"
+            )
+        return self._http
+
     async def submit(self, api_prompt: dict[str, Any], client_id: str) -> str:
         """POST /prompt → prompt_id.
 
         Raises:
             RuntimeError: ComfyUI 가 validation 실패 반환 시.
         """
-        assert self._http, "Use `async with` context"
+        http = self._require_http()
         payload = {"prompt": api_prompt, "client_id": client_id}
-        resp = await self._http.post("/prompt", json=payload)
+        resp = await http.post("/prompt", json=payload)
         if resp.status_code >= 400:
             detail = resp.text[:500]
             raise RuntimeError(
@@ -102,8 +114,8 @@ class ComfyUITransport:
         return prompt_id
 
     async def get_history(self, prompt_id: str) -> dict[str, Any]:
-        assert self._http, "Use `async with` context"
-        resp = await self._http.get(f"/history/{prompt_id}")
+        http = self._require_http()
+        resp = await http.get(f"/history/{prompt_id}")
         resp.raise_for_status()
         data = resp.json()
         return data.get(prompt_id, {})
@@ -115,13 +127,13 @@ class ComfyUITransport:
         image_type: str = "output",
     ) -> bytes:
         """GET /view → 이미지 바이트."""
-        assert self._http, "Use `async with` context"
+        http = self._require_http()
         params = {
             "filename": filename,
             "subfolder": subfolder,
             "type": image_type,
         }
-        resp = await self._http.get("/view", params=params)
+        resp = await http.get("/view", params=params)
         resp.raise_for_status()
         return resp.content
 
@@ -132,20 +144,20 @@ class ComfyUITransport:
         subfolder: str = "",
     ) -> str:
         """POST /upload/image — ComfyUI 의 input/ 폴더에 저장. 저장된 파일명 반환."""
-        assert self._http, "Use `async with` context"
+        http = self._require_http()
         files = {"image": (filename, image_bytes, "image/png")}
         data = {"type": "input", "subfolder": subfolder, "overwrite": "true"}
-        resp = await self._http.post("/upload/image", files=files, data=data)
+        resp = await http.post("/upload/image", files=files, data=data)
         resp.raise_for_status()
         result = resp.json()
         return result.get("name", filename)
 
     async def interrupt(self) -> None:
         """POST /interrupt — 현재 실행 중인 prompt 취소."""
-        assert self._http, "Use `async with` context"
+        http = self._require_http()
         try:
-            await self._http.post("/interrupt")
-        except Exception as e:
+            await http.post("/interrupt")
+        except (httpx.HTTPError, httpx.TimeoutException) as e:
             log.warning("ComfyUI interrupt failed: %s", e)
 
     # ─────────── WebSocket ───────────
@@ -181,10 +193,11 @@ class ComfyUITransport:
                 ping_timeout=10.0,
                 close_timeout=5.0,
             ) as ws:
-                start = asyncio.get_event_loop().time()
+                # monotonic clock: NTP/시스템 시계 조정과 무관, Python 3.12+ 권장 패턴.
+                start = time.monotonic()
                 last_msg_at = start
                 while True:
-                    now = asyncio.get_event_loop().time()
+                    now = time.monotonic()
                     if now - start > hard_timeout:
                         raise TimeoutError(
                             f"ComfyUI WS hard timeout ({hard_timeout:.0f}s)"
@@ -203,7 +216,7 @@ class ComfyUITransport:
                             f"ComfyUI WS idle timeout ({idle_timeout:.0f}s · 메시지 무응답)"
                         ) from e
 
-                    last_msg_at = asyncio.get_event_loop().time()
+                    last_msg_at = time.monotonic()
                     if isinstance(msg, bytes):
                         # 바이너리 프리뷰 프레임 — 스킵 (지금은 프리뷰 안 씀)
                         continue
