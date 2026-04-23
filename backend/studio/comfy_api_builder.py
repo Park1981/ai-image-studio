@@ -584,17 +584,18 @@ def build_video_from_request(
     }
 
     # ── 1. Pre-resize (ResizeImageMaskNode · 포트레이트 박스 fit) ──
-    # workflow 의 'scale dimensions' 모드: 지정 크기로 aspect fit (center, lanczos)
+    # resize_type 은 DYNAMICCOMBO 라 선택값에 따라 서브필드 추가 (width/height)
+    # API format 에선 dot notation 으로 flat 하게 기재.
     resize1_id = nid()
     api[resize1_id] = {
         "class_type": "ResizeImageMaskNode",
         "inputs": {
             "input": [load_id, 0],
             "resize_type": s.pre_resize_mode,
-            "width": s.pre_resize_width,
-            "height": s.pre_resize_height,
-            "anchor": s.pre_resize_anchor,
-            "method": s.pre_resize_method,
+            "resize_type.width": s.pre_resize_width,
+            "resize_type.height": s.pre_resize_height,
+            "scale_method": s.pre_resize_scale_method,
+            "crop": s.pre_resize_crop,
         },
     }
 
@@ -614,7 +615,7 @@ def build_video_from_request(
         "class_type": "LTXVPreprocess",
         "inputs": {
             "image": [resize2_id, 0],
-            "preprocess_seed": s.preprocess_seed,
+            "img_compression": s.preprocess_img_compression,
         },
     }
 
@@ -628,9 +629,9 @@ def build_video_from_request(
     api[text_encoder_id] = {
         "class_type": "LTXAVTextEncoderLoader",
         "inputs": {
-            "ckpt_name": unet_name,
             "text_encoder": VIDEO_MODEL.files.text_encoder,
-            "dtype": VIDEO_MODEL.files.weight_dtype,
+            "ckpt_name": unet_name,
+            "device": VIDEO_MODEL.files.weight_dtype,  # "default" 등
         },
     }
     audio_vae_id = nid()
@@ -710,7 +711,7 @@ def build_video_from_request(
             "vae": [ckpt_id, 2],  # Checkpoint 의 VAE output slot (보통 index 2)
             "image": [preprocess_id, 0],
             "latent": [empty_vid_id, 0],
-            "padding": s.imgtovideo_first_pad,
+            "strength": s.imgtovideo_first_strength,
             "bypass": s.imgtovideo_bypass,
         },
     }
@@ -791,7 +792,7 @@ def build_video_from_request(
             "vae": [ckpt_id, 2],
             "image": [preprocess_id, 0],
             "latent": [upsampler_id, 0],
-            "padding": s.imgtovideo_second_pad,
+            "strength": s.imgtovideo_second_strength,
             "bypass": s.imgtovideo_bypass,
         },
     }
@@ -900,6 +901,8 @@ def build_video_from_request(
         "inputs": {
             "video": [create_video_id, 0],
             "filename_prefix": "AIS-Video",
+            "format": s.save_format,
+            "codec": s.save_codec,
         },
     }
 

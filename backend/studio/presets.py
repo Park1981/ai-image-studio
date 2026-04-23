@@ -236,11 +236,12 @@ class VideoSampling:
     frame_count: int = 126  # seconds*fps + 1 (LTX 요구사항)
 
     # Pre-resize (ResizeImageMaskNode · 포트레이트 박스 fit)
+    # 실제 노드 schema: resize_type (DYNAMICCOMBO · grouped) + scale_method + crop
     pre_resize_width: int = 500
     pre_resize_height: int = 800
     pre_resize_mode: str = "scale dimensions"
-    pre_resize_anchor: str = "center"
-    pre_resize_method: str = "lanczos"
+    pre_resize_crop: str = "center"
+    pre_resize_scale_method: str = "lanczos"
 
     # Longer-edge 리사이즈 (ResizeImagesByLongerEdge)
     longer_edge: int = 1536
@@ -268,11 +269,15 @@ class VideoSampling:
     )
     upscale_cfg: float = 1.0
 
-    # LTXV 특수 파라미터
-    preprocess_seed: int = 18       # LTXVPreprocess[18]
-    imgtovideo_first_pad: float = 1.0    # LTXVImgToVideoInplace[1, False] (base stage)
-    imgtovideo_second_pad: float = 0.7   # LTXVImgToVideoInplace[0.7, False] (upscale stage)
+    # LTXV 특수 파라미터 (실 schema 기준 이름)
+    preprocess_img_compression: int = 18    # LTXVPreprocess.img_compression
+    imgtovideo_first_strength: float = 1.0  # LTXVImgToVideoInplace.strength (base)
+    imgtovideo_second_strength: float = 0.7 # LTXVImgToVideoInplace.strength (upscale)
     imgtovideo_bypass: bool = False
+
+    # SaveVideo
+    save_format: str = "mp4"  # COMBO default 'auto'
+    save_codec: str = "h264"  # COMBO default 'auto'
 
     # VAE decode
     vae_decode_tile_size: int = 768
