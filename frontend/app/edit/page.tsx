@@ -343,7 +343,7 @@ export default function EditPage() {
         style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "320px 1fr",
+          gridTemplateColumns: "400px 1fr",
           minHeight: "calc(100vh - 52px)",
         }}
       >
@@ -546,7 +546,7 @@ export default function EditPage() {
                     <img
                       src={sourceImage}
                       alt={sourceLabel}
-                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      style={{ width: "100%", height: "100%", objectFit: "contain", display: "block", background: "#111" }}
                     />
                     {/* 하단 그라디언트 오버레이 */}
                     <div
