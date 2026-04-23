@@ -9,7 +9,9 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import settings
@@ -130,6 +132,54 @@ app.include_router(prompt.router)
 
 # 재설계 (/api/studio/*) — Phase 2 신규 라우터. 기존 라우터와 병행.
 app.include_router(studio_router)
+
+
+# ─────────────────────────────────────────────
+# 전역 예외 핸들러 — 2026-04-24
+# 목적:
+#  1) 어떤 엔드포인트에서 예기치 못한 예외가 나도 FastAPI 기본 HTML
+#     "Internal Server Error" 대신 JSON 응답 + 경로/클래스 명시
+#  2) 콘솔에 전체 traceback 덤프 → 다음 500 발생 시 원인 즉시 파악
+#  3) HTTPException (404, 413 등 명시 에러) 은 기본 핸들러 유지
+# ─────────────────────────────────────────────
+
+
+@app.exception_handler(Exception)
+async def _unhandled_exception_handler(request: Request, exc: Exception):
+    # HTTPException 은 FastAPI 기본 핸들러가 이미 처리 — 여기엔 안 옴.
+    # 순수 Python Exception 만 진입.
+    logger.exception(
+        "🔥 Unhandled %s at %s %s",
+        type(exc).__name__,
+        request.method,
+        request.url.path,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "서버 내부 오류 · 백엔드 콘솔 로그 확인",
+            "error": type(exc).__name__,
+            "path": request.url.path,
+        },
+    )
+
+
+# HTTPException 은 명시적이므로 그대로 유지 (404, 413 등)
+# 단, 로깅만 찍어 디버깅 도움
+@app.exception_handler(HTTPException)
+async def _http_exception_handler(request: Request, exc: HTTPException):
+    if exc.status_code >= 500:
+        logger.warning(
+            "HTTP %d at %s %s: %s",
+            exc.status_code,
+            request.method,
+            request.url.path,
+            exc.detail,
+        )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+    )
 
 
 @app.get("/")
