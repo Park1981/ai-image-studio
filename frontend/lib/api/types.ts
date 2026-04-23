@@ -143,3 +143,21 @@ export interface ProcessStatusSnapshot {
   /** nvidia-smi 실패 시 null. total_gb=0 이거나 쿼리 실패면 null 반환. */
   vram: VramSnapshot | null;
 }
+
+/**
+ * POST /api/studio/vision-analyze 응답 — Vision Analyzer 독립 페이지용.
+ * 백엔드는 비전 호출 실패여도 HTTP 200 + fallback=true 로 반환하니 상태 분기는 fallback 필드로.
+ */
+export interface VisionAnalysisResponse {
+  /** 영문 상세 설명 (40-120 단어 목표). fallback=true 면 빈 문자열. */
+  en: string;
+  /** 한글 번역. 번역만 실패해도 en 은 보존되고 ko=null. */
+  ko: string | null;
+  /** 백엔드: "ollama" | "fallback". Mock 경로: "mock". */
+  provider: "ollama" | "fallback" | "mock";
+  fallback: boolean;
+  /** PIL 측정값. 추출 실패 시 0. */
+  width: number;
+  height: number;
+  sizeBytes: number;
+}

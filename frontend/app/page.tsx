@@ -1,12 +1,13 @@
 /**
  * Main Menu Page (진입점)
- * 카드 3장: 이미지 생성 / 이미지 수정 / 영상 생성(준비 중)
+ * 카드 4장: 이미지 생성 / 이미지 수정 / Vision 분석 / 영상 생성(준비 중)
  */
 
 "use client";
 
 import { useRouter } from "next/navigation";
 import { Logo, TopBar } from "@/components/chrome/Chrome";
+import VramBadge from "@/components/chrome/VramBadge";
 import MenuCard from "@/components/menu/MenuCard";
 import Icon from "@/components/ui/Icon";
 import SettingsButton from "@/components/settings/SettingsButton";
@@ -88,11 +89,11 @@ export default function MainMenuPage() {
           </p>
         </div>
 
-        {/* 카드 3장 */}
+        {/* 카드 4장 */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: "repeat(4, 1fr)",
             gap: 20,
           }}
         >
@@ -109,6 +110,14 @@ export default function MainMenuPage() {
             desc="참조 이미지와 자연어 지시를 비전 모델로 분석해 수정본을 생성합니다."
             hue="#EEF9E4"
             onClick={() => router.push("/edit")}
+          />
+          <MenuCard
+            icon="search"
+            title="Vision 분석"
+            desc="이미지 한 장을 비전 모델로 분석해 상세 영/한 설명을 추출합니다. 생성 프롬프트로 복사해 쓸 수 있어요."
+            hue="#FFF3E0"
+            tag="보조 기능"
+            onClick={() => router.push("/vision")}
           />
           <MenuCard
             icon="film"
@@ -147,12 +156,7 @@ export default function MainMenuPage() {
                 {historyCount}장
               </strong>
             </span>
-            <span
-              className="mono"
-              style={{ color: "var(--ink-4)", fontSize: 11, letterSpacing: ".04em" }}
-            >
-              VRAM 11.4 / 24 GB
-            </span>
+            <VramBadge />
           </div>
         </div>
       </main>
