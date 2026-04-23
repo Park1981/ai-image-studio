@@ -8,7 +8,7 @@ runtime 에 type 체크를 받는 이점. /api/studio/models 엔드포인트로
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Literal
 
 
