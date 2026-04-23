@@ -920,6 +920,8 @@ async def create_video_task(
     ollama_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
     vision_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
     adult = bool(meta_obj.get("adult", False))
+    # Lightning 토글 — 기본 True (4-step 초고속). False 면 full 30-step.
+    lightning = bool(meta_obj.get("lightning", True))
     # longerEdge: 사용자 지정 긴 변 픽셀. 누락/0 이면 기본값.
     longer_edge_raw = meta_obj.get("longerEdge") or meta_obj.get("longer_edge")
     longer_edge: int | None = None
@@ -961,6 +963,7 @@ async def create_video_task(
             source_w,
             source_h,
             longer_edge,
+            lightning,
         )
     )
     return TaskCreated(
@@ -995,6 +998,7 @@ async def _run_video_pipeline_task(
     source_width: int = 0,
     source_height: int = 0,
     longer_edge: int | None = None,
+    lightning: bool = True,
 ) -> None:
     """Video i2v 파이프라인 백그라운드 실행 (5 step).
 
@@ -1082,6 +1086,7 @@ async def _run_video_pipeline_task(
                 source_width=source_width or None,
                 source_height=source_height or None,
                 longer_edge=longer_edge,
+                lightning=lightning,
             )
 
         await task.emit("step", {"step": 3, "done": True})

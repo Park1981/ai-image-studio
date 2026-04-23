@@ -178,6 +178,12 @@ export interface VideoRequest {
    * 누락 시 백엔드 기본값 (1536) 사용.
    */
   longerEdge?: number;
+  /**
+   * Lightning 4-step 초고속 모드 (2026-04-24 · v10).
+   * true  (기본) — distilled LoRA + 4-step sigmas (5분 내외, 얼굴 drift 가능)
+   * false        — LoRA 체인 스킵 + 30-step full sigmas (20분+, 얼굴 보존 최강)
+   */
+  lightning?: boolean;
 }
 
 export type VideoStage =

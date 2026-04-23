@@ -53,10 +53,23 @@ def test_video_files_consistent() -> None:
 
 
 def test_video_loras_three_entries() -> None:
-    """distilled 2회 + extra 1회 = 3개."""
+    """lightning 2회 + adult 1회 = 3개 · 2026-04-24 v10: role rename."""
     assert len(VIDEO_MODEL.loras) == 3
     assert all(isinstance(l, VideoLoraEntry) for l in VIDEO_MODEL.loras)
     assert all(l.strength == 0.5 for l in VIDEO_MODEL.loras)
+    # role 구성: lightning 2개, adult 1개
+    roles = [l.role for l in VIDEO_MODEL.loras]
+    assert roles.count("lightning") == 2
+    assert roles.count("adult") == 1
+
+
+def test_video_sampling_tuned_for_identity() -> None:
+    """2026-04-24 v10: 얼굴 보존 위한 튜닝값."""
+    s = VIDEO_MODEL.sampling
+    # upscale anchor 강화
+    assert s.imgtovideo_second_strength == 0.9
+    # 원본 디테일 보존
+    assert s.preprocess_img_compression == 12
 
 
 def test_resolve_unet_override() -> None:
@@ -157,6 +170,78 @@ def test_build_video_lora_chain_count_adult() -> None:
     assert any(
         "eros" in n["inputs"]["lora_name"].lower() for n in lora_nodes
     ), "성인 모드 ON 인데 eros LoRA 가 체인에 없음"
+
+
+def test_build_video_lightning_off_skips_distilled() -> None:
+    """Lightning OFF — distilled LoRA 체인에서 제거 (고품질 모드)."""
+    api = build_video_from_request(
+        prompt="x", source_filename="x.png", seed=1, lightning=False
+    )
+    counts = Counter(_classes(api))
+    # adult=False 기본 + lightning=False → LoRA 0개
+    assert counts["LoraLoaderModelOnly"] == 0
+
+
+def test_build_video_lightning_off_with_adult() -> None:
+    """Lightning OFF + Adult ON — adult LoRA 1개만 체인에 포함."""
+    api = build_video_from_request(
+        prompt="x",
+        source_filename="x.png",
+        seed=1,
+        lightning=False,
+        adult=True,
+    )
+    counts = Counter(_classes(api))
+    assert counts["LoraLoaderModelOnly"] == 1
+    lora_nodes = [
+        n for n in api.values() if n["class_type"] == "LoraLoaderModelOnly"
+    ]
+    assert "eros" in lora_nodes[0]["inputs"]["lora_name"].lower()
+
+
+def test_build_video_lightning_off_uses_quality_sigmas() -> None:
+    """Lightning OFF 시 sigmas 가 full 30-step 스케줄로 교체."""
+    from studio.presets import QUALITY_BASE_SIGMAS, QUALITY_UPSCALE_SIGMAS
+
+    api_off = build_video_from_request(
+        prompt="x", source_filename="x.png", seed=1, lightning=False
+    )
+    sigmas_nodes = [
+        n for n in api_off.values() if n["class_type"] == "ManualSigmas"
+    ]
+    # 2개 ManualSigmas (base + upscale)
+    assert len(sigmas_nodes) == 2
+    sigmas_strs = {n["inputs"]["sigmas"] for n in sigmas_nodes}
+    assert QUALITY_BASE_SIGMAS in sigmas_strs
+    assert QUALITY_UPSCALE_SIGMAS in sigmas_strs
+
+    # Lightning ON 에선 distilled sigmas (원본 VIDEO_MODEL.sampling 값)
+    api_on = build_video_from_request(
+        prompt="x", source_filename="x.png", seed=1, lightning=True
+    )
+    sigmas_nodes_on = [
+        n for n in api_on.values() if n["class_type"] == "ManualSigmas"
+    ]
+    sigmas_strs_on = {n["inputs"]["sigmas"] for n in sigmas_nodes_on}
+    assert VIDEO_MODEL.sampling.base_sigmas in sigmas_strs_on
+    assert VIDEO_MODEL.sampling.upscale_sigmas in sigmas_strs_on
+
+
+def test_quality_sigmas_format_and_shift() -> None:
+    """build_quality_sigmas 가 flow shift 적용된 CSV 형태인지."""
+    from studio.presets import build_quality_sigmas
+
+    s = build_quality_sigmas(30, shift=3.1)
+    parts = [p.strip() for p in s.split(",")]
+    # steps + 1 개 (첫 값 1.0, 마지막 0.0)
+    assert len(parts) == 31
+    # 첫/마지막 sigma 값 확인 — shift 공식에서 σ=1.0 → 1.0, σ=0 → 0
+    assert parts[0] == "1.0000"
+    assert parts[-1] == "0.0000"
+    # 중간값은 단조 감소
+    floats = [float(p) for p in parts]
+    for i in range(len(floats) - 1):
+        assert floats[i] >= floats[i + 1]
 
 
 def test_build_video_sampling_counts() -> None:

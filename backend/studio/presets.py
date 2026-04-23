@@ -48,15 +48,16 @@ class LoraEntry:
 
 # ── Video 전용 LoRA 엔트리 ──
 # LTX-2.3 의 LoRA 체인:
-#  - distilled (2개): base 샘플링 + upscale 샘플링에서 상시 필요 (품질 확보)
+#  - lightning (2개): Lightning 토글 ON 시 4-step 초고속 샘플링용
+#    (2026-04-24 v10: 기존 "distilled" 에서 rename — Qwen 과 용어 통일)
 #  - adult (옵션): 성인 모드 토글 ON 시에만 체인에 포함
-# 2026-04-24 · v2: role 필드 추가로 adult 토글 동적 분기 지원.
+# Lightning OFF + adult OFF → LoRA 0개 (full LTX 2.3 원본 샘플링, 얼굴 보존 최강)
 @dataclass(frozen=True)
 class VideoLoraEntry:
     name: str
     strength: float
-    role: Literal["distilled", "adult"] = "distilled"
-    note: str = ""  # 워크플로우상 역할 메모 (예: "distilled base", "extra")
+    role: Literal["lightning", "adult"] = "lightning"
+    note: str = ""  # 워크플로우상 역할 메모 (예: "lightning base", "extra")
 
 
 # ── 파일 세트 ──
@@ -273,9 +274,12 @@ class VideoSampling:
     upscale_cfg: float = 1.0
 
     # LTXV 특수 파라미터 (실 schema 기준 이름)
-    preprocess_img_compression: int = 18    # LTXVPreprocess.img_compression
+    # 2026-04-24 · v10: 얼굴 identity drift 대응 (커뮤니티 consensus 반영)
+    #   - img_compression 18→12: 원본 얼굴/피부 디테일 보존 강화
+    #   - second_strength 0.7→0.9: upscale 단계 first-frame anchor 강화
+    preprocess_img_compression: int = 12    # LTXVPreprocess.img_compression
     imgtovideo_first_strength: float = 1.0  # LTXVImgToVideoInplace.strength (base)
-    imgtovideo_second_strength: float = 0.7 # LTXVImgToVideoInplace.strength (upscale)
+    imgtovideo_second_strength: float = 0.9 # LTXVImgToVideoInplace.strength (upscale)
     imgtovideo_bypass: bool = False
 
     # SaveVideo
@@ -308,20 +312,21 @@ VIDEO_MODEL = VideoModelPreset(
         upscaler="ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
     ),
     # 워크플로우 체인 순서 (model ← lora_last ← ... ← lora_first ← checkpoint).
-    #  - distilled 2개: 상시 (base·upscale 샘플링 품질 확보)
+    #  - lightning 2개: Lightning 토글 ON 시만 체인 포함 (4-step 초고속, 품질 희생)
     #  - adult (eros): 성인 모드 토글 ON 시에만 체인 포함
+    # 2026-04-24 · v10: role "distilled" → "lightning" rename.
     loras=[
         VideoLoraEntry(
             name="ltx-2.3-22b-distilled-lora-384.safetensors",
             strength=0.5,
-            role="distilled",
-            note="distilled · base",
+            role="lightning",
+            note="lightning · base (4-step distilled)",
         ),
         VideoLoraEntry(
             name="ltx-2.3-22b-distilled-lora-384.safetensors",
             strength=0.5,
-            role="distilled",
-            note="distilled · upscale",
+            role="lightning",
+            note="lightning · upscale (4-step distilled)",
         ),
         VideoLoraEntry(
             name="ltx2310eros_beta.safetensors",
@@ -363,16 +368,27 @@ def count_extra_loras(loras: list[LoraEntry]) -> int:
 
 
 def active_video_loras(
-    loras: list[VideoLoraEntry], adult: bool
+    loras: list[VideoLoraEntry],
+    adult: bool,
+    lightning: bool = True,
 ) -> list[VideoLoraEntry]:
-    """성인 모드 토글에 따라 활성 Video LoRA 체인 반환.
+    """Lightning/Adult 토글 조합에 따라 활성 Video LoRA 체인 반환.
 
-    - adult=False: role == "distilled" 만 (기본 2개)
-    - adult=True : 전부 (distilled 2개 + adult 1개)
+    2026-04-24 · v10: lightning 인자 추가.
+
+    - lightning=True,  adult=False: lightning 2개 (4-step 초고속 · 기본)
+    - lightning=True,  adult=True : lightning 2개 + adult 1개 (초고속 + NSFW)
+    - lightning=False, adult=False: LoRA 0개 (full 30-step · 얼굴 보존 최강)
+    - lightning=False, adult=True : adult 1개만 (full sampling + NSFW)
     """
-    if adult:
-        return list(loras)
-    return [lo for lo in loras if lo.role != "adult"]
+    result: list[VideoLoraEntry] = []
+    for lo in loras:
+        if lo.role == "lightning" and not lightning:
+            continue
+        if lo.role == "adult" and not adult:
+            continue
+        result.append(lo)
+    return result
 
 
 # ── Video 해상도 슬라이더 범위 (2026-04-24 · v9) ──
@@ -383,6 +399,32 @@ VIDEO_LONGER_EDGE_MIN = 512
 VIDEO_LONGER_EDGE_MAX = 1536
 VIDEO_LONGER_EDGE_STEP = 128
 VIDEO_LONGER_EDGE_DEFAULT = 1536
+
+
+def build_quality_sigmas(steps: int, shift: float = 3.1) -> str:
+    """Lightning OFF 시 쓸 full-step flow matching sigmas 생성.
+
+    LTX 2.3 = flow matching 모델. simple scheduler + flow shift 적용.
+    Shifted sigma 공식: σ' = shift·σ / (1 + (shift-1)·σ)
+
+    Args:
+        steps: 샘플링 스텝 수 (보통 30 for base, 20 for upscale)
+        shift: flow shift 계수 (VIDEO_MODEL.sampling.shift 와 동일, 기본 3.1)
+
+    Returns:
+        "1.0000, 0.9888, ..., 0.0" 형태 CSV (ManualSigmas 입력용).
+    """
+    parts: list[str] = []
+    for i in range(steps + 1):
+        s = 1.0 - (i / steps)
+        shifted = shift * s / (1 + (shift - 1) * s) if s > 0 else 0.0
+        parts.append(f"{shifted:.4f}")
+    return ", ".join(parts)
+
+
+# Lightning OFF (고품질) 모드 sigmas — 상수화 (빌드 속도 ↑)
+QUALITY_BASE_SIGMAS = build_quality_sigmas(30, shift=3.1)
+QUALITY_UPSCALE_SIGMAS = build_quality_sigmas(20, shift=3.1)
 
 
 def compute_video_resize(

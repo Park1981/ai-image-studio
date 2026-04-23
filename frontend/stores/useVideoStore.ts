@@ -72,6 +72,13 @@ export interface VideoState {
    */
   longerEdge: number;
 
+  /**
+   * Lightning 4-step 초고속 모드 (2026-04-24 · v10).
+   * ON  (기본) — 5분 내외 · distilled LoRA · 얼굴 drift 가능
+   * OFF        — 20분+ · full 30-step · 얼굴 보존 최강
+   */
+  lightning: boolean;
+
   /* 파이프라인 상태 (세션 한정) */
   running: boolean;
   currentStep: 1 | 2 | 3 | 4 | 5 | null;
@@ -96,6 +103,7 @@ export interface VideoState {
   setPrompt: (v: string) => void;
   setAdult: (v: boolean) => void;
   setLongerEdge: (v: number) => void;
+  setLightning: (v: boolean) => void;
   setRunning: (running: boolean) => void;
   setStep: (step: 1 | 2 | 3 | 4 | 5 | null, done: boolean) => void;
   recordStepDetail: (detail: VideoStepDetail) => void;
@@ -114,6 +122,7 @@ export const useVideoStore = create<VideoState>((set) => ({
   prompt: "피사체는 그대로 유지. 부드러운 창가 빛과 느린 달리 인, 잔잔한 앰비언스.",
   adult: false,
   longerEdge: VIDEO_LONGER_EDGE_DEFAULT,
+  lightning: true,
 
   running: false,
   currentStep: null,
@@ -147,6 +156,8 @@ export const useVideoStore = create<VideoState>((set) => ({
     );
     set({ longerEdge: clamped });
   },
+
+  setLightning: (v) => set({ lightning: v }),
 
   setRunning: (running) =>
     set(

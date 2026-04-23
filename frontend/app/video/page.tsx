@@ -70,6 +70,8 @@ export default function VideoPage() {
   const setAdult = useVideoStore((s) => s.setAdult);
   const longerEdge = useVideoStore((s) => s.longerEdge);
   const setLongerEdge = useVideoStore((s) => s.setLongerEdge);
+  const lightning = useVideoStore((s) => s.lightning);
+  const setLightning = useVideoStore((s) => s.setLightning);
   const running = useVideoStore((s) => s.running);
   const currentStep = useVideoStore((s) => s.currentStep);
   const stepDone = useVideoStore((s) => s.stepDone);
@@ -323,6 +325,106 @@ export default function VideoPage() {
             sourceHeight={sourceHeight}
           />
 
+          {/* Lightning 토글 — ON (기본): 4-step 초고속, OFF: full 30-step (얼굴 보존) */}
+          <button
+            type="button"
+            onClick={() => setLightning(!lightning)}
+            aria-pressed={lightning}
+            title={
+              lightning
+                ? "빠른 생성 ON — 4-step distilled LoRA · 5분 내외 · 얼굴 drift 가능"
+                : "고품질 모드 — full 30-step · 20분+ · 얼굴 보존 최강"
+            }
+            style={{
+              all: "unset",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              padding: "10px 14px",
+              borderRadius: 10,
+              border: lightning
+                ? "1px solid rgba(250, 173, 20, .45)"
+                : "1px solid var(--line)",
+              background: lightning
+                ? "linear-gradient(135deg, rgba(250,173,20,.12), rgba(250,173,20,.04))"
+                : "var(--surface)",
+              transition: "all .18s",
+            }}
+            onMouseEnter={(e) => {
+              if (!lightning)
+                (e.currentTarget as HTMLButtonElement).style.borderColor =
+                  "var(--line-2)";
+            }}
+            onMouseLeave={(e) => {
+              if (!lightning)
+                (e.currentTarget as HTMLButtonElement).style.borderColor =
+                  "var(--line)";
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span
+                style={{
+                  fontSize: 16,
+                  filter: lightning ? "none" : "grayscale(.8) opacity(.5)",
+                  transition: "filter .2s",
+                }}
+              >
+                ⚡
+              </span>
+              <div>
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: lightning ? "var(--amber-ink)" : "var(--ink)",
+                    letterSpacing: "-0.01em",
+                  }}
+                >
+                  빠른 생성 (Lightning)
+                </div>
+                <div
+                  style={{
+                    fontSize: 10.5,
+                    color: "var(--ink-4)",
+                    marginTop: 2,
+                  }}
+                >
+                  {lightning
+                    ? "4-step · 약 5분 · 얼굴 변할 수 있음"
+                    : "Full 30-step · 약 20분+ · 얼굴 보존 최강"}
+                </div>
+              </div>
+            </div>
+            {/* 스위치 인디케이터 */}
+            <div
+              style={{
+                width: 36,
+                height: 20,
+                borderRadius: 999,
+                background: lightning ? "#FAAD14" : "var(--line-2)",
+                position: "relative",
+                transition: "background .2s",
+                flexShrink: 0,
+              }}
+            >
+              <div
+                style={{
+                  position: "absolute",
+                  top: 2,
+                  left: lightning ? 18 : 2,
+                  width: 16,
+                  height: 16,
+                  borderRadius: "50%",
+                  background: "#fff",
+                  boxShadow: "0 1px 3px rgba(0,0,0,.2)",
+                  transition: "left .2s",
+                }}
+              />
+            </div>
+          </button>
+
           {/* 성인 모드 토글 — ON: gemma4 NSFW clause + eros LoRA 체인 포함 */}
           <button
             type="button"
@@ -529,7 +631,11 @@ export default function VideoPage() {
                 marginTop: 6,
               }}
             >
-              평균 소요 <span className="mono">5~20분</span> · 5초 영상 · 로컬 처리
+              평균 소요{" "}
+              <span className="mono">
+                {lightning ? "5~10분" : "25~40분"}
+              </span>{" "}
+              · 5초 영상 · 로컬 처리
             </div>
           </div>
         </section>

@@ -33,6 +33,8 @@ from .presets import (
     EDIT_MODEL,
     GENERATE_MODEL,
     LoraEntry,
+    QUALITY_BASE_SIGMAS,
+    QUALITY_UPSCALE_SIGMAS,
     VIDEO_LONGER_EDGE_DEFAULT,
     VIDEO_MODEL,
     VideoLoraEntry,
@@ -564,6 +566,7 @@ def build_video_from_request(
     source_width: int | None = None,
     source_height: int | None = None,
     longer_edge: int | None = None,
+    lightning: bool = True,
 ) -> ApiPrompt:
     """LTX-2.3 i2v 워크플로우 API 포맷 조립.
 
@@ -573,16 +576,17 @@ def build_video_from_request(
         seed: base stage RandomNoise 시드 (upscale stage 는 런타임 random)
         negative_prompt: 기본은 VIDEO_MODEL.negative_prompt
         unet_override: VRAM 16GB 대응용 · Kijai transformer_only 등 파일명
-        adult: 성인 모드 토글. True 면 eros LoRA 체인 포함,
-            False 면 distilled LoRA 만 로드.
+        adult: 성인 모드 토글. True 면 eros LoRA 체인 포함.
         source_width: 원본 이미지 너비 (px). 제공되면 원본 비율 유지 리사이즈 계산.
             None 이면 레거시 포트레이트 박스 (500×800) fit 로 폴백.
         source_height: 원본 이미지 높이.
         longer_edge: 사용자 지정 긴 변 픽셀 (512~1536, step 128). 기본 1536.
-            source_width/height 둘 다 제공될 때만 적용됨.
+        lightning: Lightning 4-step 초고속 모드 (2026-04-24 · v10).
+            True (기본) = distilled LoRA 체인 + 4-step sigmas (5분 내외, 얼굴 drift 가능)
+            False       = LoRA 스킵 + 30-step full sigmas (20분+, 얼굴 보존 최강)
 
     Returns:
-        ComfyUI /prompt 용 flat dict (35개 에센셜 노드).
+        ComfyUI /prompt 용 flat dict (Lightning ON=37 nodes, OFF=35 nodes).
     """
     api: ApiPrompt = {}
     nid = _make_id_gen()
@@ -676,13 +680,19 @@ def build_video_from_request(
         "inputs": {"model_name": VIDEO_MODEL.files.upscaler},
     }
 
-    # ── 5. LoRA 체인 (순차 · adult 토글에 따라 2~3단) ──
-    active_loras = active_video_loras(VIDEO_MODEL.loras, adult=adult)
+    # ── 5. LoRA 체인 (순차 · lightning/adult 토글 조합에 따라 0~3단) ──
+    active_loras = active_video_loras(
+        VIDEO_MODEL.loras, adult=adult, lightning=lightning
+    )
     model_ref = _build_video_lora_chain(
         api, nid,
         base_model=[ckpt_id, 0],
         loras=active_loras,
     )
+
+    # ── sigmas 선택: Lightning ON 은 4-step distilled, OFF 는 30-step full ──
+    base_sigmas = s.base_sigmas if lightning else QUALITY_BASE_SIGMAS
+    upscale_sigmas = s.upscale_sigmas if lightning else QUALITY_UPSCALE_SIGMAS
 
     # ── 6. CLIPTextEncode (positive · negative) ──
     pos_encode_id = nid()
@@ -773,7 +783,7 @@ def build_video_from_request(
     sigmas_base_id = nid()
     api[sigmas_base_id] = {
         "class_type": "ManualSigmas",
-        "inputs": {"sigmas": s.base_sigmas},
+        "inputs": {"sigmas": base_sigmas},
     }
     guider_base_id = nid()
     api[guider_base_id] = {
@@ -864,7 +874,7 @@ def build_video_from_request(
     sigmas_up_id = nid()
     api[sigmas_up_id] = {
         "class_type": "ManualSigmas",
-        "inputs": {"sigmas": s.upscale_sigmas},
+        "inputs": {"sigmas": upscale_sigmas},
     }
     guider_up_id = nid()
     api[guider_up_id] = {
