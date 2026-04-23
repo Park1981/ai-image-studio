@@ -67,3 +67,9 @@ docs/.bkit-memory.json
 backend/docs/.pdca-status.json
 backend/docs/.bkit-memory.json
 backend/docs/
+
+# 루트에 drop 된 개인 스크린샷/AI 이미지 — 실수 추적 방지
+/ChatGPT Image*
+/Screenshot*
+/스크린샷*
+*.tmp.png
