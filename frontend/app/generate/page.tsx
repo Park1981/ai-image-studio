@@ -1043,6 +1043,21 @@ function AdvancedAccordion({
   onSeed: (v: number) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // 입력 중 raw string — blur/Enter 시에만 store 커밋 (중간값 clamp 방지)
+  const [rawW, setRawW] = useState(String(width));
+  const [rawH, setRawH] = useState(String(height));
+
+  // store 값이 외부에서 바뀌면(프리셋 칩 클릭 등) raw 도 동기화
+  const prevWidth = useRef(width);
+  const prevHeight = useRef(height);
+  useEffect(() => {
+    if (prevWidth.current !== width) { setRawW(String(width)); prevWidth.current = width; }
+    if (prevHeight.current !== height) { setRawH(String(height)); prevHeight.current = height; }
+  }, [width, height]);
+
+  const commitW = () => { const n = parseInt(rawW, 10); if (!isNaN(n)) onWidth(n); else setRawW(String(width)); };
+  const commitH = () => { const n = parseInt(rawH, 10); if (!isNaN(n)) onHeight(n); else setRawH(String(height)); };
+
   return (
     <div
       style={{
@@ -1114,8 +1129,10 @@ function AdvancedAccordion({
                 min={256}
                 max={2048}
                 step={8}
-                value={width}
-                onChange={(e) => onWidth(Number(e.target.value) || 0)}
+                value={rawW}
+                onChange={(e) => setRawW(e.target.value)}
+                onBlur={commitW}
+                onKeyDown={(e) => { if (e.key === "Enter") { commitW(); (e.target as HTMLInputElement).blur(); } }}
                 style={{ ...inputStyle, width: 78, textAlign: "right" }}
                 aria-label="width px"
               />
@@ -1146,8 +1163,10 @@ function AdvancedAccordion({
                 min={256}
                 max={2048}
                 step={8}
-                value={height}
-                onChange={(e) => onHeight(Number(e.target.value) || 0)}
+                value={rawH}
+                onChange={(e) => setRawH(e.target.value)}
+                onBlur={commitH}
+                onKeyDown={(e) => { if (e.key === "Enter") { commitH(); (e.target as HTMLInputElement).blur(); } }}
                 style={{ ...inputStyle, width: 78, textAlign: "right" }}
                 aria-label="height px"
               />
