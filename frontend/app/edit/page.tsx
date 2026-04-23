@@ -115,6 +115,7 @@ export default function EditPage() {
 
   const [drag, setDrag] = useState(false);
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   /* ── Lightbox ── */
@@ -342,14 +343,14 @@ export default function EditPage() {
         style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "2fr 3fr",
+          gridTemplateColumns: "320px 1fr",
           minHeight: "calc(100vh - 52px)",
         }}
       >
         {/* ── LEFT column ── */}
         <section
           style={{
-            padding: "28px 32px",
+            padding: "24px 20px",
             borderRight: "1px solid var(--line)",
             display: "flex",
             flexDirection: "column",
@@ -452,161 +453,221 @@ export default function EditPage() {
               </div>
             )}
 
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDrag(true);
-              }}
-              onDragLeave={() => setDrag(false)}
-              onDrop={(e) => {
-                e.preventDefault();
-                setDrag(false);
-                handleFiles(e.dataTransfer.files);
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              style={{
-                position: "relative",
-                background: drag ? "var(--accent-soft)" : "rgba(74,158,255,.04)",
-                border: `1.5px dashed ${drag ? "var(--accent)" : "rgba(74,158,255,.45)"}`,
-                borderRadius: 12,
-                padding: "22px 22px",
-                minHeight: 180,
-                display: "flex",
-                gap: 16,
-                alignItems: "center",
-                transition: "all .2s",
-                cursor: "pointer",
-              }}
-            >
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleFiles(e.target.files)}
-                style={{ display: "none" }}
-              />
-
-              {sourceImage ? (
-                sourceImage.startsWith("data:") ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={sourceImage}
-                    alt={sourceLabel}
-                    style={{
-                      width: 130,
-                      height: 130,
-                      objectFit: "contain", // 잘리지 않게 letterbox
-                      borderRadius: 10,
-                      flexShrink: 0,
-                      background: "var(--bg-2)",
-                      display: "block",
-                    }}
-                  />
-                ) : (
-                  <ImageTile
-                    seed={sourceImage}
-                    aspect="1/1"
-                    style={{ width: 130, flexShrink: 0 }}
-                  />
-                )
-              ) : (
+            {/* 컴팩트 이미지 카드 — 이미지 우선, 상세정보는 ⓘ 클릭 시 팝오버 */}
+            <div style={{ position: "relative" }}>
+              {/* 정보 팝오버 — ⓘ 클릭 시 카드 위에 표시 */}
+              {infoOpen && sourceImage && (
                 <div
                   style={{
-                    width: 130,
-                    height: 130,
-                    flexShrink: 0,
+                    position: "absolute",
+                    bottom: "calc(100% + 6px)",
+                    left: 0,
+                    right: 0,
+                    background: "var(--surface)",
+                    border: "1px solid var(--line)",
                     borderRadius: 10,
-                    background:
-                      "repeating-linear-gradient(135deg, #F4F1EB 0 10px, #EEEAE1 10px 20px)",
-                    border: "1px dashed #D4CEC0",
-                    display: "grid",
-                    placeItems: "center",
-                    color: "var(--ink-4)",
+                    padding: "10px 12px",
+                    zIndex: 20,
+                    boxShadow: "0 4px 16px rgba(0,0,0,.1)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    fontSize: 11.5,
                   }}
                 >
-                  <Icon name="upload" size={22} />
+                  <Icon name="check" size={10} style={{ color: "var(--green)", flexShrink: 0 }} />
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                      color: "var(--ink-2)",
+                    }}
+                  >
+                    {sourceLabel}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSource(null);
+                      setInfoOpen(false);
+                      toast.info("이미지 해제됨");
+                    }}
+                    style={{
+                      all: "unset",
+                      cursor: "pointer",
+                      color: "var(--ink-3)",
+                      fontSize: 11,
+                      textDecoration: "underline",
+                      textUnderlineOffset: 3,
+                      flexShrink: 0,
+                    }}
+                  >
+                    해제
+                  </button>
                 </div>
               )}
 
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: "var(--ink)",
-                    marginBottom: 2,
-                  }}
-                >
-                  {sourceImage ? "이미지 준비됨" : "이미지 드래그 또는 클릭"}
-                </div>
-                <div
-                  style={{
-                    fontSize: 12,
-                    color: "var(--ink-3)",
-                    marginBottom: 12,
-                    lineHeight: 1.55,
-                  }}
-                >
-                  히스토리에서도 선택할 수 있어요 · PNG · JPG · WebP
-                </div>
-                <div
-                  className="mono"
-                  style={{
-                    fontSize: 10.5,
-                    color: "var(--ink-4)",
-                    letterSpacing: ".04em",
-                    display: "flex",
-                    gap: 8,
-                    alignItems: "center",
-                    flexWrap: "wrap",
-                  }}
-                >
-                  <span
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 5,
-                      padding: "2px 8px",
-                      background: "#fff",
-                      border: "1px solid var(--line)",
-                      borderRadius: 999,
-                      color: sourceImage ? "var(--ink-2)" : "var(--ink-4)",
-                      minWidth: 0,
-                      maxWidth: "100%",
-                      overflow: "hidden",
-                    }}
-                  >
-                    {sourceImage && (
-                      <Icon
-                        name="check"
-                        size={10}
-                        style={{ color: "var(--green)", flexShrink: 0 }}
-                      />
+              {/* 메인 카드 */}
+              <div
+                onDragOver={(e) => { e.preventDefault(); setDrag(true); }}
+                onDragLeave={() => setDrag(false)}
+                onDrop={(e) => { e.preventDefault(); setDrag(false); handleFiles(e.dataTransfer.files); }}
+                onClick={() => { if (!sourceImage) fileInputRef.current?.click(); }}
+                style={{
+                  position: "relative",
+                  height: 170,
+                  borderRadius: 12,
+                  overflow: "hidden",
+                  background: sourceImage
+                    ? "var(--bg-2)"
+                    : drag ? "var(--accent-soft)" : "rgba(74,158,255,.04)",
+                  border: sourceImage
+                    ? `1px solid var(--line)`
+                    : `1.5px dashed ${drag ? "var(--accent)" : "rgba(74,158,255,.45)"}`,
+                  transition: "all .2s",
+                  cursor: sourceImage ? "default" : "pointer",
+                }}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleFiles(e.target.files)}
+                  style={{ display: "none" }}
+                />
+
+                {sourceImage ? (
+                  <>
+                    {/* 이미지 풀커버 */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={sourceImage}
+                      alt={sourceLabel}
+                      style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                    />
+                    {/* 하단 그라디언트 오버레이 */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: "linear-gradient(to top, rgba(0,0,0,.55) 0%, transparent 55%)",
+                        pointerEvents: "none",
+                      }}
+                    />
+                    {/* 사이즈 배지 — 좌하단 */}
+                    {sourceWidth && sourceHeight && (
+                      <span
+                        className="mono"
+                        style={{
+                          position: "absolute",
+                          bottom: 8,
+                          left: 10,
+                          fontSize: 10,
+                          color: "rgba(255,255,255,.85)",
+                          letterSpacing: ".04em",
+                          background: "rgba(0,0,0,.35)",
+                          borderRadius: 4,
+                          padding: "2px 6px",
+                          pointerEvents: "none",
+                        }}
+                      >
+                        {sourceWidth}×{sourceHeight}
+                      </span>
                     )}
-                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {sourceLabel}
-                    </span>
-                  </span>
-                  {sourceImage && (
+                    {/* 변경 버튼 — 우하단 */}
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSource(null);
-                        toast.info("이미지 해제됨");
-                      }}
+                      onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}
                       style={{
-                        all: "unset",
+                        position: "absolute",
+                        bottom: 8,
+                        right: 8,
+                        fontSize: 10,
+                        color: "rgba(255,255,255,.8)",
+                        background: "rgba(0,0,0,.35)",
+                        border: "none",
+                        borderRadius: 4,
+                        padding: "2px 7px",
                         cursor: "pointer",
-                        color: "var(--ink-3)",
-                        textDecoration: "underline",
-                        textUnderlineOffset: 3,
+                        fontFamily: "inherit",
                       }}
                     >
-                      해제
+                      변경
                     </button>
-                  )}
-                </div>
+                    {/* ⓘ 상세보기 — 좌상단 */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setInfoOpen((v) => !v); }}
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        left: 8,
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: infoOpen ? "rgba(255,255,255,.9)" : "rgba(0,0,0,.4)",
+                        color: infoOpen ? "var(--ink)" : "#fff",
+                        border: "none",
+                        cursor: "pointer",
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: 11,
+                        fontWeight: 700,
+                        fontFamily: "serif",
+                        lineHeight: 1,
+                      }}
+                      title="상세 정보"
+                    >
+                      i
+                    </button>
+                    {/* × 해제 — 우상단 */}
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); setSource(null); setInfoOpen(false); toast.info("이미지 해제됨"); }}
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        width: 22,
+                        height: 22,
+                        borderRadius: "50%",
+                        background: "rgba(0,0,0,.4)",
+                        color: "#fff",
+                        border: "none",
+                        cursor: "pointer",
+                        display: "grid",
+                        placeItems: "center",
+                      }}
+                      title="이미지 해제"
+                    >
+                      <Icon name="x" size={10} />
+                    </button>
+                  </>
+                ) : (
+                  /* 빈 상태 — 업로드 유도 */
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      height: "100%",
+                      gap: 8,
+                      color: "var(--ink-4)",
+                    }}
+                  >
+                    <Icon name="upload" size={22} />
+                    <div style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-3)" }}>
+                      드래그 또는 클릭
+                    </div>
+                    <div style={{ fontSize: 10.5, color: "var(--ink-4)" }}>
+                      PNG · JPG · WebP
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
