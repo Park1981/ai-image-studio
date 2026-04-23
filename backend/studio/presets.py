@@ -46,6 +46,16 @@ class LoraEntry:
     role: Literal["lightning", "extra"]
 
 
+# ── Video 전용 LoRA 엔트리 ──
+# Qwen 의 lightning/extra 분류와 달리, LTX-2.3 은 LoRA 체인을 순차 적용 후
+# base+upscale 두 샘플링에서 같은 체인을 공유. role 구분 의미 없고 순서만 중요.
+@dataclass(frozen=True)
+class VideoLoraEntry:
+    name: str
+    strength: float
+    note: str = ""  # 워크플로우상 역할 메모 (예: "distilled base", "extra")
+
+
 # ── 파일 세트 ──
 @dataclass(frozen=True)
 class ModelFiles:
@@ -192,6 +202,137 @@ DEFAULT_OLLAMA_ROLES = OllamaRoles(
     text="gemma4-un:latest",
     vision="qwen2.5vl:7b",  # 표준 vision 모델 (Ollama 0.20.2 llama.cpp 지원)
 )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# LTX-2.3 Image-to-Video 프리셋
+# ══════════════════════════════════════════════════════════════════════
+# 출처: Comfy-Org/workflow_templates/templates/video_ltx2_3_i2v.json
+# 공식 ComfyUI 템플릿의 subgraph 를 분석해 에센셜 값을 Python 으로 추출.
+# ComfyMathExpression/PrimitiveInt/Reroute 조력 노드는 Python 에서 미리 계산해
+# 에센셜 25~28 노드로 축소 후 build_video_from_request 가 조립.
+# ══════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class VideoFiles:
+    """LTX-2.3 체크포인트/인코더/업스케일러 파일명.
+
+    unet 과 audio_vae 는 **같은 파일** — LTX-2.3 체크포인트에 AV VAE 가 통합.
+    """
+    unet: str
+    text_encoder: str
+    upscaler: str
+    weight_dtype: str = "default"
+
+
+@dataclass(frozen=True)
+class VideoSampling:
+    """LTX-2.3 2-stage sampling 파라미터 (공식 템플릿 값 그대로)."""
+
+    # 시간
+    seconds: int = 5
+    fps: int = 25
+    frame_count: int = 126  # seconds*fps + 1 (LTX 요구사항)
+
+    # Pre-resize (ResizeImageMaskNode · 포트레이트 박스 fit)
+    pre_resize_width: int = 500
+    pre_resize_height: int = 800
+    pre_resize_mode: str = "scale dimensions"
+    pre_resize_anchor: str = "center"
+    pre_resize_method: str = "lanczos"
+
+    # Longer-edge 리사이즈 (ResizeImagesByLongerEdge)
+    longer_edge: int = 1536
+
+    # EmptyLTXVLatentVideo (pre_resize 의 절반)
+    latent_width: int = 250   # pre_resize_width / 2
+    latent_height: int = 400  # pre_resize_height / 2
+    batch_size: int = 1
+
+    # LTXVEmptyLatentAudio
+    audio_frames: int = 126     # == frame_count
+    audio_frame_rate: int = 25  # == fps
+    audio_channels: int = 1
+
+    # Sampling — Stage 1 (base)
+    base_sampler: str = "euler_cfg_pp"
+    base_sigmas: str = "0.85, 0.7250, 0.4219, 0.0"
+    base_seed: int = 42       # RandomNoise widget (fixed) — build 호출자가 override 가능
+    base_cfg: float = 1.0
+
+    # Sampling — Stage 2 (upscale)
+    upscale_sampler: str = "euler_ancestral_cfg_pp"
+    upscale_sigmas: str = (
+        "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+    )
+    upscale_cfg: float = 1.0
+
+    # LTXV 특수 파라미터
+    preprocess_seed: int = 18       # LTXVPreprocess[18]
+    imgtovideo_first_pad: float = 1.0    # LTXVImgToVideoInplace[1, False] (base stage)
+    imgtovideo_second_pad: float = 0.7   # LTXVImgToVideoInplace[0.7, False] (upscale stage)
+    imgtovideo_bypass: bool = False
+
+    # VAE decode
+    vae_decode_tile_size: int = 768
+    vae_decode_overlap: int = 64
+    vae_decode_temporal: int = 4096
+    vae_decode_temporal_overlap: int = 4
+
+
+@dataclass(frozen=True)
+class VideoModelPreset:
+    display_name: str
+    tag: str
+    files: VideoFiles
+    loras: list[VideoLoraEntry]
+    sampling: VideoSampling
+    negative_prompt: str
+
+
+VIDEO_MODEL = VideoModelPreset(
+    display_name="LTX Video 2.3",
+    tag="22B · A/V",
+    files=VideoFiles(
+        unet="ltx-2.3-22b-dev-fp8.safetensors",
+        text_encoder="gemma_3_12B_it_fp4_mixed.safetensors",
+        upscaler="ltx-2.3-spatial-upscaler-x2-1.1.safetensors",
+    ),
+    # 워크플로우 체인 순서 그대로 (model ← lora3 ← lora2 ← lora1 ← checkpoint):
+    #   Checkpoint → 285(distilled) → 325(distilled) → 324(eros) → CFGGuider
+    loras=[
+        VideoLoraEntry(
+            name="ltx-2.3-22b-distilled-lora-384.safetensors",
+            strength=0.5,
+            note="distilled · base",
+        ),
+        VideoLoraEntry(
+            name="ltx-2.3-22b-distilled-lora-384.safetensors",
+            strength=0.5,
+            note="distilled · upscale",
+        ),
+        VideoLoraEntry(
+            name="ltx2310eros_beta.safetensors",
+            strength=0.5,
+            note="extra",
+        ),
+    ],
+    sampling=VideoSampling(),
+    negative_prompt=(
+        "pc game, console game, video game, cartoon, childish, ugly"
+    ),
+)
+
+
+def resolve_video_unet_name(env_override: str | None = None) -> str:
+    """VRAM 16GB 환경에서 공식 fp8 (29GB) 대신 Kijai transformer_only 등
+    대체 파일을 쓸 수 있게 env override 를 허용.
+
+    - env_override 가 있으면 그 값 사용
+    - 없으면 VIDEO_MODEL.files.unet 반환 (공식 29GB fp8)
+    """
+    return env_override or VIDEO_MODEL.files.unet
 
 
 # ── 유틸 ──
