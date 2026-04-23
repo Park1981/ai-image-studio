@@ -31,7 +31,8 @@
 | 비전 체이닝 | qwen2.5vl → gemma4 → LTX (Edit 모드와 동일 2-call) |
 | 출력 | MP4 (H.264 + AAC 오디오, CreateVideo 24fps) |
 | 빌더 방식 | Python (Qwen Gen/Edit 과 동일) |
-| 구현 난이도 | Edit 모드 수준 (사용자 요구) |
+| UX 난이도 | Edit 모드 수준 (사용자 요구) |
+| **구현 복잡도** | **Edit 보다 한 단계 위** — 아래 섹션 12 참고 |
 
 ## 3. 아키텍처
 
@@ -263,6 +264,57 @@ async def run_video_pipeline(
     return VideoPipelineResult(...)
 ```
 
+#### 4.4b `_dispatch_to_comfy` 확장 — save_output 콜백 주입
+
+현재 `_dispatch_to_comfy` 의 마지막 단계는 `_save_comfy_output(comfy, prompt_id)` 호출로 **이미지 PNG 저장 전용**. Video 파이프라인은 MP4 저장 경로가 달라 그대로 못 쓴다.
+
+**선택**: 공통 함수는 유지하고 **`save_output` 콜백을 주입** 하는 방식으로 확장.
+
+```python
+SaveOutputFn = Callable[[ComfyUITransport, str], Awaitable[tuple[str, int, int]]]
+# 반환: (url, width, height) · video 의 경우 width/height 는 frame 해상도
+
+async def _dispatch_to_comfy(
+    task: Task,
+    api_prompt_factory,
+    *,
+    progress_start: int,
+    progress_span: int,
+    client_prefix: str = "ais",
+    upload_bytes: bytes | None = None,
+    upload_filename: str | None = None,
+    save_output: SaveOutputFn | None = None,  # NEW — None 이면 기존 이미지 저장
+) -> ComfyDispatchResult:
+    ...
+    save_fn = save_output or _save_comfy_output
+    image_ref, width, height = await save_fn(comfy, prompt_id)
+    ...
+```
+
+Video 파이프라인은 `_save_comfy_video()` 구현해서 주입. Generate/Edit 는 기본값 그대로 동작 (회귀 없음).
+
+```python
+async def _save_comfy_video(
+    comfy: ComfyUITransport, prompt_id: str
+) -> tuple[str, int, int]:
+    """LTX i2v 결과 MP4 다운로드 + 저장.
+
+    ⚠️ ComfyUI history 응답에서 SaveVideo 노드의 출력이 어느 키로
+    나오는지(`videos` / `gifs` / `files`) 실제 캡처로 확인해야 함.
+    이 구현은 V2 시작 전 capture 결과로 확정.
+    """
+    history = await comfy.get_history(prompt_id)
+    files = extract_output_files(history, output_class="SaveVideo")
+    if not files:
+        raise RuntimeError("no video output")
+    f = files[0]  # {filename, subfolder, type, format?}
+    raw = await comfy.download_file(f["filename"], f["subfolder"], f["type"])
+    save_name = f"{uuid.uuid4().hex}.mp4"
+    (STUDIO_OUTPUT_DIR / save_name).write_bytes(raw)
+    # width/height 는 mp4 디코드 없이 알기 어려움 → 0 반환 (UI 에서 표기 생략)
+    return (f"{STUDIO_URL_PREFIX}/{save_name}", 0, 0)
+```
+
 ### 4.5 `studio/router.py` 확장
 
 ```python
@@ -362,28 +414,105 @@ async def download_file(
     """GET /view 일반화 — 기존 download_image 를 감싸는 alias."""
 ```
 
-그리고 `extract_output_images()` 와 평행하게 `extract_output_files(history_entry, class_filter="SaveVideo")` 추가 — history JSON 에서 SaveVideo 노드의 출력 파일 목록 반환.
+그리고 `extract_output_images()` 와 평행하게 `extract_output_files(history_entry, output_class="SaveVideo")` 추가 — history JSON 에서 특정 class_type 노드의 출력 파일 목록 반환.
+
+#### ⚠️ V2 전 필수: SaveVideo 출력 키 캡처
+
+ComfyUI `history/{prompt_id}` 응답에서 `outputs[node_id]` 가 SaveVideo 의 경우 어떤 키로 나오는지 **실제 구동해서 확인 필요**.
+
+후보 키: `videos` / `gifs` / `files` / `images` (어느 것일지 버전/포크마다 다름).
+
+**캡처 절차**:
+1. ComfyUI 에서 공식 LTX-2.3 i2v 워크플로우 1회 수동 실행 (Sysmem Fallback 활성화 전제)
+2. 생성 완료 후 ComfyUI `/history/{prompt_id}` 를 브라우저에서 직접 조회
+3. SaveVideo 노드의 outputs 구조 JSON 복사
+4. 이 spec 에 결과 첨부 후 `extract_output_files` 구현 확정
+
+**추정 구조 (검증 전)**:
+```json
+{
+  "outputs": {
+    "<save_node_id>": {
+      "videos": [{"filename": "...mp4", "subfolder": "", "type": "output", "format": "video/mp4"}]
+    }
+  }
+}
+```
+
+캡처 없이 구현하면 첫 E2E 에서 `KeyError`. **V2 시작 전 차단자**.
 
 ### 4.7 `studio/history_db.py` 확장
 
 - CHECK constraint `mode IN ('generate', 'edit')` → `('generate', 'edit', 'video')`
-- 기존 DB 마이그레이션: SQLite CHECK 변경은 까다로워서 **"CHECK 제거"** 방향 — 런타임 validation 으로 전환
 - 신규 필드는 추가하지 않음. `imageRef` 가 mp4 URL 이면 video 로 간주
 
-**마이그레이션**:
-```sql
--- 무통증 경로: CHECK 제거한 새 테이블로 copy
-PRAGMA foreign_keys=off;
-BEGIN;
-CREATE TABLE studio_history_new (id TEXT PRIMARY KEY, mode TEXT NOT NULL, ...);
-INSERT INTO studio_history_new SELECT * FROM studio_history;
-DROP TABLE studio_history;
-ALTER TABLE studio_history_new RENAME TO studio_history;
-COMMIT;
-PRAGMA foreign_keys=on;
+#### 마이그레이션 전략 (SQLite CHECK 제약)
+
+SQLite 는 `ALTER TABLE ... DROP CHECK` 불가. 테이블 재생성 필수.
+
+**판별**: PRAGMA table_info 로는 CHECK 표현식 안 나옴. `sqlite_master.sql` 에서 CREATE TABLE 원문 조회 후 정규식으로 `CHECK(mode IN ('generate','edit'))` 존재 여부 확인.
+
+**안전한 idempotent 마이그레이션**:
+```python
+async def _needs_video_migration(db: aiosqlite.Connection) -> bool:
+    cur = await db.execute(
+        "SELECT sql FROM sqlite_master "
+        "WHERE type='table' AND name='studio_history'"
+    )
+    row = await cur.fetchone()
+    if not row or not row[0]:
+        return False
+    create_sql = row[0]
+    # 'video' 가 CHECK 목록에 이미 포함됐으면 스킵
+    return "'video'" not in create_sql
+
+async def _migrate_add_video_mode(db: aiosqlite.Connection) -> None:
+    """CHECK 제약 확장 — 다음 순서로 원자적 실행:
+    1) 트랜잭션 시작
+    2) 새 CREATE TABLE studio_history_new (CHECK 확장판)
+    3) INSERT ... SELECT 로 데이터 복사 (인덱스 없이)
+    4) DROP TABLE studio_history
+    5) ALTER TABLE ... RENAME TO studio_history
+    6) 인덱스 재생성 (idx_studio_history_created, idx_studio_history_mode)
+    7) COMMIT
+    """
+    await db.execute("BEGIN IMMEDIATE")
+    try:
+        await db.execute(
+            "CREATE TABLE studio_history_new ("
+            " id TEXT PRIMARY KEY,"
+            " mode TEXT NOT NULL CHECK(mode IN ('generate','edit','video')),"
+            " ... (기존 컬럼 순서 완전 동일)"
+            ")"
+        )
+        await db.execute(
+            "INSERT INTO studio_history_new SELECT * FROM studio_history"
+        )
+        await db.execute("DROP TABLE studio_history")
+        await db.execute(
+            "ALTER TABLE studio_history_new RENAME TO studio_history"
+        )
+        # 인덱스는 DROP TABLE 에서 함께 삭제됨 → 재생성
+        await db.execute(CREATE_IDX_CREATED)
+        await db.execute(CREATE_IDX_MODE)
+        await db.commit()
+        log.info("studio_history 마이그레이션: 'video' 모드 CHECK 확장 완료")
+    except Exception:
+        await db.execute("ROLLBACK")
+        raise
 ```
 
-런타임에 `init_studio_history_db()` 에서 idempotent 체크 (PRAGMA table_info 로 기존 CHECK 확인 후 마이그레이션).
+`init_studio_history_db()` 에서:
+```python
+if await _needs_video_migration(db):
+    await _migrate_add_video_mode(db)
+```
+
+**주의 사항**:
+- `BEGIN IMMEDIATE` 로 write lock 확보
+- 실패 시 ROLLBACK → 기존 테이블 그대로 유지 (데이터 무손실)
+- 신규 CREATE TABLE 은 기존과 **컬럼 순서·타입 완전 동일** 해야 `SELECT *` 복사 안전. 이 spec 구현 시 기존 `CREATE_TABLE` 상수를 그대로 재사용하되 CHECK 부분만 교체.
+- 테스트: `test_video_pipeline.py` 에 마이그레이션 테스트 추가 (CHECK 없는 DB → 마이그레이션 → 'video' insert 성공 확인).
 
 ### 4.8 저장 경로
 
@@ -392,7 +521,7 @@ PRAGMA foreign_keys=on;
 
 ## 5. 프론트엔드 설계
 
-### 5.1 `lib/api/types.ts` 확장
+### 5.1 `lib/api/types.ts` 확장 + 파급 효과
 
 ```typescript
 // mode 타입에 "video" 추가
@@ -407,6 +536,39 @@ export interface HistoryItem {
   /** 프레임 수. video 모드만. */
   frameCount?: number;
 }
+```
+
+#### ⚠️ mode 확장 파급 — video ref 를 이미지로 렌더하면 broken
+
+`imageRef` 가 `.mp4` URL 인 경우 기존 컴포넌트들이 `<img src={imageRef}>` 로 렌더하면 broken image 표시. 영향 파일 + 대응:
+
+| 컴포넌트 | 영향 | 대응 |
+|---------|------|------|
+| `components/ui/ImageTile.tsx` | `isImageRef(seed)` 가 `.mp4` 도 image 로 판정 → `<img>` broken | `isVideoRef(ref)` 추가 · `<video muted poster>` 분기 또는 상위에서 render prop 주입 |
+| `components/studio/HistoryTile.tsx` | item.mode === "video" 인 경우 전부 ImageTile 로 렌더 | mode 따라 VideoThumb 컴포넌트로 분기 |
+| `components/studio/SelectedItemPreview.tsx` | Generate 전용이라 video 미진입 (히스토리 필터가 mode==="generate") | **영향 없음** (필터로 격리) |
+| `components/studio/HistoryPicker.tsx` | Edit 페이지의 "히스토리에서 선택" — 전체 items 를 ImageTile 로 | Edit 원본으로는 video 부적절 → `items.filter(mode !== "video")` |
+| `components/studio/AiEnhanceCard.tsx` | upgradedPrompt/visionDescription 표시 — 이미지 자체는 안 그림 | **영향 없음** |
+| `components/studio/ImageLightbox.tsx` | `<img src>` 로 큰 이미지 | mode==="video" 면 `<video controls>` 분기 또는 Video 전용 Lightbox 별도 |
+| `stores/useHistoryStore.ts` | 전체 items 공유 | `itemsByMode` 이미 존재 — 필터로 OK |
+
+**이번 spec 구현 범위**:
+- `ImageTile` + `HistoryTile` 은 video 분기 **구현** (필수 · 히스토리 그리드에 video 썸네일 나와야)
+- `HistoryPicker` 는 **필터**만 (`mode !== "video"`)
+- `ImageLightbox` 는 **이번 범위 밖** — Video 는 VideoPlayerCard 가 우측에 상시 노출되므로 라이트박스 없어도 동작. v2 확장.
+
+`VideoThumb` 컴포넌트 간단 설계:
+```typescript
+<div style={{position:"relative", aspectRatio:"1/1"}}>
+  <video src={ref} muted playsInline preload="metadata"
+         style={{width:"100%", height:"100%", objectFit:"cover"}} />
+  <div style={{position:"absolute", bottom:6, right:6,
+               background:"rgba(0,0,0,.6)", color:"#fff",
+               fontSize:10, padding:"2px 6px", borderRadius:4}}>
+    ▶ 4s
+  </div>
+</div>
+```
 
 export interface VideoRequest {
   sourceImage: string | File;
@@ -601,14 +763,15 @@ Edit 페이지 레이아웃 재활용 (좌 400px / 우 1fr):
 
 ## 10. 구현 순서 (커밋 단위)
 
-1. **V1. Spec 문서** (이 문서) 커밋
-2. **V2. 백엔드 preset + 빌더** — presets.py::VIDEO_MODEL + comfy_api_builder.py::build_video_from_request + test_video_builder.py
-3. **V3. 백엔드 파이프라인** — prompt_pipeline.py::upgrade_video_prompt + video_pipeline.py + history_db.py 마이그레이션 + test_video_pipeline.py
-4. **V4. 백엔드 라우트** — router.py::/video + /video/stream + comfy_transport 확장 + /env override 연결
-5. **V5. 프론트 타입/API/스토어** — types.ts + lib/api/video.ts + useVideoStore.ts
-6. **V6. 프론트 훅/컴포넌트** — useVideoPipeline.ts + VideoPlayerCard.tsx
-7. **V7. 프론트 페이지** — app/video/page.tsx 실구현 + 메인 메뉴 disabled 해제
-8. **V8. 검증 + master 머지** — pytest + tsc + build + 실 구동 체크리스트
+1. **V1. Spec 문서** (이 문서) 커밋 ✅
+2. **V1.5. ComfyUI SaveVideo 출력 키 캡처** — ⚠️ **차단자** · 실 구동 1회, `/history/{id}` JSON 복사해서 spec 업데이트. 이 결과 없이 V2 시작 금지.
+3. **V2. 백엔드 preset + 빌더** — presets.py::VIDEO_MODEL + comfy_api_builder.py::build_video_from_request + test_video_builder.py
+4. **V3. 백엔드 파이프라인** — prompt_pipeline.py::upgrade_video_prompt + video_pipeline.py + history_db.py 마이그레이션(sqlite_master 기반) + test_video_pipeline.py (마이그레이션 테스트 포함)
+5. **V4. 백엔드 라우트 + transport 확장** — router.py::/video + /video/stream + comfy_transport.extract_output_files + download_file + _dispatch_to_comfy 에 save_output 콜백 주입 + _save_comfy_video
+6. **V5. 프론트 타입/API/스토어** — types.ts (mode 확장 + video 메타) + lib/api/video.ts + useVideoStore.ts
+7. **V6. 프론트 훅/컴포넌트** — useVideoPipeline.ts + VideoPlayerCard.tsx + VideoThumb (ImageTile/HistoryTile video 분기)
+8. **V7. 프론트 페이지 + 필터** — app/video/page.tsx 실구현 + 메인 메뉴 disabled 해제 + HistoryPicker 에 video 필터
+9. **V8. 검증 + master 머지** — pytest (마이그레이션 테스트 포함) + tsc + build + 실 구동 체크리스트
 
 ## 11. 향후 확장 여지 (이번 범위 밖)
 
@@ -619,3 +782,22 @@ Edit 페이지 레이아웃 재활용 (좌 400px / 우 1fr):
 - 썸네일/포스터 프레임 추출 (ffmpeg) — 히스토리 썸네일 개선
 - 영상 전용 라이트박스 (ImageLightbox 확장)
 - LoRA 강도 토글 (현재 0.5 고정)
+- MP4 메타 파싱으로 width/height/duration 백엔드에서 정확 기록 (현재 0 반환)
+
+## 12. 실제 구현 복잡도 — "Edit 보다 한 단계 위" 상세
+
+사용자 요구는 "Edit 모드 수준" 이지만 UX 만 그렇고 구현 복잡도는 실질적으로 높다. 주의 요인:
+
+| 요인 | Edit | Video | 차이 |
+|------|------|-------|------|
+| 출력 포맷 | PNG 1장 | MP4 + 오디오 | `download_file` · mime 처리 · `<video>` 재생 |
+| 워크플로우 노드 수 | 15~20 | **47** | LTX-2.3 subgraph 큼 |
+| Sampling 구조 | 단일 KSampler | **2-stage** (base + upscale) + AV concat | `build_video_from_request` 분기 많음 |
+| WS 타임아웃 | 10분 | **60분** | idle 15분 · hard 1시간 |
+| ComfyUI 출력 키 | `images` 확정 | **`videos`/`gifs`/`files` 미확인** | V1.5 캡처 필요 |
+| DB 마이그레이션 | 기존 컬럼 추가 (ALTER) | **CHECK 제약 확장** (재생성) | 트랜잭션/인덱스 복구 |
+| 프론트 썸네일 | `<img>` | **`<video>` + poster** | ImageTile 분기 |
+| 히스토리 렌더 파급 | mode 분기 불필요 | **mode==="video" 전파** (5+ 파일) | 타입 union 확장 |
+| VRAM 요구 | 16GB 여유 | **16GB 빡빡 (29GB fp8)** | env override + Sysmem Fallback 문서화 |
+
+**총평**: UI 자체는 Edit 복붙 수준 단순하지만, 백엔드/스토리지/타입 레이어는 한 층 위의 작업. V2~V8 커밋 단위로 나눈 건 이 복잡도를 단계별로 차단하려는 목적.
