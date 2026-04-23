@@ -133,7 +133,7 @@ export type GenStage =
       /** comfyui-sampling 시 총 샘플러 step (예: 40) */
       samplingTotal?: number | null;
     }
-  | { type: "done"; item: HistoryItem };
+  | { type: "done"; item: HistoryItem; savedToHistory: boolean };
 
 export type EditStage =
   | {
@@ -168,7 +168,7 @@ export type EditStage =
       samplingStep?: number;
       samplingTotal?: number;
     }
-  | { type: "done"; item: HistoryItem };
+  | { type: "done"; item: HistoryItem; savedToHistory: boolean };
 
 /* ─────────────────────────────────
    공용 유틸
@@ -283,8 +283,16 @@ async function* realGenerateStream(
       throw new Error(payload.message || "pipeline error");
     }
     if (evt.event === "done") {
-      const payload = evt.data as { item: HistoryItem };
-      yield { type: "done", item: normalizeItem(payload.item) };
+      const payload = evt.data as {
+        item: HistoryItem;
+        savedToHistory?: boolean;
+      };
+      yield {
+        type: "done",
+        item: normalizeItem(payload.item),
+        // 백엔드가 안 보내면 "정상 저장" 으로 가정 (구 버전 호환)
+        savedToHistory: payload.savedToHistory ?? true,
+      };
       return;
     }
     if (evt.event === "stage") {
@@ -348,7 +356,7 @@ async function* mockGenerateStream(
         ]
       : undefined,
   };
-  yield { type: "done", item };
+  yield { type: "done", item, savedToHistory: true };
 }
 
 /* ─────────────────────────────────
@@ -438,8 +446,15 @@ async function* realEditStream(
       throw new Error(payload.message || "pipeline error");
     }
     if (evt.event === "done") {
-      const payload = evt.data as { item: HistoryItem };
-      yield { type: "done", item: normalizeItem(payload.item) };
+      const payload = evt.data as {
+        item: HistoryItem;
+        savedToHistory?: boolean;
+      };
+      yield {
+        type: "done",
+        item: normalizeItem(payload.item),
+        savedToHistory: payload.savedToHistory ?? true,
+      };
       return;
     }
     if (evt.event === "step") {
@@ -519,7 +534,7 @@ async function* mockEditStream(
     upgradedPromptKo: `${req.prompt}, 얼굴 동일성 유지 (같은 사람, 동일한 이목구비), 사실적인 피부 텍스처, 스무딩 없음, 포토리얼리즘, 자연광`,
     promptProvider: "mock",
   };
-  yield { type: "done", item };
+  yield { type: "done", item, savedToHistory: true };
 }
 
 /* ─────────────────────────────────

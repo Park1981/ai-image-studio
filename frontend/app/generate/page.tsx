@@ -74,6 +74,7 @@ export default function GeneratePage() {
   const height = useGenerateStore((s) => s.height);
   const setWidth = useGenerateStore((s) => s.setWidth);
   const setHeight = useGenerateStore((s) => s.setHeight);
+  const setDimensions = useGenerateStore((s) => s.setDimensions);
   const aspectLocked = useGenerateStore((s) => s.aspectLocked);
   const setAspectLocked = useGenerateStore((s) => s.setAspectLocked);
   const research = useGenerateStore((s) => s.research);
@@ -104,7 +105,6 @@ export default function GeneratePage() {
   const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
   const visionModelSel = useSettingsStore((s) => s.visionModel);
   const addTemplate = useSettingsStore((s) => s.addTemplate);
-  const ollamaStatus = useProcessStore((s) => s.ollama);
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
   /* ── 생성 모드에서만 보이는 히스토리 필터 ── */
@@ -190,6 +190,13 @@ export default function GeneratePage() {
             toast.warn(
               "gemma4 업그레이드 실패",
               "원본 프롬프트로 생성됨. Ollama 상태 확인 또는 설정에서 재시작해봐.",
+            );
+          }
+          // 히스토리 DB 저장 실패 — 프론트 localStorage 에는 들어가지만 서버 재기동 시 사라짐
+          if (!evt.savedToHistory) {
+            toast.warn(
+              "히스토리 DB 저장 실패",
+              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
             );
           }
           return;
@@ -300,11 +307,6 @@ export default function GeneratePage() {
       );
     }
   };
-
-  /* ── 프리퍼런스 showUpgradeStep 은 Phase 2 에서 모달로 연결 예정.
-        지금은 토스트로 일시 안내만. */
-  void showUpgradeStep;
-  void ollamaStatus;
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -442,6 +444,13 @@ export default function GeneratePage() {
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  // Shift+Enter — 즉시 생성 (툴팁 ⇧↵ 배지와 일치)
+                  if (e.key === "Enter" && e.shiftKey) {
+                    e.preventDefault();
+                    if (!generating && prompt.trim()) handleGenerate();
+                  }
+                }}
                 placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."
                 rows={5}
                 style={{
@@ -926,17 +935,11 @@ export default function GeneratePage() {
                   <SmallBtn
                     icon="sparkle"
                     onClick={() => {
-                      // 프롬프트/종횡비/시드/옵션을 현재 폼에 로드
+                      // 프롬프트/사이즈/시드/옵션을 현재 폼에 완전 복원 (픽셀 기준 권위)
                       setPrompt(selectedItem.prompt);
-                      // 종횡비 역추출 (width:height 비율 → label)
-                      const ratio = ASPECT_RATIOS.find(
-                        (r) =>
-                          Math.abs(
-                            r.width / r.height -
-                              selectedItem.width / selectedItem.height,
-                          ) < 0.01,
-                      );
-                      if (ratio) setAspect(ratio.label);
+                      // 실제 픽셀 사이즈를 그대로 복원 — 프리셋/커스텀 여부 무관.
+                      // setDimensions 는 aspectLocked 무시하고 원자적으로 양쪽 세팅 + aspect 라벨 매칭.
+                      setDimensions(selectedItem.width, selectedItem.height);
                       setSeed(selectedItem.seed);
                       setSteps(selectedItem.steps);
                       setCfg(selectedItem.cfg);
@@ -945,7 +948,7 @@ export default function GeneratePage() {
                       }
                       toast.info(
                         "재생성 준비",
-                        "같은 설정으로 로드됨 · [생성] 눌러",
+                        `${selectedItem.width}×${selectedItem.height} · [생성] 눌러`,
                       );
                     }}
                   >

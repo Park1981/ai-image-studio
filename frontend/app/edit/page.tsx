@@ -104,19 +104,28 @@ export default function EditPage() {
   const selectHistory = useHistoryStore((s) => s.select);
   // 수정 모드 우측 그리드는 edit 결과만 (generate 섞이면 Before/After 슬라이더가 엉뚱하게 매칭됨)
   const editResults = items.filter((x) => x.mode === "edit");
+  // 그리드는 최근 12개만 노출 (과다 스크롤 방지)
   const historyForRight = editResults.slice(0, 12);
   // afterId 는 기본 null. 새 수정이 완료되면 setAfterId 로 지정됨.
   // 히스토리 썸네일 클릭 시에도 사용자 의도대로 지정됨.
   const [afterId, setAfterId] = useState<string | null>(null);
-  // fallback 제거: afterId 에 해당하는 아이템 없으면 undefined 리턴 → 슬라이더 placeholder 표시
+  // afterItem 은 전체 editResults 에서 검색 — 12개 넘어간 오래된 결과라도
+  // 사용자가 선택해둔 것이면 슬라이더에 정상 표시됨.
   const afterItem = afterId
-    ? historyForRight.find((x) => x.id === afterId)
+    ? editResults.find((x) => x.id === afterId)
     : undefined;
 
   const [drag, setDrag] = useState(false);
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  /* ── 소스 이미지 해제 (카드 우상단 × 와 팝오버 링크 공통 경로) ── */
+  const handleClearSource = () => {
+    setSource(null);
+    setInfoOpen(false);
+    toast.info("이미지 해제됨");
+  };
 
   /* ── Lightbox ── */
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -249,6 +258,13 @@ export default function EditPage() {
             toast.warn(
               "gemma4 업그레이드 실패",
               "Ollama 상태 확인 필요",
+            );
+          }
+          // 히스토리 DB 저장 실패 힌트 (백엔드 B10)
+          if (!evt.savedToHistory) {
+            toast.warn(
+              "히스토리 DB 저장 실패",
+              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
             );
           }
           return;
@@ -491,9 +507,7 @@ export default function EditPage() {
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      setSource(null);
-                      setInfoOpen(false);
-                      toast.info("이미지 해제됨");
+                      handleClearSource();
                     }}
                     style={{
                       all: "unset",
@@ -626,7 +640,7 @@ export default function EditPage() {
                     {/* × 해제 — 우상단 */}
                     <button
                       type="button"
-                      onClick={(e) => { e.stopPropagation(); setSource(null); setInfoOpen(false); toast.info("이미지 해제됨"); }}
+                      onClick={(e) => { e.stopPropagation(); handleClearSource(); }}
                       style={{
                         position: "absolute",
                         top: 8,
