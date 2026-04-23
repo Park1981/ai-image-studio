@@ -63,6 +63,12 @@ class Settings(BaseSettings):
     # 기본 워크플로우
     default_workflow: str = "qwen_image"
 
+    # LTX-2.3 Video i2v — VRAM 16GB 대응용 unet override.
+    # 기본 fp8 체크포인트(29GB)가 로컬에서 너무 크면, .env 에
+    # LTX_UNET_NAME=ltx-2.3-22b-dev_transformer_only_fp8_scaled.safetensors
+    # 같이 지정해 Kijai/축소 variant 로 교체 가능.
+    ltx_unet_name: str | None = None
+
     # 앱 설정
     # ComfyUI(8000)와 충돌 회피를 위해 백엔드는 8001 기본 사용
     app_host: str = "127.0.0.1"

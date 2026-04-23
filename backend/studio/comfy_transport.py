@@ -126,12 +126,25 @@ class ComfyUITransport:
         subfolder: str = "",
         image_type: str = "output",
     ) -> bytes:
-        """GET /view → 이미지 바이트."""
+        """GET /view → 이미지 바이트 (PNG/JPG 등). download_file 의 별칭."""
+        return await self.download_file(filename, subfolder, image_type)
+
+    async def download_file(
+        self,
+        filename: str,
+        subfolder: str = "",
+        file_type: str = "output",
+    ) -> bytes:
+        """GET /view → 임의 파일 바이트 (이미지/영상 공용).
+
+        ComfyUI /view 는 type=output 으로 임의 바이너리 서빙 가능 —
+        MP4/GIF/이미지 구분 안 함.
+        """
         http = self._require_http()
         params = {
             "filename": filename,
             "subfolder": subfolder,
-            "type": image_type,
+            "type": file_type,
         }
         resp = await http.get("/view", params=params)
         resp.raise_for_status()
@@ -260,4 +273,53 @@ def extract_output_images(history_entry: dict[str, Any]) -> list[dict[str, str]]
                     "type": img.get("type", "output"),
                 }
             )
+    return results
+
+
+# ComfyUI 버전별로 SaveVideo 등이 outputs 안에 어떤 키로 배치하는지 다름 —
+# 몇 개의 후보 키 순회하며 먼저 발견된 파일 메타 반환.
+_OUTPUT_FILE_KEYS = ("videos", "gifs", "animated", "files", "images")
+
+
+def extract_output_files(
+    history_entry: dict[str, Any],
+    node_class_filter: str | None = None,
+) -> list[dict[str, str]]:
+    """history 응답에서 모든 파일 출력 추출 (video/image/etc).
+
+    SaveVideo 노드가 outputs 에 어떤 키로 들어가는지 ComfyUI 버전/포크마다
+    다르므로 (`videos`/`gifs`/`animated`/`files`/`images`) 순서대로 탐색.
+
+    Args:
+        history_entry: /history/{prompt_id} 응답의 entry
+        node_class_filter: (옵션) 특정 class_type 의 노드 출력만. None 이면 전부.
+            현재 history_entry 에는 class_type 정보 없음 → 보통 None 으로 호출,
+            파일 확장자로 후처리 필터링 권장.
+
+    Returns:
+        [{filename, subfolder, type, format?}, ...]
+    """
+    outputs = history_entry.get("outputs", {})
+    results: list[dict[str, str]] = []
+    for _node_id, node_output in outputs.items():
+        if not isinstance(node_output, dict):
+            continue
+        for key in _OUTPUT_FILE_KEYS:
+            files = node_output.get(key, [])
+            if not isinstance(files, list):
+                continue
+            for f in files:
+                if not isinstance(f, dict):
+                    continue
+                entry = {
+                    "filename": f.get("filename", ""),
+                    "subfolder": f.get("subfolder", ""),
+                    "type": f.get("type", "output"),
+                }
+                if "format" in f:
+                    entry["format"] = f["format"]
+                results.append(entry)
+    # node_class_filter 는 현재 history_entry 에 class_type 없어 적용 불가.
+    # Future: history.outputs 구조에 class_type 포함되면 활용.
+    _ = node_class_filter
     return results
