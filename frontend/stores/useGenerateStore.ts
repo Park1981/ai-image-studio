@@ -8,7 +8,18 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import { GENERATE_MODEL, type AspectRatioLabel } from "@/lib/model-presets";
+import {
+  ASPECT_RATIOS,
+  GENERATE_MODEL,
+  getAspect,
+  type AspectRatioLabel,
+} from "@/lib/model-presets";
+
+/** Qwen/ComfyUI 권장: 8의 배수 + 256~2048 clamp */
+export function snapDimension(v: number): number {
+  const clamped = Math.max(256, Math.min(2048, Math.round(v)));
+  return Math.round(clamped / 8) * 8;
+}
 
 export interface StageEvent {
   type: string;
@@ -20,9 +31,18 @@ export interface StageEvent {
   arrivedAt: number;
 }
 
+/** 프리셋 중 어느 것과도 안 맞는 사용자 지정 사이즈 */
+export type AspectValue = AspectRatioLabel | "custom";
+
 export interface GenerateState {
   prompt: string;
-  aspect: AspectRatioLabel;
+  /** 프리셋 라벨 또는 "custom" (사용자가 픽셀 직접 수정한 경우) */
+  aspect: AspectValue;
+  /** 실제 사용할 픽셀 폭/높이 — aspect 프리셋과 독립적 */
+  width: number;
+  height: number;
+  /** 비율 잠금: ON 이면 한쪽 수정 시 다른쪽 자동 계산 */
+  aspectLocked: boolean;
   research: boolean;
   lightning: boolean;
   steps: number;
@@ -44,7 +64,12 @@ export interface GenerateState {
 
   // actions
   setPrompt: (v: string) => void;
+  /** 프리셋 선택 — aspect + width + height 를 동시에 프리셋 값으로 세팅 */
   setAspect: (v: AspectRatioLabel) => void;
+  /** 픽셀 직접 수정 — aspectLocked 상태를 참고해 반대편 자동 갱신 */
+  setWidth: (v: number) => void;
+  setHeight: (v: number) => void;
+  setAspectLocked: (v: boolean) => void;
   setResearch: (v: boolean) => void;
   setLightning: (v: boolean) => void;
   setSteps: (v: number) => void;
@@ -65,9 +90,15 @@ const DEFAULT_PROMPT =
 
 export const useGenerateStore = create<GenerateState>()(
   persist(
-    (set) => ({
+    (set) => {
+      const defaultAspect = GENERATE_MODEL.defaults.aspect;
+      const defaultPreset = getAspect(defaultAspect);
+      return {
       prompt: DEFAULT_PROMPT,
-      aspect: GENERATE_MODEL.defaults.aspect,
+      aspect: defaultAspect,
+      width: defaultPreset.width,
+      height: defaultPreset.height,
+      aspectLocked: true,
       research: true,
       lightning: false,
       steps: GENERATE_MODEL.defaults.steps,
@@ -83,7 +114,28 @@ export const useGenerateStore = create<GenerateState>()(
       samplingTotal: null,
 
       setPrompt: (v) => set({ prompt: v }),
-      setAspect: (v) => set({ aspect: v }),
+      setAspect: (v) => {
+        // 프리셋 선택 시 width/height 도 함께 프리셋 값으로 덮어씀 (비율 잠금 기준이 리셋됨)
+        const preset = getAspect(v);
+        set({ aspect: v, width: preset.width, height: preset.height });
+      },
+      setWidth: (v) =>
+        set((s) => {
+          const newW = snapDimension(v);
+          if (!s.aspectLocked) return { width: newW, aspect: matchAspect(newW, s.height) };
+          const ratio = s.width / s.height || 1;
+          const newH = snapDimension(newW / ratio);
+          return { width: newW, height: newH, aspect: matchAspect(newW, newH) };
+        }),
+      setHeight: (v) =>
+        set((s) => {
+          const newH = snapDimension(v);
+          if (!s.aspectLocked) return { height: newH, aspect: matchAspect(s.width, newH) };
+          const ratio = s.width / s.height || 1;
+          const newW = snapDimension(newH * ratio);
+          return { width: newW, height: newH, aspect: matchAspect(newW, newH) };
+        }),
+      setAspectLocked: (v) => set({ aspectLocked: v }),
       setResearch: (v) => set({ research: v }),
       setLightning: (v) => set({ lightning: v }),
       setSteps: (v) => set({ steps: v }),
@@ -137,15 +189,19 @@ export const useGenerateStore = create<GenerateState>()(
           });
         }
       },
-    }),
+      };
+    },
     {
       name: "ais:generate",
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
       // 진행 상태 제외 (영속 X)
       partialize: (s) => ({
         prompt: s.prompt,
         aspect: s.aspect,
+        width: s.width,
+        height: s.height,
+        aspectLocked: s.aspectLocked,
         research: s.research,
         lightning: s.lightning,
         steps: s.steps,
@@ -155,3 +211,9 @@ export const useGenerateStore = create<GenerateState>()(
     },
   ),
 );
+
+/** W/H 가 기존 프리셋 중 하나와 동일하면 라벨 매칭, 아니면 "custom". */
+function matchAspect(w: number, h: number): AspectValue {
+  const match = ASPECT_RATIOS.find((r) => r.width === w && r.height === h);
+  return match?.label ?? "custom";
+}

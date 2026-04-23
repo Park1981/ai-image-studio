@@ -89,6 +89,7 @@ export default function EditPage() {
   const setStep = useEditStore((s) => s.setStep);
   const recordStepDetail = useEditStore((s) => s.recordStepDetail);
   const setSampling = useEditStore((s) => s.setSampling);
+  const setPipelineProgress = useEditStore((s) => s.setPipelineProgress);
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
   const resetPipeline = useEditStore((s) => s.resetPipeline);
@@ -230,6 +231,9 @@ export default function EditPage() {
               provider: evt.provider,
             });
           }
+        } else if (evt.type === "stage") {
+          // 백엔드가 계산한 전체 파이프라인 진행률(0~100) 그대로 표시
+          setPipelineProgress(evt.progress, evt.stageLabel);
         } else if (evt.type === "done") {
           resetPipeline();
           addItem(evt.item);

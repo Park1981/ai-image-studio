@@ -28,7 +28,9 @@ export type IconName =
   | "copy"
   | "x"
   | "dot"
-  | "wand";
+  | "wand"
+  | "lock"
+  | "unlock";
 
 interface IconProps {
   name: IconName;
@@ -208,6 +210,21 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
           <path d="M15 4V2M15 16v-2M8 9h2M20 9h2M17.8 11.8l1.4 1.4M17.8 6.2l1.4-1.4" />
           <path d="m3 21 9-9" />
           <path d="m12.5 11.5 3 3" />
+        </svg>
+      );
+    // 자물쇠 — 비율 잠금 토글에 사용
+    case "lock":
+      return (
+        <svg {...common}>
+          <rect x="4" y="11" width="16" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+        </svg>
+      );
+    case "unlock":
+      return (
+        <svg {...common}>
+          <rect x="4" y="11" width="16" height="10" rx="2" />
+          <path d="M8 11V7a4 4 0 0 1 8 0" />
         </svg>
       );
     default:

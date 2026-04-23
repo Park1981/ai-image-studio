@@ -155,12 +155,26 @@ export function Toggle({
           }}
         />
       </span>
+      {/*
+        visually-hidden 패턴 — 화면상 보이지 않지만 Tab 포커스 + 스크린리더 인식 가능.
+        display:none 이나 pointerEvents:none 로 완전히 제거하면 키보드/접근성 도구에서 제외됨.
+      */}
       <input
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        // display:none = layout flow 에서 완전 제거 (position:absolute 부유 이슈 방지)
-        style={{ display: "none" }}
+        aria-label={label}
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: "hidden",
+          clip: "rect(0,0,0,0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
       />
       <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-2)" }}>

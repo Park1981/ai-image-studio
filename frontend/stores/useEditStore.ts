@@ -47,6 +47,9 @@ export interface EditState {
   samplingStep: number | null;
   /** ComfyUI 샘플러 총 스텝 */
   samplingTotal: number | null;
+  /** 백엔드 stage.progress (0~100) — ProgressModal 상단 진행바가 이 값을 그대로 표시 */
+  pipelineProgress: number;
+  pipelineLabel: string;
 
   // 비교 슬라이더
   compareX: number;
@@ -64,6 +67,7 @@ export interface EditState {
   setStep: (step: 1 | 2 | 3 | 4 | null, done: boolean) => void;
   recordStepDetail: (detail: EditStepDetail) => void;
   setCompareX: (v: number) => void;
+  setPipelineProgress: (progress: number, label?: string) => void;
   resetPipeline: () => void;
   /** ComfyUI 샘플링 스텝 업데이트 */
   setSampling: (step: number | null, total: number | null) => void;
@@ -85,6 +89,8 @@ export const useEditStore = create<EditState>((set) => ({
   startedAt: null,
   samplingStep: null,
   samplingTotal: null,
+  pipelineProgress: 0,
+  pipelineLabel: "",
 
   compareX: 50,
 
@@ -108,6 +114,8 @@ export const useEditStore = create<EditState>((set) => ({
             startedAt: Date.now(),
             samplingStep: null,
             samplingTotal: null,
+            pipelineProgress: 0,
+            pipelineLabel: "초기화",
           }
         : { running },
     ),
@@ -130,6 +138,11 @@ export const useEditStore = create<EditState>((set) => ({
       return { stepHistory: [...s.stepHistory, detail] };
     }),
   setCompareX: (v) => set({ compareX: v }),
+  setPipelineProgress: (progress, label) =>
+    set((s) => ({
+      pipelineProgress: progress,
+      pipelineLabel: label ?? s.pipelineLabel,
+    })),
   resetPipeline: () =>
     set({
       running: false,
@@ -139,6 +152,8 @@ export const useEditStore = create<EditState>((set) => ({
       startedAt: null,
       samplingStep: null,
       samplingTotal: null,
+      pipelineProgress: 0,
+      pipelineLabel: "",
     }),
   setSampling: (step, total) =>
     set({ samplingStep: step, samplingTotal: total }),

@@ -400,19 +400,59 @@ function EditTimeline() {
   const stepDone = useEditStore((s) => s.stepDone);
   const currentStep = useEditStore((s) => s.currentStep);
   const stepHistory = useEditStore((s) => s.stepHistory);
+  // 백엔드가 계산한 전체 파이프라인 진행률 (0~100) — 상단 얇은 바로 표시
+  const pipelineProgress = useEditStore((s) => s.pipelineProgress);
+  const pipelineLabel = useEditStore((s) => s.pipelineLabel);
 
   return (
-    <ol
-      style={{
-        listStyle: "none",
-        padding: 0,
-        margin: 0,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-      }}
-    >
-      {EDIT_STEP_META.map((m) => {
+    <>
+      {/* 전체 진행 % — Step 4 ComfyUI 샘플링 중에도 실시간으로 움직임 */}
+      <div style={{ marginBottom: 14 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            fontSize: 11,
+            color: "var(--ink-3)",
+            marginBottom: 4,
+          }}
+        >
+          <span style={{ letterSpacing: "-0.005em" }}>
+            {pipelineLabel || (running ? "대기" : "-")}
+          </span>
+          <span className="mono" style={{ letterSpacing: ".04em" }}>
+            {pipelineProgress}%
+          </span>
+        </div>
+        <div
+          style={{
+            height: 6,
+            background: "var(--line-2)",
+            borderRadius: 3,
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              height: "100%",
+              width: `${Math.min(100, Math.max(0, pipelineProgress))}%`,
+              background: "var(--accent)",
+              transition: "width .25s ease",
+            }}
+          />
+        </div>
+      </div>
+      <ol
+        style={{
+          listStyle: "none",
+          padding: 0,
+          margin: 0,
+          display: "flex",
+          flexDirection: "column",
+          gap: 10,
+        }}
+      >
+        {EDIT_STEP_META.map((m) => {
         const detail = stepHistory.find((x) => x.n === m.n);
         const isDone = stepDone >= m.n;
         const isRunning = running && currentStep === m.n && !isDone;
@@ -454,8 +494,9 @@ function EditTimeline() {
             )}
           </div>
         );
-      })}
-    </ol>
+        })}
+      </ol>
+    </>
   );
 }
 

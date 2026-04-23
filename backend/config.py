@@ -42,7 +42,8 @@ class Settings(BaseSettings):
     )
 
     # ComfyUI 설정
-    comfyui_url: str = "http://127.0.0.1:8188"
+    # 기본값: ComfyUI Desktop 설치(8000) 기준. 원본 ComfyUI 기본 8188 을 쓰는 환경에선 .env 로 override.
+    comfyui_url: str = "http://127.0.0.1:8000"
     comfyui_executable: str = ""
     comfyui_models_path: str = ""
     comfyui_auto_shutdown_minutes: int = 10
@@ -63,8 +64,9 @@ class Settings(BaseSettings):
     default_workflow: str = "qwen_image"
 
     # 앱 설정
+    # ComfyUI(8000)와 충돌 회피를 위해 백엔드는 8001 기본 사용
     app_host: str = "127.0.0.1"
-    app_port: int = 8000
+    app_port: int = 8001
     frontend_url: str = "http://localhost:3000"
 
     # 데이터 경로
@@ -102,8 +104,29 @@ class Settings(BaseSettings):
         CORS 허용 origin 리스트 — frontend_url을 comma-separated로 파싱
         개발 시 여러 포트(3000, 3001) 병행 지원
         예: frontend_url="http://localhost:3000,http://localhost:3001"
+
+        추가 처리:
+         - trailing slash 제거 (브라우저 Origin 헤더는 slash 없이 옴)
+         - localhost ↔ 127.0.0.1 자동 대응 (브라우저는 두 origin을 다르게 취급)
         """
-        return [url.strip() for url in self.frontend_url.split(",") if url.strip()]
+        # 1) 파싱 + trailing slash 제거
+        raw = [url.strip().rstrip("/") for url in self.frontend_url.split(",") if url.strip()]
+        # 2) localhost ↔ 127.0.0.1 쌍 자동 생성
+        expanded: list[str] = []
+        for url in raw:
+            expanded.append(url)
+            if "://localhost" in url:
+                expanded.append(url.replace("://localhost", "://127.0.0.1"))
+            elif "://127.0.0.1" in url:
+                expanded.append(url.replace("://127.0.0.1", "://localhost"))
+        # 3) 중복 제거 (입력 순서 유지)
+        seen: set[str] = set()
+        out: list[str] = []
+        for u in expanded:
+            if u not in seen:
+                seen.add(u)
+                out.append(u)
+        return out
 
     def ensure_data_dirs(self) -> None:
         """데이터 디렉토리 자동 생성"""

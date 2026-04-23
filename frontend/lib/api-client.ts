@@ -51,6 +51,9 @@ export interface HistoryItem {
 export interface GenerateRequest {
   prompt: string;
   aspect: string;
+  /** 사용자가 픽셀 직접 지정 — 주어지면 백엔드가 aspect 프리셋 대신 사용 */
+  width?: number;
+  height?: number;
   steps: number;
   cfg: number;
   seed: number;
@@ -61,6 +64,9 @@ export interface GenerateRequest {
   visionModel?: string;
   /** showUpgradeStep 사용 시: 모달에서 사용자가 확정한 영문 프롬프트 */
   preUpgradedPrompt?: string;
+  /** upgrade-only 단계에서 이미 얻은 Claude 힌트 — 빈 배열 [] 도 "조사 완료" 로 간주됨.
+   *  undefined 이면 백엔드가 research 플래그대로 조사 실행. */
+  preResearchHints?: string[];
 }
 
 export interface UpgradeOnlyResult {
@@ -149,6 +155,18 @@ export type EditStage =
       progress: number;
       samplingStep?: number | null;
       samplingTotal?: number | null;
+    }
+  /**
+   * 백엔드가 emit 하는 전체 파이프라인 진행률 (0~100) + 단계 라벨.
+   * Generate 의 GenStage 와 동일한 의미로 통일 — ProgressModal 의 상단 진행바는 이 값만 사용.
+   */
+  | {
+      type: "stage";
+      stageType: string;
+      progress: number;
+      stageLabel: string;
+      samplingStep?: number;
+      samplingTotal?: number;
     }
   | { type: "done"; item: HistoryItem };
 
@@ -360,17 +378,19 @@ async function* realEditStream(
     const src = req.sourceImage;
     if (src.startsWith("mock-seed://")) {
       throw new Error(
-        "Mock 결과 이미지는 수정에 사용 불가. 먼저 저장 후 파일로 업로드해줘.",
+        "Mock 결과 이미지는 수정에 사용 불가. 실제 생성 후 재시도해줘.",
       );
     }
-    // data URL / http / relative path 전부 fetch 로 blob 변환 가능
+    // data:/blob:/ http(s): 모두 fetch 로 통일해 blob 변환.
+    // 히스토리 이미지(/images/studio/... 절대 URL)는 백엔드의 ensure_cors_for_static_images
+    // 미들웨어가 Access-Control-Allow-Origin 을 주입해주므로 CORS 통과.
     try {
       const res = await fetch(src);
       if (!res.ok) {
         throw new Error(`image fetch ${res.status}: ${src.slice(0, 80)}`);
       }
       const blob = await res.blob();
-      // 파일명 추출 (histroy URL 이면 basename, data URL 이면 "upload.png")
+      // 파일명 추출 (history URL 이면 basename, data URL 이면 "upload.png")
       const guessedName = src.startsWith("data:")
         ? "upload.png"
         : src.split("/").pop()?.split("?")[0] || "source.png";
@@ -434,13 +454,23 @@ async function* realEditStream(
       yield { type: "step", ...payload };
     }
     if (evt.event === "stage") {
-      // ComfyUI 샘플링 상세 (step 4 내부에서 여러 번 도착)
       const payload = evt.data as {
-        type?: string;
-        progress?: number;
+        type: string;
+        progress: number;
+        stageLabel: string;
         samplingStep?: number | null;
         samplingTotal?: number | null;
       };
+      // 전체 파이프라인 진행률 (ProgressModal 상단 바용)
+      yield {
+        type: "stage",
+        stageType: payload.type,
+        progress: payload.progress,
+        stageLabel: payload.stageLabel,
+        samplingStep: payload.samplingStep ?? undefined,
+        samplingTotal: payload.samplingTotal ?? undefined,
+      };
+      // ComfyUI 샘플링일 때 추가로 샘플러 스텝 표시용 "sampling" 이벤트도 방출
       if (payload.type === "comfyui-sampling") {
         yield {
           type: "sampling",

@@ -193,6 +193,12 @@ def build_generate_api(v: GenerateApiInput) -> ApiPrompt:
     return api
 
 
+def _snap_dimension(v: int) -> int:
+    """Qwen/ComfyUI 권장 — 사이즈는 8의 배수 + 256~2048 clamp."""
+    v = max(256, min(2048, int(v)))
+    return (v // 8) * 8
+
+
 def build_generate_from_request(
     *,
     prompt: str,
@@ -201,9 +207,21 @@ def build_generate_from_request(
     cfg: float,
     seed: int,
     lightning: bool,
+    width: int | None = None,
+    height: int | None = None,
 ) -> ApiPrompt:
-    """프리셋 + 요청값으로 한 방에 빌드."""
-    aspect = get_aspect(aspect_label)
+    """프리셋 + 요청값으로 한 방에 빌드.
+
+    width/height 가 둘 다 주어지면 aspect_label 프리셋 대신 사용자 지정 사이즈 사용.
+    내부에서 8의 배수 + 256~2048 clamp 로 정규화.
+    """
+    if width is not None and height is not None:
+        resolved_w = _snap_dimension(width)
+        resolved_h = _snap_dimension(height)
+    else:
+        aspect = get_aspect(aspect_label)
+        resolved_w = aspect.width
+        resolved_h = aspect.height
     d = GENERATE_MODEL.defaults
     lightning_lora = next(
         (l for l in GENERATE_MODEL.loras if l.role == "lightning"),
@@ -214,8 +232,8 @@ def build_generate_from_request(
     inp = GenerateApiInput(
         prompt=prompt,
         negative_prompt=GENERATE_MODEL.negative_prompt,
-        width=aspect.width,
-        height=aspect.height,
+        width=resolved_w,
+        height=resolved_h,
         seed=seed,
         steps=steps,
         cfg=cfg,

@@ -41,7 +41,6 @@ import {
   GENERATE_MODEL,
   activeLoras,
   countExtraLoras,
-  getAspect,
   type AspectRatioLabel,
 } from "@/lib/model-presets";
 import {
@@ -57,7 +56,7 @@ import {
   urlToDataUrl,
 } from "@/lib/image-actions";
 import { useEditStore } from "@/stores/useEditStore";
-import { useGenerateStore } from "@/stores/useGenerateStore";
+import { useGenerateStore, type AspectValue } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore } from "@/stores/useProcessStore";
@@ -71,6 +70,12 @@ export default function GeneratePage() {
   const setPrompt = useGenerateStore((s) => s.setPrompt);
   const aspect = useGenerateStore((s) => s.aspect);
   const setAspect = useGenerateStore((s) => s.setAspect);
+  const width = useGenerateStore((s) => s.width);
+  const height = useGenerateStore((s) => s.height);
+  const setWidth = useGenerateStore((s) => s.setWidth);
+  const setHeight = useGenerateStore((s) => s.setHeight);
+  const aspectLocked = useGenerateStore((s) => s.aspectLocked);
+  const setAspectLocked = useGenerateStore((s) => s.setAspectLocked);
   const research = useGenerateStore((s) => s.research);
   const setResearch = useGenerateStore((s) => s.setResearch);
   const lightning = useGenerateStore((s) => s.lightning);
@@ -143,16 +148,20 @@ export default function GeneratePage() {
     if (lightningByDefault && !lightning) applyLightning(true);
   }, [lightningByDefault, lightning, applyLightning]);
 
-  const { width, height } = getAspect(aspect);
   const sizeLabel = `${width}×${height}`;
 
-  /* ── 실제 생성 스트림 실행 (preUpgraded 유무 분기) ── */
-  const runGenerateStream = async (preUpgraded?: string) => {
+  /* ── 실제 생성 스트림 실행 (preUpgraded / preResearchHints 유무 분기) ── */
+  const runGenerateStream = async (
+    preUpgraded?: string,
+    preResearchHints?: string[],
+  ) => {
     setRunning(true, 0, "초기화");
     try {
       for await (const evt of generateImageStream({
         prompt,
         aspect,
+        width,
+        height,
         steps,
         cfg,
         seed,
@@ -161,6 +170,7 @@ export default function GeneratePage() {
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
         preUpgradedPrompt: preUpgraded,
+        preResearchHints,
       })) {
         if (evt.type === "done") {
           addItem(evt.item);
@@ -253,8 +263,12 @@ export default function GeneratePage() {
     researchHints: string[];
   }) => {
     setUpgradeOpen(false);
-    void p.researchHints; // 현재 미사용 (모달에서만 표시)
-    await runGenerateStream(p.finalPrompt);
+    // research 토글 ON + upgrade-only 단계에서 이미 조사된 힌트가 있으면 재호출 방지.
+    // 토글 OFF 면 힌트 자체를 보내지 않아 백엔드가 research 단계를 스킵.
+    await runGenerateStream(
+      p.finalPrompt,
+      research ? p.researchHints : undefined,
+    );
   };
 
   const handleUpgradeRerun = async () => {
@@ -603,11 +617,17 @@ export default function GeneratePage() {
           <AdvancedAccordion
             aspect={aspect}
             sizeLabel={sizeLabel}
+            width={width}
+            height={height}
+            aspectLocked={aspectLocked}
             lightning={lightning}
             steps={steps}
             cfg={cfg}
             seed={seed}
             onAspect={(v) => setAspect(v)}
+            onWidth={setWidth}
+            onHeight={setHeight}
+            onAspectLocked={setAspectLocked}
             onLightning={applyLightning}
             onSteps={setSteps}
             onCfg={setCfg}
@@ -988,23 +1008,35 @@ export default function GeneratePage() {
 function AdvancedAccordion({
   aspect,
   sizeLabel,
+  width,
+  height,
+  aspectLocked,
   lightning,
   steps,
   cfg,
   seed,
   onAspect,
+  onWidth,
+  onHeight,
+  onAspectLocked,
   onLightning,
   onSteps,
   onCfg,
   onSeed,
 }: {
-  aspect: AspectRatioLabel;
+  aspect: AspectValue;
   sizeLabel: string;
+  width: number;
+  height: number;
+  aspectLocked: boolean;
   lightning: boolean;
   steps: number;
   cfg: number;
   seed: number;
   onAspect: (v: AspectRatioLabel) => void;
+  onWidth: (v: number) => void;
+  onHeight: (v: number) => void;
+  onAspectLocked: (v: boolean) => void;
   onLightning: (v: boolean) => void;
   onSteps: (v: number) => void;
   onCfg: (v: number) => void;
@@ -1071,15 +1103,93 @@ function AdvancedAccordion({
             gap: "16px 20px",
           }}
         >
-          <Field label={`종횡비 · ${sizeLabel}`}>
-            <SegControl
-              options={ASPECT_RATIOS.map((r) => ({
-                label: r.label,
-                value: r.label,
-              }))}
-              value={aspect}
-              onChange={(v) => onAspect(v as AspectRatioLabel)}
-            />
+          <Field
+            label={`사이즈 · ${sizeLabel}${aspect === "custom" ? "" : ` · ${aspect}`}`}
+          >
+            {/* W × H 숫자 입력 + 비율 잠금 토글 */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <input
+                className="mono"
+                type="number"
+                min={256}
+                max={2048}
+                step={8}
+                value={width}
+                onChange={(e) => onWidth(Number(e.target.value) || 0)}
+                style={{ ...inputStyle, width: 78, textAlign: "right" }}
+                aria-label="width px"
+              />
+              <button
+                type="button"
+                onClick={() => onAspectLocked(!aspectLocked)}
+                title={
+                  aspectLocked
+                    ? "비율 잠금 ON — 한쪽 수정 시 반대쪽 자동 계산"
+                    : "비율 잠금 OFF — 자유 입력"
+                }
+                style={{
+                  ...iconBtnStyle,
+                  background: aspectLocked
+                    ? "var(--accent-soft)"
+                    : iconBtnStyle.background,
+                  color: aspectLocked ? "var(--accent)" : iconBtnStyle.color,
+                  borderColor: aspectLocked
+                    ? "var(--accent)"
+                    : iconBtnStyle.borderColor,
+                }}
+              >
+                <Icon name={aspectLocked ? "lock" : "unlock"} size={13} />
+              </button>
+              <input
+                className="mono"
+                type="number"
+                min={256}
+                max={2048}
+                step={8}
+                value={height}
+                onChange={(e) => onHeight(Number(e.target.value) || 0)}
+                style={{ ...inputStyle, width: 78, textAlign: "right" }}
+                aria-label="height px"
+              />
+            </div>
+            {/* 프리셋 칩 — 원터치로 익숙한 비율 설정 */}
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 4,
+                marginTop: 6,
+              }}
+            >
+              {ASPECT_RATIOS.map((r) => {
+                const active = aspect === r.label;
+                return (
+                  <button
+                    key={r.label}
+                    type="button"
+                    onClick={() => onAspect(r.label)}
+                    style={{
+                      all: "unset",
+                      cursor: "pointer",
+                      fontSize: 10.5,
+                      fontWeight: 500,
+                      padding: "3px 8px",
+                      borderRadius: 999,
+                      border: `1px solid ${
+                        active ? "var(--accent)" : "var(--line)"
+                      }`,
+                      background: active
+                        ? "var(--accent-soft)"
+                        : "transparent",
+                      color: active ? "var(--accent)" : "var(--ink-3)",
+                    }}
+                    title={`${r.width}×${r.height}`}
+                  >
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
           </Field>
           <Field label="Lightning 모드">
             <Toggle

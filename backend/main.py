@@ -99,18 +99,20 @@ app.add_middleware(
 )
 
 
-# StaticFiles mount 는 Starlette 의 sub-app 이라 CORSMiddleware 가 자동 적용 안 됨.
-# (특히 fetch() 로 이미지 다운로드 시 CORS 차단) — /images 응답에 수동으로 CORS 헤더 주입.
+# StaticFiles mount 응답에 CORS 헤더 직접 주입
+# 이유: CORSMiddleware는 FastAPI 라우터에는 자동 반응하지만,
+#       app.mount() 로 얹은 StaticFiles sub-ASGI 응답에는 헤더가 확실히 안 붙는 경우가 있어
+#       브라우저 fetch() 가 "No 'Access-Control-Allow-Origin' header" 로 차단됨.
+#       history 이미지 → Edit 모드 전송 (urlToDataUrl) 시 재현됨.
 @app.middleware("http")
 async def ensure_cors_for_static_images(request: Request, call_next):
     response = await call_next(request)
-    if request.url.path.startswith("/images"):
+    if request.url.path.startswith("/images/"):
         origin = request.headers.get("origin")
-        allowed = set(settings.frontend_origins)
-        if origin and origin in allowed:
+        if origin and origin in settings.frontend_origins:
             response.headers["Access-Control-Allow-Origin"] = origin
-            response.headers["Vary"] = "Origin"
             response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Vary"] = "Origin"
     return response
 
 
