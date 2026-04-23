@@ -200,40 +200,71 @@ function normalizeItem(item: HistoryItem): HistoryItem {
 
 /**
  * SSE 스트림 파서 — fetch 의 ReadableStream 을 `event: X\ndata: {...}\n\n` 단위로 끊어서 yield.
+ *
+ * 설계 결정:
+ *  - data 는 반드시 JSON object (구 버전에서 string fallback 허용했는데 호출처들은
+ *    `as { item: ... }` 로 cast 하고 있어서 런타임 버그 유발 → JSON 실패 시 skip).
+ *  - `:` 로 시작하는 라인(heartbeat/comment) 은 SSE 스펙상 무시.
+ *  - try/finally 로 reader.releaseLock() 보장 — 호출자가 break 하거나
+ *    예외로 빠져나가도 리소스 정리.
  */
 async function* parseSSE(
   response: Response,
-): AsyncGenerator<{ event: string; data: unknown }, void, unknown> {
+): AsyncGenerator<
+  { event: string; data: Record<string, unknown> },
+  void,
+  unknown
+> {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("SSE body missing");
   const decoder = new TextDecoder();
   let buffer = "";
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
 
-    let boundary = buffer.indexOf("\n\n");
-    while (boundary !== -1) {
-      const block = buffer.slice(0, boundary);
-      buffer = buffer.slice(boundary + 2);
+      let boundary = buffer.indexOf("\n\n");
+      while (boundary !== -1) {
+        const block = buffer.slice(0, boundary);
+        buffer = buffer.slice(boundary + 2);
 
-      let eventName = "message";
-      const dataLines: string[] = [];
-      for (const line of block.split("\n")) {
-        if (line.startsWith("event:")) eventName = line.slice(6).trim();
-        else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
-      }
-      if (dataLines.length > 0) {
-        const raw = dataLines.join("\n");
-        try {
-          yield { event: eventName, data: JSON.parse(raw) };
-        } catch {
-          yield { event: eventName, data: raw };
+        let eventName = "message";
+        const dataLines: string[] = [];
+        for (const line of block.split("\n")) {
+          // SSE 주석 (":" 시작) — heartbeat 등, 무시
+          if (line.startsWith(":")) continue;
+          if (line.startsWith("event:")) eventName = line.slice(6).trim();
+          else if (line.startsWith("data:"))
+            dataLines.push(line.slice(5).trim());
         }
+        if (dataLines.length > 0) {
+          const raw = dataLines.join("\n");
+          try {
+            const parsed = JSON.parse(raw);
+            // 객체만 수용 — 배열/primitive 면 호출처 cast 가 암묵적 버그가 되므로 skip
+            if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+              yield {
+                event: eventName,
+                data: parsed as Record<string, unknown>,
+              };
+            }
+            // object 가 아니면 SSE 프레임이긴 하지만 우리 프로토콜엔 없음 → drop.
+          } catch {
+            // JSON 깨짐 — 드롭 (로그도 안 남김: 스트림 신호 노이즈 줄이기)
+          }
+        }
+        boundary = buffer.indexOf("\n\n");
       }
-      boundary = buffer.indexOf("\n\n");
+    }
+  } finally {
+    // 호출자가 break/throw 로 탈출해도 body stream lock 해제
+    try {
+      reader.releaseLock();
+    } catch {
+      /* already released */
     }
   }
 }
