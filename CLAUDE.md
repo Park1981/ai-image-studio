@@ -34,17 +34,17 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 
 ## Key Files (재설계 이후)
 ### 신규 (권위)
-- **backend/studio/router.py**: `/api/studio/*` FastAPI 라우터 (generate/edit SSE · upgrade-only · research · interrupt · history · models · process · ollama/models)
-- **backend/studio/comfy_api_builder.py**: ComfyUI flat API format 빌더 (`build_generate_from_request`, `build_edit_from_request`)
-- **backend/studio/comfy_transport.py**: WebSocket + HTTP 전송 (idle 600s / hard 1800s timeout)
-- **backend/studio/{prompt,vision}_pipeline.py**: Ollama gemma4 업그레이드 + qwen2.5vl 비전 2단계
-- **backend/studio/presets.py**: Qwen Image 2512 / Edit 2511 프리셋 (프론트와 동기화 필수)
-- **backend/studio/history_db.py**: SQLite studio_history 테이블
-- **backend/workflows/qwen_image_2512.json, qwen_image_edit_2511.json**: 워크플로우 참조 (디스패치는 comfy_api_builder 가 Python 으로 구성)
+- **backend/studio/router.py**: `/api/studio/*` FastAPI 라우터 (generate/edit/**video** SSE · upgrade-only · research · interrupt · vision-analyze · history · models · process · ollama/models)
+- **backend/studio/comfy_api_builder.py**: ComfyUI flat API format 빌더 (`build_generate_from_request`, `build_edit_from_request`, **`build_video_from_request`**)
+- **backend/studio/comfy_transport.py**: WebSocket + HTTP 전송 (idle 600s / hard 1800s timeout · Video 는 idle 900s / hard 3600s)
+- **backend/studio/{prompt,vision,video}_pipeline.py**: Ollama gemma4 업그레이드 + qwen2.5vl 비전 · Video 는 5-step 체이닝
+- **backend/studio/presets.py**: Qwen Image 2512 / Edit 2511 / **LTX Video 2.3** 프리셋 (프론트와 동기화 필수) · `compute_video_resize`, `build_quality_sigmas`, `active_video_loras` 헬퍼 포함
+- **backend/studio/history_db.py**: SQLite studio_history 테이블 (mode: generate/edit/**video**)
+- **backend/workflows/qwen_image_2512.json, qwen_image_edit_2511.json**: 워크플로우 참조 (디스패치는 comfy_api_builder 가 Python 으로 구성 · Video 는 38-node flat API 전부 Python 조립)
 - **frontend/app/{page,generate,edit,video}/page.tsx**: 4 라우트
-- **frontend/components/studio/\***: AiEnhanceCard, HistoryTile, ImageLightbox, ProgressModal, UpgradeConfirmModal
+- **frontend/components/studio/\***: AiEnhanceCard, HistoryTile, ImageLightbox (video 분기 포함), ProgressModal (generate/edit/**video** 3 모드), UpgradeConfirmModal, VideoPlayerCard
 - **frontend/lib/{api-client,model-presets,image-actions}.ts**: 핵심 프론트 유틸
-- **frontend/stores/use*Store.ts**: Zustand 6개 (settings/process/history/generate/edit/toast)
+- **frontend/stores/use*Store.ts**: Zustand 7개 (settings/process/history/generate/edit/**video**/toast) · `useVideoStore` 에 adult/longerEdge/lightning 토글 + computeVideoResize 헬퍼
 - **frontend/app/globals.css**: 디자인 토큰 (warm neutral + cool blue)
 
 ### 레거시 (참조용 · 수정 금지)
@@ -59,6 +59,8 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 - 디자인 토큰 변경 시 사용자 피드백 필수
 - 이미지 경로 파라미터는 path traversal 방지 검증 필수
 - CORS: localhost만 허용
+- **gemma4-un 호출 시 `think: false` 필수** (reasoning 모델이라 없으면 content 빈값)
+- **Video LTX-2.3 는 공간 해상도 8배수 필수** (compute_video_resize 가 자동 스냅)
 
 ## Testing
 - Backend: pytest + httpx AsyncClient
@@ -76,26 +78,36 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 - Codex 피드백 반영 후 상호 보완하여 품질 향상
 - 대규모 코드 분석, 갭 분석 등 토큰 소모가 큰 작업도 Codex에 위임 가능
 
-## Model System (재설계 · 2026-04-22)
+## Model System (재설계 · 2026-04-22 · Video 추가 2026-04-24)
 - 생성 모드: **Qwen Image 2512** (diffusion_models/qwen_image_2512_fp8_e4m3fn.safetensors)
   - Lightning LoRA: `Qwen-Image-2512-Lightning-4steps-V1.0-fp32.safetensors` (토글)
   - Extra LoRA: `FemNude_qwen-image-2512_epoch30.safetensors` (상시 strength 1)
 - 수정 모드: **Qwen Image Edit 2511** (diffusion_models/qwen_image_edit_2511_bf16.safetensors)
   - Lightning LoRA: `Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors` (토글)
   - Extra LoRA: `SexGod_CouplesNudity_QwenEdit_2511_v1.safetensors` (상시 strength 0.7)
+- 영상 모드: **LTX Video 2.3** (ltx-2.3-22b-dev-fp8.safetensors, 29GB · 16GB VRAM 한계)
+  - Text Encoder: `gemma_3_12B_it_fp4_mixed.safetensors`
+  - Upscaler: `ltx-2.3-spatial-upscaler-x2-1.1.safetensors`
+  - Lightning LoRA (토글): `ltx-2.3-22b-distilled-lora-384.safetensors` × 2 (base/upscale)
+  - Adult LoRA (토글): `ltx2310eros_beta.safetensors`
+  - 2-stage sampling (base + upscale) · 126 frames (5s × 25fps + 1)
+  - 해상도 슬라이더 512~1536 (step 128) · 원본 비율 유지 (8배수 스냅)
 - 공통 CLIP: `qwen_2.5_vl_7b_fp8_scaled.safetensors` (qwen_image type)
 - 공통 VAE: `qwen_image_vae.safetensors`
-- 프롬프트 업그레이드: `gemma4-un:latest` (Ollama)
-- 수정 모드 비전: `qwen2.5vl:7b` (Ollama · 기본값)
+- 프롬프트 업그레이드: `gemma4-un:latest` (Ollama · 26B · **think=False 필수**)
+- 수정/영상 비전: `qwen2.5vl:7b` (Ollama · 기본값)
 - 프리셋 정의: `backend/studio/presets.py` + `frontend/lib/model-presets.ts` (동기화 필수)
 - 종횡비 프리셋 (Qwen 권장): 1:1 1328² / 16:9 1664×928 / 9:16 928×1664 / 4:3 1472×1104 / 3:4 1104×1472 / 3:2 1584×1056 / 2:3 1056×1584
 
 ## API Endpoints (`/api/studio/*`)
 - `POST /generate` + `GET /generate/stream/{id}` (SSE 단계 스트림)
 - `POST /edit` (multipart) + `GET /edit/stream/{id}` (SSE 4단계)
+- `POST /video` (multipart) + `GET /video/stream/{id}` (SSE 5단계, LTX-2.3 i2v)
+  - meta JSON: `{prompt, adult?, lightning?, longerEdge?, ollamaModel?, visionModel?}`
 - `POST /upgrade-only` (gemma4 업그레이드만, showUpgradeStep 토글 ON 시 사용)
 - `POST /research` (Claude CLI 조사 힌트)
 - `POST /interrupt` (ComfyUI 전역 중단)
+- `POST /vision-analyze` (Vision Analyzer 독립 페이지)
 - `GET /models`, `GET /ollama/models`
 - `GET /process/status`, `POST /process/{ollama|comfyui}/{start|stop}`
 - `GET/DELETE /history[/{id}]`
