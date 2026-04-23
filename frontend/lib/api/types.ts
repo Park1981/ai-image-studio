@@ -7,7 +7,7 @@
 
 export interface HistoryItem {
   id: string;
-  mode: "generate" | "edit";
+  mode: "generate" | "edit" | "video";
   prompt: string;
   label: string;
   width: number;
@@ -18,6 +18,7 @@ export interface HistoryItem {
   lightning: boolean;
   model: string;
   createdAt: number;
+  /** generate/edit 은 이미지 URL, video 는 mp4 URL */
   imageRef: string;
   /** 실 백엔드가 보조로 포함할 수 있는 메타 */
   upgradedPrompt?: string;
@@ -28,6 +29,14 @@ export interface HistoryItem {
   visionDescription?: string;
   /** ComfyUI 에러 메시지 (Mock 폴백 시) */
   comfyError?: string | null;
+
+  /* ── Video 전용 메타 (mode === "video" 일 때만 채워짐) ── */
+  /** 영상 길이 (초) */
+  durationSec?: number;
+  /** 프레임률 */
+  fps?: number;
+  /** 총 프레임 수 */
+  frameCount?: number;
 }
 
 export interface GenerateRequest {
@@ -148,6 +157,50 @@ export interface ProcessStatusSnapshot {
  * POST /api/studio/vision-analyze 응답 — Vision Analyzer 독립 페이지용.
  * 백엔드는 비전 호출 실패여도 HTTP 200 + fallback=true 로 반환하니 상태 분기는 fallback 필드로.
  */
+/* ──────────── Video i2v (LTX-2.3) ──────────── */
+
+export interface VideoRequest {
+  /** data URL, 서버 ref, 또는 File 객체 */
+  sourceImage: string | File;
+  prompt: string;
+  ollamaModel?: string;
+  visionModel?: string;
+}
+
+export type VideoStage =
+  | {
+      type: "step";
+      step: 1 | 2 | 3 | 4 | 5;
+      done: boolean;
+      /** step 1 done 의 비전 설명 */
+      description?: string;
+      /** step 2 done 의 최종 LTX 프롬프트 (영문) */
+      finalPrompt?: string;
+      /** step 2 done 의 한글 번역 */
+      finalPromptKo?: string | null;
+      /** step 2 provider (ollama/fallback) */
+      provider?: string;
+    }
+  | {
+      /** ComfyUI 샘플링 상세 (step 4 내부) */
+      type: "sampling";
+      progress: number;
+      samplingStep?: number | null;
+      samplingTotal?: number | null;
+    }
+  | {
+      /** 백엔드 파이프라인 진행률 (0~100) + 단계 라벨 */
+      type: "stage";
+      stageType: string;
+      progress: number;
+      stageLabel: string;
+      samplingStep?: number;
+      samplingTotal?: number;
+    }
+  | { type: "done"; item: HistoryItem; savedToHistory: boolean };
+
+/* ──────────── Vision Analyzer ──────────── */
+
 export interface VisionAnalysisResponse {
   /** 영문 상세 설명 (40-120 단어 목표). fallback=true 면 빈 문자열. */
   en: string;
