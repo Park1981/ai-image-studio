@@ -22,16 +22,14 @@ import HistoryTile from "@/components/studio/HistoryTile";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import ResearchBanner from "@/components/studio/ResearchBanner";
+import SelectedItemPreview from "@/components/studio/SelectedItemPreview";
 import UpgradeConfirmModal from "@/components/studio/UpgradeConfirmModal";
 import Icon from "@/components/ui/Icon";
-import ImageTile from "@/components/ui/ImageTile";
 import {
   Pill,
   Field,
-  SegControl,
   Range,
-  Meta,
-  SmallBtn,
   Spinner,
   Toggle,
   inputStyle,
@@ -40,8 +38,6 @@ import {
 import {
   ASPECT_RATIOS,
   GENERATE_MODEL,
-  activeLoras,
-  countExtraLoras,
   type AspectRatioLabel,
 } from "@/lib/model-presets";
 import {
@@ -527,91 +523,11 @@ export default function GeneratePage() {
           </div>
 
           {/* 조사 필요 배너 */}
-          <label
-            style={{
-              display: "flex",
-              gap: 12,
-              padding: "14px 16px",
-              background: "var(--amber-soft)",
-              border: "1px solid rgba(250,173,20,.35)",
-              borderRadius: 10,
-              cursor: "pointer",
-              alignItems: "flex-start",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={research}
-              onChange={(e) => setResearch(e.target.checked)}
-              style={{
-                marginTop: 3,
-                accentColor: "var(--amber-ink)",
-                width: 15,
-                height: 15,
-              }}
-            />
-            <div style={{ flex: 1 }}>
-              <div
-                style={{
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--amber-ink)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                  letterSpacing: "-0.005em",
-                }}
-              >
-                <Icon name="search" size={13} />
-                조사 필요{" "}
-                <span
-                  style={{
-                    fontSize: 10.5,
-                    fontWeight: 500,
-                    background: "#FFF",
-                    border: "1px solid rgba(250,173,20,.35)",
-                    borderRadius: 4,
-                    padding: "1px 6px",
-                    color: "var(--amber-ink)",
-                  }}
-                >
-                  퀄리티 업
-                </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    handleResearchNow();
-                  }}
-                  style={{
-                    marginLeft: "auto",
-                    all: "unset",
-                    cursor: "pointer",
-                    fontSize: 10.5,
-                    color: "var(--amber-ink)",
-                    padding: "2px 6px",
-                    borderRadius: 4,
-                    border: "1px solid rgba(250,173,20,.35)",
-                    background: "#fff",
-                  }}
-                  title="지금 바로 조사만 실행"
-                >
-                  미리보기
-                </button>
-              </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--ink-2)",
-                  marginTop: 4,
-                  lineHeight: 1.55,
-                }}
-              >
-                Claude CLI로 최신 모델 정보·프롬프트 스타일을 조사한 뒤 반영합니다.
-                <span style={{ color: "var(--ink-4)" }}> 약 +15s</span>
-              </div>
-            </div>
-          </label>
+          <ResearchBanner
+            checked={research}
+            onChange={setResearch}
+            onPreview={handleResearchNow}
+          />
 
           {/* 고급 accordion */}
           <AdvancedAccordion
@@ -806,149 +722,54 @@ export default function GeneratePage() {
           </div>
 
           {/* 선택 프리뷰 */}
-          {selectedItem ? (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0,1fr) 220px",
-                gap: 16,
-                padding: 16,
-                background: "var(--surface)",
-                border: "1px solid var(--line)",
-                borderRadius: 14,
-                boxShadow: "var(--shadow-sm)",
+          {selectedItem && (
+            <SelectedItemPreview
+              item={selectedItem}
+              onDownload={() =>
+                downloadImage(
+                  selectedItem.imageRef,
+                  filenameFromRef(
+                    selectedItem.imageRef,
+                    `ais-${selectedItem.id}.png`,
+                  ),
+                )
+              }
+              onCopy={() => copyImageToClipboard(selectedItem.imageRef)}
+              onSendToEdit={async () => {
+                // 이미지를 data URL 로 변환 → useEditStore 에 source 로 저장 → /edit 이동
+                toast.info("수정으로 전송 중…");
+                const res = await urlToDataUrl(selectedItem.imageRef);
+                if (!res) {
+                  toast.error("전송 실패", "이미지를 불러올 수 없음");
+                  return;
+                }
+                useEditStore
+                  .getState()
+                  .setSource(
+                    res.dataUrl,
+                    `${selectedItem.label} · ${res.width}×${res.height}`,
+                    res.width,
+                    res.height,
+                  );
+                router.push("/edit");
               }}
-            >
-              <ImageTile
-                seed={selectedItem.imageRef || selectedItem.id}
-                aspect="1/1"
-              />
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 10,
-                  minWidth: 0,
-                }}
-              >
-                <div>
-                  <div
-                    className="mono"
-                    style={{
-                      fontSize: 10,
-                      color: "var(--ink-4)",
-                      letterSpacing: ".08em",
-                    }}
-                  >
-                    #{selectedItem.id.slice(-6).toUpperCase()}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 500,
-                      marginTop: 4,
-                      whiteSpace: "nowrap",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                    }}
-                  >
-                    {selectedItem.label}
-                  </div>
-                </div>
-                <Meta k="모델" v={selectedItem.model} />
-                <Meta
-                  k="사이즈"
-                  v={`${selectedItem.width}×${selectedItem.height}`}
-                />
-                <Meta
-                  k="스텝/CFG"
-                  v={`${selectedItem.steps} · ${selectedItem.cfg}${selectedItem.lightning ? " ⚡" : ""}`}
-                />
-                <Meta
-                  k="Seed"
-                  v={<span className="mono">{selectedItem.seed}</span>}
-                />
-                <Meta
-                  k="LoRA"
-                  v={`${activeLoras(GENERATE_MODEL, selectedItem.lightning).length} 적용 (+${countExtraLoras(GENERATE_MODEL)})`}
-                />
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "1fr 1fr",
-                    gap: 6,
-                    marginTop: "auto",
-                  }}
-                >
-                  <SmallBtn
-                    icon="download"
-                    onClick={() =>
-                      downloadImage(
-                        selectedItem.imageRef,
-                        filenameFromRef(
-                          selectedItem.imageRef,
-                          `ais-${selectedItem.id}.png`,
-                        ),
-                      )
-                    }
-                  >
-                    저장
-                  </SmallBtn>
-                  <SmallBtn
-                    icon="copy"
-                    onClick={() => copyImageToClipboard(selectedItem.imageRef)}
-                  >
-                    복사
-                  </SmallBtn>
-                  <SmallBtn
-                    icon="edit"
-                    onClick={async () => {
-                      // 이미지를 data URL 로 변환 → useEditStore 에 source 로 저장 → /edit 이동
-                      toast.info("수정으로 전송 중…");
-                      const res = await urlToDataUrl(selectedItem.imageRef);
-                      if (!res) {
-                        toast.error("전송 실패", "이미지를 불러올 수 없음");
-                        return;
-                      }
-                      useEditStore
-                        .getState()
-                        .setSource(
-                          res.dataUrl,
-                          `${selectedItem.label} · ${res.width}×${res.height}`,
-                          res.width,
-                          res.height,
-                        );
-                      router.push("/edit");
-                    }}
-                  >
-                    수정으로
-                  </SmallBtn>
-                  <SmallBtn
-                    icon="sparkle"
-                    onClick={() => {
-                      // 프롬프트/사이즈/시드/옵션을 현재 폼에 완전 복원 (픽셀 기준 권위)
-                      setPrompt(selectedItem.prompt);
-                      // 실제 픽셀 사이즈를 그대로 복원 — 프리셋/커스텀 여부 무관.
-                      // setDimensions 는 aspectLocked 무시하고 원자적으로 양쪽 세팅 + aspect 라벨 매칭.
-                      setDimensions(selectedItem.width, selectedItem.height);
-                      setSeed(selectedItem.seed);
-                      setSteps(selectedItem.steps);
-                      setCfg(selectedItem.cfg);
-                      if (selectedItem.lightning !== lightning) {
-                        applyLightning(selectedItem.lightning);
-                      }
-                      toast.info(
-                        "재생성 준비",
-                        `${selectedItem.width}×${selectedItem.height} · [생성] 눌러`,
-                      );
-                    }}
-                  >
-                    재생성
-                  </SmallBtn>
-                </div>
-              </div>
-            </div>
-          ) : null}
+              onReuse={() => {
+                // 프롬프트/사이즈/시드/옵션을 현재 폼에 완전 복원 (픽셀 기준 권위)
+                setPrompt(selectedItem.prompt);
+                setDimensions(selectedItem.width, selectedItem.height);
+                setSeed(selectedItem.seed);
+                setSteps(selectedItem.steps);
+                setCfg(selectedItem.cfg);
+                if (selectedItem.lightning !== lightning) {
+                  applyLightning(selectedItem.lightning);
+                }
+                toast.info(
+                  "재생성 준비",
+                  `${selectedItem.width}×${selectedItem.height} · [생성] 눌러`,
+                );
+              }}
+            />
+          )}
 
           {/* AI 보강 결과 카드 (선택된 아이템에 한해) */}
           {selectedItem && <AiEnhanceCard item={selectedItem} />}
