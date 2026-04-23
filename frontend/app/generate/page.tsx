@@ -41,17 +41,12 @@ import {
   type AspectRatioLabel,
 } from "@/lib/model-presets";
 import {
-  generateImageStream,
-  researchPrompt,
-  upgradeOnly,
-  type UpgradeOnlyResult,
-} from "@/lib/api-client";
-import {
   downloadImage,
   copyImageToClipboard,
   filenameFromRef,
   urlToDataUrl,
 } from "@/lib/image-actions";
+import { useGeneratePipeline } from "@/hooks/useGeneratePipeline";
 import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore, type AspectValue } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -87,22 +82,21 @@ export default function GeneratePage() {
   const generating = useGenerateStore((s) => s.generating);
   const progress = useGenerateStore((s) => s.progress);
   const stage = useGenerateStore((s) => s.stage);
-  const setRunning = useGenerateStore((s) => s.setRunning);
-  const resetRunning = useGenerateStore((s) => s.resetRunning);
-  const pushStage = useGenerateStore((s) => s.pushStage);
-  const setSampling = useGenerateStore((s) => s.setSampling);
 
-  const addItem = useHistoryStore((s) => s.add);
   const items = useHistoryStore((s) => s.items);
   const selectedId = useHistoryStore((s) => s.selectedId);
   const selectItem = useHistoryStore((s) => s.select);
 
-  const showUpgradeStep = useSettingsStore((s) => s.showUpgradeStep);
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
-  const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
-  const visionModelSel = useSettingsStore((s) => s.visionModel);
   const addTemplate = useSettingsStore((s) => s.addTemplate);
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
+
+  /* ── 파이프라인 훅 (스트림 + 업그레이드 모달 + 조사) ── */
+  const pipeline = useGeneratePipeline();
+  const handleGenerate = pipeline.generate;
+  const handleUpgradeConfirm = pipeline.upgrade.confirm;
+  const handleUpgradeRerun = pipeline.upgrade.rerun;
+  const handleResearchNow = pipeline.researchNow;
 
   /* ── 생성 모드에서만 보이는 히스토리 필터 ── */
   const genItems = useMemo(
@@ -110,13 +104,6 @@ export default function GeneratePage() {
     [items],
   );
   const selectedItem = genItems.find((i) => i.id === selectedId);
-
-  /* ── Upgrade 확인 모달 상태 ── */
-  const [upgradeOpen, setUpgradeOpen] = useState(false);
-  const [upgradeLoading, setUpgradeLoading] = useState(false);
-  const [upgradeResult, setUpgradeResult] = useState<UpgradeOnlyResult | null>(
-    null,
-  );
 
   /* ── Lightbox + 그리드 컬럼 토글 ── */
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
@@ -147,180 +134,19 @@ export default function GeneratePage() {
 
   const sizeLabel = `${width}×${height}`;
 
-  /* ── 실제 생성 스트림 실행 (preUpgraded / preResearchHints 유무 분기) ── */
-  const runGenerateStream = async (
-    preUpgraded?: string,
-    preResearchHints?: string[],
-  ) => {
-    setRunning(true, 0, "초기화");
-    try {
-      for await (const evt of generateImageStream({
-        prompt,
-        aspect,
-        width,
-        height,
-        steps,
-        cfg,
-        seed,
-        lightning,
-        research,
-        ollamaModel: ollamaModelSel,
-        visionModel: visionModelSel,
-        preUpgradedPrompt: preUpgraded,
-        preResearchHints,
-      })) {
-        if (evt.type === "done") {
-          addItem(evt.item);
-          resetRunning();
-          // 모달은 훅에서 자동 close. running=false 로 바뀌면 닫힘
-          toast.success(
-            "생성 완료",
-            `${evt.item.width}×${evt.item.height} · seed ${evt.item.seed}`,
-          );
-          // 에러/폴백 상세 토스트 (백엔드가 item 에 실어 보내는 힌트)
-          if (evt.item.comfyError) {
-            toast.error(
-              "ComfyUI 오류 (Mock 폴백 적용)",
-              evt.item.comfyError.slice(0, 160),
-            );
-          } else if (evt.item.promptProvider === "fallback") {
-            toast.warn(
-              "gemma4 업그레이드 실패",
-              "원본 프롬프트로 생성됨. Ollama 상태 확인 또는 설정에서 재시작해봐.",
-            );
-          }
-          // 히스토리 DB 저장 실패 — 프론트 localStorage 에는 들어가지만 서버 재기동 시 사라짐
-          if (!evt.savedToHistory) {
-            toast.warn(
-              "히스토리 DB 저장 실패",
-              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
-            );
-          }
-          return;
-        }
-        setRunning(true, evt.progress, evt.stageLabel);
-        pushStage({
-          type: evt.type,
-          label: evt.stageLabel,
-          progress: evt.progress,
-        });
-        // ComfyUI 샘플링 스텝 정보 (있는 경우만)
-        if (evt.type === "comfyui-sampling") {
-          setSampling(evt.samplingStep ?? null, evt.samplingTotal ?? null);
-        }
-      }
-    } catch (err) {
-      resetRunning();
-      toast.error(
-        "생성 실패",
-        err instanceof Error ? err.message : "알 수 없는 오류",
-      );
-    }
-  };
-
-  /* ── 생성 실행 진입점 (showUpgradeStep 따라 모달 우회) ── */
-  const handleGenerate = async () => {
-    if (generating) return;
-    if (!prompt.trim()) {
-      toast.warn("프롬프트를 입력해줘");
-      return;
-    }
-    if (comfyuiStatus === "stopped") {
-      toast.warn(
-        "ComfyUI 정지 상태",
-        "설정에서 시작해도 되고, Mock 은 그대로 돌아가.",
-      );
-    }
-
-    if (showUpgradeStep) {
-      // 업그레이드 확인 모달 경유 — upgrade-only 먼저 호출
-      setUpgradeOpen(true);
-      setUpgradeLoading(true);
-      setUpgradeResult(null);
-      try {
-        const result = await upgradeOnly({
-          prompt,
-          research,
-          ollamaModel: ollamaModelSel,
-        });
-        setUpgradeResult(result);
-      } catch (err) {
-        toast.error(
-          "업그레이드 실패",
-          err instanceof Error ? err.message : "원본으로 바로 생성할게",
-        );
-        setUpgradeOpen(false);
-        // 폴백: 업그레이드 없이 바로 생성
-        await runGenerateStream();
-      } finally {
-        setUpgradeLoading(false);
-      }
-      return;
-    }
-
-    // 기본 플로우 — 바로 생성
-    await runGenerateStream();
-  };
-
-  const handleUpgradeConfirm = async (p: {
-    finalPrompt: string;
-    researchHints: string[];
-  }) => {
-    setUpgradeOpen(false);
-    // research 토글 ON + upgrade-only 단계에서 이미 조사된 힌트가 있으면 재호출 방지.
-    // 토글 OFF 면 힌트 자체를 보내지 않아 백엔드가 research 단계를 스킵.
-    await runGenerateStream(
-      p.finalPrompt,
-      research ? p.researchHints : undefined,
-    );
-  };
-
-  const handleUpgradeRerun = async () => {
-    setUpgradeLoading(true);
-    try {
-      const result = await upgradeOnly({
-        prompt,
-        research,
-        ollamaModel: ollamaModelSel,
-      });
-      setUpgradeResult(result);
-    } catch (err) {
-      toast.error("재업그레이드 실패", err instanceof Error ? err.message : "");
-    } finally {
-      setUpgradeLoading(false);
-    }
-  };
-
-  /* ── "조사 필요" 단독 실행 (모달 대신 토스트 힌트) ── */
-  const handleResearchNow = async () => {
-    toast.info("Claude CLI 호출 중…", "최신 팁을 조사하는 중이야");
-    try {
-      const { hints } = await researchPrompt(prompt, GENERATE_MODEL.displayName);
-      toast.success("조사 완료", hints.slice(0, 2).join(" · "));
-    } catch (err) {
-      toast.error(
-        "조사 실패",
-        err instanceof Error ? err.message : "",
-      );
-    }
-  };
-
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {progressOpen && (
         <ProgressModal mode="generate" onClose={() => setProgressOpen(false)} />
       )}
       <UpgradeConfirmModal
-        open={upgradeOpen}
-        loading={upgradeLoading}
+        open={pipeline.upgrade.open}
+        loading={pipeline.upgrade.loading}
         original={prompt}
-        result={upgradeResult}
+        result={pipeline.upgrade.result}
         onConfirm={handleUpgradeConfirm}
         onRerun={handleUpgradeRerun}
-        onCancel={() => {
-          setUpgradeOpen(false);
-          toast.info("생성 취소됨");
-        }}
+        onCancel={pipeline.upgrade.cancel}
       />
       <ImageLightbox
         src={lightboxSrc}

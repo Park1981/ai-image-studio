@@ -37,8 +37,8 @@ import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
 import { SmallBtn, Spinner, Toggle } from "@/components/ui/primitives";
 import { EDIT_MODEL } from "@/lib/model-presets";
-import { editImageStream } from "@/lib/api-client";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
+import { useEditPipeline } from "@/hooks/useEditPipeline";
 import { useEditStore } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -66,20 +66,12 @@ export default function EditPage() {
   const lightning = useEditStore((s) => s.lightning);
   const setLightning = useEditStore((s) => s.setLightning);
   const running = useEditStore((s) => s.running);
-  const setRunning = useEditStore((s) => s.setRunning);
   const currentStep = useEditStore((s) => s.currentStep);
   const stepDone = useEditStore((s) => s.stepDone);
-  const setStep = useEditStore((s) => s.setStep);
-  const recordStepDetail = useEditStore((s) => s.recordStepDetail);
-  const setSampling = useEditStore((s) => s.setSampling);
-  const setPipelineProgress = useEditStore((s) => s.setPipelineProgress);
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
-  const resetPipeline = useEditStore((s) => s.resetPipeline);
 
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
-  const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
-  const visionModelSel = useSettingsStore((s) => s.visionModel);
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
   const items = useHistoryStore((s) => s.items);
@@ -97,6 +89,12 @@ export default function EditPage() {
   const afterItem = afterId
     ? editResults.find((x) => x.id === afterId)
     : undefined;
+
+  /* ── 파이프라인 훅 — 새 결과 완료 시 afterId 지정 ── */
+  const pipeline = useEditPipeline({
+    onComplete: (id) => setAfterId(id),
+  });
+  const handleGenerate = pipeline.generate;
 
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
 
@@ -151,91 +149,6 @@ export default function EditPage() {
   ) => {
     setSource(image, label, w, h);
     toast.success("이미지 업로드 완료", label.split(" · ")[0]);
-  };
-
-  /* ── 생성 (수정) 실행 ── */
-  const handleGenerate = async () => {
-    if (running) return;
-    if (!sourceImage) {
-      toast.warn("원본 이미지 먼저 업로드해줘");
-      return;
-    }
-    if (!prompt.trim()) {
-      toast.warn("수정 지시를 입력해줘");
-      return;
-    }
-
-    setRunning(true);
-    try {
-      for await (const evt of editImageStream({
-        sourceImage,
-        prompt,
-        lightning,
-        ollamaModel: ollamaModelSel,
-        visionModel: visionModelSel,
-      })) {
-        if (evt.type === "sampling") {
-          // ComfyUI 샘플링 상세 (step 4 내부)
-          setSampling(evt.samplingStep ?? null, evt.samplingTotal ?? null);
-          continue;
-        }
-        if (evt.type === "step") {
-          setStep(evt.step, evt.done);
-          if (!evt.done) {
-            // step 시작 시점 기록
-            recordStepDetail({
-              n: evt.step,
-              startedAt: Date.now(),
-              doneAt: null,
-            });
-          } else {
-            // step 완료 + 상세 데이터 병합
-            recordStepDetail({
-              n: evt.step,
-              startedAt: Date.now(), // merge 시 기존 값 유지됨
-              doneAt: Date.now(),
-              description: evt.description,
-              finalPrompt: evt.finalPrompt,
-              finalPromptKo: evt.finalPromptKo,
-              provider: evt.provider,
-            });
-          }
-        } else if (evt.type === "stage") {
-          // 백엔드가 계산한 전체 파이프라인 진행률(0~100) 그대로 표시
-          setPipelineProgress(evt.progress, evt.stageLabel);
-        } else if (evt.type === "done") {
-          resetPipeline();
-          addItem(evt.item);
-          setAfterId(evt.item.id);
-          toast.success("수정 완료", evt.item.label);
-          if (evt.item.comfyError) {
-            toast.error(
-              "ComfyUI 오류 (Mock 폴백 적용)",
-              evt.item.comfyError.slice(0, 160),
-            );
-          } else if (evt.item.promptProvider === "fallback") {
-            toast.warn(
-              "gemma4 업그레이드 실패",
-              "Ollama 상태 확인 필요",
-            );
-          }
-          // 히스토리 DB 저장 실패 힌트 (백엔드 B10)
-          if (!evt.savedToHistory) {
-            toast.warn(
-              "히스토리 DB 저장 실패",
-              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
-            );
-          }
-          return;
-        }
-      }
-    } catch (err) {
-      resetPipeline();
-      toast.error(
-        "수정 실패",
-        err instanceof Error ? err.message : "알 수 없는 오류",
-      );
-    }
   };
 
   return (
