@@ -23,10 +23,13 @@ import {
   type WheelEvent,
 } from "react";
 import Icon from "@/components/ui/Icon";
+import type { HistoryItem } from "@/lib/api-client";
+import { copyText } from "@/lib/image-actions";
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 8;
 const ZOOM_STEP = 0.15;
+const INFO_PANEL_WIDTH = 340;
 
 interface Props {
   src: string | null;
@@ -37,6 +40,11 @@ interface Props {
   onDownload?: () => void;
   /** "원본으로 보내기" 핸들러 (옵션) — 연속 수정 플로우용 */
   onUseAsSource?: () => void;
+  /**
+   * 2026-04-24: 메타정보(프롬프트/seed/steps/model/...) 표시용.
+   * 있으면 우측 340px 정보 패널 렌더. 없으면 기존 단순 뷰어.
+   */
+  item?: HistoryItem;
 }
 
 export default function ImageLightbox(props: Props) {
@@ -52,6 +60,7 @@ function LightboxInner({
   onClose,
   onDownload,
   onUseAsSource,
+  item,
 }: Props) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -135,6 +144,8 @@ function LightboxInner({
         background: "rgba(8, 8, 10, 0.88)",
         display: "grid",
         placeItems: "center",
+        // 정보 패널 있으면 이미지 영역이 패널에 안 가리도록 우측 padding
+        paddingRight: item ? INFO_PANEL_WIDTH : 0,
         animation: "fade-in .18s ease",
         userSelect: "none",
         overflow: "hidden",
@@ -240,13 +251,15 @@ function LightboxInner({
         />
       </div>
 
-      {/* Footer hint */}
+      {/* Footer hint — 정보 패널 있을 땐 좌측 기준 정렬 (패널에 겹치지 않게) */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
           bottom: 18,
-          left: "50%",
+          left: item
+            ? `calc((100% - ${INFO_PANEL_WIDTH}px) / 2)`
+            : "50%",
           transform: "translateX(-50%)",
           padding: "6px 14px",
           background: "rgba(0,0,0,.45)",
@@ -259,7 +272,364 @@ function LightboxInner({
       >
         WHEEL zoom · DRAG pan · DBL reset · ESC close
       </div>
+
+      {/* Info Panel — item 전달된 경우만 렌더 */}
+      {item && <InfoPanel item={item} onClose={(e) => e.stopPropagation()} />}
     </div>
+  );
+}
+
+/* ─────────────────────────────────
+   InfoPanel — 우측 메타정보 사이드바
+   ───────────────────────────────── */
+function InfoPanel({
+  item,
+  onClose,
+}: {
+  item: HistoryItem;
+  onClose: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <aside
+      onClick={onClose}
+      style={{
+        position: "absolute",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: INFO_PANEL_WIDTH,
+        background: "rgba(16,16,20,.96)",
+        borderLeft: "1px solid rgba(255,255,255,.08)",
+        overflowY: "auto",
+        padding: "60px 20px 28px",
+        color: "rgba(255,255,255,.92)",
+        zIndex: 3,
+        boxShadow: "-8px 0 24px rgba(0,0,0,.4)",
+      }}
+    >
+      {/* 헤더 */}
+      <div style={{ marginBottom: 16 }}>
+        <div
+          className="mono"
+          style={{
+            fontSize: 10,
+            color: "rgba(255,255,255,.45)",
+            letterSpacing: ".12em",
+            textTransform: "uppercase",
+          }}
+        >
+          #{item.id.slice(-8).toUpperCase()} · {item.mode}
+        </div>
+        <div
+          style={{
+            fontSize: 14,
+            fontWeight: 600,
+            marginTop: 6,
+            lineHeight: 1.4,
+            wordBreak: "break-word",
+          }}
+        >
+          {item.label}
+        </div>
+      </div>
+
+      {/* 메타 그리드 */}
+      <section style={{ marginBottom: 18 }}>
+        <SectionTitle>Meta</SectionTitle>
+        <MetaRow k="모델" v={item.model} />
+        <MetaRow k="사이즈" v={`${item.width}×${item.height}`} />
+        <MetaRow
+          k="Seed"
+          v={<span className="mono">{item.seed}</span>}
+          copyable={String(item.seed)}
+        />
+        <MetaRow
+          k="스텝/CFG"
+          v={`${item.steps} · ${item.cfg}${item.lightning ? " ⚡" : ""}`}
+        />
+        {item.promptProvider && (
+          <MetaRow
+            k="Prompt Provider"
+            v={
+              <span
+                className="mono"
+                style={{
+                  color:
+                    item.promptProvider === "fallback"
+                      ? "var(--amber-ink)"
+                      : "rgba(255,255,255,.9)",
+                }}
+              >
+                {item.promptProvider}
+              </span>
+            }
+          />
+        )}
+        <MetaRow
+          k="생성일"
+          v={new Date(item.createdAt).toLocaleString("ko-KR", {
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        />
+      </section>
+
+      {/* 원본 프롬프트 */}
+      <section style={{ marginBottom: 18 }}>
+        <SectionTitle
+          action={
+            <CopyChip
+              text={item.prompt}
+              label="원본 프롬프트"
+            />
+          }
+        >
+          원본 프롬프트
+        </SectionTitle>
+        <PromptBlock text={item.prompt} />
+      </section>
+
+      {/* 업그레이드된 영문 — 있으면 */}
+      {item.upgradedPrompt && (
+        <section style={{ marginBottom: 18 }}>
+          <SectionTitle
+            action={
+              <CopyChip
+                text={item.upgradedPrompt}
+                label="업그레이드 (영문)"
+              />
+            }
+          >
+            업그레이드 <span style={{ color: "rgba(255,255,255,.45)" }}>EN</span>
+          </SectionTitle>
+          <PromptBlock text={item.upgradedPrompt} />
+        </section>
+      )}
+
+      {/* 한글 번역 — 있으면 */}
+      {item.upgradedPromptKo && (
+        <section style={{ marginBottom: 18 }}>
+          <SectionTitle
+            action={
+              <CopyChip
+                text={item.upgradedPromptKo}
+                label="한글 번역"
+              />
+            }
+          >
+            한글 번역 <span style={{ color: "rgba(255,255,255,.45)" }}>KO</span>
+          </SectionTitle>
+          <PromptBlock text={item.upgradedPromptKo} />
+        </section>
+      )}
+
+      {/* 비전 설명 (Edit 모드) */}
+      {item.visionDescription && (
+        <section style={{ marginBottom: 18 }}>
+          <SectionTitle
+            action={
+              <CopyChip
+                text={item.visionDescription}
+                label="비전 설명"
+              />
+            }
+          >
+            비전 설명
+          </SectionTitle>
+          <PromptBlock text={item.visionDescription} />
+        </section>
+      )}
+
+      {/* 조사 힌트 */}
+      {item.researchHints && item.researchHints.length > 0 && (
+        <section style={{ marginBottom: 18 }}>
+          <SectionTitle>조사 힌트</SectionTitle>
+          <ul
+            style={{
+              listStyle: "disc",
+              paddingLeft: 18,
+              margin: 0,
+              fontSize: 12,
+              lineHeight: 1.6,
+              color: "rgba(255,255,255,.82)",
+            }}
+          >
+            {item.researchHints.map((h, i) => (
+              <li key={i} style={{ marginBottom: 4 }}>
+                {h}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {/* ComfyUI 에러 (Mock 폴백 시) */}
+      {item.comfyError && (
+        <section style={{ marginBottom: 18 }}>
+          <SectionTitle>⚠ ComfyUI 오류</SectionTitle>
+          <div
+            style={{
+              fontSize: 11.5,
+              color: "var(--amber-ink)",
+              background: "rgba(250,173,20,.08)",
+              border: "1px solid rgba(250,173,20,.25)",
+              borderRadius: 8,
+              padding: "8px 10px",
+              lineHeight: 1.5,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {item.comfyError}
+          </div>
+        </section>
+      )}
+    </aside>
+  );
+}
+
+function SectionTitle({
+  children,
+  action,
+}: {
+  children: React.ReactNode;
+  action?: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        marginBottom: 8,
+        gap: 8,
+      }}
+    >
+      <h4
+        style={{
+          margin: 0,
+          fontSize: 11,
+          fontWeight: 600,
+          letterSpacing: ".1em",
+          textTransform: "uppercase",
+          color: "rgba(255,255,255,.6)",
+        }}
+      >
+        {children}
+      </h4>
+      {action}
+    </div>
+  );
+}
+
+function MetaRow({
+  k,
+  v,
+  copyable,
+}: {
+  k: string;
+  v: React.ReactNode;
+  copyable?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "80px 1fr auto",
+        alignItems: "center",
+        gap: 8,
+        padding: "5px 0",
+        fontSize: 12,
+        borderBottom: "1px solid rgba(255,255,255,.05)",
+      }}
+    >
+      <span
+        style={{
+          color: "rgba(255,255,255,.5)",
+          fontSize: 11,
+          letterSpacing: ".02em",
+        }}
+      >
+        {k}
+      </span>
+      <span style={{ color: "rgba(255,255,255,.92)", overflow: "hidden" }}>
+        {v}
+      </span>
+      {copyable && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            copyText(copyable, k);
+          }}
+          title={`${k} 복사`}
+          style={{
+            all: "unset",
+            cursor: "pointer",
+            padding: "2px 6px",
+            borderRadius: 6,
+            fontSize: 10,
+            color: "rgba(255,255,255,.5)",
+            border: "1px solid rgba(255,255,255,.15)",
+          }}
+        >
+          복사
+        </button>
+      )}
+    </div>
+  );
+}
+
+function PromptBlock({ text }: { text: string }) {
+  return (
+    <div
+      style={{
+        fontSize: 12.5,
+        lineHeight: 1.55,
+        color: "rgba(255,255,255,.88)",
+        background: "rgba(255,255,255,.04)",
+        border: "1px solid rgba(255,255,255,.08)",
+        borderRadius: 8,
+        padding: "10px 12px",
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+        maxHeight: 260,
+        overflowY: "auto",
+      }}
+    >
+      {text}
+    </div>
+  );
+}
+
+function CopyChip({ text, label }: { text: string; label: string }) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        copyText(text, label);
+      }}
+      title={`${label} 복사`}
+      style={{
+        all: "unset",
+        cursor: "pointer",
+        fontSize: 10.5,
+        padding: "3px 8px",
+        borderRadius: 999,
+        background: "rgba(255,255,255,.08)",
+        border: "1px solid rgba(255,255,255,.12)",
+        color: "rgba(255,255,255,.85)",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+      }}
+    >
+      <Icon name="copy" size={10} />
+      복사
+    </button>
   );
 }
 

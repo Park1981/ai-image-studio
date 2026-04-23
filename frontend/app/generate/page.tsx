@@ -150,6 +150,7 @@ export default function GeneratePage() {
       />
       <ImageLightbox
         src={lightboxSrc}
+        item={selectedItem}
         alt={selectedItem?.label}
         filename={
           selectedItem

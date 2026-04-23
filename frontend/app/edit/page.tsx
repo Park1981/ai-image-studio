@@ -158,6 +158,7 @@ export default function EditPage() {
       )}
       <ImageLightbox
         src={lightboxSrc}
+        item={afterItem}
         alt={afterItem?.label}
         filename={
           afterItem
