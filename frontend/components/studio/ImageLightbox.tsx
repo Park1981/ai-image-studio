@@ -35,6 +35,8 @@ interface Props {
   onClose: () => void;
   /** 저장 버튼 핸들러 (옵션) */
   onDownload?: () => void;
+  /** "원본으로 보내기" 핸들러 (옵션) — 연속 수정 플로우용 */
+  onUseAsSource?: () => void;
 }
 
 export default function ImageLightbox(props: Props) {
@@ -49,6 +51,7 @@ function LightboxInner({
   filename,
   onClose,
   onDownload,
+  onUseAsSource,
 }: Props) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
@@ -187,6 +190,19 @@ function LightboxInner({
           >
             +
           </ToolBtn>
+          {onUseAsSource && (
+            <ToolBtn
+              onClick={() => {
+                onUseAsSource();
+                onClose();
+              }}
+              title="이 이미지를 수정 원본으로"
+              accent
+            >
+              <Icon name="edit" size={12} />
+              <span style={{ marginLeft: 5, fontSize: 11 }}>원본으로</span>
+            </ToolBtn>
+          )}
           {onDownload && (
             <ToolBtn onClick={onDownload} title="저장">
               <Icon name="download" size={14} />
@@ -210,7 +226,7 @@ function LightboxInner({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={src}
+          src={src ?? undefined}
           alt={alt}
           draggable={false}
           style={{
@@ -255,11 +271,16 @@ function ToolBtn({
   children,
   onClick,
   title,
+  accent = false,
 }: {
   children: React.ReactNode;
   onClick: () => void;
   title?: string;
+  /** accent=true 면 파란색 강조 (예: 원본으로 버튼) */
+  accent?: boolean;
 }) {
+  const baseBg = accent ? "rgba(74,158,255,.85)" : "rgba(255,255,255,.1)";
+  const hoverBg = accent ? "rgba(74,158,255,1)" : "rgba(255,255,255,.18)";
   return (
     <button
       type="button"
@@ -272,22 +293,21 @@ function ToolBtn({
         height: 30,
         padding: "0 10px",
         borderRadius: 8,
-        background: "rgba(255,255,255,.1)",
+        background: baseBg,
         color: "rgba(255,255,255,.95)",
-        display: "grid",
-        placeItems: "center",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
         fontSize: 12,
         fontWeight: 500,
         border: "1px solid rgba(255,255,255,.08)",
         transition: "background .15s",
       }}
       onMouseEnter={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background =
-          "rgba(255,255,255,.18)";
+        (e.currentTarget as HTMLButtonElement).style.background = hoverBg;
       }}
       onMouseLeave={(e) => {
-        (e.currentTarget as HTMLButtonElement).style.background =
-          "rgba(255,255,255,.1)";
+        (e.currentTarget as HTMLButtonElement).style.background = baseBg;
       }}
     >
       {children}

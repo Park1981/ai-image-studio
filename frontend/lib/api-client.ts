@@ -39,9 +39,13 @@ export interface HistoryItem {
   imageRef: string;
   /** 실 백엔드가 보조로 포함할 수 있는 메타 */
   upgradedPrompt?: string;
+  /** 업그레이드된 영문 프롬프트의 한국어 번역 (v2 · 2026-04-23) */
+  upgradedPromptKo?: string | null;
   promptProvider?: string;
   researchHints?: string[];
   visionDescription?: string;
+  /** ComfyUI 에러 메시지 (Mock 폴백 시) */
+  comfyError?: string | null;
 }
 
 export interface GenerateRequest {
@@ -61,6 +65,8 @@ export interface GenerateRequest {
 
 export interface UpgradeOnlyResult {
   upgradedPrompt: string;
+  /** 한국어 번역 (v2 · 2026-04-23). null 이면 파싱 실패 or fallback */
+  upgradedPromptKo?: string | null;
   provider: string;
   fallback: boolean;
   researchHints: string[];
@@ -76,6 +82,7 @@ export async function upgradeOnly(params: {
     await sleep(800 + Math.random() * 600);
     return {
       upgradedPrompt: `${params.prompt}, cinematic lighting, 35mm film, shallow depth of field, editorial photo aesthetic`,
+      upgradedPromptKo: `${params.prompt}, 영화적 조명, 35mm 필름, 얕은 심도, 에디토리얼 포토 감성`,
       provider: "mock",
       fallback: false,
       researchHints: params.research
@@ -115,6 +122,10 @@ export type GenStage =
         | "postprocess";
       progress: number;
       stageLabel: string;
+      /** comfyui-sampling 시 현재 샘플러 step (예: 3) */
+      samplingStep?: number | null;
+      /** comfyui-sampling 시 총 샘플러 step (예: 40) */
+      samplingTotal?: number | null;
     }
   | { type: "done"; item: HistoryItem };
 
@@ -125,10 +136,19 @@ export type EditStage =
       done: boolean;
       /** step 1 done 에서 도착하는 비전 설명 */
       description?: string;
-      /** step 2 done 에서 도착하는 최종 프롬프트 */
+      /** step 2 done 에서 도착하는 최종 프롬프트 (영문) */
       finalPrompt?: string;
+      /** step 2 done 에서 도착하는 한국어 번역 (v2 · 2026-04-23) */
+      finalPromptKo?: string | null;
       /** step 2 provider (ollama/fallback) */
       provider?: string;
+    }
+  | {
+      /** ComfyUI 샘플링 중 진행률/스텝 업데이트 (step 4 내부) */
+      type: "sampling";
+      progress: number;
+      samplingStep?: number | null;
+      samplingTotal?: number | null;
     }
   | { type: "done"; item: HistoryItem };
 
@@ -300,6 +320,7 @@ async function* mockGenerateStream(
     imageRef: `mock-seed://${uid("img")}`,
     // Mock 에서도 AI 보강 결과 필드 채워서 UI 검증 가능
     upgradedPrompt: `${req.prompt}, cinematic lighting, 35mm film, shallow depth of field, highly detailed, editorial photo aesthetic`,
+    upgradedPromptKo: `${req.prompt}, 영화적 조명, 35mm 필름, 얕은 심도, 고해상도 디테일, 에디토리얼 포토 감성`,
     promptProvider: "mock",
     researchHints: req.research
       ? [
@@ -332,12 +353,32 @@ async function* realEditStream(
   // multipart: image 파일 + meta JSON
   const form = new FormData();
   if (typeof req.sourceImage === "string") {
-    // data URL → Blob 변환
-    if (req.sourceImage.startsWith("data:")) {
-      const blob = await (await fetch(req.sourceImage)).blob();
-      form.append("image", blob, "upload.png");
-    } else {
-      throw new Error("non-dataURL string sources not supported yet");
+    // 문자열 source 종류:
+    //  1) "data:image/..." — 업로드 직후 FileReader 결과
+    //  2) "http://..." or "/images/..." — 히스토리에서 선택한 서버 이미지
+    //  3) "mock-seed://..." — Mock 결과 (실 백엔드에선 에러)
+    const src = req.sourceImage;
+    if (src.startsWith("mock-seed://")) {
+      throw new Error(
+        "Mock 결과 이미지는 수정에 사용 불가. 먼저 저장 후 파일로 업로드해줘.",
+      );
+    }
+    // data URL / http / relative path 전부 fetch 로 blob 변환 가능
+    try {
+      const res = await fetch(src);
+      if (!res.ok) {
+        throw new Error(`image fetch ${res.status}: ${src.slice(0, 80)}`);
+      }
+      const blob = await res.blob();
+      // 파일명 추출 (histroy URL 이면 basename, data URL 이면 "upload.png")
+      const guessedName = src.startsWith("data:")
+        ? "upload.png"
+        : src.split("/").pop()?.split("?")[0] || "source.png";
+      form.append("image", blob, guessedName);
+    } catch (err) {
+      throw new Error(
+        `원본 이미지 로드 실패: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   } else {
     form.append("image", req.sourceImage);
@@ -387,9 +428,27 @@ async function* realEditStream(
         done: boolean;
         description?: string;
         finalPrompt?: string;
+        finalPromptKo?: string | null;
         provider?: string;
       };
       yield { type: "step", ...payload };
+    }
+    if (evt.event === "stage") {
+      // ComfyUI 샘플링 상세 (step 4 내부에서 여러 번 도착)
+      const payload = evt.data as {
+        type?: string;
+        progress?: number;
+        samplingStep?: number | null;
+        samplingTotal?: number | null;
+      };
+      if (payload.type === "comfyui-sampling") {
+        yield {
+          type: "sampling",
+          progress: payload.progress ?? 0,
+          samplingStep: payload.samplingStep ?? null,
+          samplingTotal: payload.samplingTotal ?? null,
+        };
+      }
     }
   }
 }
@@ -427,6 +486,7 @@ async function* mockEditStream(
     visionDescription:
       "A subject in a minimalist studio setting, soft window light, neutral tones, photographed with shallow depth of field.",
     upgradedPrompt: `${req.prompt}, keep the exact same face, identical face, same person, same identity, realistic skin texture, no skin smoothing, photorealistic, highly detailed face, natural lighting`,
+    upgradedPromptKo: `${req.prompt}, 얼굴 동일성 유지 (같은 사람, 동일한 이목구비), 사실적인 피부 텍스처, 스무딩 없음, 포토리얼리즘, 자연광`,
     promptProvider: "mock",
   };
   yield { type: "done", item };

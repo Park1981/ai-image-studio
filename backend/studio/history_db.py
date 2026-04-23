@@ -41,6 +41,7 @@ CREATE TABLE IF NOT EXISTS studio_history (
   created_at INTEGER NOT NULL,
   image_ref TEXT NOT NULL,
   upgraded_prompt TEXT,
+  upgraded_prompt_ko TEXT,
   prompt_provider TEXT,
   research_hints TEXT,
   vision_description TEXT,
@@ -58,11 +59,20 @@ CREATE_IDX_MODE = (
 
 
 async def init_studio_history_db() -> None:
-    """테이블/인덱스 생성 (idempotent)."""
+    """테이블/인덱스 생성 (idempotent) + 증분 마이그레이션."""
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute(CREATE_TABLE)
         await db.execute(CREATE_IDX_CREATED)
         await db.execute(CREATE_IDX_MODE)
+        # v2 (2026-04-23): upgraded_prompt_ko 컬럼 추가 (기존 DB 마이그레이션)
+        try:
+            await db.execute(
+                "ALTER TABLE studio_history ADD COLUMN upgraded_prompt_ko TEXT"
+            )
+            log.info("Migrated studio_history: added upgraded_prompt_ko column")
+        except Exception:
+            # 이미 존재하거나 최초 CREATE 직후면 에러 — 정상
+            pass
         await db.commit()
     log.info("studio_history DB ready at %s", _DB_PATH)
 
@@ -73,9 +83,9 @@ async def insert_item(item: dict[str, Any]) -> None:
         await db.execute(
             """INSERT OR REPLACE INTO studio_history
             (id, mode, prompt, label, width, height, seed, steps, cfg, lightning,
-             model, created_at, image_ref, upgraded_prompt, prompt_provider,
-             research_hints, vision_description, comfy_error)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             model, created_at, image_ref, upgraded_prompt, upgraded_prompt_ko,
+             prompt_provider, research_hints, vision_description, comfy_error)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 item["id"],
                 item["mode"],
@@ -91,6 +101,7 @@ async def insert_item(item: dict[str, Any]) -> None:
                 int(item.get("createdAt", time.time() * 1000)),
                 item["imageRef"],
                 item.get("upgradedPrompt"),
+                item.get("upgradedPromptKo"),
                 item.get("promptProvider"),
                 json.dumps(item.get("researchHints") or [], ensure_ascii=False),
                 item.get("visionDescription"),
@@ -172,6 +183,11 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
         hints = json.loads(hints_raw) if hints_raw else []
     except Exception:
         hints = []
+    # upgraded_prompt_ko 는 ALTER 로 추가된 컬럼이라 오래된 row 에서는 없을 수 있음
+    try:
+        upgraded_ko = row["upgraded_prompt_ko"]
+    except (IndexError, KeyError):
+        upgraded_ko = None
     return {
         "id": row["id"],
         "mode": row["mode"],
@@ -187,6 +203,7 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
         "createdAt": row["created_at"],
         "imageRef": row["image_ref"],
         "upgradedPrompt": row["upgraded_prompt"],
+        "upgradedPromptKo": upgraded_ko,
         "promptProvider": row["prompt_provider"],
         "researchHints": hints,
         "visionDescription": row["vision_description"],

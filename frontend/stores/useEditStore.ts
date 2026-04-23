@@ -14,8 +14,10 @@ export interface EditStepDetail {
   doneAt: number | null;
   /** step 1 에서 받은 vision 설명 */
   description?: string;
-  /** step 2 에서 받은 최종 프롬프트 */
+  /** step 2 에서 받은 최종 프롬프트 (영문) */
   finalPrompt?: string;
+  /** step 2 에서 받은 한국어 번역 (v2 · 2026-04-23) */
+  finalPromptKo?: string | null;
   /** step 2 provider (ollama/fallback) */
   provider?: string;
 }
@@ -39,6 +41,12 @@ export interface EditState {
   currentStep: 1 | 2 | 3 | 4 | null;
   /** 진행 모달용 상세 타임라인 */
   stepHistory: EditStepDetail[];
+  /** 실행 시작 시각 (ms since epoch) — 경과 시간 계산용 */
+  startedAt: number | null;
+  /** ComfyUI 샘플러 현재 스텝 */
+  samplingStep: number | null;
+  /** ComfyUI 샘플러 총 스텝 */
+  samplingTotal: number | null;
 
   // 비교 슬라이더
   compareX: number;
@@ -57,6 +65,8 @@ export interface EditState {
   recordStepDetail: (detail: EditStepDetail) => void;
   setCompareX: (v: number) => void;
   resetPipeline: () => void;
+  /** ComfyUI 샘플링 스텝 업데이트 */
+  setSampling: (step: number | null, total: number | null) => void;
 }
 
 export const useEditStore = create<EditState>((set) => ({
@@ -72,6 +82,9 @@ export const useEditStore = create<EditState>((set) => ({
   stepDone: 0,
   currentStep: null,
   stepHistory: [],
+  startedAt: null,
+  samplingStep: null,
+  samplingTotal: null,
 
   compareX: 50,
 
@@ -87,7 +100,15 @@ export const useEditStore = create<EditState>((set) => ({
   setRunning: (running) =>
     set(
       running
-        ? { running, stepDone: 0, currentStep: 1, stepHistory: [] }
+        ? {
+            running,
+            stepDone: 0,
+            currentStep: 1,
+            stepHistory: [],
+            startedAt: Date.now(),
+            samplingStep: null,
+            samplingTotal: null,
+          }
         : { running },
     ),
   setStep: (step, done) =>
@@ -115,5 +136,10 @@ export const useEditStore = create<EditState>((set) => ({
       stepDone: 0,
       currentStep: null,
       stepHistory: [],
+      startedAt: null,
+      samplingStep: null,
+      samplingTotal: null,
     }),
+  setSampling: (step, total) =>
+    set({ samplingStep: step, samplingTotal: total }),
 }));

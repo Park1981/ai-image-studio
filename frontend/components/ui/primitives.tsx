@@ -159,7 +159,8 @@ export function Toggle({
         type="checkbox"
         checked={checked}
         onChange={(e) => onChange(e.target.checked)}
-        style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}
+        // display:none = layout flow 에서 완전 제거 (position:absolute 부유 이슈 방지)
+        style={{ display: "none" }}
       />
       <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-2)" }}>

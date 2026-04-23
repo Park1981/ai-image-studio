@@ -206,13 +206,13 @@ function EditorShell({
             <>
               <Section
                 label={`gemma4 업그레이드 결과 (${result.provider}${result.fallback ? " · 폴백" : ""})`}
-                hint="수정하고 [이대로 생성] 누르면 아래 프롬프트로 진행. [재업그레이드] 는 gemma4 를 다시 돌려."
+                hint="수정하고 [이대로 생성] 누르면 아래 영문 프롬프트로 진행. [재업그레이드] 는 gemma4 를 다시 돌려."
               >
                 <textarea
                   ref={textareaRef}
                   value={edit}
                   onChange={(e) => setEdit(e.target.value)}
-                  rows={8}
+                  rows={7}
                   style={{
                     width: "100%",
                     padding: "12px 14px",
@@ -229,6 +229,31 @@ function EditorShell({
                   }}
                 />
               </Section>
+
+              {/* 한국어 번역 (gemma4 가 같이 반환) */}
+              {result.upgradedPromptKo && (
+                <Section
+                  label="한국어 번역"
+                  hint="영문 프롬프트의 의미를 gemma4 가 번역한 결과. 생성엔 영향 없음 (참고용)."
+                >
+                  <p
+                    style={{
+                      margin: 0,
+                      padding: "10px 14px",
+                      background: "var(--bg-2)",
+                      border: "1px dashed var(--line)",
+                      borderRadius: 10,
+                      fontSize: 12.5,
+                      color: "var(--ink-2)",
+                      lineHeight: 1.65,
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                    }}
+                  >
+                    {result.upgradedPromptKo}
+                  </p>
+                </Section>
+              )}
 
               {result.researchHints.length > 0 && (
                 <Section label="Claude 조사 힌트">

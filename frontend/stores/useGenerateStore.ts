@@ -35,6 +35,12 @@ export interface GenerateState {
   stage: string;
   /** 진행 모달용 stage 이벤트 타임라인 */
   stageHistory: StageEvent[];
+  /** 실행 시작 시각 (ms since epoch) — 경과 시간 계산용 */
+  startedAt: number | null;
+  /** ComfyUI 샘플러 현재 스텝 (예: 3) */
+  samplingStep: number | null;
+  /** ComfyUI 샘플러 총 스텝 (예: 40) */
+  samplingTotal: number | null;
 
   // actions
   setPrompt: (v: string) => void;
@@ -47,6 +53,8 @@ export interface GenerateState {
   setRunning: (generating: boolean, progress?: number, stage?: string) => void;
   resetRunning: () => void;
   pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
+  /** ComfyUI 샘플링 스텝 업데이트 */
+  setSampling: (step: number | null, total: number | null) => void;
 
   /** Lightning 토글 시 steps/CFG 자동 스위치 (defaults ↔ lightning) */
   applyLightning: (on: boolean) => void;
@@ -70,6 +78,9 @@ export const useGenerateStore = create<GenerateState>()(
       progress: 0,
       stage: "",
       stageHistory: [],
+      startedAt: null,
+      samplingStep: null,
+      samplingTotal: null,
 
       setPrompt: (v) => set({ prompt: v }),
       setAspect: (v) => set({ aspect: v }),
@@ -79,16 +90,28 @@ export const useGenerateStore = create<GenerateState>()(
       setCfg: (v) => set({ cfg: v }),
       setSeed: (v) => set({ seed: v }),
       setRunning: (generating, progress = 0, stage = "") =>
-        set((s) => ({
-          generating,
-          progress,
-          stage,
-          // 새 세션 시작(generating=true + progress=0) 이면 히스토리 초기화
-          stageHistory:
-            generating && progress === 0 ? [] : s.stageHistory,
-        })),
+        set((s) => {
+          // 새 세션 시작(generating=true + progress=0) 이면 시작 시각 기록 + 상태 초기화
+          const freshStart = generating && progress === 0;
+          return {
+            generating,
+            progress,
+            stage,
+            stageHistory: freshStart ? [] : s.stageHistory,
+            startedAt: freshStart ? Date.now() : s.startedAt,
+            samplingStep: freshStart ? null : s.samplingStep,
+            samplingTotal: freshStart ? null : s.samplingTotal,
+          };
+        }),
       resetRunning: () =>
-        set({ generating: false, progress: 0, stage: "" }),
+        set({
+          generating: false,
+          progress: 0,
+          stage: "",
+          startedAt: null,
+          samplingStep: null,
+          samplingTotal: null,
+        }),
       pushStage: (evt) =>
         set((s) => ({
           stageHistory: [
@@ -96,6 +119,8 @@ export const useGenerateStore = create<GenerateState>()(
             { ...evt, arrivedAt: Date.now() },
           ],
         })),
+      setSampling: (step, total) =>
+        set({ samplingStep: step, samplingTotal: total }),
 
       applyLightning: (on) => {
         if (on) {

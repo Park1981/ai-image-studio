@@ -22,6 +22,11 @@ interface Props {
   onAfterDelete?: () => void;
   /** 더블클릭 시 콜백 (라이트박스 열기 등) */
   onDoubleClick?: () => void;
+  /**
+   * "원본으로 보내기" 콜백. 있으면 hover 시 좌상단에 버튼 노출.
+   * 수정 모드 히스토리에서 연속 수정 플로우용.
+   */
+  onUseAsSource?: () => void;
   aspect?: string;
   style?: CSSProperties;
 }
@@ -32,6 +37,7 @@ export default function HistoryTile({
   onClick,
   onAfterDelete,
   onDoubleClick,
+  onUseAsSource,
   aspect = "1/1",
   style,
 }: Props) {
@@ -74,6 +80,51 @@ export default function HistoryTile({
           boxShadow: selected ? "0 0 0 4px rgba(74,158,255,.15)" : "none",
         }}
       />
+      {hover && onUseAsSource && (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            onUseAsSource();
+          }}
+          title="이 이미지를 수정 원본으로"
+          style={{
+            all: "unset",
+            cursor: "pointer",
+            position: "absolute",
+            top: 6,
+            left: 6,
+            height: 26,
+            padding: "0 10px",
+            borderRadius: 999,
+            background: "rgba(74,158,255,.92)",
+            backdropFilter: "blur(4px)",
+            color: "#fff",
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 4,
+            fontSize: 11,
+            fontWeight: 600,
+            letterSpacing: ".02em",
+            border: "1px solid rgba(255,255,255,.25)",
+            transition: "background .15s, transform .15s",
+            boxShadow: "0 2px 8px rgba(0,0,0,.3)",
+          }}
+          onMouseEnter={(e) => {
+            const el = e.currentTarget as HTMLButtonElement;
+            el.style.background = "rgba(74,158,255,1)";
+            el.style.transform = "scale(1.04)";
+          }}
+          onMouseLeave={(e) => {
+            const el = e.currentTarget as HTMLButtonElement;
+            el.style.background = "rgba(74,158,255,.92)";
+            el.style.transform = "scale(1)";
+          }}
+        >
+          <Icon name="edit" size={11} stroke={2.2} />
+          원본으로
+        </button>
+      )}
       {hover && (
         <button
           type="button"

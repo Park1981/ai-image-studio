@@ -113,6 +113,7 @@ export default function ProgressModal({
           onClose={onClose}
           onCancel={handleCancel}
         />
+        <StatusBar mode={mode} />
         <div
           style={{
             flex: 1,
@@ -123,6 +124,123 @@ export default function ProgressModal({
           {mode === "generate" ? <GenerateTimeline /> : <EditTimeline />}
         </div>
       </section>
+    </div>
+  );
+}
+
+/**
+ * StatusBar - 헤더 바로 아래에 표시되는 "상태 스트립".
+ * 경과 시간 (mm:ss) + ComfyUI 샘플링 스텝 (3/40) + 전체 진행률 %.
+ *
+ * 500ms 간격으로 tick — 경과 시간 즉시성 유지.
+ */
+function StatusBar({ mode }: { mode: "generate" | "edit" }) {
+  // mode 별 store 에서 startedAt / sampling 정보 pull
+  const genStartedAt = useGenerateStore((s) => s.startedAt);
+  const genSamplingStep = useGenerateStore((s) => s.samplingStep);
+  const genSamplingTotal = useGenerateStore((s) => s.samplingTotal);
+  const genProgress = useGenerateStore((s) => s.progress);
+  const genRunning = useGenerateStore((s) => s.generating);
+
+  const editStartedAt = useEditStore((s) => s.startedAt);
+  const editSamplingStep = useEditStore((s) => s.samplingStep);
+  const editSamplingTotal = useEditStore((s) => s.samplingTotal);
+  const editRunning = useEditStore((s) => s.running);
+  const editStepDone = useEditStore((s) => s.stepDone);
+
+  const startedAt = mode === "generate" ? genStartedAt : editStartedAt;
+  const samplingStep = mode === "generate" ? genSamplingStep : editSamplingStep;
+  const samplingTotal =
+    mode === "generate" ? genSamplingTotal : editSamplingTotal;
+  const running = mode === "generate" ? genRunning : editRunning;
+  // 에디트는 4-step 진행도, 제너레이트는 stage progress 0~100
+  const progress =
+    mode === "generate" ? genProgress : Math.round((editStepDone / 4) * 100);
+
+  // 경과 시간 500ms tick
+  const [nowTick, setNowTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running || !startedAt) return;
+    const id = setInterval(() => setNowTick(Date.now()), 500);
+    return () => clearInterval(id);
+  }, [running, startedAt]);
+
+  const elapsedSec = startedAt
+    ? Math.max(0, Math.floor((nowTick - startedAt) / 1000))
+    : 0;
+  const mm = Math.floor(elapsedSec / 60)
+    .toString()
+    .padStart(2, "0");
+  const ss = (elapsedSec % 60).toString().padStart(2, "0");
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        padding: "10px 22px",
+        background: "var(--bg-2)",
+        borderBottom: "1px solid var(--line)",
+        fontSize: 12,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+        <StatusChip
+          icon="clock"
+          label={`${mm}:${ss}`}
+          title="총 경과 시간"
+          mono
+        />
+        {samplingStep != null && samplingTotal != null && samplingTotal > 0 && (
+          <StatusChip
+            icon="cpu"
+            label={`스텝 ${samplingStep}/${samplingTotal}`}
+            title="ComfyUI 샘플러 진행 스텝"
+            mono
+          />
+        )}
+      </div>
+      <div
+        className="mono"
+        style={{
+          fontSize: 12,
+          fontWeight: 600,
+          color: "var(--accent)",
+          letterSpacing: ".04em",
+        }}
+      >
+        {progress}%
+      </div>
+    </div>
+  );
+}
+
+function StatusChip({
+  icon,
+  label,
+  title,
+  mono = false,
+}: {
+  icon: "clock" | "cpu";
+  label: string;
+  title?: string;
+  mono?: boolean;
+}) {
+  return (
+    <div
+      title={title}
+      className={mono ? "mono" : undefined}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        color: "var(--ink-2)",
+      }}
+    >
+      <Icon name={icon} size={12} />
+      <span style={{ fontSize: 11.5 }}>{label}</span>
     </div>
   );
 }
@@ -319,13 +437,19 @@ function EditTimeline() {
                 {detail.description}
               </DetailBox>
             )}
-            {/* step 2 최종 프롬프트 */}
+            {/* step 2 최종 프롬프트 (영문) */}
             {m.n === 2 && detail?.finalPrompt && isDone && (
               <DetailBox
                 kind={detail.provider === "fallback" ? "warn" : "info"}
                 title={`최종 프롬프트 (${detail.provider})`}
               >
                 {detail.finalPrompt}
+              </DetailBox>
+            )}
+            {/* step 2 한국어 번역 (있을 때만 · v2) */}
+            {m.n === 2 && detail?.finalPromptKo && isDone && (
+              <DetailBox kind="muted" title="한국어 번역">
+                {detail.finalPromptKo}
               </DetailBox>
             )}
           </div>
@@ -453,19 +577,28 @@ function TimelineRow({
   );
 }
 
-/* ── 상세 정보 박스 (비전 설명 · 최종 프롬프트) ── */
+/* ── 상세 정보 박스 (비전 설명 · 최종 프롬프트 · 번역) ── */
 function DetailBox({
   kind,
   title,
   children,
 }: {
-  kind: "info" | "warn";
+  kind: "info" | "warn" | "muted";
   title: string;
   children: React.ReactNode;
 }) {
-  const bg = kind === "warn" ? "var(--amber-soft)" : "var(--bg-2)";
+  const bg =
+    kind === "warn"
+      ? "var(--amber-soft)"
+      : kind === "muted"
+        ? "var(--surface)"
+        : "var(--bg-2)";
   const border =
-    kind === "warn" ? "rgba(250,173,20,.35)" : "var(--line)";
+    kind === "warn"
+      ? "rgba(250,173,20,.35)"
+      : kind === "muted"
+        ? "var(--line)"
+        : "var(--line)";
   return (
     <div
       style={{

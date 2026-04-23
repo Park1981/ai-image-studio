@@ -27,6 +27,7 @@ import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import HistoryTile from "@/components/studio/HistoryTile";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
+import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import { useProcessStore } from "@/stores/useProcessStore";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
@@ -87,6 +88,7 @@ export default function EditPage() {
   const stepDone = useEditStore((s) => s.stepDone);
   const setStep = useEditStore((s) => s.setStep);
   const recordStepDetail = useEditStore((s) => s.recordStepDetail);
+  const setSampling = useEditStore((s) => s.setSampling);
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
   const resetPipeline = useEditStore((s) => s.resetPipeline);
@@ -202,6 +204,11 @@ export default function EditPage() {
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
       })) {
+        if (evt.type === "sampling") {
+          // ComfyUI 샘플링 상세 (step 4 내부)
+          setSampling(evt.samplingStep ?? null, evt.samplingTotal ?? null);
+          continue;
+        }
         if (evt.type === "step") {
           setStep(evt.step, evt.done);
           if (!evt.done) {
@@ -219,6 +226,7 @@ export default function EditPage() {
               doneAt: Date.now(),
               description: evt.description,
               finalPrompt: evt.finalPrompt,
+              finalPromptKo: evt.finalPromptKo,
               provider: evt.provider,
             });
           }
@@ -278,6 +286,21 @@ export default function EditPage() {
             );
           }
         }}
+        onUseAsSource={
+          afterItem
+            ? () => {
+                // Lightbox 에서 "원본으로" — 연속 수정 플로우
+                setSource(
+                  afterItem.imageRef,
+                  `${afterItem.label} · ${afterItem.width}×${afterItem.height}`,
+                  afterItem.width,
+                  afterItem.height,
+                );
+                setAfterId(null);
+                toast.info("원본으로 지정", afterItem.label);
+              }
+            : undefined
+        }
       />
       <TopBar
         left={
@@ -601,12 +624,18 @@ export default function EditPage() {
             </div>
             <div
               style={{
+                position: "relative",
                 background: "var(--surface)",
                 border: "1px solid var(--line)",
                 borderRadius: 12,
                 boxShadow: "var(--shadow-sm)",
               }}
             >
+              {/* 숨김 스프링 프롬프트 히스토리 메뉴 */}
+              <PromptHistoryPeek
+                mode="edit"
+                onSelect={(p) => setPrompt(p)}
+              />
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -618,7 +647,7 @@ export default function EditPage() {
                   outline: "none",
                   resize: "none",
                   background: "transparent",
-                  padding: "12px 14px",
+                  padding: "12px 42px 30px 14px",
                   fontFamily: "inherit",
                   fontSize: 13.5,
                   lineHeight: 1.55,
@@ -626,6 +655,39 @@ export default function EditPage() {
                   borderRadius: 12,
                 }}
               />
+              {/* 비우기 버튼 — Generate 페이지와 통일 */}
+              {prompt.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPrompt("")}
+                  title="프롬프트 비우기"
+                  style={{
+                    all: "unset",
+                    cursor: "pointer",
+                    position: "absolute",
+                    bottom: 6,
+                    right: 10,
+                    fontSize: 11,
+                    color: "var(--ink-4)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
+                    padding: "4px 6px",
+                    borderRadius: 6,
+                    transition: "background .12s",
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background =
+                      "var(--bg-2)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.background =
+                      "transparent";
+                  }}
+                >
+                  <Icon name="x" size={10} /> 비우기
+                </button>
+              )}
             </div>
           </div>
 
@@ -773,7 +835,17 @@ export default function EditPage() {
 
           <div style={{ flex: 1 }} />
 
-          {/* CTA */}
+          {/* CTA — sticky 하단 (페이지 스크롤 시에도 viewport 하단에 고정) */}
+          <div
+            style={{
+              position: "sticky",
+              bottom: 12,
+              paddingTop: 10,
+              zIndex: 4,
+              background:
+                "linear-gradient(to bottom, transparent, var(--bg) 45%)",
+            }}
+          >
           <button
             type="button"
             onClick={handleGenerate}
@@ -798,9 +870,11 @@ export default function EditPage() {
               alignItems: "center",
               justifyContent: "center",
               gap: 8,
+              width: "100%",
+              boxSizing: "border-box",
               boxShadow: running
                 ? "none"
-                : "0 2px 10px rgba(74,158,255,.35), inset 0 1px 0 rgba(255,255,255,.2)",
+                : "0 4px 18px rgba(74,158,255,.42), inset 0 1px 0 rgba(255,255,255,.2)",
               transition: "all .18s",
             }}
             onMouseEnter={(e) => {
@@ -825,6 +899,7 @@ export default function EditPage() {
               </>
             )}
           </button>
+          </div>
         </section>
 
         {/* ── RIGHT column ── */}
@@ -976,6 +1051,17 @@ export default function EditPage() {
                 onDoubleClick={() => setLightboxSrc(it.imageRef)}
                 onAfterDelete={() => {
                   if (afterId === it.id) setAfterId(null);
+                }}
+                onUseAsSource={() => {
+                  // 이 결과 이미지를 다시 수정 원본으로 (연속 수정 플로우)
+                  setSource(
+                    it.imageRef,
+                    `${it.label} · ${it.width}×${it.height}`,
+                    it.width,
+                    it.height,
+                  );
+                  setAfterId(null); // 비교 슬라이더 초기화
+                  toast.info("원본으로 지정", it.label);
                 }}
               />
             ))}

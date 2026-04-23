@@ -20,6 +20,7 @@ import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import HistoryTile from "@/components/studio/HistoryTile";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
+import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import UpgradeConfirmModal from "@/components/studio/UpgradeConfirmModal";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
@@ -86,6 +87,7 @@ export default function GeneratePage() {
   const setRunning = useGenerateStore((s) => s.setRunning);
   const resetRunning = useGenerateStore((s) => s.resetRunning);
   const pushStage = useGenerateStore((s) => s.pushStage);
+  const setSampling = useGenerateStore((s) => s.setSampling);
 
   const addItem = useHistoryStore((s) => s.add);
   const items = useHistoryStore((s) => s.items);
@@ -188,6 +190,10 @@ export default function GeneratePage() {
           label: evt.stageLabel,
           progress: evt.progress,
         });
+        // ComfyUI 샘플링 스텝 정보 (있는 경우만)
+        if (evt.type === "comfyui-sampling") {
+          setSampling(evt.samplingStep ?? null, evt.samplingTotal ?? null);
+        }
       }
     } catch (err) {
       resetRunning();
@@ -414,6 +420,11 @@ export default function GeneratePage() {
                 boxShadow: "var(--shadow-sm)",
               }}
             >
+              {/* 숨김 스프링 프롬프트 히스토리 메뉴 (우상단) */}
+              <PromptHistoryPeek
+                mode="generate"
+                onSelect={(p) => setPrompt(p)}
+              />
               <textarea
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
@@ -425,7 +436,7 @@ export default function GeneratePage() {
                   outline: "none",
                   resize: "none",
                   background: "transparent",
-                  padding: "14px 16px 38px",
+                  padding: "14px 44px 38px 16px",
                   fontFamily: "inherit",
                   fontSize: 14,
                   lineHeight: 1.6,
@@ -603,7 +614,19 @@ export default function GeneratePage() {
             onSeed={setSeed}
           />
 
-          {/* Primary CTA */}
+          {/* Primary CTA — sticky 하단 (페이지 스크롤 시 viewport 하단에 고정) */}
+          <div
+            style={{
+              position: "sticky",
+              bottom: 12,
+              marginTop: "auto",
+              paddingTop: 10,
+              zIndex: 4,
+              // 하단 그라데이션으로 "떠있는 느낌"
+              background:
+                "linear-gradient(to bottom, transparent, var(--bg) 45%)",
+            }}
+          >
           <button
             type="button"
             onClick={handleGenerate}
@@ -624,11 +647,12 @@ export default function GeneratePage() {
               alignItems: "center",
               justifyContent: "center",
               gap: 8,
+              width: "100%",
+              boxSizing: "border-box",
               boxShadow: generating
                 ? "none"
-                : "0 2px 10px rgba(74,158,255,.35), inset 0 1px 0 rgba(255,255,255,.2)",
+                : "0 4px 18px rgba(74,158,255,.42), inset 0 1px 0 rgba(255,255,255,.2)",
               transition: "all .18s",
-              marginTop: "auto",
               position: "relative",
               overflow: "hidden",
             }}
@@ -695,12 +719,13 @@ export default function GeneratePage() {
               fontSize: 11,
               color: "var(--ink-4)",
               textAlign: "center",
-              marginTop: -8,
+              marginTop: 6,
             }}
           >
             평균 소요{" "}
             <span className="mono">~{research ? "42" : "28"}s</span> · 로컬 처리 ·
             데이터 전송 없음
+          </div>
           </div>
         </section>
 

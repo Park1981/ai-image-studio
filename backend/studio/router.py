@@ -352,6 +352,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             "createdAt": int(time.time() * 1000),
             "imageRef": image_ref,
             "upgradedPrompt": upgrade.upgraded,
+            "upgradedPromptKo": upgrade.translation,
             "promptProvider": upgrade.provider,
             "researchHints": research_hints,
             "comfyError": comfy_error,
@@ -396,12 +397,17 @@ async def _dispatch_to_comfy(
                 if evt.kind == "progress":
                     pct = evt.percent or 0.0
                     progress = progress_start + int(span * pct)
+                    # value/max 는 sampler step 숫자 (예: 3/40)
+                    step_val = evt.data.get("value")
+                    step_max = evt.data.get("max")
                     await task.emit(
                         "stage",
                         {
                             "type": "comfyui-sampling",
                             "progress": progress,
                             "stageLabel": f"ComfyUI 샘플링 {int(pct * 100)}%",
+                            "samplingStep": step_val,
+                            "samplingTotal": step_max,
                         },
                     )
                 # execution_success 면 listen 내부에서 종료
@@ -567,6 +573,7 @@ async def _run_edit_pipeline(
                 "step": 2,
                 "done": True,
                 "finalPrompt": vision.final_prompt,
+                "finalPromptKo": vision.upgrade.translation,
                 "provider": vision.upgrade.provider,
             },
         )
@@ -611,6 +618,7 @@ async def _run_edit_pipeline(
             "createdAt": int(time.time() * 1000),
             "imageRef": image_ref,
             "upgradedPrompt": vision.final_prompt,
+            "upgradedPromptKo": vision.upgrade.translation,
             "visionDescription": vision.image_description,
             "comfyError": comfy_err,
         }
@@ -650,6 +658,7 @@ async def upgrade_only(body: UpgradeOnlyBody):
     )
     return {
         "upgradedPrompt": upgrade.upgraded,
+        "upgradedPromptKo": upgrade.translation,
         "provider": upgrade.provider,
         "fallback": upgrade.fallback,
         "researchHints": research_hints,

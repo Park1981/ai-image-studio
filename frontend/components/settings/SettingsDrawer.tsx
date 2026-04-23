@@ -75,6 +75,8 @@ export default function SettingsDrawer() {
         <div
           style={{
             flex: 1,
+            // flex 자식의 min-height 기본값이 auto — 콘텐츠가 길면 축소되는 이슈 방지
+            minHeight: 0,
             overflowY: "auto",
             padding: "6px 20px 32px",
             display: "flex",
@@ -753,8 +755,8 @@ function FooterInfo() {
         gap: 4,
       }}
     >
-      <div>AI Image Studio · v1.2.4 · LOCAL</div>
-      <div>ComfyUI :8188 · Ollama :11434 · Backend :8000 (Phase 2)</div>
+      <div>AI Image Studio · v1.3.0 · LOCAL</div>
+      <div>ComfyUI :8000 · Ollama :11434 · Backend :8001</div>
     </div>
   );
 }

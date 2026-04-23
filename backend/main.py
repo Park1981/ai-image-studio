@@ -8,7 +8,7 @@ import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
@@ -97,6 +97,22 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# StaticFiles mount 는 Starlette 의 sub-app 이라 CORSMiddleware 가 자동 적용 안 됨.
+# (특히 fetch() 로 이미지 다운로드 시 CORS 차단) — /images 응답에 수동으로 CORS 헤더 주입.
+@app.middleware("http")
+async def ensure_cors_for_static_images(request: Request, call_next):
+    response = await call_next(request)
+    if request.url.path.startswith("/images"):
+        origin = request.headers.get("origin")
+        allowed = set(settings.frontend_origins)
+        if origin and origin in allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+    return response
+
 
 # 정적 파일 서빙 (생성된 이미지)
 images_dir = Path(settings.output_image_path)
