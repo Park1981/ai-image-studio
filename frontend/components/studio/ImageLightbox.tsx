@@ -151,14 +151,14 @@ function LightboxInner({
         overflow: "hidden",
       }}
     >
-      {/* Top bar */}
+      {/* Top bar — 정보 패널에 가리지 않도록 우측 끝을 패널 경계로 제한 */}
       <div
         onClick={(e) => e.stopPropagation()}
         style={{
           position: "absolute",
           top: 0,
           left: 0,
-          right: 0,
+          right: item ? INFO_PANEL_WIDTH : 0,
           padding: "14px 18px",
           display: "flex",
           alignItems: "center",
@@ -166,7 +166,7 @@ function LightboxInner({
           gap: 12,
           background:
             "linear-gradient(to bottom, rgba(0,0,0,.4), transparent)",
-          zIndex: 2,
+          zIndex: 4, // 패널(3)보다 위 — 탑바가 확실히 클릭 받게
         }}
       >
         <div
@@ -292,6 +292,9 @@ function InfoPanel({
   return (
     <aside
       onClick={onClose}
+      // 패널 내 휠 이벤트는 상위 overlay 의 zoom 핸들러로 전파되지 않도록 차단 —
+      // 패널 자체 overflowY:auto 가 정상 스크롤 담당.
+      onWheel={(e) => e.stopPropagation()}
       style={{
         position: "absolute",
         top: 0,
