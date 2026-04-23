@@ -278,10 +278,10 @@ export default function EditPage() {
               </button>
             </div>
 
-            {/* History picker overlay */}
+            {/* History picker overlay — video 항목은 Edit 의 원본으로 부적절하므로 제외 */}
             <HistoryPicker
               open={historyPickerOpen}
-              items={items}
+              items={items.filter((i) => i.mode !== "video")}
               onSelect={(it) => {
                 setSource(
                   it.imageRef,

@@ -1,20 +1,133 @@
 /**
- * Video Page (스텁)
- * 아직 구현 안 됨 — 메뉴에서도 disabled 상태지만, 직접 URL 접근 시 안내 화면
+ * Video Page — LTX-2.3 Image-to-Video (i2v) 실구현.
+ * 2026-04-24 · V7.
+ *
+ * 레이아웃은 Edit 페이지와 유사 (좌 400px · 우 1fr).
+ *  - 좌: SourceImageCard + 프롬프트 textarea + [영상 생성] CTA
+ *  - 우: VideoPlayerCard + 파이프라인 5단계 + 수정 히스토리 갤러리 (mode=video)
  */
 
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Logo, TopBar, BackBtn } from "@/components/chrome/Chrome";
-import Icon from "@/components/ui/Icon";
+import {
+  BackBtn,
+  IconBtn,
+  Logo,
+  ModelBadge,
+  TopBar,
+} from "@/components/chrome/Chrome";
+import VramBadge from "@/components/chrome/VramBadge";
 import SettingsButton from "@/components/settings/SettingsButton";
+import HistoryTile from "@/components/studio/HistoryTile";
+import PipelineSteps, {
+  type PipelineStepMeta,
+} from "@/components/studio/PipelineSteps";
+import ProgressModal from "@/components/studio/ProgressModal";
+import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import SourceImageCard from "@/components/studio/SourceImageCard";
+import VideoPlayerCard from "@/components/studio/VideoPlayerCard";
+import Icon from "@/components/ui/Icon";
+import { Spinner } from "@/components/ui/primitives";
+import { useVideoPipeline } from "@/hooks/useVideoPipeline";
+import { filenameFromRef } from "@/lib/image-actions";
+import { useHistoryStore } from "@/stores/useHistoryStore";
+import { useProcessStore } from "@/stores/useProcessStore";
+import { useSettingsStore } from "@/stores/useSettingsStore";
+import { toast } from "@/stores/useToastStore";
+import { useVideoStore } from "@/stores/useVideoStore";
+
+/* LTX-2.3 i2v 파이프라인 5단계 — qwen2.5vl + gemma4 + ComfyUI 2-stage + save */
+const PIPELINE_META: PipelineStepMeta[] = [
+  { n: 1, label: "이미지 비전 분석", model: "qwen2.5vl" },
+  { n: 2, label: "영상 프롬프트 통합", model: "gemma4-un" },
+  { n: 3, label: "워크플로우 구성", model: "LTX i2v builder" },
+  { n: 4, label: "ComfyUI 샘플링 (2-stage)", model: "ltx-2.3-22b-fp8" },
+  { n: 5, label: "MP4 저장", model: "CreateVideo + SaveVideo" },
+];
 
 export default function VideoPage() {
   const router = useRouter();
 
+  /* ── store ── */
+  const sourceImage = useVideoStore((s) => s.sourceImage);
+  const sourceLabel = useVideoStore((s) => s.sourceLabel);
+  const sourceWidth = useVideoStore((s) => s.sourceWidth);
+  const sourceHeight = useVideoStore((s) => s.sourceHeight);
+  const setSource = useVideoStore((s) => s.setSource);
+  const prompt = useVideoStore((s) => s.prompt);
+  const setPrompt = useVideoStore((s) => s.setPrompt);
+  const running = useVideoStore((s) => s.running);
+  const currentStep = useVideoStore((s) => s.currentStep);
+  const stepDone = useVideoStore((s) => s.stepDone);
+  const pipelineProgress = useVideoStore((s) => s.pipelineProgress);
+  const pipelineLabel = useVideoStore((s) => s.pipelineLabel);
+  const lastVideoRef = useVideoStore((s) => s.lastVideoRef);
+
+  const items = useHistoryStore((s) => s.items);
+
+  const visionModel = useSettingsStore((s) => s.visionModel);
+  const comfyuiStatus = useProcessStore((s) => s.comfyui);
+
+  /* ── 파이프라인 훅 ── */
+  const { generate: handleGenerate } = useVideoPipeline();
+
+  /* ── 영상 히스토리 (mode=video 만) ── */
+  const videoResults = items.filter((x) => x.mode === "video");
+
+  /* ── 컬럼 토글 (Generate/Edit 일관) ── */
+  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
+  const cycleGrid = () =>
+    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
+
+  /* ── 현재 재생할 mp4: lastVideoRef (세션) 우선, 없으면 최근 video 히스토리 ── */
+  const playingRef =
+    lastVideoRef ?? (videoResults.length > 0 ? videoResults[0].imageRef : null);
+
+  /* ── 진행 모달 open 상태 ── */
+  const [progressOpen, setProgressOpen] = useState(false);
+  useEffect(() => {
+    if (running) setProgressOpen(true);
+  }, [running]);
+  useEffect(() => {
+    if (running) return;
+    if (!progressOpen) return;
+    const t = setTimeout(() => setProgressOpen(false), 1400);
+    return () => clearTimeout(t);
+  }, [running, progressOpen]);
+
+  /* ── 프롬프트 textarea auto-grow (Gen/Edit 일관) ── */
+  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoGrow = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  useEffect(() => {
+    if (promptTextareaRef.current) autoGrow(promptTextareaRef.current);
+  }, [prompt]);
+
+  const handleSourceChange = (
+    image: string,
+    label: string,
+    w: number,
+    h: number,
+  ) => {
+    setSource(image, label, w, h);
+    toast.success("이미지 업로드 완료", label.split(" · ")[0]);
+  };
+  const handleClearSource = () => {
+    setSource(null);
+    toast.info("이미지 해제됨");
+  };
+
+  const ctaDisabled = running || !sourceImage || !prompt.trim();
+
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+      {progressOpen && (
+        <ProgressModal mode="edit" onClose={() => setProgressOpen(false)} />
+      )}
       <TopBar
         left={
           <>
@@ -22,61 +135,404 @@ export default function VideoPage() {
             <Logo />
           </>
         }
-        right={<SettingsButton />}
+        center={
+          <ModelBadge
+            name="LTX Video 2.3"
+            tag="22B · A/V"
+            status={comfyuiStatus === "running" ? "ready" : "loading"}
+          />
+        }
+        right={
+          <>
+            <VramBadge />
+            <SettingsButton />
+          </>
+        }
       />
 
-      <main
+      <div
         style={{
           flex: 1,
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "40px 48px",
-          gap: 20,
+          display: "grid",
+          gridTemplateColumns: "400px 1fr",
+          minHeight: "calc(100vh - 52px)",
         }}
       >
-        <div
+        {/* ── LEFT: 업로드 + 프롬프트 + CTA ── */}
+        <section
           style={{
-            width: 72,
-            height: 72,
-            borderRadius: 20,
-            background: "var(--bg-2)",
-            display: "grid",
-            placeItems: "center",
-            color: "var(--ink-3)",
+            padding: "24px 20px",
+            borderRight: "1px solid var(--line)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+            background: "var(--bg)",
           }}
         >
-          <Icon name="film" size={32} stroke={1.4} />
-        </div>
-        <div style={{ textAlign: "center", maxWidth: 440 }}>
-          <div
-            className="mono"
-            style={{
-              fontSize: 11,
-              color: "var(--ink-4)",
-              letterSpacing: ".18em",
-              marginBottom: 10,
-              textTransform: "uppercase",
-            }}
-          >
-            준비 중 · v2
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                marginBottom: 10,
+              }}
+            >
+              <label
+                style={{
+                  fontSize: 12.5,
+                  fontWeight: 600,
+                  color: "var(--ink-2)",
+                }}
+              >
+                원본 이미지
+              </label>
+              <span
+                className="mono"
+                style={{ fontSize: 10.5, color: "var(--ink-4)" }}
+              >
+                {sourceWidth && sourceHeight
+                  ? `${sourceWidth}×${sourceHeight}`
+                  : "—"}
+              </span>
+            </div>
+            <SourceImageCard
+              sourceImage={sourceImage}
+              sourceLabel={sourceLabel}
+              sourceWidth={sourceWidth}
+              sourceHeight={sourceHeight}
+              onChange={handleSourceChange}
+              onClear={handleClearSource}
+              onError={(msg) => toast.error(msg)}
+            />
           </div>
-          <h2
+
+          {/* Prompt */}
+          <div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                justifyContent: "space-between",
+                marginBottom: 10,
+              }}
+            >
+              <label
+                style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}
+              >
+                영상 지시
+              </label>
+              <span
+                className="mono"
+                style={{ fontSize: 10.5, color: "var(--ink-4)" }}
+              >
+                {prompt.length} chars
+              </span>
+            </div>
+            <div
+              style={{
+                position: "relative",
+                background: "var(--surface)",
+                border: "1px solid var(--line)",
+                borderRadius: 12,
+                boxShadow: "var(--shadow-sm)",
+              }}
+            >
+              <PromptHistoryPeek mode="edit" onSelect={(p) => setPrompt(p)} />
+              <textarea
+                ref={promptTextareaRef}
+                value={prompt}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  autoGrow(e.target);
+                }}
+                placeholder="어떤 움직임/카메라/분위기의 영상? 예: 느린 달리 인, 창가 빛 변화..."
+                rows={3}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  border: "none",
+                  outline: "none",
+                  resize: "none",
+                  background: "transparent",
+                  padding: "12px 42px 30px 14px",
+                  fontFamily: "inherit",
+                  fontSize: 13.5,
+                  lineHeight: 1.55,
+                  color: "var(--ink)",
+                  borderRadius: 12,
+                  minHeight: 76,
+                  maxHeight: "60vh",
+                  overflowY: "auto",
+                }}
+              />
+              {prompt.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setPrompt("")}
+                  title="프롬프트 비우기"
+                  style={{
+                    all: "unset",
+                    cursor: "pointer",
+                    position: "absolute",
+                    bottom: 6,
+                    right: 10,
+                    fontSize: 11,
+                    color: "var(--ink-4)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
+                    padding: "4px 6px",
+                    borderRadius: 6,
+                  }}
+                >
+                  <Icon name="x" size={10} /> 비우기
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Pipeline (5단계 초록박스) */}
+          <PipelineSteps
+            steps={PIPELINE_META}
+            stepDone={stepDone}
+            currentStep={currentStep}
+            running={running}
+            lightning={false}
+          />
+
+          {/* VRAM 주의 배너 */}
+          <div
             style={{
-              fontSize: 22,
-              fontWeight: 600,
-              letterSpacing: "-0.02em",
-              margin: "0 0 10px",
+              padding: "10px 12px",
+              background: "var(--amber-soft)",
+              border: "1px solid rgba(250,173,20,.35)",
+              borderRadius: 10,
+              fontSize: 11.5,
+              color: "var(--amber-ink)",
+              lineHeight: 1.55,
             }}
           >
-            영상 생성은 곧 만나요
-          </h2>
-          <p style={{ fontSize: 13.5, color: "var(--ink-3)", lineHeight: 1.6, margin: 0 }}>
-            이미지 기능이 안정된 뒤 Wan 2.x 기반 Text/Image-to-Video 워크플로우로 돌아올게요.
-          </p>
-        </div>
-      </main>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                fontWeight: 600,
+                marginBottom: 3,
+              }}
+            >
+              <Icon name="search" size={12} />
+              16GB VRAM 주의
+            </div>
+            공식 fp8 체크포인트(29GB)는 VRAM 초과. NVIDIA Control Panel →
+            “CUDA Sysmem Fallback: Prefer” 활성화 또는 <code>.env</code>에 {" "}
+            <code>LTX_UNET_NAME</code> 지정으로 경량 variant 교체.
+          </div>
+
+          <div style={{ flex: 1 }} />
+
+          {/* Sticky CTA */}
+          <div
+            style={{
+              position: "sticky",
+              bottom: 12,
+              paddingTop: 10,
+              zIndex: 4,
+              background:
+                "linear-gradient(to bottom, transparent, var(--bg) 45%)",
+            }}
+          >
+            <button
+              type="button"
+              onClick={handleGenerate}
+              disabled={ctaDisabled}
+              style={{
+                all: "unset",
+                cursor: ctaDisabled ? "not-allowed" : "pointer",
+                textAlign: "center",
+                background: ctaDisabled ? "#B9CEE5" : "var(--accent)",
+                color: "#fff",
+                padding: "14px 20px",
+                borderRadius: 999,
+                fontSize: 14,
+                fontWeight: 600,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                width: "100%",
+                boxSizing: "border-box",
+                boxShadow: running
+                  ? "none"
+                  : "0 4px 18px rgba(74,158,255,.42), inset 0 1px 0 rgba(255,255,255,.2)",
+                transition: "all .18s",
+              }}
+              onMouseEnter={(e) => {
+                if (!ctaDisabled)
+                  (e.currentTarget as HTMLButtonElement).style.background =
+                    "var(--accent-ink)";
+              }}
+              onMouseLeave={(e) => {
+                if (!ctaDisabled)
+                  (e.currentTarget as HTMLButtonElement).style.background =
+                    "var(--accent)";
+              }}
+            >
+              {running ? (
+                <>
+                  <Spinner /> 처리 중… {Math.round(pipelineProgress)}%
+                </>
+              ) : (
+                <>
+                  <Icon name="sparkle" size={15} />
+                  영상 생성
+                </>
+              )}
+            </button>
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--ink-4)",
+                textAlign: "center",
+                marginTop: 6,
+              }}
+            >
+              평균 소요 <span className="mono">5~20분</span> · 5초 영상 · 로컬 처리
+            </div>
+          </div>
+        </section>
+
+        {/* ── RIGHT: 플레이어 + 히스토리 ── */}
+        <section
+          style={{
+            padding: "24px 32px",
+            display: "flex",
+            flexDirection: "column",
+            gap: 18,
+            minWidth: 0,
+          }}
+        >
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+                영상 결과
+              </h3>
+              <span
+                className="mono"
+                style={{
+                  fontSize: 11,
+                  color: "var(--ink-4)",
+                  letterSpacing: ".04em",
+                }}
+              >
+                MP4 · 5s · 25fps
+              </span>
+            </div>
+          </div>
+
+          <VideoPlayerCard
+            src={playingRef}
+            running={running}
+            progress={pipelineProgress}
+            label={pipelineLabel}
+            filename={
+              playingRef ? filenameFromRef(playingRef, "ais-video.mp4") : undefined
+            }
+          />
+
+          {/* 영상 히스토리 */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              paddingTop: 4,
+              borderTop: "1px solid var(--line)",
+              marginTop: 4,
+            }}
+          >
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 10,
+                marginTop: 10,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+                영상 히스토리
+              </h3>
+              <span
+                className="mono"
+                style={{ fontSize: 11, color: "var(--ink-4)" }}
+              >
+                {videoResults.length} items
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+              <IconBtn
+                icon="grid"
+                title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
+                onClick={cycleGrid}
+              />
+            </div>
+          </div>
+
+          <div style={{ maxHeight: "55vh", overflowY: "auto", paddingRight: 4 }}>
+            {videoResults.length === 0 ? (
+              <div
+                style={{
+                  padding: "20px 16px",
+                  background: "var(--surface)",
+                  border: "1px dashed var(--line-2)",
+                  borderRadius: 12,
+                  textAlign: "center",
+                  color: "var(--ink-4)",
+                  fontSize: 12,
+                }}
+              >
+                아직 생성된 영상이 없어.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+                  gap: 12,
+                }}
+              >
+                {videoResults.map((it) => (
+                  <HistoryTile
+                    key={it.id}
+                    item={it}
+                    selected={playingRef === it.imageRef}
+                    onClick={() => {
+                      // 플레이어에 지정 — 세션 state (lastVideoRef) 로
+                      useVideoStore.getState().setLastVideoRef(it.imageRef);
+                    }}
+                    onExpand={() => {
+                      // 새 탭에서 원본 mp4 오픈 (Lightbox 는 v2)
+                      if (typeof window !== "undefined") {
+                        window.open(it.imageRef, "_blank", "noopener");
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div style={{ flex: 1 }} />
+        </section>
+      </div>
     </div>
   );
 }
+
