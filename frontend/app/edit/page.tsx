@@ -17,10 +17,11 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import {
-  Logo,
-  TopBar,
   BackBtn,
+  IconBtn,
+  Logo,
   ModelBadge,
+  TopBar,
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
 import VramBadge from "@/components/chrome/VramBadge";
@@ -78,14 +79,11 @@ export default function EditPage() {
   const addItem = useHistoryStore((s) => s.add);
   const selectHistory = useHistoryStore((s) => s.select);
   // 수정 모드 우측 그리드는 edit 결과만 (generate 섞이면 Before/After 슬라이더가 엉뚱하게 매칭됨)
+  // 2026-04-24 G2: 갤러리화 — 전체 렌더 + 스크롤 박스로 제한 대신 스크롤 UX 로 전환
   const editResults = items.filter((x) => x.mode === "edit");
-  // 그리드는 최근 12개만 노출 (과다 스크롤 방지)
-  const historyForRight = editResults.slice(0, 12);
   // afterId 는 기본 null. 새 수정이 완료되면 setAfterId 로 지정됨.
   // 히스토리 썸네일 클릭 시에도 사용자 의도대로 지정됨.
   const [afterId, setAfterId] = useState<string | null>(null);
-  // afterItem 은 전체 editResults 에서 검색 — 12개 넘어간 오래된 결과라도
-  // 사용자가 선택해둔 것이면 슬라이더에 정상 표시됨.
   const afterItem = afterId
     ? editResults.find((x) => x.id === afterId)
     : undefined;
@@ -106,8 +104,10 @@ export default function EditPage() {
 
   /* ── Lightbox ── */
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
-  // 수정 히스토리 그리드는 3 컬럼 고정 (edit 은 결과 수가 적어 토글 불필요)
-  const gridCols = 3;
+  // 수정 히스토리 갤러리 컬럼 토글 — Generate/Vision 과 동일 패턴
+  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
+  const cycleGrid = () =>
+    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
   /* ── 진행 모달 open 상태 ── */
   const [progressOpen, setProgressOpen] = useState(false);
@@ -592,50 +592,95 @@ export default function EditPage() {
               marginTop: 4,
             }}
           >
-            <h3 style={{ margin: "10px 0 0", fontSize: 13, fontWeight: 600 }}>
-              수정 히스토리
-            </h3>
-            <span
-              className="mono"
-              style={{ fontSize: 11, color: "var(--ink-4)", marginTop: 10 }}
+            <div
+              style={{
+                display: "flex",
+                alignItems: "baseline",
+                gap: 10,
+                marginTop: 10,
+              }}
             >
-              {historyForRight.length} items
-            </span>
+              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+                수정 히스토리
+              </h3>
+              <span
+                className="mono"
+                style={{
+                  fontSize: 11,
+                  color: "var(--ink-4)",
+                  letterSpacing: ".04em",
+                }}
+              >
+                {editResults.length} items
+              </span>
+            </div>
+            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+              <IconBtn
+                icon="grid"
+                title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
+                onClick={cycleGrid}
+              />
+            </div>
           </div>
 
+          {/* 갤러리 스크롤 박스 — 전체 렌더, 자체 스크롤로 상단 비교뷰 고정 */}
           <div
             style={{
-              display: "grid",
-              gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-              gap: 12,
+              maxHeight: "55vh",
+              overflowY: "auto",
+              paddingRight: 4,
             }}
           >
-            {historyForRight.map((it) => (
-              <HistoryTile
-                key={it.id}
-                item={it}
-                selected={afterId === it.id}
-                onClick={() => {
-                  setAfterId(it.id);
-                  selectHistory(it.id);
+            {editResults.length === 0 ? (
+              <div
+                style={{
+                  padding: "28px 20px",
+                  background: "var(--surface)",
+                  border: "1px dashed var(--line-2)",
+                  borderRadius: 12,
+                  textAlign: "center",
+                  color: "var(--ink-4)",
+                  fontSize: 12.5,
                 }}
-                onDoubleClick={() => setLightboxSrc(it.imageRef)}
-                onAfterDelete={() => {
-                  if (afterId === it.id) setAfterId(null);
+              >
+                아직 수정 결과가 없어. 왼쪽에서 이미지 올리고 [수정 생성] 눌러봐.
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+                  gap: 12,
                 }}
-                onUseAsSource={() => {
-                  // 이 결과 이미지를 다시 수정 원본으로 (연속 수정 플로우)
-                  setSource(
-                    it.imageRef,
-                    `${it.label} · ${it.width}×${it.height}`,
-                    it.width,
-                    it.height,
-                  );
-                  setAfterId(null); // 비교 슬라이더 초기화
-                  toast.info("원본으로 지정", it.label);
-                }}
-              />
-            ))}
+              >
+                {editResults.map((it) => (
+                  <HistoryTile
+                    key={it.id}
+                    item={it}
+                    selected={afterId === it.id}
+                    onClick={() => {
+                      setAfterId(it.id);
+                      selectHistory(it.id);
+                    }}
+                    onDoubleClick={() => setLightboxSrc(it.imageRef)}
+                    onAfterDelete={() => {
+                      if (afterId === it.id) setAfterId(null);
+                    }}
+                    onUseAsSource={() => {
+                      // 이 결과 이미지를 다시 수정 원본으로 (연속 수정 플로우)
+                      setSource(
+                        it.imageRef,
+                        `${it.label} · ${it.width}×${it.height}`,
+                        it.width,
+                        it.height,
+                      );
+                      setAfterId(null); // 비교 슬라이더 초기화
+                      toast.info("원본으로 지정", it.label);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>
