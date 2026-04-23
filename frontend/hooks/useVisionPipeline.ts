@@ -13,6 +13,7 @@
 "use client";
 
 import { analyzeImage } from "@/lib/api-client";
+import { resizeImageToThumbnail } from "@/lib/image-actions";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
@@ -67,11 +68,15 @@ export function useVisionPipeline(): UseVisionPipeline {
 
       setResult(result.en, result.ko);
 
+      // 썸네일 리사이즈 — localStorage 용량 방어 (원본 dataURL 은 수 MB, 썸네일은 수십 KB)
+      // 실패 시 원본 그대로 사용 (히스토리는 유지, 용량은 MAX 건수 상한으로 방어).
+      const thumbnailRef = await resizeImageToThumbnail(currentImage);
+
       // fallback=true 면 entry 에도 en="" 저장되지만 히스토리는 기록함
       // (사용자가 "이때 Ollama 가 맛이 갔었구나" 를 알 수 있도록)
       const entry: VisionEntry = {
         id: makeEntryId(),
-        imageRef: currentImage,
+        imageRef: thumbnailRef,
         thumbLabel: currentLabel,
         en: result.en,
         ko: result.ko,

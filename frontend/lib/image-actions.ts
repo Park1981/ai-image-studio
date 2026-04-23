@@ -83,6 +83,50 @@ export function filenameFromRef(
 }
 
 /**
+ * 이미지(URL 또는 dataURL)를 썸네일 dataURL 로 리사이즈.
+ * localStorage 영속 히스토리용 — 원본 dataURL 을 그대로 저장하면 용량 폭증(수 MB/건).
+ * JPEG q80 + longest-side maxDim 으로 보통 30~50KB.
+ *
+ * 원본보다 작거나 같은 이미지는 그대로 리인코딩 (여전히 JPEG 로 통일해 용량 이득).
+ * 실패 시 원본 src 반환 (히스토리는 유지, 용량 제한은 MAX 건수로만 방어).
+ */
+export async function resizeImageToThumbnail(
+  src: string,
+  maxDim = 256,
+  quality = 0.8,
+): Promise<string> {
+  if (!src || typeof window === "undefined") return src;
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      // dataURL / blob / 동일 origin 은 CORS 무관. 혹시 cross-origin 이면 anonymous.
+      if (!src.startsWith("data:") && !src.startsWith("blob:")) {
+        el.crossOrigin = "anonymous";
+      }
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("image load failed"));
+      el.src = src;
+    });
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) return src;
+    const ratio = Math.min(1, maxDim / Math.max(w, h));
+    const tw = Math.max(1, Math.round(w * ratio));
+    const th = Math.max(1, Math.round(h * ratio));
+    const canvas = document.createElement("canvas");
+    canvas.width = tw;
+    canvas.height = th;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return src;
+    ctx.drawImage(img, 0, 0, tw, th);
+    return canvas.toDataURL("image/jpeg", quality);
+  } catch {
+    // 리사이즈 실패 — 원본 반환 (용량 부담 감수)
+    return src;
+  }
+}
+
+/**
  * 이미지 URL 을 data URL 로 변환 (CORS 허용 범위 내).
  * edit 모드로 전송 · 템플릿 저장 등 브라우저 로컬 처리를 위해 사용.
  *

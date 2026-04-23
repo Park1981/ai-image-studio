@@ -617,25 +617,35 @@ export default function GeneratePage() {
             </div>
           )}
 
-          {/* 그리드 */}
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-                gap: 12,
-              }}
-            >
-              {genItems.map((it) => (
-                <HistoryTile
-                  key={it.id}
-                  item={it}
-                  selected={selectedId === it.id}
-                  onClick={() => selectItem(it.id)}
-                  onDoubleClick={() => setLightboxSrc(it.imageRef)}
-                />
-              ))}
-            </div>
+          {/* 갤러리 스크롤 박스 — 전체 렌더, 자체 스크롤로 상단 프리뷰/AI보강 카드 고정 */}
+          <div
+            style={{
+              flex: 1,
+              minHeight: 0,
+              maxHeight: "55vh",
+              overflowY: "auto",
+              paddingRight: 4,
+            }}
+          >
+            {genItems.length === 0 ? null : (
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
+                  gap: 12,
+                }}
+              >
+                {genItems.map((it) => (
+                  <HistoryTile
+                    key={it.id}
+                    item={it}
+                    selected={selectedId === it.id}
+                    onClick={() => selectItem(it.id)}
+                    onDoubleClick={() => setLightboxSrc(it.imageRef)}
+                  />
+                ))}
+              </div>
+            )}
           </div>
         </section>
       </div>

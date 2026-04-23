@@ -8,6 +8,7 @@
 
 "use client";
 
+import { IconBtn } from "@/components/chrome/Chrome";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
 import type { VisionEntry } from "@/stores/useVisionStore";
@@ -17,6 +18,12 @@ interface Props {
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
   onClear: () => void;
+  /** 그리드 컬럼 수 (2/3/4) */
+  gridCols: 2 | 3 | 4;
+  /** 그리드 토글 콜백 — 부모가 useState 관리 */
+  onCycleGrid: () => void;
+  /** localStorage 상한 (2026-04-24 G1: 100) */
+  maxEntries: number;
 }
 
 function formatTime(ms: number): string {
@@ -31,6 +38,9 @@ export default function VisionHistoryList({
   onSelect,
   onDelete,
   onClear,
+  gridCols,
+  onCycleGrid,
+  maxEntries,
 }: Props) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
@@ -59,36 +69,49 @@ export default function VisionHistoryList({
             className="mono"
             style={{ fontSize: 11, color: "var(--ink-4)", letterSpacing: ".04em" }}
           >
-            {entries.length} / 20
+            {entries.length} / {maxEntries}
           </span>
         </div>
-        {entries.length > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                const ok = window.confirm("모든 분석 기록을 지울까?");
-                if (!ok) return;
-              }
-              onClear();
-            }}
-            style={{
-              all: "unset",
-              cursor: "pointer",
-              fontSize: 11,
-              color: "var(--ink-4)",
-              padding: "4px 8px",
-              borderRadius: 6,
-              border: "1px solid var(--line)",
-              marginTop: 8,
-            }}
-          >
-            모두 지우기
-          </button>
-        )}
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginTop: 6,
+          }}
+        >
+          <IconBtn
+            icon="grid"
+            title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
+            onClick={onCycleGrid}
+          />
+          {entries.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== "undefined") {
+                  const ok = window.confirm("모든 분석 기록을 지울까?");
+                  if (!ok) return;
+                }
+                onClear();
+              }}
+              style={{
+                all: "unset",
+                cursor: "pointer",
+                fontSize: 11,
+                color: "var(--ink-4)",
+                padding: "4px 8px",
+                borderRadius: 6,
+                border: "1px solid var(--line)",
+              }}
+            >
+              모두 지우기
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* 리스트 */}
+      {/* 리스트 — 갤러리 스크롤 박스 (G4) */}
       {entries.length === 0 ? (
         <div
           style={{
@@ -106,8 +129,11 @@ export default function VisionHistoryList({
       ) : (
         <div
           style={{
+            maxHeight: "55vh",
+            overflowY: "auto",
+            paddingRight: 4,
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
+            gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
             gap: 10,
           }}
         >
