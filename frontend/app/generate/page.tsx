@@ -132,6 +132,18 @@ export default function GeneratePage() {
     if (lightningByDefault && !lightning) applyLightning(true);
   }, [lightningByDefault, lightning, applyLightning]);
 
+  /* ── 프롬프트 textarea auto-grow (내용 높이에 맞춰 자동 확장) ── */
+  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoGrow = (el: HTMLTextAreaElement) => {
+    // scrollHeight 는 정확한 content 높이 — 'auto' 로 먼저 리셋해야 줄어들기도 가능.
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  // 마운트 직후 + prompt 외부 변경(템플릿 선택/재생성 복원 등) 시 재측정
+  useEffect(() => {
+    if (promptTextareaRef.current) autoGrow(promptTextareaRef.current);
+  }, [prompt]);
+
   const sizeLabel = `${width}×${height}`;
 
   return (
@@ -214,16 +226,7 @@ export default function GeneratePage() {
             background: "var(--bg)",
           }}
         >
-          <div
-            style={{
-              // 프롬프트 영역을 좌측 패널의 남는 공간 전부 차지하도록 (반응형 확장)
-              // 조사배너 · 고급아코디언 · CTA 가 자연스레 자리 잡고, 남은 높이는 이 박스가 흡수.
-              flex: 1,
-              minHeight: 220,
-              display: "flex",
-              flexDirection: "column",
-            }}
-          >
+          <div>
             <div
               style={{
                 display: "flex",
@@ -257,11 +260,6 @@ export default function GeneratePage() {
                 borderRadius: 12,
                 transition: "border .15s",
                 boxShadow: "var(--shadow-sm)",
-                // 라벨 아래 남은 공간 전부 차지 → textarea 가 full-height 로 늘어남
-                flex: 1,
-                display: "flex",
-                flexDirection: "column",
-                minHeight: 180,
               }}
             >
               {/* 숨김 스프링 프롬프트 히스토리 메뉴 (우상단) */}
@@ -270,8 +268,12 @@ export default function GeneratePage() {
                 onSelect={(p) => setPrompt(p)}
               />
               <textarea
+                ref={promptTextareaRef}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  autoGrow(e.target);
+                }}
                 onKeyDown={(e) => {
                   // Shift+Enter — 즉시 생성 (툴팁 ⇧↵ 배지와 일치)
                   if (e.key === "Enter" && e.shiftKey) {
@@ -280,7 +282,9 @@ export default function GeneratePage() {
                   }
                 }}
                 placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."
+                rows={3}
                 style={{
+                  display: "block",
                   width: "100%",
                   border: "none",
                   outline: "none",
@@ -292,9 +296,10 @@ export default function GeneratePage() {
                   lineHeight: 1.6,
                   color: "var(--ink)",
                   borderRadius: 12,
-                  // 컨테이너 full-fill — rows 속성 제거, flex 로 높이 확보
-                  flex: 1,
-                  minHeight: 140,
+                  // auto-grow: 내용만큼만 커지고 상한(60vh) 에서 멈춰 내부 스크롤.
+                  minHeight: 96,
+                  maxHeight: "60vh",
+                  overflowY: "auto",
                 }}
               />
               <div

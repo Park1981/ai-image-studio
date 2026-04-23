@@ -140,6 +140,17 @@ export default function EditPage() {
     if (lightningByDefault && !lightning) setLightning(true);
   }, [lightningByDefault, lightning, setLightning]);
 
+  /* ── 프롬프트 textarea auto-grow (내용 높이에 맞춰 자동 확장) ── */
+  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
+  const autoGrow = (el: HTMLTextAreaElement) => {
+    el.style.height = "auto";
+    el.style.height = `${el.scrollHeight}px`;
+  };
+  // 마운트/외부 prompt 변경(다시 버튼 등 복원) 시 재측정
+  useEffect(() => {
+    if (promptTextareaRef.current) autoGrow(promptTextareaRef.current);
+  }, [prompt]);
+
   /* ── 파일 업로드 결과 수신 (SourceImageCard 에서 호출) ── */
   const handleSourceChange = (
     image: string,
@@ -330,11 +341,16 @@ export default function EditPage() {
                 onSelect={(p) => setPrompt(p)}
               />
               <textarea
+                ref={promptTextareaRef}
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  autoGrow(e.target);
+                }}
                 placeholder="어떻게 수정할까요? 예: 배경을 바다로 바꿔줘"
                 rows={3}
                 style={{
+                  display: "block",
                   width: "100%",
                   border: "none",
                   outline: "none",
@@ -346,6 +362,10 @@ export default function EditPage() {
                   lineHeight: 1.55,
                   color: "var(--ink)",
                   borderRadius: 12,
+                  // auto-grow — 내용 높이 맞춰 확장, 상한 60vh 에서 내부 스크롤
+                  minHeight: 76,
+                  maxHeight: "60vh",
+                  overflowY: "auto",
                 }}
               />
               {/* 비우기 버튼 — Generate 페이지와 통일 */}
