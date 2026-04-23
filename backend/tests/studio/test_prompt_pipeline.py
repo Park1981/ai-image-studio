@@ -1,16 +1,16 @@
 """
-prompt_pipeline 파서 견고성 테스트 (2026-04-23).
+prompt_pipeline._strip_repeat_noise 견고성 테스트 (2026-04-23).
 
-핵심: gemma4 가 JSON loop 에 빠진 응답도 복구해야 함.
+gemma4-un 이 긴 출력에서 pipe/hyphen/word/phrase loop 에 빠지는 이슈에 대한
+안전망(regex 기반 잘라내기) 동작 검증.
+
+※ 2026-04-23 후속(Opus 리뷰): v3 전환으로 JSON 양방향 파싱 경로를 제거했으므로
+   _parse_bilingual_response / _extract_broken_json_fields 테스트도 함께 삭제.
 """
 
 from __future__ import annotations
 
-from backend.studio.prompt_pipeline import (
-    _extract_broken_json_fields,
-    _parse_bilingual_response,
-    _strip_repeat_noise,
-)
+from backend.studio.prompt_pipeline import _strip_repeat_noise
 
 
 def test_strip_repeat_noise_pipe_loop() -> None:
@@ -66,71 +66,3 @@ def test_strip_repeat_noise_real_gemma4_output() -> None:
     assert cleaned.count("larger") < 4
     # 시작 문장은 보존
     assert "A hyper-realistic editorial photo" in cleaned
-
-
-def test_parse_clean_json() -> None:
-    raw = '{"en": "A photo of a cat.", "ko": "고양이 사진."}'
-    en, ko = _parse_bilingual_response(raw)
-    assert en == "A photo of a cat."
-    assert ko == "고양이 사진."
-
-
-def test_parse_json_with_code_fence() -> None:
-    raw = '```json\n{"en": "foo", "ko": "푸"}\n```'
-    en, ko = _parse_bilingual_response(raw)
-    assert en == "foo"
-    assert ko == "푸"
-
-
-def test_parse_broken_json_pipe_loop() -> None:
-    # gemma4 가 pipe loop 에 빠진 실제 재현 케이스
-    raw = '{"en": "A hyper-realistic photo of a young woman, shot on 랩||||||||||||||||||||'
-    en, ko = _parse_bilingual_response(raw)
-    # pipe 노이즈 제거됐고 en 가 유효하게 복원
-    assert "|" not in en
-    assert "hyper-realistic" in en
-    assert ko is None
-
-
-def test_parse_broken_json_missing_closing_brace() -> None:
-    raw = '{"en": "incomplete json", "ko": "미완 번역"'
-    en, ko = _parse_bilingual_response(raw)
-    # 정규식으로 en/ko 복원돼야 함
-    assert "incomplete json" in en
-    assert ko == "미완 번역"
-
-
-def test_parse_empty_input() -> None:
-    en, ko = _parse_bilingual_response("")
-    assert en == ""
-    assert ko is None
-
-
-def test_parse_plain_text_no_json() -> None:
-    # JSON 없이 그냥 텍스트만 오면 전체를 en 으로 폴백
-    raw = "Just a plain English prompt without JSON wrapper."
-    en, ko = _parse_bilingual_response(raw)
-    assert en == raw
-    assert ko is None
-
-
-def test_parse_json_with_surrounding_text() -> None:
-    # 모델이 앞뒤에 자연어 붙인 경우
-    raw = 'Here is the result:\n{"en": "foo", "ko": "푸"}\nDone.'
-    en, ko = _parse_bilingual_response(raw)
-    assert en == "foo"
-    assert ko == "푸"
-
-
-def test_extract_broken_fields_en_only() -> None:
-    raw = '{"en": "prompt text"'  # ko 가 아예 없음
-    en, ko = _extract_broken_json_fields(raw)
-    assert "prompt text" in en
-    assert ko is None
-
-
-def test_extract_broken_fields_both_closed() -> None:
-    raw = '{"en": "one", "ko": "하나"}'
-    en, ko = _extract_broken_json_fields(raw)
-    assert en == "one"
-    assert ko == "하나"
