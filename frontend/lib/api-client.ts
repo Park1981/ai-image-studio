@@ -17,12 +17,14 @@ export type {
   OllamaModel,
   ProcessStatusSnapshot,
   VramSnapshot,
+  VisionAnalysisResponse,
 } from "./api/types";
 
 export { USE_MOCK, STUDIO_BASE } from "./api/client";
 
 export { upgradeOnly, researchPrompt, generateImageStream } from "./api/generate";
 export { editImageStream } from "./api/edit";
+export { analyzeImage, type AnalyzeImageOptions } from "./api/vision";
 export { listHistory, deleteHistoryItem, clearHistory } from "./api/history";
 export {
   fetchProcessStatus,
