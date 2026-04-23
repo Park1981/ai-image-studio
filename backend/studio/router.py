@@ -40,7 +40,7 @@ from typing import Any, Awaitable, Callable
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from .presets import (
     ASPECT_RATIOS,
@@ -131,8 +131,8 @@ class GenerateBody(BaseModel):
         default=None, alias="preResearchHints"
     )
 
-    class Config:
-        populate_by_name = True
+    # Pydantic V2: class-based Config 대신 model_config = ConfigDict(...)
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class UpgradeOnlyBody(BaseModel):
@@ -142,8 +142,7 @@ class UpgradeOnlyBody(BaseModel):
     research: bool = False
     ollama_model: str | None = Field(default=None, alias="ollamaModel")
 
-    class Config:
-        populate_by_name = True
+    model_config = ConfigDict(populate_by_name=True)
 
 
 class ResearchBody(BaseModel):
