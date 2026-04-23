@@ -641,7 +641,7 @@ export default function GeneratePage() {
                     item={it}
                     selected={selectedId === it.id}
                     onClick={() => selectItem(it.id)}
-                    onDoubleClick={() => setLightboxSrc(it.imageRef)}
+                    onExpand={() => setLightboxSrc(it.imageRef)}
                   />
                 ))}
               </div>

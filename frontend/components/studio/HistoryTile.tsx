@@ -1,15 +1,18 @@
 /**
- * HistoryTile - 히스토리 그리드에서 사용하는 이미지 타일.
- * ImageTile + hover 시 상단 우측에 삭제 버튼.
+ * HistoryTile - 히스토리 그리드 이미지 타일.
+ * 2026-04-24 UI 개편:
+ *  - ImageTile label 제거 — 프롬프트 한 줄이 이미지 위에 겹쳐 보이던 현상 해소
+ *  - hover 시 하단 액션 바에 [자세히 · 원본으로? · 삭제] 일렬 노출
+ *  - double-click 도 계속 "자세히" 로 동작 (편의 유지)
  *
- * 삭제: 서버에도 전파 (useHistoryStore.remove + api-client.deleteHistoryItem).
+ * 삭제는 서버에도 전파 (useHistoryStore.remove + api-client.deleteHistoryItem).
  */
 
 "use client";
 
-import { useState, type CSSProperties } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import ImageTile from "@/components/ui/ImageTile";
-import Icon from "@/components/ui/Icon";
+import Icon, { type IconName } from "@/components/ui/Icon";
 import { deleteHistoryItem, type HistoryItem } from "@/lib/api-client";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
@@ -20,10 +23,15 @@ interface Props {
   onClick: () => void;
   /** 삭제 후 부모에서 처리할 추가 로직 (예: selected=null) */
   onAfterDelete?: () => void;
-  /** 더블클릭 시 콜백 (라이트박스 열기 등) */
+  /**
+   * "자세히" 액션 — 라이트박스 열기 등.
+   * hover 바의 첫 버튼 + tile 전체 double-click 둘 다 이 콜백 호출.
+   */
+  onExpand?: () => void;
+  /** @deprecated onExpand 사용. 하위호환 유지 — 기존 호출처 변경 전까지 alias. */
   onDoubleClick?: () => void;
   /**
-   * "원본으로 보내기" 콜백. 있으면 hover 시 좌상단에 버튼 노출.
+   * "원본으로" 콜백 — 있을 때만 hover 바 가운데 버튼 노출.
    * 수정 모드 히스토리에서 연속 수정 플로우용.
    */
   onUseAsSource?: () => void;
@@ -31,11 +39,73 @@ interface Props {
   style?: CSSProperties;
 }
 
+/** hover 바 공통 버튼 — 아이콘 + 라벨. */
+function BarButton({
+  icon,
+  label,
+  title,
+  onClick,
+  variant = "neutral",
+}: {
+  icon: IconName;
+  label: ReactNode;
+  title: string;
+  onClick: (e: React.MouseEvent) => void;
+  variant?: "neutral" | "primary" | "danger";
+}) {
+  const [hov, setHov] = useState(false);
+  const palette = {
+    neutral: {
+      bg: "rgba(0,0,0,.55)",
+      bgHov: "rgba(0,0,0,.75)",
+    },
+    primary: {
+      bg: "rgba(74,158,255,.88)",
+      bgHov: "rgba(74,158,255,1)",
+    },
+    danger: {
+      bg: "rgba(0,0,0,.55)",
+      bgHov: "rgba(192,57,43,.92)",
+    },
+  }[variant];
+  return (
+    <button
+      type="button"
+      title={title}
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      style={{
+        all: "unset",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "5px 10px",
+        borderRadius: 999,
+        fontSize: 11,
+        fontWeight: 600,
+        letterSpacing: ".02em",
+        color: "#fff",
+        background: hov ? palette.bgHov : palette.bg,
+        backdropFilter: "blur(4px)",
+        border: "1px solid rgba(255,255,255,.18)",
+        transition: "background .15s, transform .15s",
+        transform: hov ? "scale(1.03)" : "scale(1)",
+      }}
+    >
+      <Icon name={icon} size={11} stroke={2.2} />
+      {label}
+    </button>
+  );
+}
+
 export default function HistoryTile({
   item,
   selected,
   onClick,
   onAfterDelete,
+  onExpand,
   onDoubleClick,
   onUseAsSource,
   aspect = "1/1",
@@ -44,9 +114,11 @@ export default function HistoryTile({
   const [hover, setHover] = useState(false);
   const remove = useHistoryStore((s) => s.remove);
 
+  // onExpand/onDoubleClick 중 정의된 쪽 사용 (하위호환)
+  const triggerExpand = onExpand ?? onDoubleClick;
+
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    // confirm 은 생략 — 실수 방지 필요하면 추후 추가. 현재는 store 에 남아있으니 복구는 새로고침 전에는 불가.
     remove(item.id);
     try {
       await deleteHistoryItem(item.id);
@@ -65,11 +137,10 @@ export default function HistoryTile({
       style={{ position: "relative", ...style }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      onDoubleClick={onDoubleClick}
+      onDoubleClick={triggerExpand}
     >
       <ImageTile
         seed={item.imageRef || item.id}
-        label={item.label}
         onClick={onClick}
         aspect={aspect}
         style={{
@@ -80,84 +151,66 @@ export default function HistoryTile({
           boxShadow: selected ? "0 0 0 4px rgba(74,158,255,.15)" : "none",
         }}
       />
-      {hover && onUseAsSource && (
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onUseAsSource();
-          }}
-          title="이 이미지를 수정 원본으로"
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            position: "absolute",
-            top: 6,
-            left: 6,
-            height: 26,
-            padding: "0 10px",
-            borderRadius: 999,
-            background: "rgba(74,158,255,.92)",
-            backdropFilter: "blur(4px)",
-            color: "#fff",
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 4,
-            fontSize: 11,
-            fontWeight: 600,
-            letterSpacing: ".02em",
-            border: "1px solid rgba(255,255,255,.25)",
-            transition: "background .15s, transform .15s",
-            boxShadow: "0 2px 8px rgba(0,0,0,.3)",
-          }}
-          onMouseEnter={(e) => {
-            const el = e.currentTarget as HTMLButtonElement;
-            el.style.background = "rgba(74,158,255,1)";
-            el.style.transform = "scale(1.04)";
-          }}
-          onMouseLeave={(e) => {
-            const el = e.currentTarget as HTMLButtonElement;
-            el.style.background = "rgba(74,158,255,.92)";
-            el.style.transform = "scale(1)";
-          }}
-        >
-          <Icon name="edit" size={11} stroke={2.2} />
-          원본으로
-        </button>
-      )}
+
+      {/* hover 액션 바 — 하단에 그라디언트 + 버튼 일렬 */}
       {hover && (
-        <button
-          type="button"
-          onClick={handleDelete}
-          title="삭제"
+        <div
           style={{
-            all: "unset",
-            cursor: "pointer",
             position: "absolute",
-            top: 6,
-            right: 6,
-            width: 26,
-            height: 26,
-            borderRadius: 999,
-            background: "rgba(0,0,0,.55)",
-            backdropFilter: "blur(4px)",
-            color: "#fff",
-            display: "grid",
-            placeItems: "center",
-            border: "1px solid rgba(255,255,255,.15)",
-            transition: "background .15s",
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background =
-              "rgba(192,57,43,.92)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.background =
-              "rgba(0,0,0,.55)";
+            left: 0,
+            right: 0,
+            bottom: 0,
+            padding: "22px 8px 8px",
+            background:
+              "linear-gradient(to top, rgba(0,0,0,.55) 0%, transparent 100%)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 6,
+            pointerEvents: "none", // 버튼만 클릭, 그라디언트는 통과
           }}
         >
-          <Icon name="x" size={13} stroke={2.4} />
-        </button>
+          <div
+            style={{
+              display: "inline-flex",
+              gap: 6,
+              pointerEvents: "auto",
+            }}
+          >
+            {triggerExpand && (
+              <BarButton
+                icon="zoom-in"
+                label="자세히"
+                title="라이트박스에서 크게 보기"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerExpand();
+                }}
+              />
+            )}
+            {onUseAsSource && (
+              <BarButton
+                icon="edit"
+                label="원본으로"
+                title="이 이미지를 수정 원본으로"
+                variant="primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onUseAsSource();
+                }}
+              />
+            )}
+          </div>
+          <div style={{ pointerEvents: "auto" }}>
+            <BarButton
+              icon="x"
+              label=""
+              title="삭제"
+              variant="danger"
+              onClick={handleDelete}
+            />
+          </div>
+        </div>
       )}
     </div>
   );

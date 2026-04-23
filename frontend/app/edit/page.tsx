@@ -662,7 +662,7 @@ export default function EditPage() {
                       setAfterId(it.id);
                       selectHistory(it.id);
                     }}
-                    onDoubleClick={() => setLightboxSrc(it.imageRef)}
+                    onExpand={() => setLightboxSrc(it.imageRef)}
                     onAfterDelete={() => {
                       if (afterId === it.id) setAfterId(null);
                     }}
