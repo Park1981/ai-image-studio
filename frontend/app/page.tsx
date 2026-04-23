@@ -101,21 +101,21 @@ export default function MainMenuPage() {
             icon="image"
             title="이미지 생성"
             desc="자연어 프롬프트를 gemma4로 업그레이드한 뒤 ComfyUI 워크플로우에 전달합니다."
-            hue="#EAF3FF"
+            bgImage="/menu/generate.png"
             onClick={() => router.push("/generate")}
           />
           <MenuCard
             icon="edit"
             title="이미지 수정"
             desc="참조 이미지와 자연어 지시를 비전 모델로 분석해 수정본을 생성합니다."
-            hue="#EEF9E4"
+            bgImage="/menu/edit.png"
             onClick={() => router.push("/edit")}
           />
           <MenuCard
             icon="search"
             title="Vision 분석"
             desc="이미지 한 장을 비전 모델로 분석해 상세 영/한 설명을 추출합니다. 생성 프롬프트로 복사해 쓸 수 있어요."
-            hue="#FFF3E0"
+            bgImage="/menu/vision.png"
             tag="보조 기능"
             onClick={() => router.push("/vision")}
           />
@@ -123,6 +123,7 @@ export default function MainMenuPage() {
             icon="film"
             title="영상 생성"
             desc="이미지 또는 프롬프트로부터 짧은 클립을 생성합니다. 다음 버전에서 제공됩니다."
+            bgImage="/menu/video.png"
             tag="준비 중 · v2"
             disabled
             onClick={() => router.push("/video")}
