@@ -584,8 +584,9 @@ def build_video_from_request(
     }
 
     # ── 1. Pre-resize (ResizeImageMaskNode · 포트레이트 박스 fit) ──
-    # resize_type 은 DYNAMICCOMBO 라 선택값에 따라 서브필드 추가 (width/height)
-    # API format 에선 dot notation 으로 flat 하게 기재.
+    # resize_type 은 DYNAMICCOMBO — 선택값에 따라 서브필드 추가.
+    # "scale dimensions" 는 width/height/crop 3 서브필드 요구.
+    # scale_method 는 독립 top-level 필드.
     resize1_id = nid()
     api[resize1_id] = {
         "class_type": "ResizeImageMaskNode",
@@ -594,8 +595,8 @@ def build_video_from_request(
             "resize_type": s.pre_resize_mode,
             "resize_type.width": s.pre_resize_width,
             "resize_type.height": s.pre_resize_height,
+            "resize_type.crop": s.pre_resize_crop,
             "scale_method": s.pre_resize_scale_method,
-            "crop": s.pre_resize_crop,
         },
     }
 
