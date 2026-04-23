@@ -548,16 +548,21 @@ export default function EditPage() {
                       border: "1px solid var(--line)",
                       borderRadius: 999,
                       color: sourceImage ? "var(--ink-2)" : "var(--ink-4)",
+                      minWidth: 0,
+                      maxWidth: "100%",
+                      overflow: "hidden",
                     }}
                   >
                     {sourceImage && (
                       <Icon
                         name="check"
                         size={10}
-                        style={{ color: "var(--green)" }}
+                        style={{ color: "var(--green)", flexShrink: 0 }}
                       />
                     )}
-                    {sourceLabel}
+                    <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {sourceLabel}
+                    </span>
                   </span>
                   {sourceImage && (
                     <button
