@@ -23,6 +23,9 @@ export type {
   ComparisonScores,
   ComparisonComments,
   ComparisonAnalysis,
+  VisionCompareScores,
+  VisionCompareComments,
+  VisionCompareAnalysis,
 } from "./api/types";
 
 export { USE_MOCK, STUDIO_BASE } from "./api/client";

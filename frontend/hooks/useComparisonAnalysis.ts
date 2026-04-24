@@ -21,7 +21,7 @@ import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
-import type { HistoryItem } from "@/lib/api-client";
+import type { ComparisonAnalysis, HistoryItem } from "@/lib/api-client";
 
 /** RTX 4070 Ti SUPER 16GB 기준 — ComfyUI + qwen2.5vl 동시 실행 OOM 방지 임계치 */
 const VRAM_THRESHOLD_GB = 13;
@@ -118,7 +118,7 @@ export function useComparisonAnalysis() {
       _notify();
 
       try {
-        const { analysis, saved } = await compareAnalyze({
+        const { analysis: rawAnalysis, saved } = await compareAnalyze({
           source: item.sourceRef,
           result: item.imageRef,
           editPrompt: item.prompt,
@@ -127,6 +127,9 @@ export function useComparisonAnalysis() {
           visionModel,
           ollamaModel,
         });
+        // 이 훅은 Edit context 전용이라 응답이 항상 ComparisonAnalysis (Edit 5축).
+        // compareAnalyze 의 응답 union 을 좁혀서 HistoryItem.comparisonAnalysis 에 할당.
+        const analysis = rawAnalysis as ComparisonAnalysis;
 
         // 결과를 store 의 해당 item 에만 inline patch (다른 item 영향 없음)
         const next = itemsRef.current.map((x) =>

@@ -43,18 +43,18 @@ Generate 입력 UX: Step/CFG/Seed UI 제거(백엔드는 GENERATE_MODEL.defaults
 - **backend/studio/router.py**: `/api/studio/*` FastAPI 라우터 (generate/edit/**video** SSE · upgrade-only · research · interrupt · vision-analyze · **compare-analyze** · history · models · process · ollama/models)
 - **backend/studio/comfy_api_builder.py**: ComfyUI flat API format 빌더 (`build_generate_from_request`, `build_edit_from_request`, **`build_video_from_request`**)
 - **backend/studio/comfy_transport.py**: WebSocket + HTTP 전송 (idle 600s / hard 1800s timeout · Video 는 idle 900s / hard 3600s)
-- **backend/studio/{prompt,vision,video,comparison}_pipeline.py**: Ollama gemma4 업그레이드 + qwen2.5vl 비전 · Video 는 5-step 체이닝 · **comparison 은 multi-image 5축 평가**
+- **backend/studio/{prompt,vision,video,comparison}_pipeline.py**: Ollama gemma4 업그레이드 + qwen2.5vl 비전 · Video 는 5-step 체이닝 · **comparison 은 multi-image 5축 평가** · **comparison 은 2 context 분리 (analyze_pair=Edit / analyze_pair_generic=Vision Compare · SYSTEM 프롬프트와 5축 모두 별도 · Edit 무영향 보장)**
 - **backend/studio/presets.py**: Qwen Image 2512 / Edit 2511 / **LTX Video 2.3** 프리셋 (프론트와 동기화 필수) · `compute_video_resize`, `build_quality_sigmas`, `active_video_loras` 헬퍼 포함
 - **backend/studio/history_db.py**: SQLite studio_history 테이블 (mode: generate/edit/**video**) · **source_ref + comparison_analysis + v5: adult/duration_sec/fps/frame_count 컬럼** (video 메타 · idempotent ALTER 마이그레이션)
 - **backend/workflows/qwen_image_2512.json, qwen_image_edit_2511.json**: 워크플로우 참조 (디스패치는 comfy_api_builder 가 Python 으로 구성 · Video 는 38-node flat API 전부 Python 조립)
-- **frontend/app/{page,generate,edit,video,vision}/page.tsx**: 5 라우트 · 모두 페이지 최소너비 `1024` + grid `"400px minmax(624px, 1fr)"` 통일
+- **frontend/app/{page,generate,edit,video,vision,vision/compare}/page.tsx**: 6 라우트 · 모두 페이지 최소너비 `1024` + grid `"400px minmax(624px, 1fr)"` 통일 · 메인 page 는 3카테고리(이미지/비전/영상) × 2카드 그리드 (Image:생성/수정 · Vision:분석/비교 · Video:생성/업스케일(준비중))
 - **frontend/components/studio/\*** (2026-04-24 이전): AiEnhanceCard(미사용·보존), HistoryTile(아이콘 only hover 바), ImageLightbox (video 분기 + InfoPanel + 비교 분석 조건부 + BeforeAfter 토글), ProgressModal, UpgradeConfirmModal, VideoPlayerCard(+크게 버튼), **ComparisonAnalysisCard, ComparisonAnalysisModal**
 - **frontend/components/studio/\*** (2026-04-24 신설 · 공용): **HistoryGallery** (Masonry+날짜섹션 · generate/edit/video), **SectionHeader** (섹션 접기헤더 · HistoryGallery+VisionHistoryList 공유), **HistorySectionHeader** (히스토리 헤더 템플릿 · 4메뉴 통일), **ResultHoverActionBar** (+ActionBarButton · 호버 글래스바), **ResultInfoModal** (애플시트 스프링 · 보존), **BeforeAfterSlider** (edit 지역 컴포넌트 공용화 · Lightbox 비교 토글 재사용)
 - **frontend/lib/date-sections.ts**: 제네릭 `groupByDate<T extends { createdAt: number }>` + `isClosedSection` (HistoryGallery + VisionHistoryList 공유)
 - **frontend/hooks/useComparisonAnalysis.ts**: 비교 분석 트리거 + per-item busy guard + VRAM 임계 (>13GB skip) + 결과 store inline patch
 - **frontend/hooks/useGeneratePipeline.ts**: 스트림 실행 + 업그레이드 모달 + **researchPreview** state (loading/hints/error/run · ResearchBanner 인라인 결과 용)
 - **frontend/lib/{api-client,model-presets,image-actions}.ts**: 핵심 프론트 유틸 · **lib/api/compare.ts** (compareAnalyze) · image-actions fetch 는 `cache:"no-store"` 로 CORS 캐시 우회
-- **frontend/stores/use*Store.ts**: Zustand 7개 (settings/process/history/generate/edit/**video**/toast) · `useVideoStore` 에 adult/longerEdge/lightning 토글 + computeVideoResize 헬퍼 · `useSettingsStore` 에 `autoCompareAnalysis` 토글 · `useGenerateStore` 는 v3 (steps/cfg/seed 필드 제거, migrate 로 옛 값 자동 삭제)
+- **frontend/stores/use*Store.ts**: Zustand 8개 (settings/process/history/generate/edit/**video**/**visionCompare**/toast) · `useVideoStore` 에 adult/longerEdge/lightning 토글 + computeVideoResize 헬퍼 · `useSettingsStore` 에 `autoCompareAnalysis` 토글 · `useGenerateStore` 는 v3 (steps/cfg/seed 필드 제거, migrate 로 옛 값 자동 삭제) · `useVisionCompareStore` 는 persist X 완전 휘발 (페이지 떠나면 모두 사라짐)
 - **frontend/app/globals.css**: 디자인 토큰 (warm neutral + cool blue) + `@keyframes fade-in`
 
 ### 레거시 (참조용 · 수정 금지)
@@ -118,9 +118,10 @@ Generate 입력 UX: Step/CFG/Seed UI 제거(백엔드는 GENERATE_MODEL.defaults
 - `POST /research` (Claude CLI 조사 힌트)
 - `POST /interrupt` (ComfyUI 전역 중단)
 - `POST /vision-analyze` (Vision Analyzer 독립 페이지)
-- `POST /compare-analyze` (multipart source+result+meta) — Edit 결과 vs 원본 5축 평가 (qwen2.5vl multi-image)
-  - meta JSON: `{editPrompt, historyItemId?, visionModel?, ollamaModel?}`
-  - 응답: `{analysis: ComparisonAnalysis, saved: bool}` · HTTP 200 원칙 (fallback 보장)
+- `POST /compare-analyze` (multipart source+result+meta) — qwen2.5vl multi-image 5축 평가 (2 context 분리)
+  - meta JSON Edit context (default): `{editPrompt, historyItemId?, visionModel?, ollamaModel?}` — analyze_pair() · 5축 face_id/body_pose/attire/background/intent_fidelity
+  - meta JSON Vision Compare context: `{context: "compare", compareHint?, visionModel?, ollamaModel?}` — analyze_pair_generic() · 5축 composition/color/subject/mood/quality · historyItemId 미전송 = 완전 휘발
+  - 응답: `{analysis: ComparisonAnalysis | VisionCompareAnalysis, saved: bool}` · HTTP 200 원칙 (fallback 보장)
   - asyncio.Lock + 30s timeout → 503 (ComfyUI 샘플링과 직렬화)
 - `GET /models`, `GET /ollama/models`
 - `GET /process/status`, `POST /process/{ollama|comfyui}/{start|stop}`

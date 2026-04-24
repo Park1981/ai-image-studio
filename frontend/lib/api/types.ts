@@ -37,6 +37,35 @@ export interface ComparisonAnalysis {
   visionModel: string;
 }
 
+/* ──────────── Vision Compare Analysis (임의 두 이미지 비교 · 신규) ──────────── */
+
+/** Vision Compare 5축 점수 (composition/color/subject/mood/quality) */
+export interface VisionCompareScores {
+  composition: number | null;
+  color: number | null;
+  subject: number | null;
+  mood: number | null;
+  quality: number | null;
+}
+
+export type VisionCompareComments = {
+  [K in keyof VisionCompareScores]: string;
+};
+
+/** Vision Compare 분석 단일 결과 (휘발 · DB 저장 X). */
+export interface VisionCompareAnalysis {
+  scores: VisionCompareScores;
+  overall: number;
+  comments_en: VisionCompareComments;
+  comments_ko: VisionCompareComments;
+  summary_en: string;
+  summary_ko: string;
+  provider: "ollama" | "fallback";
+  fallback: boolean;
+  analyzedAt: number;
+  visionModel: string;
+}
+
 export interface HistoryItem {
   id: string;
   mode: "generate" | "edit" | "video";

@@ -6,14 +6,14 @@
  */
 
 import { STUDIO_BASE, USE_MOCK, sleep } from "./client";
-import type { ComparisonAnalysis } from "./types";
+import type { ComparisonAnalysis, VisionCompareAnalysis } from "./types";
 
 export interface CompareAnalyzeRequest {
-  /** 원본 이미지 — File / data URL / 절대 URL */
+  /** 원본 이미지 / IMAGE_A — File / data URL / 절대 URL */
   source: File | string;
-  /** 수정 결과 이미지 — File / data URL / 절대 URL */
+  /** 수정 결과 이미지 / IMAGE_B — File / data URL / 절대 URL */
   result: File | string;
-  /** 사용자가 친 수정 지시 (시스템 프롬프트 컨텍스트). */
+  /** Edit context 일 때 사용자 수정 지시 (compare context 에선 무시). */
   editPrompt: string;
   /** 있으면 백엔드가 DB 에 영구 저장. tsk-{12hex} 형식. */
   historyItemId?: string;
@@ -21,10 +21,22 @@ export interface CompareAnalyzeRequest {
   visionModel?: string;
   /** 번역 모델 override (기본 settings.ollamaModel). */
   ollamaModel?: string;
+  /**
+   * 코드 경로 분기 (백엔드 default "edit" · 미전송 시 Edit 경로 = 기존 동작 100%).
+   * "compare" → analyze_pair_generic 호출 + 5축 (composition/color/subject/mood/quality)
+   */
+  context?: "edit" | "compare";
+  /** Vision Compare 메뉴 전용 힌트 (context="compare" 일 때만 사용). */
+  compareHint?: string;
 }
 
 export interface CompareAnalyzeResponse {
-  analysis: ComparisonAnalysis;
+  /**
+   * 분석 결과. context="edit" → ComparisonAnalysis (Edit 5축),
+   * context="compare" → VisionCompareAnalysis (Vision Compare 5축).
+   * 호출자가 context 를 알고 있으므로 적절히 narrow 가능.
+   */
+  analysis: ComparisonAnalysis | VisionCompareAnalysis;
   /** historyItemId 가 DB 에 존재하고 갱신 성공 시 true. */
   saved: boolean;
 }
@@ -51,9 +63,48 @@ async function toBlob(input: File | string): Promise<Blob> {
 export async function compareAnalyze(
   req: CompareAnalyzeRequest,
 ): Promise<CompareAnalyzeResponse> {
+  const isCompare = req.context === "compare";
+
   // Mock 분기: UI 개발 시 실 백엔드 없이 동작 확인용
   if (USE_MOCK) {
     await sleep(800 + Math.random() * 600);
+    if (isCompare) {
+      // Vision Compare 5축 mock (composition/color/subject/mood/quality)
+      return {
+        analysis: {
+          scores: {
+            composition: 78,
+            color: 65,
+            subject: 92,
+            mood: 70,
+            quality: 88,
+          },
+          overall: 79,
+          comments_en: {
+            composition: "Similar framing with minor crop differences.",
+            color: "Image B has warmer tones.",
+            subject: "Same person, slightly different pose.",
+            mood: "Both calm but B is brighter.",
+            quality: "B has higher resolution feel.",
+          },
+          comments_ko: {
+            composition: "비슷한 프레이밍, 약간의 크롭 차이.",
+            color: "B 가 더 따뜻한 톤.",
+            subject: "동일 인물, 자세 약간 다름.",
+            mood: "둘 다 차분, B 가 더 밝음.",
+            quality: "B 가 해상도가 더 좋게 느껴짐.",
+          },
+          summary_en: "A and B are very similar with mild stylistic shifts.",
+          summary_ko: "A·B 매우 유사 · 약간의 스타일 변화.",
+          provider: "ollama",
+          fallback: false,
+          analyzedAt: Date.now(),
+          visionModel: req.visionModel ?? "qwen2.5vl:7b",
+        },
+        saved: false,
+      };
+    }
+    // Edit 5축 mock (face_id/body_pose/attire/background/intent_fidelity) — 기존 그대로
     return {
       analysis: {
         scores: {
@@ -95,15 +146,18 @@ export async function compareAnalyze(
   const resultBlob = await toBlob(req.result);
   form.append("source", sourceBlob, "source.png");
   form.append("result", resultBlob, "result.png");
-  form.append(
-    "meta",
-    JSON.stringify({
-      editPrompt: req.editPrompt,
-      historyItemId: req.historyItemId,
-      visionModel: req.visionModel,
-      ollamaModel: req.ollamaModel,
-    }),
-  );
+  // meta 빌드 — context 없으면 백엔드 기본 "edit" 으로 동작 (기존 호출자 100% 무영향)
+  const metaPayload: Record<string, unknown> = {
+    editPrompt: req.editPrompt,
+    historyItemId: req.historyItemId,
+    visionModel: req.visionModel,
+    ollamaModel: req.ollamaModel,
+  };
+  if (isCompare) {
+    metaPayload.context = "compare";
+    metaPayload.compareHint = req.compareHint ?? "";
+  }
+  form.append("meta", JSON.stringify(metaPayload));
 
   // 백엔드 호출
   const res = await fetch(`${STUDIO_BASE}/api/studio/compare-analyze`, {
@@ -120,7 +174,7 @@ export async function compareAnalyze(
     throw new Error("compare-analyze: malformed response");
   }
   return {
-    analysis: json.analysis as ComparisonAnalysis,
+    analysis: json.analysis,
     saved: !!json.saved,
   };
 }

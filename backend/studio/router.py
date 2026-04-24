@@ -59,7 +59,7 @@ from .prompt_pipeline import upgrade_generate_prompt
 from .claude_cli import research_prompt
 from .vision_pipeline import analyze_image_detailed, run_vision_pipeline
 from .video_pipeline import run_video_pipeline
-from .comparison_pipeline import analyze_pair
+from .comparison_pipeline import analyze_pair, analyze_pair_generic
 from .comfy_api_builder import (
     build_generate_from_request,
     build_edit_from_request,
@@ -1376,7 +1376,10 @@ async def compare_analyze(
     except json.JSONDecodeError as e:
         raise HTTPException(400, f"meta JSON invalid: {e}") from e
 
+    # context 분기: 기본 "edit" (Edit 호출자 무영향) · "compare" 면 generic 코드 경로
+    context = (meta_obj.get("context") or "edit").strip().lower()
     edit_prompt = (meta_obj.get("editPrompt") or "").strip()
+    compare_hint = (meta_obj.get("compareHint") or "").strip()
     history_item_id_raw = meta_obj.get("historyItemId")
     vision_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
     text_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
@@ -1400,17 +1403,30 @@ async def compare_analyze(
         raise HTTPException(503, "compare-analyze busy (locked > 30s)") from e
 
     try:
-        result_obj = await analyze_pair(
-            source_bytes=source_bytes,
-            result_bytes=result_bytes,
-            edit_prompt=edit_prompt,
-            vision_model=vision_override,
-            text_model=text_override,
-        )
+        if context == "compare":
+            # Vision Compare 메뉴 — 사용자가 임의로 고른 두 이미지 비교
+            # source = IMAGE_A, result = IMAGE_B (multipart 필드명 재활용)
+            result_obj = await analyze_pair_generic(
+                image_a_bytes=source_bytes,
+                image_b_bytes=result_bytes,
+                compare_hint=compare_hint,
+                vision_model=vision_override,
+                text_model=text_override,
+            )
+        else:
+            # 기본 "edit" 코드 경로 — 기존 동작 100% 보존
+            result_obj = await analyze_pair(
+                source_bytes=source_bytes,
+                result_bytes=result_bytes,
+                edit_prompt=edit_prompt,
+                vision_model=vision_override,
+                text_model=text_override,
+            )
     finally:
         _COMPARE_LOCK.release()
 
     # historyItemId 가 _TASK_ID_RE 매치 + DB 에 존재할 때만 저장
+    # (Vision Compare 메뉴는 historyItemId 미전송 → 자동 스킵 = 완전 휘발 보장)
     saved = False
     if isinstance(history_item_id_raw, str) and _TASK_ID_RE.match(history_item_id_raw):
         try:

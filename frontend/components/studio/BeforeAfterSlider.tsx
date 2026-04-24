@@ -19,6 +19,11 @@ import Icon from "@/components/ui/Icon";
 interface Props {
   beforeSrc: string;
   afterSeed: string;
+  /**
+   * After 측 실제 이미지 URL (data: 또는 절대 URL). 주면 ImageTile 대신 <img>.
+   * 미전달 시 기존 동작 (afterSeed 기반 ImageTile placeholder) 유지 — Edit 호출자 무영향.
+   */
+  afterSrc?: string;
   /** 원본 이미지 실제 비율 (예: "1920 / 1080"). 없으면 16:10 폴백. */
   aspectRatio?: string;
   /** compareX (0~100). props 로 주면 제어 모드, 없으면 내부 state (비제어). */
@@ -26,15 +31,21 @@ interface Props {
   setCompareX?: (v: number) => void;
   /** 최대 높이 CSS 값 (기본 "70vh"). Lightbox 등에선 "none" 으로 해제 가능. */
   maxHeight?: string;
+  /** 코너 라벨 커스터마이징 (기본 Before/After). */
+  beforeLabel?: string;
+  afterLabel?: string;
 }
 
 export default function BeforeAfterSlider({
   beforeSrc,
   afterSeed,
+  afterSrc,
   aspectRatio = "16 / 10",
   compareX: controlledCompareX,
   setCompareX: controlledSetCompareX,
   maxHeight = "70vh",
+  beforeLabel = "Before",
+  afterLabel = "After",
 }: Props) {
   // 비제어 fallback — 부모가 state 안 주면 내부에서 관리 (기본 50%).
   const [internalCompareX, setInternalCompareX] = useState(50);
@@ -108,12 +119,30 @@ export default function BeforeAfterSlider({
         WebkitUserSelect: "none",
       }}
     >
-      {/* After (full) */}
-      <ImageTile
-        seed={afterSeed}
-        aspect={aspectRatio}
-        style={{ width: "100%", height: "100%", borderRadius: 0 }}
-      />
+      {/* After (full) — afterSrc 가 data:/URL 이면 <img>, 아니면 seed 기반 ImageTile */}
+      {afterSrc && (afterSrc.startsWith("data:") || afterSrc.startsWith("http") || afterSrc.startsWith("/")) ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={afterSrc}
+          alt="after"
+          draggable={false}
+          style={{
+            width: "100%",
+            height: "100%",
+            objectFit: "contain",
+            display: "block",
+            // @ts-expect-error — 비표준 Webkit 속성
+            WebkitUserDrag: "none",
+            userSelect: "none",
+          }}
+        />
+      ) : (
+        <ImageTile
+          seed={afterSeed}
+          aspect={aspectRatio}
+          style={{ width: "100%", height: "100%", borderRadius: 0 }}
+        />
+      )}
       {/* Before (clipped) */}
       <div
         style={{
@@ -125,8 +154,8 @@ export default function BeforeAfterSlider({
         {renderBefore}
       </div>
 
-      <CornerBadge pos="tl">Before</CornerBadge>
-      <CornerBadge pos="tr">After</CornerBadge>
+      <CornerBadge pos="tl">{beforeLabel}</CornerBadge>
+      <CornerBadge pos="tr">{afterLabel}</CornerBadge>
 
       <div
         onMouseDown={startDrag}
