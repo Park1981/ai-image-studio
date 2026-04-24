@@ -180,7 +180,7 @@ async def list_items(
     """최신순 목록. before_ts 가 있으면 그보다 이전 것만 (pagination cursor)."""
     where = []
     params: list[Any] = []
-    if mode in ("generate", "edit"):
+    if mode in ("generate", "edit", "video"):
         where.append("mode = ?")
         params.append(mode)
     if before_ts:
@@ -226,9 +226,12 @@ async def clear_all() -> int:
         return cur.rowcount
 
 
+_VALID_MODES = ("generate", "edit", "video")
+
+
 async def count_items(mode: str | None = None) -> int:
-    where_sql = "WHERE mode = ?" if mode in ("generate", "edit") else ""
-    params = [mode] if mode in ("generate", "edit") else []
+    where_sql = "WHERE mode = ?" if mode in _VALID_MODES else ""
+    params = [mode] if mode in _VALID_MODES else []
     async with aiosqlite.connect(_DB_PATH) as db:
         cur = await db.execute(
             f"SELECT COUNT(*) FROM studio_history {where_sql}", params

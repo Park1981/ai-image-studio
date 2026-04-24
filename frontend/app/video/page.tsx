@@ -36,7 +36,6 @@ import { filenameFromRef } from "@/lib/image-actions";
 import type { HistoryItem } from "@/lib/api-client";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
-import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import {
   computeVideoResize,
@@ -81,7 +80,7 @@ export default function VideoPage() {
 
   const items = useHistoryStore((s) => s.items);
 
-  const visionModel = useSettingsStore((s) => s.visionModel);
+  // visionModel 은 useVideoPipeline 내부에서 store 직접 읽음 (여기 구독 불필요)
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
   /* ── 파이프라인 훅 ── */
@@ -99,13 +98,19 @@ export default function VideoPage() {
   const playingRef =
     lastVideoRef ?? (videoResults.length > 0 ? videoResults[0].imageRef : null);
 
-  /* ── 진행 모달 open 상태 ── */
+  /* ── 진행 모달 open 상태 ──
+   * running false→true 전이 시 자동 오픈. React 공식 권장: prev state 비교.
+   */
   const [progressOpen, setProgressOpen] = useState(false);
+  const [prevRunning, setPrevRunning] = useState(running);
+  if (prevRunning !== running) {
+    setPrevRunning(running);
+    if (running) setProgressOpen(true);
+  }
+
   /* ── Lightbox (자세히 누르면 오픈) ── */
   const [lightboxItem, setLightboxItem] = useState<HistoryItem | null>(null);
-  useEffect(() => {
-    if (running) setProgressOpen(true);
-  }, [running]);
+
   useEffect(() => {
     if (running) return;
     if (!progressOpen) return;
@@ -263,7 +268,7 @@ export default function VideoPage() {
                 boxShadow: "var(--shadow-sm)",
               }}
             >
-              <PromptHistoryPeek mode="edit" onSelect={(p) => setPrompt(p)} />
+              <PromptHistoryPeek mode="video" onSelect={(p) => setPrompt(p)} />
               <textarea
                 ref={promptTextareaRef}
                 value={prompt}

@@ -24,12 +24,18 @@ import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
 
 interface Props {
-  mode: "generate" | "edit";
+  mode: "generate" | "edit" | "video";
   /** 프롬프트 선택 시 호출 — 입력창에 주입 */
   onSelect: (prompt: string) => void;
   /** 패널 정렬. "right" = 트리거 오른쪽 끝 기준 (기본). "left" = 왼쪽 끝 기준. */
   align?: "left" | "right";
 }
+
+const MODE_LABEL: Record<Props["mode"], string> = {
+  generate: "생성",
+  edit: "수정",
+  video: "영상",
+};
 
 const MAX_ITEMS = 20;
 const ENTER_DELAY = 150;
@@ -114,7 +120,7 @@ export default function PromptHistoryPeek({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        title={`이전 ${mode === "generate" ? "생성" : "수정"} 프롬프트 (${prompts.length}개)`}
+        title={`이전 ${MODE_LABEL[mode]} 프롬프트 (${prompts.length}개)`}
         style={{
           all: "unset",
           cursor: "pointer",

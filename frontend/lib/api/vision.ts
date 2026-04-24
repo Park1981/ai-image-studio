@@ -94,6 +94,9 @@ async function mockAnalyze(
   _sourceImage: string | File,
   _opts: AnalyzeImageOptions,
 ): Promise<VisionAnalysisResponse> {
+  // 인자 사용 안 함 — Mock 은 고정 응답. underscore prefix 만으로는 lint 통과 안 돼서 명시적 noop.
+  void _sourceImage;
+  void _opts;
   await sleep(600 + Math.random() * 400);
   return {
     en: "Editorial-style portrait photograph, soft north-facing window light pooling on the subject's left cheek, shallow depth of field with creamy bokeh, neutral warm palette blending ochre and muted terracotta, fine skin texture retained with subtle 35mm film grain, balanced rule-of-thirds composition, slight matte film look, quiet contemplative mood.",

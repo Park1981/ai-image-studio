@@ -18,7 +18,11 @@ from config import settings
 from database import init_db
 from routers import generate, history, models, process, prompt
 from services.process_manager import process_manager
-from studio.router import router as studio_router
+from studio.router import (
+    router as studio_router,
+    start_cleanup_loop as start_studio_cleanup_loop,
+    stop_cleanup_loop as stop_studio_cleanup_loop,
+)
 from studio.history_db import init_studio_history_db
 
 # 로깅 설정
@@ -91,6 +95,8 @@ async def lifespan(app: FastAPI):
 
     # 유휴 자동 종료 백그라운드 태스크 시작
     idle_task = asyncio.create_task(_idle_shutdown_loop())
+    # studio SSE task 주기적 stale cleanup 시작
+    start_studio_cleanup_loop()
 
     yield
 
@@ -100,6 +106,8 @@ async def lifespan(app: FastAPI):
         await idle_task
     except asyncio.CancelledError:
         pass
+    # studio cleanup loop 종료
+    await stop_studio_cleanup_loop()
 
     # ── 종료 ──
     await process_manager.stop_comfyui()

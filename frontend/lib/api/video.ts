@@ -179,10 +179,9 @@ async function* mockVideoStream(
     lightning: false,
     model: "LTX Video 2.3",
     createdAt: Date.now(),
-    imageRef:
-      typeof req.sourceImage === "string"
-        ? req.sourceImage // Mock: 원본 이미지 path 를 imageRef 로 → <video> 는 못 재생하지만 썸네일은 OK
-        : "mock-seed://video",
+    // Mock 모드는 실제 mp4 가 없음 → mock-seed:// sentinel 로 통일.
+    // VideoPlayerCard / ImageLightbox 가 이 sentinel 을 보면 재생 시도 안 하고 안내 표시.
+    imageRef: "mock-seed://video",
     visionDescription: "(mock) warm window light portrait",
     upgradedPrompt:
       "cinematic dolly in, warm window light, shallow DoF, film grain",

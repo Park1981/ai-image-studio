@@ -65,7 +65,10 @@ export interface EditState {
   setLightning: (v: boolean) => void;
   setRunning: (running: boolean) => void;
   setStep: (step: 1 | 2 | 3 | 4 | null, done: boolean) => void;
-  recordStepDetail: (detail: EditStepDetail) => void;
+  /** n 만 필수. 나머지는 부분 업데이트 — 기존 필드 (특히 startedAt) 는 머지에서 보존. */
+  recordStepDetail: (
+    detail: Partial<EditStepDetail> & { n: EditStepDetail["n"] },
+  ) => void;
   setCompareX: (v: number) => void;
   setPipelineProgress: (progress: number, label?: string) => void;
   resetPipeline: () => void;
@@ -128,14 +131,22 @@ export const useEditStore = create<EditState>((set) => ({
     set((s) => {
       const existing = s.stepHistory.find((x) => x.n === detail.n);
       if (existing) {
-        // done 도착 시 완료 시각 + 상세 merge
+        // done 도착 시 완료 시각 + 상세 merge. 기존 startedAt 을 후순위로 두지 않기 위해
+        // detail 먼저, 그 위에 x.startedAt 을 다시 덮어 보존.
         return {
           stepHistory: s.stepHistory.map((x) =>
-            x.n === detail.n ? { ...x, ...detail } : x,
+            x.n === detail.n ? { ...x, ...detail, startedAt: x.startedAt } : x,
           ),
         };
       }
-      return { stepHistory: [...s.stepHistory, detail] };
+      // 새 엔트리 — startedAt 없으면 현재 시각 기본.
+      const fresh: EditStepDetail = {
+        startedAt: Date.now(),
+        doneAt: null,
+        ...detail,
+        n: detail.n,
+      };
+      return { stepHistory: [...s.stepHistory, fresh] };
     }),
   setCompareX: (v) => set({ compareX: v }),
   setPipelineProgress: (progress, label) =>

@@ -113,23 +113,30 @@ export default function HistoryTile({
 }: Props) {
   const [hover, setHover] = useState(false);
   const remove = useHistoryStore((s) => s.remove);
+  const restore = useHistoryStore((s) => s.add);
 
   // onExpand/onDoubleClick 중 정의된 쪽 사용 (하위호환)
   const triggerExpand = onExpand ?? onDoubleClick;
 
+  /**
+   * 옵티미스틱 삭제 — 즉시 UI 에서 제거하고 서버 호출.
+   * 서버 실패 시 store.add 로 원본 복원 + 사용자 안내 (데이터 손실 방지).
+   */
   const handleDelete = async (e: React.MouseEvent) => {
     e.stopPropagation();
     remove(item.id);
     try {
       await deleteHistoryItem(item.id);
+      toast.info("삭제됨", item.label);
+      onAfterDelete?.();
     } catch (err) {
-      toast.warn(
-        "서버 삭제 실패",
-        err instanceof Error ? err.message : "로컬만 제거됨",
+      // 서버 실패 → 로컬 복원
+      restore(item);
+      toast.error(
+        "삭제 실패 · 복원됨",
+        err instanceof Error ? err.message : "서버 응답 없음",
       );
     }
-    toast.info("삭제됨", item.label);
-    onAfterDelete?.();
   };
 
   return (

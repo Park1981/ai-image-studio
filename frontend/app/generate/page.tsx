@@ -111,11 +111,17 @@ export default function GeneratePage() {
   const cycleGrid = () =>
     setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
-  /* ── 진행 모달 open 상태 ── */
+  /* ── 진행 모달 open 상태 ──
+   * generating false→true 전이 시 자동 오픈. React 공식 권장 패턴:
+   * https://react.dev/reference/react/useState#storing-information-from-previous-renders
+   */
   const [progressOpen, setProgressOpen] = useState(false);
-  useEffect(() => {
+  const [prevGenerating, setPrevGenerating] = useState(generating);
+  if (prevGenerating !== generating) {
+    setPrevGenerating(generating);
     if (generating) setProgressOpen(true);
-  }, [generating]);
+  }
+
   // 생성 끝나고 1.2초 후 자동 close (단, 사용자가 이미 닫았다면 무시)
   useEffect(() => {
     if (generating) return;
@@ -124,7 +130,9 @@ export default function GeneratePage() {
     return () => clearTimeout(t);
   }, [generating, progressOpen]);
 
-  /* ── 진입 시 Lightning 기본값 적용 (1회) ── */
+  /* ── 진입 시 Lightning 기본값 적용 (1회) ──
+   * applyLightning 은 store action (setState 트리거) 이지만 mount 1회만이라 effect 가 적합.
+   */
   const appliedRef = useRef(false);
   useEffect(() => {
     if (appliedRef.current) return;
@@ -720,13 +728,18 @@ function AdvancedAccordion({
   const [rawW, setRawW] = useState(String(width));
   const [rawH, setRawH] = useState(String(height));
 
-  // store 값이 외부에서 바뀌면(프리셋 칩 클릭 등) raw 도 동기화
-  const prevWidth = useRef(width);
-  const prevHeight = useRef(height);
-  useEffect(() => {
-    if (prevWidth.current !== width) { setRawW(String(width)); prevWidth.current = width; }
-    if (prevHeight.current !== height) { setRawH(String(height)); prevHeight.current = height; }
-  }, [width, height]);
+  // store 값이 외부에서 바뀌면(프리셋 칩 클릭 등) raw 도 동기화.
+  // React 19 권장: prev state 비교 (effect 안 setState 회피).
+  const [prevW, setPrevW] = useState(width);
+  const [prevH, setPrevH] = useState(height);
+  if (prevW !== width) {
+    setPrevW(width);
+    setRawW(String(width));
+  }
+  if (prevH !== height) {
+    setPrevH(height);
+    setRawH(String(height));
+  }
 
   const commitW = () => { const n = parseInt(rawW, 10); if (!isNaN(n)) onWidth(n); else setRawW(String(width)); };
   const commitH = () => { const n = parseInt(rawH, 10); if (!isNaN(n)) onHeight(n); else setRawH(String(height)); };

@@ -76,7 +76,7 @@ export default function EditPage() {
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
   const items = useHistoryStore((s) => s.items);
-  const addItem = useHistoryStore((s) => s.add);
+  // history.add 는 useEditPipeline 내부에서 호출됨 (여기 직접 사용 안 함)
   const selectHistory = useHistoryStore((s) => s.select);
   // 수정 모드 우측 그리드는 edit 결과만 (generate 섞이면 Before/After 슬라이더가 엉뚱하게 매칭됨)
   // 2026-04-24 G2: 갤러리화 — 전체 렌더 + 스크롤 박스로 제한 대신 스크롤 UX 로 전환
@@ -109,11 +109,16 @@ export default function EditPage() {
   const cycleGrid = () =>
     setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
-  /* ── 진행 모달 open 상태 ── */
+  /* ── 진행 모달 open 상태 ──
+   * running false→true 전이 시 자동 오픈. React 공식 권장: prev state 비교.
+   */
   const [progressOpen, setProgressOpen] = useState(false);
-  useEffect(() => {
+  const [prevRunning, setPrevRunning] = useState(running);
+  if (prevRunning !== running) {
+    setPrevRunning(running);
     if (running) setProgressOpen(true);
-  }, [running]);
+  }
+
   useEffect(() => {
     if (running) return;
     if (!progressOpen) return;
@@ -123,14 +128,13 @@ export default function EditPage() {
 
   /* ── sourceImage 변경 시 afterId 리셋 ──
      과거 edit 결과가 엉뚱한 Before/After 매칭으로 나타나는 현상 방지.
-     새 수정이 완료되면 handleGenerate 의 done 핸들러에서 다시 setAfterId 해줌. */
-  const prevSourceRef = useRef<string | null>(sourceImage);
-  useEffect(() => {
-    if (prevSourceRef.current !== sourceImage) {
-      prevSourceRef.current = sourceImage;
-      setAfterId(null);
-    }
-  }, [sourceImage]);
+     새 수정이 완료되면 handleGenerate 의 done 핸들러에서 다시 setAfterId 해줌.
+     React 19 권장: render-time prev state 비교 패턴. */
+  const [prevSource, setPrevSource] = useState<string | null>(sourceImage);
+  if (prevSource !== sourceImage) {
+    setPrevSource(sourceImage);
+    setAfterId(null);
+  }
 
   /* ── 진입 시 Lightning 기본값 ── */
   const appliedRef = useRef(false);

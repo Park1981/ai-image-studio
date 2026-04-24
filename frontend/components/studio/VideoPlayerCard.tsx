@@ -87,8 +87,41 @@ export default function VideoPlayerCard({
     );
   }
 
+  // ── Mock 결과 (실 mp4 없음) ──
+  if (src && src.startsWith("mock-seed://")) {
+    return (
+      <div
+        style={{
+          padding: "28px 20px",
+          background: "var(--surface)",
+          border: "1px dashed var(--line-2)",
+          borderRadius: 14,
+          textAlign: "center",
+          color: "var(--ink-3)",
+          fontSize: 12.5,
+          lineHeight: 1.6,
+        }}
+      >
+        <div style={{ fontWeight: 600, marginBottom: 6, color: "var(--ink-2)" }}>
+          Mock 영상 생성 완료
+        </div>
+        <div style={{ fontSize: 11.5, color: "var(--ink-4)" }}>
+          실제 mp4 는 없어. 실 ComfyUI 연결은
+          <br />
+          <code
+            className="mono"
+            style={{ fontSize: 11, color: "var(--ink-3)" }}
+          >
+            NEXT_PUBLIC_USE_MOCK=false
+          </code>{" "}
+          환경변수로 켜줘.
+        </div>
+      </div>
+    );
+  }
+
   // ── Empty ──
-  if (!src || src.startsWith("mock-seed://")) {
+  if (!src) {
     return (
       <div
         style={{
@@ -120,7 +153,7 @@ export default function VideoPlayerCard({
         overflow: "hidden",
       }}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element — video element */}
+      {/* video element — Next img 룰 적용 대상 아님 */}
       <video
         src={src}
         controls

@@ -183,7 +183,8 @@ class Task:
 
     def __init__(self, task_id: str) -> None:
         self.task_id = task_id
-        self.queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue()
+        # 큐 maxsize 제한 — 이벤트 폭주 시 메모리 보호. 1000 = 초당 50 이벤트 × 20초.
+        self.queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=1000)
         self.closed = False
         self.cancelled = False
         # monotonic: NTP 보정과 무관한 TTL 계산
@@ -199,34 +200,91 @@ class Task:
             await self.queue.put({"event": "__close__", "data": {}})
 
     def cancel(self) -> None:
-        """클라이언트 끊김 시 파이프라인 강제 종료."""
+        """클라이언트 끊김 시 파이프라인 강제 종료 + 큐 drain."""
         self.cancelled = True
         if self.worker and not self.worker.done():
             self.worker.cancel()
+        # 큐에 남은 이벤트 drain — 메모리 회수
+        try:
+            while True:
+                self.queue.get_nowait()
+        except asyncio.QueueEmpty:
+            pass
 
 
 TASKS: dict[str, Task] = {}
 _TASKS_LOCK = asyncio.Lock()
 TASK_TTL_SEC = 600  # 10분
+_CLEANUP_INTERVAL_SEC = 120  # 2분마다 stale sweep
 
 
 async def _new_task() -> Task:
-    """Task 등록 + 오래된 항목 cleanup (lock 보호)."""
+    """Task 등록 (lock 보호). cleanup 은 별도 백그라운드 task 에서 주기 실행."""
     async with _TASKS_LOCK:
-        # 오래된 완료 태스크 정리 (monotonic 기반)
-        now = time.monotonic()
-        stale = [
-            tid
-            for tid, t in TASKS.items()
-            if t.closed and now - t.created_at > TASK_TTL_SEC
-        ]
-        for tid in stale:
-            TASKS.pop(tid, None)
-
         task_id = f"tsk-{uuid.uuid4().hex[:12]}"
         t = Task(task_id)
         TASKS[task_id] = t
         return t
+
+
+async def _cleanup_stale_tasks() -> int:
+    """closed 여부와 무관하게 TTL 초과한 task 모두 정리.
+
+    Returns:
+        정리된 task 개수.
+    """
+    async with _TASKS_LOCK:
+        now = time.monotonic()
+        stale = [
+            tid
+            for tid, t in TASKS.items()
+            if now - t.created_at > TASK_TTL_SEC
+        ]
+        for tid in stale:
+            t = TASKS.pop(tid, None)
+            # 살아있는 worker 가 있으면 강제 종료 (좀비 회수)
+            if t is not None and not t.closed:
+                t.cancel()
+        return len(stale)
+
+
+async def _periodic_cleanup_loop() -> None:
+    """앱 lifespan 동안 주기적으로 stale task 정리."""
+    while True:
+        try:
+            await asyncio.sleep(_CLEANUP_INTERVAL_SEC)
+            count = await _cleanup_stale_tasks()
+            if count:
+                log.info("stale task cleanup: %d removed", count)
+        except asyncio.CancelledError:
+            log.info("cleanup loop cancelled")
+            raise
+        except Exception:
+            # 절대 죽지 않게 — 다음 주기에 재시도
+            log.exception("cleanup loop iteration failed")
+
+
+# 앱 lifespan 에서 시작/종료할 백그라운드 task 핸들 (main.py 의 lifespan 에서 관리)
+_cleanup_task_handle: asyncio.Task[None] | None = None
+
+
+def start_cleanup_loop() -> None:
+    """앱 시작 시 호출. 이미 돌고 있으면 noop."""
+    global _cleanup_task_handle
+    if _cleanup_task_handle is None or _cleanup_task_handle.done():
+        _cleanup_task_handle = asyncio.create_task(_periodic_cleanup_loop())
+
+
+async def stop_cleanup_loop() -> None:
+    """앱 종료 시 호출."""
+    global _cleanup_task_handle
+    if _cleanup_task_handle and not _cleanup_task_handle.done():
+        _cleanup_task_handle.cancel()
+        try:
+            await _cleanup_task_handle
+        except (asyncio.CancelledError, Exception):
+            pass
+        _cleanup_task_handle = None
 
 
 # ─────────────────────────────────────────────
@@ -246,8 +304,13 @@ async def _stream_task(task: Task, request: Request | None = None):
     - queue 에서 꺼낼 때 짧은 timeout 으로 wait_for 걸어 주기적으로
       client disconnect 여부 체크 → 끊겼으면 task.cancel() 로 파이프라인 회수.
     - `__close__` 이벤트 수신 시 정상 종료.
+    - 이미 closed + 큐 비어있는 task 에 재접속하면 즉시 종료 (ping 무한 루프 방지).
     - generator 가 GC 되거나 caller 가 aclose 하면 CancelledError 로 빠져나감.
     """
+    # 재접속 케이스 — 이미 끝난 task 에 다시 stream 요청 시 즉시 종료
+    if task.closed and task.queue.empty():
+        log.info("SSE re-connect to closed task — closing immediately: %s", task.task_id)
+        return
     try:
         while True:
             # disconnect 감지 주기 (초) — 너무 짧으면 CPU 낭비, 너무 길면 반응성 저하
@@ -257,6 +320,10 @@ async def _stream_task(task: Task, request: Request | None = None):
                 if request is not None and await request.is_disconnected():
                     log.info("SSE client disconnected: %s", task.task_id)
                     task.cancel()
+                    break
+                # task 가 그 사이 close 됐는데 큐도 비어있으면 더 보낼 게 없음 — 종료
+                if task.closed and task.queue.empty():
+                    log.info("SSE task closed during wait — finishing: %s", task.task_id)
                     break
                 # heartbeat — 프록시 idle timeout 방지 (콜론 시작 주석은 SSE 스펙상 무시됨)
                 yield b": ping\n\n"
@@ -1322,14 +1389,14 @@ async def list_history(
     before: int | None = None,
 ):
     """히스토리 조회 (최신순, mode 필터, cursor pagination)."""
+    valid_modes = ("generate", "edit", "video")
+    safe_mode = mode if mode in valid_modes else None
     items = await history_db.list_items(
-        mode=mode if mode in ("generate", "edit") else None,
+        mode=safe_mode,
         limit=max(1, min(limit, 200)),
         before_ts=before,
     )
-    total = await history_db.count_items(
-        mode if mode in ("generate", "edit") else None
-    )
+    total = await history_db.count_items(safe_mode)
     return {"items": items, "total": total}
 
 

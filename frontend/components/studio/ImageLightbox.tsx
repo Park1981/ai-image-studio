@@ -31,15 +31,21 @@ const MAX_ZOOM = 8;
 const ZOOM_STEP = 0.15;
 const INFO_PANEL_WIDTH = 340;
 
-/** 비디오 확장자 판별 (mp4/webm/mov/data:video) */
+/** 비디오 확장자 판별 (mp4/webm/mov/data:video/mock-seed://video) */
 function isVideoSrc(src: string): boolean {
   if (src.startsWith("data:video/")) return true;
+  if (src.startsWith("mock-seed://video")) return true;
   const clean = src.split(/[?#]/)[0].toLowerCase();
   return (
     clean.endsWith(".mp4") ||
     clean.endsWith(".webm") ||
     clean.endsWith(".mov")
   );
+}
+
+/** mock 영상 sentinel 여부 */
+function isMockVideoSrc(src: string | null): boolean {
+  return !!src && src.startsWith("mock-seed://video");
 }
 
 interface Props {
@@ -258,21 +264,46 @@ function LightboxInner({
             maxHeight: "90vh",
           }}
         >
-          <video
-            src={src ?? undefined}
-            controls
-            autoPlay
-            loop
-            playsInline
-            style={{
-              maxWidth: "95vw",
-              maxHeight: "90vh",
-              display: "block",
-              background: "#000",
-              borderRadius: 4,
-              boxShadow: "0 20px 60px rgba(0,0,0,.5)",
-            }}
-          />
+          {isMockVideoSrc(src) ? (
+            <div
+              style={{
+                width: "min(560px, 80vw)",
+                padding: "44px 28px",
+                background: "rgba(255,255,255,.06)",
+                border: "1px dashed rgba(255,255,255,.2)",
+                borderRadius: 10,
+                textAlign: "center",
+                color: "rgba(255,255,255,.85)",
+                fontSize: 13.5,
+                lineHeight: 1.6,
+              }}
+            >
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>
+                Mock 영상 (실 mp4 없음)
+              </div>
+              <div style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>
+                실제 재생을 보려면 백엔드 연결 (NEXT_PUBLIC_USE_MOCK=false) 후
+                <br />
+                다시 생성해줘.
+              </div>
+            </div>
+          ) : (
+            <video
+              src={src ?? undefined}
+              controls
+              autoPlay
+              loop
+              playsInline
+              style={{
+                maxWidth: "95vw",
+                maxHeight: "90vh",
+                display: "block",
+                background: "#000",
+                borderRadius: 4,
+                boxShadow: "0 20px 60px rgba(0,0,0,.5)",
+              }}
+            />
+          )}
         </div>
       ) : (
         <div

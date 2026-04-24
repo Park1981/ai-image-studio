@@ -7,7 +7,7 @@ import { STUDIO_BASE, USE_MOCK, normalizeItem } from "./client";
 import type { HistoryItem } from "./types";
 
 export async function listHistory(opts?: {
-  mode?: "generate" | "edit";
+  mode?: "generate" | "edit" | "video";
   limit?: number;
   before?: number;
 }): Promise<{ items: HistoryItem[]; total: number }> {

@@ -78,12 +78,16 @@ export function useGeneratePipeline(): UseGeneratePipeline {
     null,
   );
 
-  /* ── 실제 스트림 소비 루프 ── */
+  /* ── 실제 스트림 소비 루프 ──
+   * try/catch/finally — generator 가 done/error 둘 다 emit 안 하고 끝나도
+   * finally 가 running=false 보장. resetRunning 은 idempotent 라 중복 호출 안전.
+   */
   const runStream = async (
     preUpgraded?: string,
     preResearchHints?: string[],
   ) => {
     setRunning(true, 0, "초기화");
+    let completed = false;
     try {
       for await (const evt of generateImageStream({
         prompt,
@@ -124,6 +128,7 @@ export function useGeneratePipeline(): UseGeneratePipeline {
               "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
             );
           }
+          completed = true;
           return;
         }
         setRunning(true, evt.progress, evt.stageLabel);
@@ -136,12 +141,21 @@ export function useGeneratePipeline(): UseGeneratePipeline {
           setSampling(evt.samplingStep ?? null, evt.samplingTotal ?? null);
         }
       }
+      // generator 가 done 없이 끝남 — 비정상 종료
+      if (!completed) {
+        toast.warn(
+          "생성 스트림이 도중에 끊겼어",
+          "백엔드 로그 확인. 결과는 저장 안 됐어.",
+        );
+      }
     } catch (err) {
-      resetRunning();
       toast.error(
         "생성 실패",
         err instanceof Error ? err.message : "알 수 없는 오류",
       );
+    } finally {
+      // 어떤 종료 경로든 running 해제 보장 (UI 영구 잠금 방지)
+      resetRunning();
     }
   };
 

@@ -106,7 +106,10 @@ export interface VideoState {
   setLightning: (v: boolean) => void;
   setRunning: (running: boolean) => void;
   setStep: (step: 1 | 2 | 3 | 4 | 5 | null, done: boolean) => void;
-  recordStepDetail: (detail: VideoStepDetail) => void;
+  /** n 만 필수. 부분 업데이트 — 기존 startedAt 등은 머지에서 보존됨. */
+  recordStepDetail: (
+    detail: Partial<VideoStepDetail> & { n: VideoStepDetail["n"] },
+  ) => void;
   setSampling: (step: number | null, total: number | null) => void;
   setPipelineProgress: (progress: number, label?: string) => void;
   setLastVideoRef: (ref: string | null) => void;
@@ -186,13 +189,20 @@ export const useVideoStore = create<VideoState>((set) => ({
     set((s) => {
       const existing = s.stepHistory.find((x) => x.n === detail.n);
       if (existing) {
+        // 머지 시 startedAt 은 항상 기존값 보존 (elapsed 측정의 기준점).
         return {
           stepHistory: s.stepHistory.map((x) =>
-            x.n === detail.n ? { ...x, ...detail } : x,
+            x.n === detail.n ? { ...x, ...detail, startedAt: x.startedAt } : x,
           ),
         };
       }
-      return { stepHistory: [...s.stepHistory, detail] };
+      const fresh: VideoStepDetail = {
+        startedAt: Date.now(),
+        doneAt: null,
+        ...detail,
+        n: detail.n,
+      };
+      return { stepHistory: [...s.stepHistory, fresh] };
     }),
 
   setSampling: (step, total) =>

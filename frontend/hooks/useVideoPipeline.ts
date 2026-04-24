@@ -68,6 +68,7 @@ export function useVideoPipeline(
     }
 
     setRunning(true);
+    let completed = false;
     try {
       for await (const evt of videoImageStream({
         sourceImage,
@@ -91,9 +92,9 @@ export function useVideoPipeline(
               doneAt: null,
             });
           } else {
+            // done 시 startedAt 안 넘김 → store merge 가 기존 startedAt 보존.
             recordStepDetail({
               n: evt.step,
-              startedAt: Date.now(), // merge 시 기존 값 유지
               doneAt: Date.now(),
               description: evt.description,
               finalPrompt: evt.finalPrompt,
@@ -126,15 +127,25 @@ export function useVideoPipeline(
               "영상은 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
             );
           }
+          completed = true;
           return;
         }
       }
+      // generator 가 done 없이 끝남 — 비정상 종료
+      if (!completed) {
+        toast.warn(
+          "영상 스트림이 도중에 끊겼어",
+          "백엔드 로그 확인. 결과는 저장 안 됐어.",
+        );
+      }
     } catch (err) {
-      resetPipeline();
       toast.error(
         "영상 생성 실패",
         err instanceof Error ? err.message : "알 수 없는 오류",
       );
+    } finally {
+      // 어떤 종료 경로든 running 해제 보장 (UI 영구 잠금 방지)
+      resetPipeline();
     }
   };
 
