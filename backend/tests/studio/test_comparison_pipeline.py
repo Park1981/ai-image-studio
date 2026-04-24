@@ -70,7 +70,7 @@ async def test_insert_with_source_ref_persists(monkeypatch, tmp_path: Path) -> N
     await history_db.init_studio_history_db()
 
     item = {
-        "id": "tsk-test12345678",
+        "id": "tsk-1a2b3c4d5e6f",
         "mode": "edit",
         "prompt": "make it blue",
         "label": "make it blue",
@@ -83,12 +83,12 @@ async def test_insert_with_source_ref_persists(monkeypatch, tmp_path: Path) -> N
         "model": "qwen-image-edit-2511",
         "createdAt": 1700000000000,
         "imageRef": "/images/studio/result.png",
-        "sourceRef": "/images/studio/edit-source/tsk-test12345678.png",
+        "sourceRef": "/images/studio/edit-source/tsk-1a2b3c4d5e6f.png",
     }
     await history_db.insert_item(item)
     items = await history_db.list_items(mode="edit")
     assert len(items) == 1
-    assert items[0]["sourceRef"] == "/images/studio/edit-source/tsk-test12345678.png"
+    assert items[0]["sourceRef"] == "/images/studio/edit-source/tsk-1a2b3c4d5e6f.png"
     assert items[0]["comparisonAnalysis"] is None  # 분석 전
 
 
@@ -101,7 +101,7 @@ async def test_update_comparison_persists_json(monkeypatch, tmp_path: Path) -> N
     await history_db.init_studio_history_db()
 
     item = {
-        "id": "tsk-test87654321",
+        "id": "tsk-9f8e7d6c5b4a",
         "mode": "edit",
         "prompt": "x",
         "label": "x",
@@ -132,10 +132,10 @@ async def test_update_comparison_persists_json(monkeypatch, tmp_path: Path) -> N
         "analyzedAt": 1700000005000,
         "visionModel": "qwen2.5vl:7b",
     }
-    ok = await history_db.update_comparison("tsk-test87654321", analysis)
+    ok = await history_db.update_comparison("tsk-9f8e7d6c5b4a", analysis)
     assert ok is True
 
-    fetched = await history_db.get_item("tsk-test87654321")
+    fetched = await history_db.get_item("tsk-9f8e7d6c5b4a")
     assert fetched is not None
     assert fetched["comparisonAnalysis"]["overall"] == 82
     assert fetched["comparisonAnalysis"]["scores"]["face_id"] == 92
