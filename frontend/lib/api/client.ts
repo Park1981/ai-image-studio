@@ -39,9 +39,17 @@ export function normalizeImageRef(ref: string): string {
   return ref;
 }
 
-/** HistoryItem 의 imageRef 필드를 정규화해서 반환 */
+/** HistoryItem 의 절대화 가능한 ref 필드 모두 정규화 (imageRef + sourceRef).
+ *  sourceRef 는 Edit 비교 분석 (Task 5+) 에서 추가됨 — 누락 시 fetch 가
+ *  frontend origin 에 404 보냄. */
 export function normalizeItem(item: HistoryItem): HistoryItem {
-  return { ...item, imageRef: normalizeImageRef(item.imageRef) };
+  return {
+    ...item,
+    imageRef: normalizeImageRef(item.imageRef),
+    sourceRef: item.sourceRef
+      ? normalizeImageRef(item.sourceRef)
+      : item.sourceRef,
+  };
 }
 
 /**
