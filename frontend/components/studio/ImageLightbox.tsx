@@ -396,24 +396,12 @@ function InfoPanel({
         boxShadow: "-8px 0 24px rgba(0,0,0,.4)",
       }}
     >
-      {/* 헤더 */}
-      <div style={{ marginBottom: 16 }}>
-        <div
-          className="mono"
-          style={{
-            fontSize: 10,
-            color: "rgba(255,255,255,.45)",
-            letterSpacing: ".12em",
-            textTransform: "uppercase",
-          }}
-        >
-          #{item.id.slice(-8).toUpperCase()} · {item.mode}
-        </div>
+      {/* 헤더 — 프롬프트 28자 요약 (상단 타이틀) */}
+      <div style={{ marginBottom: 18 }}>
         <div
           style={{
             fontSize: 14,
             fontWeight: 600,
-            marginTop: 6,
             lineHeight: 1.4,
             wordBreak: "break-word",
           }}
@@ -421,49 +409,6 @@ function InfoPanel({
           {item.label}
         </div>
       </div>
-
-      {/* 메타 그리드 */}
-      <section style={{ marginBottom: 18 }}>
-        <SectionTitle>Meta</SectionTitle>
-        <MetaRow k="모델" v={item.model} />
-        <MetaRow k="사이즈" v={`${item.width}×${item.height}`} />
-        <MetaRow
-          k="Seed"
-          v={<span className="mono">{item.seed}</span>}
-          copyable={String(item.seed)}
-        />
-        <MetaRow
-          k="스텝/CFG"
-          v={`${item.steps} · ${item.cfg}${item.lightning ? " ⚡" : ""}`}
-        />
-        {item.promptProvider && (
-          <MetaRow
-            k="Prompt Provider"
-            v={
-              <span
-                className="mono"
-                style={{
-                  color:
-                    item.promptProvider === "fallback"
-                      ? "var(--amber-ink)"
-                      : "rgba(255,255,255,.9)",
-                }}
-              >
-                {item.promptProvider}
-              </span>
-            }
-          />
-        )}
-        <MetaRow
-          k="생성일"
-          v={new Date(item.createdAt).toLocaleString("ko-KR", {
-            month: "2-digit",
-            day: "2-digit",
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        />
-      </section>
 
       {/* 원본 프롬프트 */}
       <section style={{ marginBottom: 18 }}>
@@ -531,10 +476,10 @@ function InfoPanel({
         </section>
       )}
 
-      {/* 조사 힌트 */}
+      {/* Claude 개선 힌트 */}
       {item.researchHints && item.researchHints.length > 0 && (
         <section style={{ marginBottom: 18 }}>
-          <SectionTitle>조사 힌트</SectionTitle>
+          <SectionTitle>Claude 개선 힌트</SectionTitle>
           <ul
             style={{
               listStyle: "disc",
@@ -583,6 +528,54 @@ function InfoPanel({
           <ComparisonInPanel item={item} />
         </section>
       )}
+
+      {/* ── 메타 (하단) ── 프롬프트 먼저, 참고 정보는 아래 */}
+      <section
+        style={{
+          marginTop: 4,
+          paddingTop: 14,
+          borderTop: "1px solid rgba(255,255,255,.1)",
+        }}
+      >
+        <SectionTitle>Meta</SectionTitle>
+        <MetaRow k="모델" v={item.model} />
+        <MetaRow k="사이즈" v={`${item.width}×${item.height}`} />
+        <MetaRow
+          k="Seed"
+          v={<span className="mono">{item.seed}</span>}
+        />
+        <MetaRow
+          k="스텝/CFG"
+          v={`${item.steps} · ${item.cfg}${item.lightning ? " ⚡" : ""}`}
+        />
+        {item.promptProvider && (
+          <MetaRow
+            k="Prompt Provider"
+            v={
+              <span
+                className="mono"
+                style={{
+                  color:
+                    item.promptProvider === "fallback"
+                      ? "var(--amber-ink)"
+                      : "rgba(255,255,255,.9)",
+                }}
+              >
+                {item.promptProvider}
+              </span>
+            }
+          />
+        )}
+        <MetaRow
+          k="생성일"
+          v={new Date(item.createdAt).toLocaleString("ko-KR", {
+            month: "2-digit",
+            day: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        />
+      </section>
     </aside>
   );
 }
@@ -711,6 +704,8 @@ function MetaRow({
 }
 
 function PromptBlock({ text }: { text: string }) {
+  // 2026-04-24: 내부 스크롤 제거 — InfoPanel 외부 스크롤 하나로 통일 (중첩 스크롤 UX 개선).
+  // 텍스트가 길면 섹션이 세로로 늘어나되 전체 흐름이 명확해짐.
   return (
     <div
       style={{
@@ -723,8 +718,6 @@ function PromptBlock({ text }: { text: string }) {
         padding: "10px 12px",
         whiteSpace: "pre-wrap",
         wordBreak: "break-word",
-        maxHeight: 260,
-        overflowY: "auto",
       }}
     >
       {text}

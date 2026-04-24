@@ -7,6 +7,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { HistoryItem } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
 import {
   Logo,
@@ -17,13 +18,15 @@ import {
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
 import VramBadge from "@/components/chrome/VramBadge";
-import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import HistoryGallery from "@/components/studio/HistoryGallery";
+import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import ResearchBanner from "@/components/studio/ResearchBanner";
-import SelectedItemPreview from "@/components/studio/SelectedItemPreview";
+import ResultHoverActionBar, {
+  ActionBarButton,
+} from "@/components/studio/ResultHoverActionBar";
 import UpgradeConfirmModal from "@/components/studio/UpgradeConfirmModal";
 import Icon from "@/components/ui/Icon";
 import {
@@ -110,6 +113,9 @@ export default function GeneratePage() {
   const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
   const cycleGrid = () =>
     setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
+
+  /* ── 결과 뷰어 호버 ── */
+  const [viewerHovered, setViewerHovered] = useState(false);
 
   /* ── 진행 모달 open 상태 ──
    * generating false→true 전이 시 자동 오픈. React 공식 권장 패턴:
@@ -540,56 +546,14 @@ export default function GeneratePage() {
             minWidth: 0,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingBottom: 2,
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-              <h3
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--ink)",
-                }}
-              >
-                결과 · 히스토리
-              </h3>
-              <span
-                className="mono"
-                style={{ fontSize: 11, color: "var(--ink-4)", letterSpacing: ".04em" }}
-              >
-                {genItems.length} images
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <IconBtn
-                icon="grid"
-                title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
-                onClick={cycleGrid}
-              />
-              <IconBtn
-                icon="zoom-in"
-                title="크게 보기"
-                onClick={() => {
-                  if (selectedItem?.imageRef) {
-                    setLightboxSrc(selectedItem.imageRef);
-                  } else {
-                    toast.warn("선택된 이미지가 없습니다.");
-                  }
-                }}
-              />
-            </div>
-          </div>
-
-          {/* 선택 프리뷰 */}
-          {selectedItem && (
-            <SelectedItemPreview
+          {/* ── 결과 뷰어 (선택된 아이템 있을 때 · 이미지 + 호버 액션바) ── */}
+          {selectedItem ? (
+            <GenerateResultViewer
               item={selectedItem}
+              hovered={viewerHovered}
+              onEnter={() => setViewerHovered(true)}
+              onLeave={() => setViewerHovered(false)}
+              onExpand={() => setLightboxSrc(selectedItem.imageRef)}
               onDownload={() =>
                 downloadImage(
                   selectedItem.imageRef,
@@ -601,7 +565,6 @@ export default function GeneratePage() {
               }
               onCopy={() => copyImageToClipboard(selectedItem.imageRef)}
               onSendToEdit={async () => {
-                // 이미지를 data URL 로 변환 → useEditStore 에 source 로 저장 → /edit 이동
                 toast.info("수정으로 전송 중…");
                 const res = await urlToDataUrl(selectedItem.imageRef);
                 if (!res) {
@@ -619,7 +582,6 @@ export default function GeneratePage() {
                 router.push("/edit");
               }}
               onReuse={() => {
-                // 프롬프트/사이즈/시드/옵션을 현재 폼에 완전 복원 (픽셀 기준 권위)
                 setPrompt(selectedItem.prompt);
                 setDimensions(selectedItem.width, selectedItem.height);
                 setSeed(selectedItem.seed);
@@ -634,12 +596,7 @@ export default function GeneratePage() {
                 );
               }}
             />
-          )}
-
-          {/* AI 보강 결과 카드 (선택된 아이템에 한해) */}
-          {selectedItem && <AiEnhanceCard item={selectedItem} />}
-
-          {!selectedItem && (
+          ) : (
             <div
               style={{
                 padding: "28px 20px",
@@ -656,8 +613,20 @@ export default function GeneratePage() {
             </div>
           )}
 
-          {/* 갤러리 스크롤 박스 — 자체 스크롤로 상단 프리뷰/AI보강 카드 고정.
-              빈 상태는 위쪽 selectedItem 없음 카드와 중복이라 emptyMessage=null */}
+          {/* ── 히스토리 섹션 헤더 (4 메뉴 공용) ── */}
+          <HistorySectionHeader
+            title="생성 히스토리"
+            count={genItems.length}
+            actions={
+              <IconBtn
+                icon="grid"
+                title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
+                onClick={cycleGrid}
+              />
+            }
+          />
+
+          {/* ── 갤러리 스크롤 박스 ── */}
           <div
             style={{
               flex: 1,
@@ -944,3 +913,137 @@ function AdvancedAccordion({
     </div>
   );
 }
+
+/* ─────────────────────────────────
+   결과 뷰어 (이미지 + 호버 액션바)
+   ───────────────────────────────── */
+
+function GenerateResultViewer({
+  item,
+  hovered,
+  onEnter,
+  onLeave,
+  onExpand,
+  onDownload,
+  onCopy,
+  onSendToEdit,
+  onReuse,
+}: {
+  item: HistoryItem;
+  hovered: boolean;
+  onEnter: () => void;
+  onLeave: () => void;
+  onExpand: () => void;
+  onDownload: () => void;
+  onCopy: () => void;
+  onSendToEdit: () => void;
+  onReuse: () => void;
+}) {
+  // 원본 비율 — width/height 없으면 1/1 폴백
+  const aspectRatio =
+    item.width > 0 && item.height > 0
+      ? `${item.width} / ${item.height}`
+      : "1 / 1";
+
+  // 액션바 좌측 요약 — 프롬프트 한 줄 + 사이즈
+  const summary = (
+    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+      <span
+        style={{
+          flex: 1,
+          minWidth: 0,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+          fontSize: 12,
+        }}
+        title={item.prompt}
+      >
+        {item.prompt}
+      </span>
+      <span
+        className="mono"
+        style={{
+          fontSize: 10.5,
+          color: "rgba(255,255,255,.72)",
+          letterSpacing: ".04em",
+          flexShrink: 0,
+        }}
+      >
+        {item.width}×{item.height}
+      </span>
+    </div>
+  );
+
+  return (
+    <div
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      style={{
+        position: "relative",
+        width: "100%",
+        // 결과 뷰어: 원본 비율 유지 + 최대 높이 65vh 제한. contain 으로 레터박스.
+        aspectRatio,
+        maxHeight: "65vh",
+        background: "var(--bg-2)",
+        borderRadius: 14,
+        overflow: "hidden",
+        border: "1px solid var(--line)",
+        boxShadow: "var(--shadow-sm)",
+        cursor: "zoom-in",
+      }}
+      onClick={(e) => {
+        // 액션바 버튼 클릭과 구분 — 버튼은 stopPropagation 로 이벤트 차단되니
+        // 여기로 올라온 건 이미지 영역 클릭.
+        e.stopPropagation();
+        onExpand();
+      }}
+    >
+      {/* 이미지 본체 */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={item.imageRef}
+        alt={item.label}
+        draggable={false}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          display: "block",
+          // 드래그 고스트 방지
+          // @ts-expect-error — 비표준 Webkit
+          WebkitUserDrag: "none",
+          userSelect: "none",
+        }}
+      />
+
+      {/* 하단 호버 액션바 */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <ResultHoverActionBar hovered={hovered} summary={summary}>
+          <ActionBarButton
+            icon="zoom-in"
+            title="크게 보기"
+            onClick={onExpand}
+          />
+          <ActionBarButton
+            icon="download"
+            title="저장"
+            onClick={onDownload}
+          />
+          <ActionBarButton icon="copy" title="클립보드 복사" onClick={onCopy} />
+          <ActionBarButton
+            icon="edit"
+            title="수정으로"
+            onClick={onSendToEdit}
+          />
+          <ActionBarButton
+            icon="refresh"
+            title="재생성 (파라미터 복원)"
+            onClick={onReuse}
+          />
+        </ResultHoverActionBar>
+      </div>
+    </div>
+  );
+}
+
