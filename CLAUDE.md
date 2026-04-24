@@ -16,6 +16,12 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 ResultInfoModal, BeforeAfterSlider). DB 스키마 v5 (adult/duration_sec/fps/frame_count 추가).
 Generate 입력 UX: Step/CFG/Seed UI 제거(백엔드는 GENERATE_MODEL.defaults 직접 참조 · seed 매번 랜덤).
 
+**2026-04-24 UI Consistency Audit** — `docs/ui-consistency-audit-2026-04-24.md` 참조.
+P0+P1a+P1b+R1 라운드 1 완료. 디자인 토큰 6단계 확정 (`--radius-sm/md/card/lg/xl/full`) +
+기능 토큰 (`--accent-disabled`, `--bg-dark`, `--overlay-dark`) 추가.
+edit-source + result 파일 orphan cleanup 완료 (path traversal 4-layer 방어 · pytest 130).
+라운드 2 남음: StudioResultHeader/Card/Empty/Loading/UploadSlot 5개 공통 shell 신설 + 전면 교체.
+
 ## Architecture (신규 · 재설계 후)
 - frontend/: Next.js 16, App Router, React 19, TypeScript strict, Tailwind v4, Zustand 5
 - backend/: FastAPI, Python 3.13, httpx + websockets + aiosqlite + pydantic-settings

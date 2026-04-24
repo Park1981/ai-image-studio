@@ -441,7 +441,9 @@ export default function GeneratePage() {
               cursor: generating || !prompt.trim() ? "not-allowed" : "pointer",
               textAlign: "center",
               background:
-                generating || !prompt.trim() ? "#B9CEE5" : "var(--accent)",
+                generating || !prompt.trim()
+                  ? "var(--accent-disabled)"
+                  : "var(--accent)",
               color: "#fff",
               padding: "14px 20px",
               borderRadius: 999,

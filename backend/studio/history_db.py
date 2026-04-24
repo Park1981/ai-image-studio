@@ -347,6 +347,21 @@ async def count_source_ref_usage(source_ref: str) -> int:
         return int(row[0]) if row else 0
 
 
+async def count_image_ref_usage(image_ref: str) -> int:
+    """특정 image_ref 를 참조하는 row 개수 (audit R1-6 · result cleanup 용).
+
+    image_ref 는 본래 1:1 매핑이지만, 히스토리 복제/재수정 흐름에서
+    중복 참조 가능성이 있으므로 삭제 전 안전 체크.
+    """
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT COUNT(*) FROM studio_history WHERE image_ref = ?",
+            (image_ref,),
+        )
+        row = await cur.fetchone()
+        return int(row[0]) if row else 0
+
+
 _VALID_MODES = ("generate", "edit", "video")
 
 

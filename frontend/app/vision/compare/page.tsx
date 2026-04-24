@@ -340,7 +340,7 @@ export default function VisionComparePage() {
                 all: "unset",
                 cursor: canRun ? "pointer" : "not-allowed",
                 textAlign: "center",
-                background: canRun ? "var(--accent)" : "#B9CEE5",
+                background: canRun ? "var(--accent)" : "var(--accent-disabled)",
                 color: "#fff",
                 padding: "14px 20px",
                 borderRadius: 999,

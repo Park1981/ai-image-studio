@@ -1,7 +1,7 @@
 # AI Image Studio UI Consistency Audit
 
 **작성일**: 2026-04-24  
-**상태**: P0+P1a+P1b 구현 완료 · edit-source cleanup 구현 완료 (2026-04-24 업데이트 2회차)  
+**상태**: P0+P1a+P1b+R1 완료 (라운드 2 예정 · 2026-04-24 업데이트 3회차)  
 **범위**: 메뉴별 기능 차이를 제외한 디자인/레이아웃/상태 표현 일관성 검토  
 **대상 화면**:
 - `/generate` Image Generate
@@ -707,6 +707,49 @@
 2. ✅ Video `VideoPlayerCard` loading 내부 progress bar + `{%}` 제거 → spinner + 평균 소요시간 안내로 축소
 3. ✅ Video CTA 의 `{percent}%` 제거 → `처리 중…` 만 (Edit 과 통일)
 
+### 라운드 1 (R1): 디자인 토큰 기반 확보 + 작은 개선 묶음 (구현 완료)
+
+판매 퀄리티 목표에 맞춰 라운드 2 공통 shell 리팩터의 **기반**이 되는 토큰·색상·라운딩 체계를 먼저 확정.
+
+**R1-1 Disabled CTA 색상 변수화**
+- ✅ `#B9CEE5` 하드코딩 5곳 (generate/edit/video/vision/vision-compare) → `var(--accent-disabled)` 교체
+- globals.css 에 `--accent-disabled: #C8D6E8` 신설 (warm neutral 과 조화되는 톤)
+
+**R1-2 Toast radius 토큰화**
+- ✅ `ToastHost.tsx` `borderRadius: 10` → `var(--radius)` (12)
+- Toast 자체는 이미 warm neutral 적용 완료 상태. 마지막 하드코딩만 정리.
+
+**R1-3 Lightbox 배경 토큰 봉인**
+- ✅ `ImageLightbox.tsx` `#000` → `var(--bg-dark)`, `rgba(0,0,0,.45)` → `var(--overlay-dark)`
+- 미디어 뷰어 기능성 유지 + 디자인 토큰 체계에 등록
+- 남은 `rgba(0,0,0,…)` 4곳은 shadow/gradient 장식 요소로 토큰화 불필요
+
+**R1-4 globals.css body letter-spacing 조정**
+- ✅ 전역 `letter-spacing: -0.01em` → `0` 으로 변경
+- Pretendard 기본 spacing 이 자연스럽다는 판단 (강한 스타일 필요한 곳만 인라인 명시)
+- 기존 컴포넌트 인라인 `-0.005em/-0.01em` 는 체감 미미하여 이번 라운드엔 건드리지 않음
+
+**R1-5 Radius 6단계 토큰 체계 확정**
+- ✅ globals.css 에 `--radius-sm(8) / --radius(12) / --radius-card(14) / --radius-lg(16) / --radius-xl(20) / --radius-full(999)` 확정
+- ✅ design-tokens.ts 에도 `card: '14px'` 동기화
+- 전면 교체는 **라운드 2** 에서 공통 shell 리팩터와 함께 (156 occurrences 주요 항목 잡힘)
+
+**R1-6 Result 이미지 cleanup 확장**
+- ✅ `history_db.count_image_ref_usage` 신설 (edit-source 의 `count_source_ref_usage` 와 대칭)
+- ✅ `router._result_path_from_url` / `_cleanup_result_file` helper 신설
+- path traversal 4-layer 방어:
+  1. URL prefix `/images/studio/` 검증
+  2. edit-source sub 는 제외 (이중 삭제 방지)
+  3. `/` `\` 포함 파일명 거부 (직속만)
+  4. 화이트리스트 정규식 (`[0-9a-zA-Z_\-]{1,64}\.(png|jpg|jpeg|webp|mp4)`)
+  5. `candidate.parent.resolve() == STUDIO_OUTPUT_DIR.resolve()` 최종 봉인
+- image_ref + source_ref 양쪽 모두 0건일 때만 삭제 (Generate → Edit 체인 보호)
+- DELETE API 응답: `source_cleaned`, `result_cleaned` (단일), `sources_cleaned`, `results_cleaned` (전체)
+
+**검증**
+- pytest 113 → 130 (result cleanup 17건 신규 추가, 전부 통과)
+- 프론트 lint clean (수정 파일 기준)
+
 ### 별도: edit-source orphan 파일 정리 (구현 완료)
 
 `project_pending_issues.md` 에 남아 있던 "edit-source/*.png cleanup 미구현 (DELETE history 시 파일 잔류)" 해결.
@@ -716,20 +759,24 @@
 3. ✅ 같은 `source_ref` 참조하는 다른 row 존재 시 파일 보존 (연속 수정 플로우 대응)
 4. ✅ pytest 22건 추가 (정규식/경로 변환 방어 케이스) · 총 113/113 통과
 
-### P2: 구조 리팩터
+### P2: 구조 리팩터 (라운드 2 예정)
 
-1. `StudioResultHeader`
-2. `StudioResultCard`
-3. `StudioEmptyState`
-4. `StudioLoadingState`
-5. upload slot shell 공통화
+판매 퀄리티 달성을 위한 대규모 디자인 시스템 리팩터. 회귀 위험이 크므로 별도 세션에서 진행.
+
+1. `StudioResultHeader` 신설 + 4개 페이지 헤더 교체
+2. `StudioResultCard` (media/text/panel variant) 신설
+3. `StudioEmptyState` (compact/normal/panel size) 신설
+4. `StudioLoadingState` 신설 (단 progress 는 실제 이벤트 있을 때만)
+5. `StudioUploadSlot` 신설 + `SourceImageCard` / `CompareImageSlot` 그 기반으로 재작성
+6. 156 occurrences radius 하드코딩 → `var(--radius-*)` 토큰 전면 적용
 
 ### P3: 미세 정리
 
-1. negative letter spacing 제거
-2. radius token 적용
-3. disabled CTA 색상 token화
-4. overlay opacity/pill 스타일 정리
+1. ✅ R1-4: globals.css body letter-spacing 제거 완료
+2. 🟡 개별 컴포넌트 inline `-0.005em/-0.01em` (19 occurrences) 는 체감 미미 · 라운드 2 공통 shell 작성 시 자연스럽게 제거
+3. ✅ R1-5: radius 6단계 토큰 확정. 전면 적용은 라운드 2
+4. ✅ R1-1: disabled CTA 색상 token 화 완료
+5. 🟢 overlay opacity/pill 스타일 — 라운드 2 공통 shell 에서 일괄 정리
 
 ---
 

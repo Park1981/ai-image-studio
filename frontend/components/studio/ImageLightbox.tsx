@@ -327,7 +327,8 @@ function LightboxInner({
                 maxWidth: "95vw",
                 maxHeight: "90vh",
                 display: "block",
-                background: "#000",
+                // audit R1-3: 미디어 뷰어 레터박스 배경 토큰화 (기능적으로 어두워야 함 · 토큰으로만 봉인)
+                background: "var(--bg-dark)",
                 borderRadius: 4,
                 boxShadow: "0 20px 60px rgba(0,0,0,.5)",
               }}
@@ -391,7 +392,8 @@ function LightboxInner({
             : "50%",
           transform: "translateX(-50%)",
           padding: "6px 14px",
-          background: "rgba(0,0,0,.45)",
+          // audit R1-3: 오버레이 pill 배경 토큰화
+          background: "var(--overlay-dark)",
           borderRadius: 999,
           fontSize: 11,
           color: "rgba(255,255,255,.7)",

@@ -76,12 +76,13 @@ function ToastItem({
   onDismiss: () => void;
 }) {
   const theme = KIND_THEME[toast.kind];
+  // audit R1-2: borderRadius 10 → var(--radius) 로 토큰화 (기본 input 과 동일 계열)
   const wrap: CSSProperties = {
     pointerEvents: "auto",
     minWidth: 260,
     maxWidth: 360,
     padding: "12px 14px",
-    borderRadius: 10,
+    borderRadius: "var(--radius)",
     background: theme.bg,
     border: `1px solid ${theme.border}`,
     boxShadow: "var(--shadow-md)",

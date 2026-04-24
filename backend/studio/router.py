@@ -104,8 +104,14 @@ EDIT_SOURCE_URL_PREFIX = f"{STUDIO_URL_PREFIX}/edit-source"
 _TASK_ID_RE = re.compile(r"^tsk-[0-9a-f]{12}$")
 
 # edit-source 파일명 화이트리스트 (path traversal 방지).
-# 저장 시 uuid4 hex 12자리 + ".png" 포맷이므로 이 정규식 외엔 삭제 거부.
+# 저장 시 uuid4 hex + ".png/.jpg/.jpeg/.webp" 포맷이므로 이 정규식 외엔 삭제 거부.
 _EDIT_SOURCE_FILENAME_RE = re.compile(r"^[0-9a-zA-Z_\-]{1,64}\.(png|jpg|jpeg|webp)$")
+
+# result 파일명 화이트리스트 (audit R1-6 · STUDIO_OUTPUT_DIR 직속).
+# 영상 결과는 .mp4 확장자 허용. 이미지는 edit-source 와 동일 확장자 세트.
+_RESULT_FILENAME_RE = re.compile(
+    r"^[0-9a-zA-Z_\-]{1,64}\.(png|jpg|jpeg|webp|mp4)$"
+)
 
 
 def _edit_source_path_from_url(url: str) -> Path | None:
@@ -126,6 +132,42 @@ def _edit_source_path_from_url(url: str) -> Path | None:
         if not candidate.is_relative_to(EDIT_SOURCE_DIR.resolve()):
             return None
     except ValueError:
+        return None
+    return candidate
+
+
+def _result_path_from_url(url: str) -> Path | None:
+    """result(image_ref) URL 을 실제 파일 경로로 변환. 안전하지 않으면 None.
+
+    audit R1-6: DELETE history 시 orphan 된 결과 이미지/영상 파일 정리용.
+
+    보안 방어선:
+      1. URL 이 `/images/studio/` prefix 로 시작해야 함
+      2. edit-source sub-path (`/images/studio/edit-source/...`) 는 제외
+         → edit-source 는 별도 _cleanup_edit_source_file 로만 처리 (이중 삭제 방지)
+      3. 파일명이 `_RESULT_FILENAME_RE` 화이트리스트 통과 (png/jpg/jpeg/webp/mp4)
+      4. 최종 경로가 STUDIO_OUTPUT_DIR 직속 (sub-directory 거부 — edit-source 재진입 방지)
+    """
+    if not url:
+        return None
+    prefix = STUDIO_URL_PREFIX + "/"
+    if not url.startswith(prefix):
+        return None
+    # edit-source sub 는 별도 처리. mock 결과나 타 도메인 URL 도 함께 제외.
+    if url.startswith(EDIT_SOURCE_URL_PREFIX + "/"):
+        return None
+    filename = url[len(prefix) :].split("?", 1)[0].split("#", 1)[0]
+    if "/" in filename or "\\" in filename:
+        # STUDIO_OUTPUT_DIR 직속만 허용 (sub-directory 경로 거부)
+        return None
+    if not _RESULT_FILENAME_RE.match(filename):
+        return None
+    candidate = (STUDIO_OUTPUT_DIR / filename).resolve()
+    try:
+        if candidate.parent.resolve() != STUDIO_OUTPUT_DIR.resolve():
+            # 직속 확인 (symlink 등 우회 방어)
+            return None
+    except (OSError, ValueError):
         return None
     return candidate
 
@@ -162,6 +204,34 @@ async def _cleanup_edit_source_file(
         return True
     except OSError as e:
         log.warning("edit-source 삭제 실패 %s: %s", path, e)
+        return False
+
+
+async def _cleanup_result_file(url: str | None) -> bool:
+    """result(image_ref) URL 에 해당하는 파일을 안전하게 삭제 (audit R1-6).
+
+    image_ref 는 본래 1:1 매핑이라 재참조 가능성 낮지만, Generate → Edit 체인 같은
+    경우 image_ref 와 다른 row 의 source_ref 가 같은 파일을 가리킬 수 있음.
+    파일 자체 count (image_ref + source_ref 양쪽) 가 0 일 때만 삭제.
+
+    Returns:
+        True 면 실제로 파일 1개 삭제됨. False 면 스킵/비대상/오류.
+    """
+    if not url:
+        return False
+    path = _result_path_from_url(url)
+    if path is None:
+        return False
+    # 같은 URL 이 다른 row 에서 참조되고 있으면 보존 (edit 체인 · 비교 분석 등)
+    remaining_as_image = await history_db.count_image_ref_usage(url)
+    remaining_as_source = await history_db.count_source_ref_usage(url)
+    if remaining_as_image + remaining_as_source > 0:
+        return False
+    try:
+        path.unlink(missing_ok=True)
+        return True
+    except OSError as e:
+        log.warning("result 파일 삭제 실패 %s: %s", path, e)
         return False
 
 # 백그라운드로 돌리는 asyncio.Task 참조 보관 — GC 가 중간에 수거하는 이슈 방지.
@@ -1608,26 +1678,40 @@ async def get_history(item_id: str):
 
 @router.delete("/history/{item_id}")
 async def delete_history(item_id: str):
-    # audit P1b: DB 삭제 + orphan 된 edit-source 원본 파일 정리.
-    # 같은 source_ref 를 참조하는 다른 row 가 있으면 파일은 보존.
-    ok, source_ref, _image_ref = await history_db.delete_item_with_refs(item_id)
+    # audit P1b + R1-6: DB 삭제 + orphan 된 edit-source 원본 및 result 파일 정리.
+    # 같은 ref 를 참조하는 다른 row 가 있으면 각 파일은 보존.
+    ok, source_ref, image_ref = await history_db.delete_item_with_refs(item_id)
     if not ok:
         raise HTTPException(404, "not found")
-    cleaned = await _cleanup_edit_source_file(source_ref)
-    return {"ok": True, "id": item_id, "source_cleaned": cleaned}
+    source_cleaned = await _cleanup_edit_source_file(source_ref)
+    result_cleaned = await _cleanup_result_file(image_ref)
+    return {
+        "ok": True,
+        "id": item_id,
+        "source_cleaned": source_cleaned,
+        "result_cleaned": result_cleaned,
+    }
 
 
 @router.delete("/history")
 async def clear_history():
-    # audit P1b: 전체 삭제 시 edit-source 디렉토리도 함께 정리.
-    # DB 에서 삭제된 row 의 source_ref 목록을 받아 각 파일 삭제.
-    count, source_refs, _image_refs = await history_db.clear_all_with_refs()
-    cleaned = 0
+    # audit P1b + R1-6: 전체 삭제 시 edit-source + result 파일 동시 정리.
+    count, source_refs, image_refs = await history_db.clear_all_with_refs()
+    sources_cleaned = 0
     for url in set(source_refs):
         # 전체 삭제 후이므로 count_source_ref_usage 는 무조건 0. 안전.
         if await _cleanup_edit_source_file(url):
-            cleaned += 1
-    return {"ok": True, "deleted": count, "sources_cleaned": cleaned}
+            sources_cleaned += 1
+    results_cleaned = 0
+    for url in set(image_refs):
+        if await _cleanup_result_file(url):
+            results_cleaned += 1
+    return {
+        "ok": True,
+        "deleted": count,
+        "sources_cleaned": sources_cleaned,
+        "results_cleaned": results_cleaned,
+    }
 
 
 @router.post(

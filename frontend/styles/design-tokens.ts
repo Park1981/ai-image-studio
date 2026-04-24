@@ -70,13 +70,22 @@ export const shadows = {
   lg: '0 4px 10px rgba(23, 20, 14, 0.05), 0 20px 48px rgba(23, 20, 14, 0.08)',
 } as const
 
-// 라운딩
+// 라운딩 (audit R1-5 · globals.css 와 동기)
+// sm 버튼·pill / md 입력·토스트 / card 결과카드(primary) / lg 모달 / xl 예약 / full 원형
 export const borderRadius = {
   sm: '8px',
   md: '12px',
+  card: '14px',
   lg: '16px',
   xl: '20px',
   full: '9999px',
+} as const
+
+// 기능 토큰 (audit R1-1/3 · warm neutral 체계 확장)
+export const semantic = {
+  accentDisabled: '#C8D6E8',
+  bgDark: '#0A0A0C',
+  overlayDark: 'rgba(10, 10, 12, 0.48)',
 } as const
 
 // 트랜지션

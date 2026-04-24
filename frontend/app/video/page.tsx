@@ -415,7 +415,7 @@ export default function VideoPage() {
                 all: "unset",
                 cursor: ctaDisabled ? "not-allowed" : "pointer",
                 textAlign: "center",
-                background: ctaDisabled ? "#B9CEE5" : "var(--accent)",
+                background: ctaDisabled ? "var(--accent-disabled)" : "var(--accent)",
                 color: "#fff",
                 padding: "14px 20px",
                 borderRadius: 999,

@@ -482,7 +482,7 @@ export default function EditPage() {
               textAlign: "center",
               background:
                 running || !sourceImage || !prompt.trim()
-                  ? "#B9CEE5"
+                  ? "var(--accent-disabled)"
                   : "var(--accent)",
               color: "#fff",
               padding: "14px 20px",

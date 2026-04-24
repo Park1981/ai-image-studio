@@ -221,7 +221,7 @@ export default function VisionPage() {
                 all: "unset",
                 cursor: analyzeDisabled ? "not-allowed" : "pointer",
                 textAlign: "center",
-                background: analyzeDisabled ? "#B9CEE5" : "var(--accent)",
+                background: analyzeDisabled ? "var(--accent-disabled)" : "var(--accent)",
                 color: "#fff",
                 padding: "14px 20px",
                 borderRadius: 999,
