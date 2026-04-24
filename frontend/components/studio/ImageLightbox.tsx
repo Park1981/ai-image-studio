@@ -25,6 +25,9 @@ import {
 import Icon from "@/components/ui/Icon";
 import type { HistoryItem } from "@/lib/api-client";
 import { copyText } from "@/lib/image-actions";
+import ComparisonAnalysisCard from "./ComparisonAnalysisCard";
+import ComparisonAnalysisModal from "./ComparisonAnalysisModal";
+import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 8;
@@ -572,7 +575,46 @@ function InfoPanel({
           </div>
         </section>
       )}
+
+      {/* 비교 분석 (Edit 모드 전용) */}
+      {item.mode === "edit" && (
+        <section style={{ marginBottom: 18 }}>
+          <SectionTitle>비교 분석</SectionTitle>
+          <ComparisonInPanel item={item} />
+        </section>
+      )}
     </aside>
+  );
+}
+
+/* ─────────────────────────────────
+   ComparisonInPanel — Lightbox 내부 비교 분석 카드 + 모달
+   별도 컴포넌트로 분리해 useComparisonAnalysis 훅 사용 가능
+   (InfoPanel 자체는 hook 사용 위치 부적합 X)
+   ───────────────────────────────── */
+function ComparisonInPanel({ item }: { item: HistoryItem }) {
+  // 비교 분석 훅: 분석 실행 + 진행 상태
+  const { analyze, isBusy } = useComparisonAnalysis();
+  // 상세 모달 열림/닫힘 state
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <ComparisonAnalysisCard
+        item={item}
+        busy={isBusy(item.id)}
+        onAnalyze={() => analyze(item)}
+        onOpenDetail={() => setOpen(true)}
+        onReanalyze={() => analyze(item)}
+      />
+      {/* 분석 결과 있을 때만 모달 렌더 (z-index 80 — Lightbox 70 위) */}
+      {open && item.comparisonAnalysis && (
+        <ComparisonAnalysisModal
+          item={item}
+          analysis={item.comparisonAnalysis}
+          onClose={() => setOpen(false)}
+        />
+      )}
+    </>
   );
 }
 
