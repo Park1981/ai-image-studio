@@ -29,8 +29,8 @@ import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import ComparisonAnalysisCard from "@/components/studio/ComparisonAnalysisCard";
 import ComparisonAnalysisModal from "@/components/studio/ComparisonAnalysisModal";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
+import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistoryPicker from "@/components/studio/HistoryPicker";
-import HistoryTile from "@/components/studio/HistoryTile";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import PipelineSteps, { type PipelineStepMeta } from "@/components/studio/PipelineSteps";
 import ProgressModal from "@/components/studio/ProgressModal";
@@ -673,7 +673,7 @@ export default function EditPage() {
             </div>
           </div>
 
-          {/* 갤러리 스크롤 박스 — 전체 렌더, 자체 스크롤로 상단 비교뷰 고정 */}
+          {/* 갤러리 스크롤 박스 — 자체 스크롤로 상단 비교뷰 고정 */}
           <div
             style={{
               maxHeight: "55vh",
@@ -681,72 +681,47 @@ export default function EditPage() {
               paddingRight: 4,
             }}
           >
-            {editResults.length === 0 ? (
-              <div
-                style={{
-                  padding: "28px 20px",
-                  background: "var(--surface)",
-                  border: "1px dashed var(--line-2)",
-                  borderRadius: 12,
-                  textAlign: "center",
-                  color: "var(--ink-4)",
-                  fontSize: 12.5,
-                }}
-              >
-                아직 수정 결과가 없습니다. 왼쪽에서 이미지를 업로드하고 [수정 생성]을 눌러주세요.
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-                  gap: 12,
-                }}
-              >
-                {editResults.map((it) => (
-                  <HistoryTile
-                    key={it.id}
-                    item={it}
-                    selected={afterId === it.id}
-                    onClick={() => {
-                      // 히스토리 타일 클릭 = "이 수정 다시 보기"
-                      // sourceRef 있으면 원본 이미지도 같이 복원해서 진짜 한 쌍 슬라이더로 표시
-                      // sourceRef 없는 옛 row 는 안내 + source 보존 (슬라이더 자동 빈 상태)
-                      if (it.sourceRef) {
-                        setSource(
-                          it.sourceRef,
-                          `${it.label} · ${it.width}×${it.height}`,
-                          it.width,
-                          it.height,
-                        );
-                      } else {
-                        toast.info(
-                          "옛 항목 · 원본 미저장",
-                          "Before/After 슬라이더는 표시되지 않습니다.",
-                        );
-                      }
-                      setAfterId(it.id);
-                      selectHistory(it.id);
-                    }}
-                    onExpand={() => setLightboxSrc(it.imageRef)}
-                    onAfterDelete={() => {
-                      if (afterId === it.id) setAfterId(null);
-                    }}
-                    onUseAsSource={() => {
-                      // 이 결과 이미지를 다시 수정 원본으로 (연속 수정 플로우)
-                      setSource(
-                        it.imageRef,
-                        `${it.label} · ${it.width}×${it.height}`,
-                        it.width,
-                        it.height,
-                      );
-                      setAfterId(null); // 비교 슬라이더 초기화
-                      toast.info("원본으로 지정", it.label);
-                    }}
-                  />
-                ))}
-              </div>
-            )}
+            <HistoryGallery
+              items={editResults}
+              gridCols={gridCols}
+              selectedId={afterId}
+              onTileClick={(it) => {
+                // 히스토리 타일 클릭 = "이 수정 다시 보기"
+                // sourceRef 있으면 원본도 같이 복원해 진짜 한 쌍 슬라이더로 표시.
+                // sourceRef 없는 옛 row 는 안내 + source 보존 (슬라이더 자동 빈 상태).
+                if (it.sourceRef) {
+                  setSource(
+                    it.sourceRef,
+                    `${it.label} · ${it.width}×${it.height}`,
+                    it.width,
+                    it.height,
+                  );
+                } else {
+                  toast.info(
+                    "옛 항목 · 원본 미저장",
+                    "Before/After 슬라이더는 표시되지 않습니다.",
+                  );
+                }
+                setAfterId(it.id);
+                selectHistory(it.id);
+              }}
+              onTileExpand={(it) => setLightboxSrc(it.imageRef)}
+              onAfterDelete={(it) => {
+                if (afterId === it.id) setAfterId(null);
+              }}
+              onUseAsSource={(it) => {
+                // 이 결과 이미지를 다시 수정 원본으로 (연속 수정 플로우)
+                setSource(
+                  it.imageRef,
+                  `${it.label} · ${it.width}×${it.height}`,
+                  it.width,
+                  it.height,
+                );
+                setAfterId(null); // 비교 슬라이더 초기화
+                toast.info("원본으로 지정", it.label);
+              }}
+              emptyMessage="아직 수정 결과가 없습니다. 왼쪽에서 이미지를 업로드하고 [수정 생성]을 눌러주세요."
+            />
           </div>
         </section>
       </div>

@@ -18,7 +18,7 @@ import {
 import SettingsButton from "@/components/settings/SettingsButton";
 import VramBadge from "@/components/chrome/VramBadge";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
-import HistoryTile from "@/components/studio/HistoryTile";
+import HistoryGallery from "@/components/studio/HistoryGallery";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
@@ -647,7 +647,8 @@ export default function GeneratePage() {
             </div>
           )}
 
-          {/* 갤러리 스크롤 박스 — 전체 렌더, 자체 스크롤로 상단 프리뷰/AI보강 카드 고정 */}
+          {/* 갤러리 스크롤 박스 — 자체 스크롤로 상단 프리뷰/AI보강 카드 고정.
+              빈 상태는 위쪽 selectedItem 없음 카드와 중복이라 emptyMessage=null */}
           <div
             style={{
               flex: 1,
@@ -657,25 +658,14 @@ export default function GeneratePage() {
               paddingRight: 4,
             }}
           >
-            {genItems.length === 0 ? null : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-                  gap: 12,
-                }}
-              >
-                {genItems.map((it) => (
-                  <HistoryTile
-                    key={it.id}
-                    item={it}
-                    selected={selectedId === it.id}
-                    onClick={() => selectItem(it.id)}
-                    onExpand={() => setLightboxSrc(it.imageRef)}
-                  />
-                ))}
-              </div>
-            )}
+            <HistoryGallery
+              items={genItems}
+              gridCols={gridCols}
+              selectedId={selectedId ?? null}
+              onTileClick={(it) => selectItem(it.id)}
+              onTileExpand={(it) => setLightboxSrc(it.imageRef)}
+              emptyMessage={null}
+            />
           </div>
         </section>
       </div>

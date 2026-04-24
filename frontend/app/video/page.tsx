@@ -20,7 +20,7 @@ import {
 } from "@/components/chrome/Chrome";
 import VramBadge from "@/components/chrome/VramBadge";
 import SettingsButton from "@/components/settings/SettingsButton";
-import HistoryTile from "@/components/studio/HistoryTile";
+import HistoryGallery from "@/components/studio/HistoryGallery";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import PipelineSteps, {
   type PipelineStepMeta,
@@ -728,42 +728,21 @@ export default function VideoPage() {
           </div>
 
           <div style={{ maxHeight: "55vh", overflowY: "auto", paddingRight: 4 }}>
-            {videoResults.length === 0 ? (
-              <div
-                style={{
-                  padding: "20px 16px",
-                  background: "var(--surface)",
-                  border: "1px dashed var(--line-2)",
-                  borderRadius: 12,
-                  textAlign: "center",
-                  color: "var(--ink-4)",
-                  fontSize: 12,
-                }}
-              >
-                아직 생성된 영상이 없어.
-              </div>
-            ) : (
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: `repeat(${gridCols}, 1fr)`,
-                  gap: 12,
-                }}
-              >
-                {videoResults.map((it) => (
-                  <HistoryTile
-                    key={it.id}
-                    item={it}
-                    selected={playingRef === it.imageRef}
-                    onClick={() => {
-                      // 플레이어에 지정 — 세션 state (lastVideoRef) 로
-                      useVideoStore.getState().setLastVideoRef(it.imageRef);
-                    }}
-                    onExpand={() => setLightboxItem(it)}
-                  />
-                ))}
-              </div>
-            )}
+            <HistoryGallery
+              items={videoResults}
+              gridCols={gridCols}
+              // selectedId 는 HistoryItem.id 기준 — video 는 playingRef(imageRef) 로 선택 표시.
+              // id 매칭으로 바꿔서 HistoryGallery 와 의미를 맞춤.
+              selectedId={
+                videoResults.find((v) => v.imageRef === playingRef)?.id ?? null
+              }
+              onTileClick={(it) => {
+                // 플레이어에 지정 — 세션 state (lastVideoRef) 로
+                useVideoStore.getState().setLastVideoRef(it.imageRef);
+              }}
+              onTileExpand={(it) => setLightboxItem(it)}
+              emptyMessage="아직 생성된 영상이 없습니다."
+            />
           </div>
 
           <div style={{ flex: 1 }} />
