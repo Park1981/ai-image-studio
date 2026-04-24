@@ -8,13 +8,7 @@
 
 "use client";
 
-import {
-  useEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BackBtn,
@@ -25,6 +19,7 @@ import {
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
 import VramBadge from "@/components/chrome/VramBadge";
+import BeforeAfterSlider from "@/components/studio/BeforeAfterSlider";
 import ComparisonAnalysisCard from "@/components/studio/ComparisonAnalysisCard";
 import ComparisonAnalysisModal from "@/components/studio/ComparisonAnalysisModal";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
@@ -41,7 +36,6 @@ import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import { useProcessStore } from "@/stores/useProcessStore";
 import Icon from "@/components/ui/Icon";
-import ImageTile from "@/components/ui/ImageTile";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import { EDIT_MODEL } from "@/lib/model-presets";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
@@ -568,7 +562,7 @@ export default function EditPage() {
               >
                 {/* 내부 wrapper — BeforeAfter 와 크기가 같아 액션바가 이미지 하단에만 깔림 */}
                 <div style={{ position: "relative" }}>
-                  <BeforeAfter
+                  <BeforeAfterSlider
                     beforeSrc={sourceImage}
                     afterSeed={afterItem.imageRef || afterItem.id}
                     compareX={compareX}
@@ -758,186 +752,3 @@ export default function EditPage() {
   );
 }
 
-/* ─────────────────────────────────
-   BeforeAfter 슬라이더 (before 는 dataURL 또는 seed)
-   ───────────────────────────────── */
-function BeforeAfter({
-  beforeSrc,
-  afterSeed,
-  compareX,
-  setCompareX,
-  aspectRatio = "16 / 10",
-}: {
-  beforeSrc: string;
-  afterSeed: string;
-  compareX: number;
-  setCompareX: (v: number) => void;
-  /** 원본 이미지 실제 비율 (예: "1920 / 1080"). 없으면 16:10 폴백. */
-  aspectRatio?: string;
-}) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  const onDrag = (clientX: number) => {
-    if (!wrapRef.current) return;
-    const rect = wrapRef.current.getBoundingClientRect();
-    const pct = ((clientX - rect.left) / rect.width) * 100;
-    setCompareX(Math.max(2, Math.min(98, pct)));
-  };
-
-  const startDrag = (e: React.MouseEvent) => {
-    e.preventDefault(); // 브라우저 기본 이미지 드래그·텍스트 선택 차단
-    // 드래그 동안 전역 user-select 잠궈서 화면 어디로 가든 하이라이트 안 생기게
-    const prevBodyUserSelect = document.body.style.userSelect;
-    document.body.style.userSelect = "none";
-
-    const move = (evt: MouseEvent) => onDrag(evt.clientX);
-    const up = () => {
-      window.removeEventListener("mousemove", move);
-      window.removeEventListener("mouseup", up);
-      document.body.style.userSelect = prevBodyUserSelect;
-    };
-    window.addEventListener("mousemove", move);
-    window.addEventListener("mouseup", up);
-  };
-
-  // before: data URL 이면 <img contain>, 아니면 seed 기반 ImageTile
-  const renderBefore = beforeSrc.startsWith("data:") ? (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={beforeSrc}
-      alt="before"
-      draggable={false} // 기본 이미지 고스트 드래그 방지
-      style={{
-        width: "100%",
-        height: "100%",
-        objectFit: "contain",
-        display: "block",
-        // @ts-expect-error — 비표준 Webkit 속성
-        WebkitUserDrag: "none",
-        userSelect: "none",
-      }}
-    />
-  ) : (
-    <ImageTile
-      seed={beforeSrc}
-      aspect={aspectRatio}
-      style={{ width: "100%", height: "100%", borderRadius: 0 }}
-    />
-  );
-
-  return (
-    <div
-      ref={wrapRef}
-      style={{
-        position: "relative",
-        borderRadius: 14,
-        overflow: "hidden",
-        background: "var(--bg-2)",
-        boxShadow: "var(--shadow-sm)",
-        border: "1px solid var(--line)",
-        aspectRatio,
-        maxHeight: "70vh",
-        // 슬라이더 전 영역에서 텍스트·이미지 선택 UI 발생 억제
-        userSelect: "none",
-        WebkitUserSelect: "none",
-      }}
-    >
-      {/* After (full) */}
-      <ImageTile
-        seed={afterSeed}
-        aspect={aspectRatio}
-        style={{ width: "100%", height: "100%", borderRadius: 0 }}
-      />
-      {/* Before (clipped) */}
-      <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          clipPath: `inset(0 ${100 - compareX}% 0 0)`,
-        }}
-      >
-        {renderBefore}
-      </div>
-
-      <CornerBadge pos="tl">Before</CornerBadge>
-      <CornerBadge pos="tr">After</CornerBadge>
-
-      <div
-        onMouseDown={startDrag}
-        style={{
-          position: "absolute",
-          top: 0,
-          bottom: 0,
-          left: `${compareX}%`,
-          width: 2,
-          background: "#fff",
-          transform: "translateX(-1px)",
-          cursor: "ew-resize",
-          boxShadow: "0 0 0 1px rgba(0,0,0,.15)",
-          userSelect: "none",
-          touchAction: "none",
-        }}
-      >
-        <div
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%,-50%)",
-            width: 32,
-            height: 32,
-            borderRadius: "50%",
-            background: "#fff",
-            boxShadow: "0 2px 8px rgba(0,0,0,.2)",
-            display: "grid",
-            placeItems: "center",
-            color: "var(--ink-2)",
-          }}
-        >
-          <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
-            <Icon
-              name="chevron-right"
-              size={12}
-              style={{ transform: "rotate(180deg)" }}
-            />
-            <Icon name="chevron-right" size={12} />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function CornerBadge({
-  pos,
-  children,
-}: {
-  pos: "tl" | "tr" | "bl" | "br";
-  children: ReactNode;
-}) {
-  const p: Record<string, CSSProperties> = {
-    tl: { top: 10, left: 10 },
-    tr: { top: 10, right: 10 },
-    bl: { bottom: 10, left: 10 },
-    br: { bottom: 10, right: 10 },
-  };
-  return (
-    <div
-      className="mono"
-      style={{
-        position: "absolute",
-        ...p[pos],
-        fontSize: 10,
-        letterSpacing: ".08em",
-        textTransform: "uppercase",
-        color: "#fff",
-        background: "rgba(0,0,0,.55)",
-        backdropFilter: "blur(4px)",
-        padding: "3px 8px",
-        borderRadius: 4,
-      }}
-    >
-      {children}
-    </div>
-  );
-}

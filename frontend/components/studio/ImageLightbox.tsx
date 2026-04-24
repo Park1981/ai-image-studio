@@ -25,6 +25,7 @@ import {
 import Icon from "@/components/ui/Icon";
 import type { HistoryItem } from "@/lib/api-client";
 import { copyText } from "@/lib/image-actions";
+import BeforeAfterSlider from "./BeforeAfterSlider";
 import ComparisonAnalysisCard from "./ComparisonAnalysisCard";
 import ComparisonAnalysisModal from "./ComparisonAnalysisModal";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
@@ -90,7 +91,14 @@ function LightboxInner({
 
   const isVideo = src ? isVideoSrc(src) : false;
 
-  /** ESC 키 + 숫자 key */
+  /* ── Before/After 비교 토글 (2차) ──
+     canCompare: edit 모드 + sourceRef 있을 때만 활성.
+     compareMode ON 시 이미지 영역을 BeforeAfterSlider 로 교체 + zoom/pan 컨트롤 숨김. */
+  const canCompare =
+    !isVideo && item?.mode === "edit" && !!item?.sourceRef;
+  const [compareMode, setCompareMode] = useState(false);
+
+  /** ESC 키 + 숫자 key + B(비교 토글) */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -100,21 +108,25 @@ function LightboxInner({
         setZoom(1);
         setPan({ x: 0, y: 0 });
       }
+      // B: Before/After 비교 토글 (canCompare 일 때만)
+      if ((e.key === "b" || e.key === "B") && canCompare) {
+        setCompareMode((v) => !v);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [onClose, canCompare]);
 
   const handleWheel = useCallback(
     (e: WheelEvent<HTMLDivElement>) => {
-      // 비디오는 줌/팬 비활성 — 컨트롤로 재생만 제공
-      if (isVideo) return;
+      // 비디오·비교 모드는 줌/팬 비활성 — 각각 컨트롤/슬라이더 드래그로 제공
+      if (isVideo || compareMode) return;
       // 휠 네이티브 스크롤 막고 커스텀 zoom
       e.stopPropagation();
       const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
       setZoom((z) => clamp(z + delta));
     },
-    [isVideo],
+    [isVideo, compareMode],
   );
 
   const startDrag = (e: MouseEvent<HTMLDivElement>) => {
@@ -207,7 +219,8 @@ function LightboxInner({
           {filename || alt || "이미지"}
         </div>
         <div style={{ display: "flex", gap: 6 }}>
-          {!isVideo && (
+          {/* zoom 컨트롤 — 비디오 또는 비교 모드일 땐 비활성 */}
+          {!isVideo && !compareMode && (
             <>
               <ToolBtn
                 onClick={() => setZoom((z) => clamp(z - ZOOM_STEP))}
@@ -231,6 +244,19 @@ function LightboxInner({
                 +
               </ToolBtn>
             </>
+          )}
+          {/* Before/After 비교 토글 — edit + sourceRef 있을 때만 */}
+          {canCompare && (
+            <ToolBtn
+              onClick={() => setCompareMode((v) => !v)}
+              accent={compareMode}
+              title="Before/After 비교 (B)"
+            >
+              <span style={{ fontSize: 13, lineHeight: 1 }}>↔</span>
+              <span style={{ marginLeft: 5, fontSize: 11 }}>
+                {compareMode ? "비교 해제" : "비교"}
+              </span>
+            </ToolBtn>
           )}
           {onUseAsSource && (
             <ToolBtn
@@ -308,6 +334,25 @@ function LightboxInner({
             />
           )}
         </div>
+      ) : compareMode && canCompare ? (
+        // 비교 모드 — BeforeAfterSlider 로 이미지 영역 교체. zoom/pan 비활성.
+        // wrapper 는 flex+center 로 슬라이더 자체를 가운데 정렬 (/edit 페이지와 동일 패턴).
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            width: `min(95vw${item ? ` - ${INFO_PANEL_WIDTH}px` : ""}, ${item?.width ?? 1600}px)`,
+            maxHeight: "90vh",
+            display: "flex",
+            justifyContent: "center",
+          }}
+        >
+          <BeforeAfterSlider
+            beforeSrc={item!.sourceRef!}
+            afterSeed={src ?? item!.imageRef}
+            aspectRatio={`${item!.width} / ${item!.height}`}
+            maxHeight="90vh"
+          />
+        </div>
       ) : (
         <div
           onMouseDown={startDrag}
@@ -356,7 +401,9 @@ function LightboxInner({
       >
         {isVideo
           ? "SPACE play/pause · ESC close"
-          : "WHEEL zoom · DRAG pan · DBL reset · ESC close"}
+          : compareMode
+            ? "↔ DRAG 비교 · B 토글 · ESC close"
+            : `WHEEL zoom · DRAG pan · DBL reset${canCompare ? " · B 비교" : ""} · ESC close`}
       </div>
 
       {/* Info Panel — item 전달된 경우만 렌더 */}
