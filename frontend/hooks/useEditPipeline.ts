@@ -13,6 +13,7 @@
 "use client";
 
 import { editImageStream } from "@/lib/api-client";
+import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import { useEditStore } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -47,6 +48,9 @@ export function useEditPipeline({
   // 설정
   const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
   const visionModelSel = useSettingsStore((s) => s.visionModel);
+  const autoCompareAnalysis = useSettingsStore((s) => s.autoCompareAnalysis);
+  const { analyze: analyzeComparison, isBusy: isComparisonBusy } =
+    useComparisonAnalysis();
 
   const generate = async () => {
     if (running) return;
@@ -113,6 +117,17 @@ export function useEditPipeline({
               "히스토리 DB 저장 실패",
               "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
             );
+          }
+          // 자동 비교 분석 — 토글 ON + edit 모드 + sourceRef 있음 + busy 아님 조건 모두 만족 시
+          // void 호출로 본 흐름(resetPipeline/onComplete) 차단 X, 백그라운드 비동기 실행
+          // silent=true → VRAM > 13GB 시 useComparisonAnalysis 가 자동 skip + 짧은 토스트
+          if (
+            autoCompareAnalysis &&
+            evt.item.mode === "edit" &&
+            evt.item.sourceRef &&
+            !isComparisonBusy(evt.item.id)
+          ) {
+            void analyzeComparison(evt.item, { silent: true });
           }
           completed = true;
           return;
