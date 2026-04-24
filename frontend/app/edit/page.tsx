@@ -133,14 +133,17 @@ export default function EditPage() {
     return () => clearTimeout(t);
   }, [running, progressOpen]);
 
-  /* ── sourceImage 변경 시 afterId 리셋 ──
-     과거 edit 결과가 엉뚱한 Before/After 매칭으로 나타나는 현상 방지.
-     새 수정이 완료되면 handleGenerate 의 done 핸들러에서 다시 setAfterId 해줌.
+  /* ── 매칭 안 되는 afterId 정리 (시각 selection 일관성) ──
+     슬라이더 자체는 afterItem.sourceRef === sourceImage 조건으로 자동 빈 상태 처리되지만,
+     히스토리 타일의 selected 표시도 같이 정리해주면 사용자 혼란 감소.
+     매칭되는 경우 (수정 완료 / 히스토리 타일 클릭) 는 그대로 유지.
      React 19 권장: render-time prev state 비교 패턴. */
   const [prevSource, setPrevSource] = useState<string | null>(sourceImage);
   if (prevSource !== sourceImage) {
     setPrevSource(sourceImage);
-    setAfterId(null);
+    if (afterItem && afterItem.sourceRef !== sourceImage) {
+      setAfterId(null);
+    }
   }
 
   /* ── 진입 시 Lightning 기본값 ── */
@@ -585,7 +588,7 @@ export default function EditPage() {
           </div>
 
           {/* Before/After */}
-          {sourceImage && afterItem ? (
+          {sourceImage && afterItem && afterItem.sourceRef && afterItem.sourceRef === sourceImage ? (
             <>
               <BeforeAfter
                 beforeSrc={sourceImage}
@@ -705,6 +708,22 @@ export default function EditPage() {
                     item={it}
                     selected={afterId === it.id}
                     onClick={() => {
+                      // 히스토리 타일 클릭 = "이 수정 다시 보기"
+                      // sourceRef 있으면 원본 이미지도 같이 복원해서 진짜 한 쌍 슬라이더로 표시
+                      // sourceRef 없는 옛 row 는 안내 + source 보존 (슬라이더 자동 빈 상태)
+                      if (it.sourceRef) {
+                        setSource(
+                          it.sourceRef,
+                          `${it.label} · ${it.width}×${it.height}`,
+                          it.width,
+                          it.height,
+                        );
+                      } else {
+                        toast.info(
+                          "옛 항목 · 원본 미저장",
+                          "Before/After 슬라이더는 표시되지 않아요",
+                        );
+                      }
                       setAfterId(it.id);
                       selectHistory(it.id);
                     }}

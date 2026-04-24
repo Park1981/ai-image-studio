@@ -33,11 +33,13 @@ export function useEditPipeline({
 }: UseEditPipelineOptions): UseEditPipeline {
   // 입력값
   const sourceImage = useEditStore((s) => s.sourceImage);
+  const sourceLabel = useEditStore((s) => s.sourceLabel);
   const prompt = useEditStore((s) => s.prompt);
   const lightning = useEditStore((s) => s.lightning);
   // 실행 상태 setter
   const running = useEditStore((s) => s.running);
   const setRunning = useEditStore((s) => s.setRunning);
+  const setSource = useEditStore((s) => s.setSource);
   const setStep = useEditStore((s) => s.setStep);
   const recordStepDetail = useEditStore((s) => s.recordStepDetail);
   const setSampling = useEditStore((s) => s.setSampling);
@@ -102,6 +104,17 @@ export function useEditPipeline({
         } else if (evt.type === "done") {
           resetPipeline();
           addItem(evt.item);
+          // sourceImage 를 backend 영구 sourceRef 로 교체 (dataURL → 절대 URL)
+          // → 이후 BeforeAfter 슬라이더의 매칭 조건 (afterItem.sourceRef === sourceImage)
+          //   이 정확하게 동작. 옛 row 와도 동일 비교 가능.
+          if (evt.item.sourceRef) {
+            setSource(
+              evt.item.sourceRef,
+              sourceLabel || evt.item.label,
+              evt.item.width,
+              evt.item.height,
+            );
+          }
           onComplete(evt.item.id);
           toast.success("수정 완료", evt.item.label);
           if (evt.item.comfyError) {
