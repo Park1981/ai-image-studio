@@ -26,6 +26,9 @@ import {
 import SettingsButton from "@/components/settings/SettingsButton";
 import VramBadge from "@/components/chrome/VramBadge";
 import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
+import ComparisonAnalysisCard from "@/components/studio/ComparisonAnalysisCard";
+import ComparisonAnalysisModal from "@/components/studio/ComparisonAnalysisModal";
+import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import HistoryPicker from "@/components/studio/HistoryPicker";
 import HistoryTile from "@/components/studio/HistoryTile";
 import ImageLightbox from "@/components/studio/ImageLightbox";
@@ -78,6 +81,10 @@ export default function EditPage() {
   const items = useHistoryStore((s) => s.items);
   // history.add 는 useEditPipeline 내부에서 호출됨 (여기 직접 사용 안 함)
   const selectHistory = useHistoryStore((s) => s.select);
+
+  const { analyze, isBusy } = useComparisonAnalysis();
+  const [comparisonModalOpen, setComparisonModalOpen] = useState(false);
+
   // 수정 모드 우측 그리드는 edit 결과만 (generate 섞이면 Before/After 슬라이더가 엉뚱하게 매칭됨)
   // 2026-04-24 G2: 갤러리화 — 전체 렌더 + 스크롤 박스로 제한 대신 스크롤 UX 로 전환
   const editResults = items.filter((x) => x.mode === "edit");
@@ -170,6 +177,13 @@ export default function EditPage() {
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
       {progressOpen && (
         <ProgressModal mode="edit" onClose={() => setProgressOpen(false)} />
+      )}
+      {comparisonModalOpen && afterItem?.comparisonAnalysis && (
+        <ComparisonAnalysisModal
+          item={afterItem}
+          analysis={afterItem.comparisonAnalysis}
+          onClose={() => setComparisonModalOpen(false)}
+        />
       )}
       <ImageLightbox
         src={lightboxSrc}
@@ -585,6 +599,13 @@ export default function EditPage() {
                 }
               />
               <AiEnhanceCard item={afterItem} />
+              <ComparisonAnalysisCard
+                item={afterItem}
+                busy={isBusy(afterItem.id)}
+                onAnalyze={() => analyze(afterItem)}
+                onOpenDetail={() => setComparisonModalOpen(true)}
+                onReanalyze={() => analyze(afterItem)}
+              />
             </>
           ) : (
             <div
