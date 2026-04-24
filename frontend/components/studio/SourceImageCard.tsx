@@ -134,12 +134,15 @@ export default function SourceImageCard({
         </div>
       )}
 
-      {/* StudioUploadSlot — shell + 드래그/드롭 로직 담당 */}
+      {/* StudioUploadSlot — shell + 드래그/드롭/paste 로직 담당 */}
       <StudioUploadSlot
         filled={!!sourceImage}
         height={256}
         onFiles={handleFiles}
         acceptDropWhenFilled
+        // P-3: 단일 slot 페이지(edit/video/vision) 는 호버 무관 전역 paste 허용.
+        // textarea/input focus 시 자동 skip (StudioUploadSlot 내부 가드).
+        pasteEnabled
         onReady={(pick) => setPickFn(() => pick)}
         emptyContent={
           <>

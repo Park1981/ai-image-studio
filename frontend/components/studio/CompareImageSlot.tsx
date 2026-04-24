@@ -63,6 +63,10 @@ export function CompareImageSlot({
       height={160}
       onFiles={handleFiles}
       acceptDropWhenFilled
+      // P-4: 멀티 slot(A/B) 페이지라 호버 중인 slot 만 paste 수용.
+      // 둘 다 호버 없으면 Ctrl+V 무시 (충돌/모호성 방지).
+      pasteEnabled
+      pasteRequireHover
       onReady={(pick) => setPickFn(() => pick)}
       style={{ minHeight: 140, borderRadius: "var(--radius)" }}
       emptyContent={

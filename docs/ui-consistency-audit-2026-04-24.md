@@ -823,6 +823,44 @@
 2. primitives.tsx / chrome / settings 레거시 영역 lint 에러 5건 해소 (수정 금지 영역이지만 언젠가는)
 3. `--accent-disabled` 외에 다른 시맨틱 토큰 추가 (hover/focus/active 등)
 
+### 2026-04-25 P (Paste 기능) · 구현 완료
+
+스크린샷/캡쳐 후 **Ctrl+V 로 바로 업로드** 기능. Figma/Discord/Notion 과 동일 패턴.
+
+**P-2 StudioUploadSlot 에 paste 로직 추가**
+- document-level paste 리스너 + focus 가드 (TEXTAREA/INPUT/contentEditable 자동 skip)
+- `pasteEnabled` prop (기본 false) 으로 opt-in
+- `pasteRequireHover` prop (기본 false) 으로 멀티 slot 페이지 호버 우선 지원
+
+**P-3 SourceImageCard paste 활성화**
+- 단일 slot 페이지 (edit/video/vision) 에서 호버 무관 전역 paste 수용
+- textarea 에 포커스 중이면 자동 skip — 프롬프트 텍스트 paste 와 충돌 없음
+
+**P-4 CompareImageSlot paste 활성화 (호버 요구)**
+- A/B 두 슬롯 모두 `pasteEnabled + pasteRequireHover` 활성
+- 호버 중인 슬롯 1개만 응답 → 경쟁/모호성 0
+- 둘 다 호버 없으면 Ctrl+V 무시 (의도적)
+
+**P-5 호버 힌트 UI**
+- empty 상태에 호버 중일 때만 "또는 Ctrl(+)V 로 붙여넣기" kbd 스타일 힌트
+- 비호버 시 잡음 제거
+
+**검증**
+- pytest 130/130 유지 (백엔드 무변경)
+- 프론트 lint clean (수정 파일 기준)
+- contenteditable 전수 grep 결과 0건 (프로젝트에 없음 · 방어 코드는 미래 대비로 삽입)
+
+**UX 체크리스트 (실제 사용 시나리오)**
+
+| 상황 | 동작 |
+|---|---|
+| Win+Shift+S 스크린샷 → edit 페이지 빈 공간 클릭 후 Ctrl+V | 바로 업로드 ✅ |
+| Prompt textarea 에서 텍스트 Ctrl+V | 텍스트 paste (이미지 무시) ✅ |
+| Prompt textarea 타이핑 중 클립보드에 이미지 있는 상태 Ctrl+V | textarea 에만 작용, 이미지 업로드 skip ✅ |
+| Compare 페이지 Slot A 호버 + Ctrl+V | A 에 업로드 ✅ |
+| Compare 페이지 Slot B 호버 + Ctrl+V | B 에 업로드 ✅ |
+| Compare 페이지 호버 없음 + Ctrl+V | 무반응 (의도적) |
+
 ### P3: 미세 정리
 
 1. ✅ R1-4: globals.css body letter-spacing 제거 완료
