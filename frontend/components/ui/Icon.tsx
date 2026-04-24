@@ -30,7 +30,9 @@ export type IconName =
   | "dot"
   | "wand"
   | "lock"
-  | "unlock";
+  | "unlock"
+  | "play"
+  | "upscale";
 
 interface IconProps {
   name: IconName;
@@ -83,6 +85,28 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
         <svg {...common}>
           <rect x="3" y="3" width="18" height="18" rx="2" />
           <path d="M3 8h18M3 16h18M8 3v18M16 3v18" />
+        </svg>
+      );
+    case "play":
+      // 재생 — 원형 테두리 + 중앙 플레이 삼각형 (mono-weight 라인 스타일)
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+          <path d="M10 8.5v7l6-3.5z" />
+        </svg>
+      );
+    case "upscale":
+      // 업스케일 — 좌하단 픽셀 그리드(저해상도) + 우상단 대각선 화살표(고해상도)
+      // 그리드 일부는 opacity 0.4 로 입체감
+      return (
+        <svg {...common}>
+          <rect x="3" y="17" width="4" height="4" fill="currentColor" stroke="none" />
+          <rect x="7" y="13" width="4" height="4" fill="currentColor" stroke="none" />
+          <rect x="3" y="13" width="4" height="4" fill="currentColor" stroke="none" opacity={0.4} />
+          <rect x="7" y="17" width="4" height="4" fill="currentColor" stroke="none" opacity={0.4} />
+          <rect x="11" y="17" width="4" height="4" fill="currentColor" stroke="none" opacity={0.4} />
+          <path d="M12 12 L20 4" />
+          <polyline points="15 4 20 4 20 9" />
         </svg>
       );
     case "arrow-left":

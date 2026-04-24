@@ -93,6 +93,15 @@ body {
   font-feature-settings: "zero";
 }
 
+/* 디스플레이 폰트 — 섹션 헤더·랜딩 타이틀 등 스타일리쉬 임팩트용
+   Fraunces: variable serif · opsz(144) + SOFT(50) 로 극적인 세리프 & 부드러운 커브
+   에디토리얼·매거진 무드 (하이엔드 브랜드 웹사이트 풍) */
+.display {
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-feature-settings: "ss01";
+}
+
 button {
   font-family: inherit;
 }

@@ -1,6 +1,10 @@
 /**
  * Main Menu Page (진입점)
- * 카드 4장: 이미지 생성 / 이미지 수정 / Vision 분석 / 영상 생성(준비 중)
+ *
+ * 2026-04-24 재구성 — 3카테고리 (이미지 / 비전 / 영상) × 2카드 = 6카드 그리드.
+ *  - 이미지: 생성 / 수정
+ *  - 비전:   분석 / 비교(준비 중)
+ *  - 영상:   생성 / 업스케일(준비 중)
  */
 
 "use client";
@@ -13,6 +17,46 @@ import Icon from "@/components/ui/Icon";
 import SettingsButton from "@/components/settings/SettingsButton";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
+
+/** 카테고리 섹션 래퍼 — 옅은 배경 박스 + Unbounded 디스플레이 헤더 */
+function CategorySection({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+        background: "var(--bg-2)",
+        border: "1px solid var(--line)",
+        borderRadius: 20,
+        padding: "20px 18px 22px",
+      }}
+    >
+      <div
+        className="display"
+        style={{
+          fontSize: 24,
+          color: "var(--ink)",
+          letterSpacing: "-0.005em",
+          textTransform: "uppercase",
+          fontWeight: 500,
+          lineHeight: 1.1,
+          paddingLeft: 4,
+          paddingBottom: 2,
+        }}
+      >
+        {label}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function MainMenuPage() {
   const router = useRouter();
@@ -38,7 +82,7 @@ export default function MainMenuPage() {
         }}
       >
         {/* 인사말 + 상태 스트립 */}
-        <div style={{ marginBottom: 48, textAlign: "center" }}>
+        <div style={{ marginBottom: 44, textAlign: "center" }}>
           <div
             className="mono"
             style={{
@@ -89,50 +133,76 @@ export default function MainMenuPage() {
           </p>
         </div>
 
-        {/* 카드 4장 */}
+        {/* 3카테고리 그리드 — 열당 카드 2장 세로 스택 */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(4, 1fr)",
-            gap: 20,
+            gridTemplateColumns: "repeat(3, 1fr)",
+            gap: 28,
           }}
         >
-          <MenuCard
-            icon="image"
-            title="이미지 생성"
-            desc="자연어 프롬프트를 gemma4로 업그레이드한 뒤 ComfyUI 워크플로우에 전달합니다."
-            bgImage="/menu/generate.png"
-            onClick={() => router.push("/generate")}
-          />
-          <MenuCard
-            icon="edit"
-            title="이미지 수정"
-            desc="참조 이미지와 자연어 지시를 비전 모델로 분석해 수정본을 생성합니다."
-            bgImage="/menu/edit.png"
-            onClick={() => router.push("/edit")}
-          />
-          <MenuCard
-            icon="search"
-            title="Vision 분석"
-            desc="이미지 한 장을 비전 모델로 분석해 상세 영/한 설명을 추출합니다. 생성 프롬프트로 복사해 쓸 수 있어요."
-            bgImage="/menu/vision.png"
-            tag="보조 기능"
-            onClick={() => router.push("/vision")}
-          />
-          <MenuCard
-            icon="film"
-            title="영상 생성"
-            desc="이미지 한 장에서 LTX-2.3 로 5초 · 25fps 오디오+영상 MP4 를 생성합니다."
-            bgImage="/menu/video.png"
-            tag="NEW · LTX-2.3"
-            onClick={() => router.push("/video")}
-          />
+          {/* ── 이미지 카테고리 ── */}
+          <CategorySection label="Image">
+            <MenuCard
+              icon="image"
+              title="이미지 생성"
+              desc="자연어 프롬프트를 gemma4로 업그레이드한 뒤 ComfyUI 워크플로우에 전달합니다."
+              bgImage="/menu/generate.png"
+              onClick={() => router.push("/generate")}
+            />
+            <MenuCard
+              icon="edit"
+              title="이미지 수정"
+              desc="참조 이미지와 자연어 지시를 비전 모델로 분석해 수정본을 생성합니다."
+              bgImage="/menu/edit.png"
+              onClick={() => router.push("/edit")}
+            />
+          </CategorySection>
+
+          {/* ── 비전 카테고리 ── */}
+          <CategorySection label="Vision">
+            <MenuCard
+              icon="search"
+              title="비전 분석"
+              desc="이미지 한 장을 비전 모델로 분석해 상세 영/한 설명을 추출합니다."
+              bgImage="/menu/vision.png"
+              onClick={() => router.push("/vision")}
+            />
+            <MenuCard
+              icon="grid"
+              title="비전 비교"
+              desc="두 이미지를 비전 모델로 비교해 구성·색·피사체·분위기·품질 5축 차이를 분석합니다."
+              bgImage="/menu/compare.png"
+              tag="NEW"
+              onClick={() => router.push("/vision/compare")}
+            />
+          </CategorySection>
+
+          {/* ── 영상 카테고리 ── */}
+          <CategorySection label="Video">
+            <MenuCard
+              icon="play"
+              title="영상 생성"
+              desc="이미지 한 장에서 LTX-2.3 로 5초 · 25fps 오디오+영상 MP4 를 생성합니다."
+              bgImage="/menu/video.png"
+              tag="LTX-2.3"
+              onClick={() => router.push("/video")}
+            />
+            <MenuCard
+              icon="upscale"
+              title="영상 업스케일"
+              desc="LTX-2.3 공간 업스케일러로 영상 해상도를 2배로 향상합니다."
+              bgImage="/menu/upscale.png"
+              tag="준비 중"
+              disabled
+            />
+          </CategorySection>
         </div>
 
         {/* 하단 스트립 */}
         <div
           style={{
-            marginTop: 48,
+            marginTop: 44,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",

@@ -183,6 +183,8 @@ export default function MenuCard({
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
               overflow: "hidden",
+              // 1줄/2줄 desc 가 섞여도 카드 높이 일정하게 — 2줄 공간 상시 reserve
+              minHeight: "calc(1.5em * 2)",
             }}
           >
             {desc}
