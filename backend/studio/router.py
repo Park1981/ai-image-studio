@@ -56,6 +56,7 @@ from .prompt_pipeline import upgrade_generate_prompt
 from .claude_cli import research_prompt
 from .vision_pipeline import analyze_image_detailed, run_vision_pipeline
 from .video_pipeline import run_video_pipeline
+from .comparison_pipeline import analyze_pair
 from .comfy_api_builder import (
     build_generate_from_request,
     build_edit_from_request,
@@ -1328,6 +1329,87 @@ async def vision_analyze(
         "height": height,
         "sizeBytes": len(image_bytes),
     }
+
+
+# ─────────────────────────────────────────────
+# Compare Analyze (Edit 결과 vs 원본 5축 평가)
+# ─────────────────────────────────────────────
+
+
+# ComfyUI 샘플링과 직렬화하기 위한 mutex — vision 호출이 ComfyUI 와 동시 활성 시
+# VRAM 충돌 방지. 30s 대기 후에도 안 풀리면 503.
+_COMPARE_LOCK = asyncio.Lock()
+_COMPARE_LOCK_TIMEOUT_SEC = 30.0
+_COMPARE_MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MB (Edit 와 동일)
+
+
+@router.post("/compare-analyze")
+async def compare_analyze(
+    source: UploadFile = File(...),
+    result: UploadFile = File(...),
+    meta: str = Form(...),
+):
+    """Edit 결과(result) 와 원본(source) 을 qwen2.5vl 로 5축 비교 평가.
+
+    multipart:
+      source: 원본 이미지 파일
+      result: 수정 결과 이미지 파일
+      meta: JSON {editPrompt, historyItemId?, visionModel?, ollamaModel?}
+
+    historyItemId 가 주어지면 분석 결과를 DB 에 영구 저장 (saved=True).
+    HTTP 200 원칙 — 비전 실패해도 fallback 결과로 200 반환.
+    """
+    try:
+        meta_obj = json.loads(meta)
+    except json.JSONDecodeError as e:
+        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+
+    edit_prompt = (meta_obj.get("editPrompt") or "").strip()
+    history_item_id_raw = meta_obj.get("historyItemId")
+    vision_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
+    text_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
+
+    source_bytes = await source.read()
+    result_bytes = await result.read()
+    if not source_bytes or not result_bytes:
+        raise HTTPException(400, "empty image (source or result)")
+    if (
+        len(source_bytes) > _COMPARE_MAX_IMAGE_BYTES
+        or len(result_bytes) > _COMPARE_MAX_IMAGE_BYTES
+    ):
+        raise HTTPException(413, "image too large")
+
+    # mutex — ComfyUI 샘플링과 충돌 회피용 직렬화. 30s 대기 후에도 락이면 503.
+    try:
+        await asyncio.wait_for(
+            _COMPARE_LOCK.acquire(), timeout=_COMPARE_LOCK_TIMEOUT_SEC
+        )
+    except asyncio.TimeoutError as e:
+        raise HTTPException(503, "compare-analyze busy (locked > 30s)") from e
+
+    try:
+        result_obj = await analyze_pair(
+            source_bytes=source_bytes,
+            result_bytes=result_bytes,
+            edit_prompt=edit_prompt,
+            vision_model=vision_override,
+            text_model=text_override,
+        )
+    finally:
+        _COMPARE_LOCK.release()
+
+    # historyItemId 가 _TASK_ID_RE 매치 + DB 에 존재할 때만 저장
+    saved = False
+    if isinstance(history_item_id_raw, str) and _TASK_ID_RE.match(history_item_id_raw):
+        try:
+            saved = await history_db.update_comparison(
+                history_item_id_raw, result_obj.to_dict()
+            )
+        except Exception as db_err:
+            log.warning("compare-analyze DB persist failed: %s", db_err)
+            saved = False
+
+    return {"analysis": result_obj.to_dict(), "saved": saved}
 
 
 @router.post("/research")

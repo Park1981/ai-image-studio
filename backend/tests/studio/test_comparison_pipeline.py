@@ -499,3 +499,190 @@ async def test_edit_persists_source_to_disk(monkeypatch, tmp_path: Path) -> None
     # 디스크에 파일 존재 — task_id 가 파일명
     rel = done_item["sourceRef"].replace("/images/studio/", "")
     assert (out_dir / rel).exists()
+
+
+# ───────── /compare-analyze 라우트 ─────────
+
+
+@pytest.mark.asyncio
+async def test_compare_analyze_route_happy_path(monkeypatch, tmp_path: Path) -> None:
+    """multipart source+result+meta → analysis 응답 + saved=False (no historyItemId)."""
+    from unittest.mock import AsyncMock, patch
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+    from studio.comparison_pipeline import ComparisonAnalysisResult
+
+    fake = ComparisonAnalysisResult(
+        scores={k: 80 for k in ("face_id","body_pose","attire","background","intent_fidelity")},
+        overall=80,
+        comments_en={k: "ok" for k in ("face_id","body_pose","attire","background","intent_fidelity")},
+        comments_ko={k: "괜찮음" for k in ("face_id","body_pose","attire","background","intent_fidelity")},
+        summary_en="All good.",
+        summary_ko="전반적으로 양호.",
+        provider="ollama",
+        fallback=False,
+        analyzed_at=1700000000000,
+        vision_model="qwen2.5vl:7b",
+    )
+
+    with patch(
+        "studio.router.analyze_pair",
+        new=AsyncMock(return_value=fake),
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+            res = await cli.post(
+                "/api/studio/compare-analyze",
+                files={
+                    "source": ("s.png", _tiny_png_bytes(), "image/png"),
+                    "result": ("r.png", _tiny_png_bytes(), "image/png"),
+                },
+                data={"meta": json.dumps({"editPrompt": "add earrings"})},
+            )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["analysis"]["overall"] == 80
+    assert body["saved"] is False  # historyItemId 없음
+
+
+@pytest.mark.asyncio
+async def test_compare_analyze_persists_when_history_id_given(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """historyItemId 가 DB 에 존재하면 update_comparison 호출 + saved=True."""
+    from unittest.mock import AsyncMock, patch
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+    from studio import history_db
+    from studio.comparison_pipeline import ComparisonAnalysisResult
+
+    _set_temp_db(monkeypatch, tmp_path)
+    await history_db.init_studio_history_db()
+    # 사전 row 삽입 (Task 5 의 task_id 형식 준수)
+    await history_db.insert_item({
+        "id": "tsk-aaaaaaaaaaaa",
+        "mode": "edit",
+        "prompt": "x", "label": "x",
+        "width": 1024, "height": 1024, "seed": 1,
+        "steps": 4, "cfg": 1.0, "lightning": True,
+        "model": "qwen-image-edit-2511",
+        "createdAt": 1700000000000,
+        "imageRef": "/images/studio/r.png",
+    })
+
+    fake = ComparisonAnalysisResult(
+        scores={k: 70 for k in ("face_id","body_pose","attire","background","intent_fidelity")},
+        overall=70, comments_en={}, comments_ko={},
+        summary_en="ok", summary_ko="좋음",
+        provider="ollama", fallback=False,
+        analyzed_at=1700000000000, vision_model="qwen2.5vl:7b",
+    )
+
+    with patch(
+        "studio.router.analyze_pair", new=AsyncMock(return_value=fake),
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+            res = await cli.post(
+                "/api/studio/compare-analyze",
+                files={
+                    "source": ("s.png", _tiny_png_bytes(), "image/png"),
+                    "result": ("r.png", _tiny_png_bytes(), "image/png"),
+                },
+                data={"meta": json.dumps({
+                    "editPrompt": "x",
+                    "historyItemId": "tsk-aaaaaaaaaaaa",
+                })},
+            )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["saved"] is True
+
+    fetched = await history_db.get_item("tsk-aaaaaaaaaaaa")
+    assert fetched["comparisonAnalysis"]["overall"] == 70
+
+
+@pytest.mark.asyncio
+async def test_compare_analyze_unknown_history_id_saved_false(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """historyItemId 가 DB 에 없으면 saved=False, 분석은 정상 응답."""
+    from unittest.mock import AsyncMock, patch
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+    from studio import history_db
+    from studio.comparison_pipeline import ComparisonAnalysisResult
+
+    _set_temp_db(monkeypatch, tmp_path)
+    await history_db.init_studio_history_db()
+
+    fake = ComparisonAnalysisResult(
+        scores={k: None for k in ("face_id","body_pose","attire","background","intent_fidelity")},
+        overall=0, comments_en={}, comments_ko={},
+        summary_en="x", summary_ko="x",
+        provider="fallback", fallback=True,
+        analyzed_at=0, vision_model="qwen2.5vl:7b",
+    )
+
+    with patch("studio.router.analyze_pair", new=AsyncMock(return_value=fake)):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+            res = await cli.post(
+                "/api/studio/compare-analyze",
+                files={
+                    "source": ("s.png", _tiny_png_bytes(), "image/png"),
+                    "result": ("r.png", _tiny_png_bytes(), "image/png"),
+                },
+                data={"meta": json.dumps({
+                    "editPrompt": "x",
+                    "historyItemId": "tsk-bbbbbbbbbbbb",  # 존재 안 함
+                })},
+            )
+    assert res.status_code == 200
+    assert res.json()["saved"] is False
+
+
+@pytest.mark.asyncio
+async def test_compare_analyze_empty_source_400(monkeypatch, tmp_path: Path) -> None:
+    """source 파일 비어있으면 400."""
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as cli:
+        res = await cli.post(
+            "/api/studio/compare-analyze",
+            files={
+                "source": ("s.png", b"", "image/png"),
+                "result": ("r.png", _tiny_png_bytes(), "image/png"),
+            },
+            data={"meta": json.dumps({"editPrompt": "x"})},
+        )
+    assert res.status_code == 400
+
+
+@pytest.mark.asyncio
+async def test_compare_analyze_invalid_meta_400(monkeypatch) -> None:
+    """meta JSON 깨짐 400."""
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as cli:
+        res = await cli.post(
+            "/api/studio/compare-analyze",
+            files={
+                "source": ("s.png", _tiny_png_bytes(), "image/png"),
+                "result": ("r.png", _tiny_png_bytes(), "image/png"),
+            },
+            data={"meta": "{not json"},
+        )
+    assert res.status_code == 400
