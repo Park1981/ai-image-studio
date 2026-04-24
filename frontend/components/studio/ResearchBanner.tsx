@@ -81,7 +81,7 @@ export default function ResearchBanner({
               display: "flex",
               alignItems: "center",
               gap: 6,
-              letterSpacing: "-0.005em",
+              letterSpacing: 0,
             }}
           >
             <Icon name="search" size={13} />

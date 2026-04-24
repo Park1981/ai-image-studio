@@ -120,7 +120,7 @@ export function ActionBarButton({
         alignItems: "center",
         gap: label ? 5 : 0,
         padding: label ? "6px 10px" : "7px 9px",
-        borderRadius: 999,
+        borderRadius: "var(--radius-full)",
         fontSize: 11.5,
         fontWeight: 600,
         letterSpacing: ".01em",

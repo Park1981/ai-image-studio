@@ -131,7 +131,7 @@ export function IconBtn({
       style={{
         width: 32,
         height: 32,
-        borderRadius: 8,
+        borderRadius: "var(--radius-sm)",
         border: "1px solid transparent",
         background: active ? "var(--bg-2)" : "transparent",
         color: "var(--ink-2)",
@@ -162,7 +162,7 @@ export function BackBtn({ onClick }: { onClick?: () => void }) {
       style={{
         height: 30,
         padding: "0 10px 0 8px",
-        borderRadius: 8,
+        borderRadius: "var(--radius-sm)",
         border: "1px solid var(--line)",
         background: "var(--surface)",
         color: "var(--ink-2)",
@@ -206,7 +206,7 @@ export function ModelBadge({
         alignItems: "center",
         gap: 10,
         padding: "5px 12px 5px 10px",
-        borderRadius: 999,
+        borderRadius: "var(--radius-full)",
         border: "1px solid var(--line)",
         background: "var(--surface)",
         fontSize: 12,

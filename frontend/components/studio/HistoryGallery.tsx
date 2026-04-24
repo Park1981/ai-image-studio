@@ -76,7 +76,7 @@ export default function HistoryGallery({
             padding: "28px 20px",
             background: "var(--surface)",
             border: "1px dashed var(--line-2)",
-            borderRadius: 12,
+            borderRadius: "var(--radius)",
             textAlign: "center",
             color: "var(--ink-4)",
             fontSize: 12.5,

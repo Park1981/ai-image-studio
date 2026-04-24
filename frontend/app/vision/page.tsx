@@ -225,7 +225,7 @@ export default function VisionPage() {
                 background: analyzeDisabled ? "var(--accent-disabled)" : "var(--accent)",
                 color: "#fff",
                 padding: "14px 20px",
-                borderRadius: 999,
+                borderRadius: "var(--radius-full)",
                 fontSize: 14,
                 fontWeight: 600,
                 display: "flex",

@@ -137,7 +137,7 @@ export default function ProgressModal({
       <section
         style={{
           background: "var(--bg)",
-          borderRadius: 16,
+          borderRadius: "var(--radius-lg)",
           boxShadow: "var(--shadow-lg)",
           border: "1px solid var(--line)",
           width: "min(620px, 100%)",
@@ -351,7 +351,7 @@ function Header({
             margin: 0,
             fontSize: 15,
             fontWeight: 600,
-            letterSpacing: "-0.01em",
+            letterSpacing: 0,
           }}
         >
           {title}
@@ -384,7 +384,7 @@ function Header({
             cursor: "pointer",
             width: 28,
             height: 28,
-            borderRadius: 8,
+            borderRadius: "var(--radius-sm)",
             display: "grid",
             placeItems: "center",
             color: "var(--ink-3)",
@@ -496,7 +496,7 @@ function EditTimeline() {
             marginBottom: 4,
           }}
         >
-          <span style={{ letterSpacing: "-0.005em" }}>
+          <span style={{ letterSpacing: 0 }}>
             {pipelineLabel || (running ? "대기" : "-")}
           </span>
           <span className="mono" style={{ letterSpacing: ".04em" }}>
@@ -601,7 +601,7 @@ function VideoTimeline() {
             marginBottom: 4,
           }}
         >
-          <span style={{ letterSpacing: "-0.005em" }}>
+          <span style={{ letterSpacing: 0 }}>
             {pipelineLabel || (running ? "대기" : "-")}
           </span>
           <span className="mono" style={{ letterSpacing: ".04em" }}>
@@ -832,7 +832,7 @@ function DetailBox({
         padding: "10px 12px",
         background: bg,
         border: `1px solid ${border}`,
-        borderRadius: 8,
+        borderRadius: "var(--radius-sm)",
       }}
     >
       <div

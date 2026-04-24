@@ -43,7 +43,7 @@ export function Field({ label, children }: { label: string; children: ReactNode 
           fontSize: 11,
           color: "var(--ink-3)",
           fontWeight: 500,
-          letterSpacing: "-0.005em",
+          letterSpacing: 0,
         }}
       >
         {label}
@@ -76,7 +76,7 @@ export function SegControl({
         display: "inline-flex",
         padding: 2,
         background: "var(--bg-2)",
-        borderRadius: 8,
+        borderRadius: "var(--radius-sm)",
         gap: 2,
         flexWrap: "wrap",
         opacity: disabled ? 0.45 : 1,
@@ -130,7 +130,7 @@ export function Toggle({
         gap: 10,
         cursor: "pointer",
         padding: "8px 10px",
-        borderRadius: 8,
+        borderRadius: "var(--radius-sm)",
         background: checked ? "var(--accent-soft)" : "var(--bg-2)",
         border: `1px solid ${checked ? "rgba(74,158,255,.35)" : "var(--line)"}`,
         transition: "all .15s",
@@ -141,7 +141,7 @@ export function Toggle({
           position: "relative",
           width: 28,
           height: 16,
-          borderRadius: 999,
+          borderRadius: "var(--radius-full)",
           background: checked ? "var(--accent)" : "var(--line-2)",
           transition: "background .15s",
           flexShrink: 0,
@@ -351,7 +351,7 @@ export function StepMark({ done, running }: { done: boolean; running: boolean })
 /* ── 공용 style 토큰 ── */
 export const inputStyle: CSSProperties = {
   border: "1px solid var(--line)",
-  borderRadius: 8,
+  borderRadius: "var(--radius-sm)",
   padding: "7px 10px",
   fontSize: 12,
   fontFamily: "inherit",
@@ -365,7 +365,7 @@ export const inputStyle: CSSProperties = {
 export const iconBtnStyle: CSSProperties = {
   width: 30,
   height: 30,
-  borderRadius: 8,
+  borderRadius: "var(--radius-sm)",
   border: "1px solid var(--line)",
   background: "var(--bg)",
   color: "var(--ink-2)",

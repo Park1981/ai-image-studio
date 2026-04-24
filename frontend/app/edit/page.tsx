@@ -364,7 +364,7 @@ export default function EditPage() {
                 position: "relative",
                 background: "var(--surface)",
                 border: "1px solid var(--line)",
-                borderRadius: 12,
+                borderRadius: "var(--radius)",
                 boxShadow: "var(--shadow-sm)",
               }}
             >
@@ -394,7 +394,7 @@ export default function EditPage() {
                   fontSize: 13.5,
                   lineHeight: 1.55,
                   color: "var(--ink)",
-                  borderRadius: 12,
+                  borderRadius: "var(--radius)",
                   // auto-grow — 내용 높이 맞춰 확장, 상한 60vh 에서 내부 스크롤
                   minHeight: 76,
                   maxHeight: "60vh",
@@ -488,7 +488,7 @@ export default function EditPage() {
                   : "var(--accent)",
               color: "#fff",
               padding: "14px 20px",
-              borderRadius: 999,
+              borderRadius: "var(--radius-full)",
               fontSize: 14,
               fontWeight: 600,
               display: "flex",

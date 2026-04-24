@@ -82,7 +82,7 @@ function BarButton({
         // 정사각 원형 아이콘 버튼 — 라벨 제거에 맞춰 padding 도 균일
         width: 26,
         height: 26,
-        borderRadius: 999,
+        borderRadius: "var(--radius-full)",
         color: "#fff",
         background: hov ? palette.bgHov : palette.bg,
         backdropFilter: "blur(4px)",

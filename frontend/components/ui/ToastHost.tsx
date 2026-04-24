@@ -97,7 +97,7 @@ function ToastItem({
         style={{
           width: 20,
           height: 20,
-          borderRadius: 999,
+          borderRadius: "var(--radius-full)",
           background: "var(--surface)",
           display: "grid",
           placeItems: "center",
@@ -114,7 +114,7 @@ function ToastItem({
             fontSize: 13,
             fontWeight: 600,
             color: "var(--ink)",
-            letterSpacing: "-0.005em",
+            letterSpacing: 0,
           }}
         >
           {toast.title}

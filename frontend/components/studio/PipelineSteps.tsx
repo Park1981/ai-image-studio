@@ -51,7 +51,7 @@ export default function PipelineSteps({
         style={{
           background: "var(--green-soft)",
           border: "1px solid rgba(82,196,26,.28)",
-          borderRadius: 12,
+          borderRadius: "var(--radius)",
           padding: "10px 14px",
           display: "flex",
           alignItems: "center",
@@ -64,7 +64,7 @@ export default function PipelineSteps({
         <span
           style={{
             fontWeight: 600,
-            letterSpacing: "-0.005em",
+            letterSpacing: 0,
           }}
         >
           자동 처리 중
@@ -97,7 +97,7 @@ export default function PipelineSteps({
       style={{
         background: "var(--green-soft)",
         border: "1px solid rgba(82,196,26,.28)",
-        borderRadius: 12,
+        borderRadius: "var(--radius)",
         padding: "14px 16px",
       }}
     >
@@ -117,7 +117,7 @@ export default function PipelineSteps({
             display: "flex",
             alignItems: "center",
             gap: 6,
-            letterSpacing: "-0.005em",
+            letterSpacing: 0,
           }}
         >
           <Icon name="cpu" size={13} />

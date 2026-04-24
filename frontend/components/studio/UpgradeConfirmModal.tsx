@@ -109,7 +109,7 @@ function EditorShell({
       <section
         style={{
           background: "var(--bg)",
-          borderRadius: 16,
+          borderRadius: "var(--radius-lg)",
           boxShadow: "var(--shadow-lg)",
           border: "1px solid var(--line)",
           width: "min(680px, 100%)",
@@ -143,7 +143,7 @@ function EditorShell({
                 margin: 0,
                 fontSize: 15,
                 fontWeight: 600,
-                letterSpacing: "-0.01em",
+                letterSpacing: 0,
               }}
             >
               프롬프트 업그레이드 확인
@@ -157,7 +157,7 @@ function EditorShell({
               cursor: "pointer",
               width: 28,
               height: 28,
-              borderRadius: 8,
+              borderRadius: "var(--radius-sm)",
               display: "grid",
               placeItems: "center",
               color: "var(--ink-3)",
@@ -369,7 +369,7 @@ const originalStyle: React.CSSProperties = {
   padding: "10px 12px",
   background: "var(--bg-2)",
   border: "1px solid var(--line)",
-  borderRadius: 8,
+  borderRadius: "var(--radius-sm)",
   fontSize: 12.5,
   color: "var(--ink-2)",
   lineHeight: 1.55,
@@ -380,19 +380,19 @@ const originalStyle: React.CSSProperties = {
 const primaryBtnStyle: React.CSSProperties = {
   all: "unset",
   padding: "8px 16px",
-  borderRadius: 8,
+  borderRadius: "var(--radius-sm)",
   background: "var(--accent)",
   color: "#fff",
   fontSize: 13,
   fontWeight: 600,
-  letterSpacing: "-0.005em",
+  letterSpacing: 0,
   boxShadow: "0 2px 8px rgba(74,158,255,.28)",
 };
 
 const secondaryBtnStyle: React.CSSProperties = {
   all: "unset",
   padding: "8px 14px",
-  borderRadius: 8,
+  borderRadius: "var(--radius-sm)",
   background: "var(--surface)",
   color: "var(--ink-2)",
   border: "1px solid var(--line)",

@@ -25,7 +25,7 @@
 
 "use client";
 
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, DragEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface Props {
@@ -33,7 +33,7 @@ interface Props {
   filled: boolean;
   /** 고정 높이 (px). empty 와 filled 가 같은 높이 유지. */
   height: number;
-  /** 파일 선택/드롭 시 호출. empty shell 에서만 bind 됨. */
+  /** 파일 선택/드롭 시 호출. empty shell 에서만 bind 됨 (acceptDropWhenFilled=true 이면 filled 에서도). */
   onFiles?: (files: FileList | null) => void;
   /** file input accept. 기본 image/*. */
   accept?: string;
@@ -45,6 +45,9 @@ interface Props {
   onReady?: (pick: () => void) => void;
   /** 내부 shell 에 추가 스타일. */
   style?: CSSProperties;
+  /** filled 상태에서도 drop 이벤트를 받아 새 파일로 교체할지 여부.
+   *  SourceImageCard 는 filled 일 때도 drag&drop 허용 (변경 UX). 기본 false. */
+  acceptDropWhenFilled?: boolean;
 }
 
 export default function StudioUploadSlot({
@@ -56,6 +59,7 @@ export default function StudioUploadSlot({
   children,
   onReady,
   style,
+  acceptDropWhenFilled = false,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [drag, setDrag] = useState(false);
@@ -78,12 +82,25 @@ export default function StudioUploadSlot({
   };
 
   if (filled) {
+    const dropHandlers = acceptDropWhenFilled
+      ? {
+          onDragOver: (e: DragEvent<HTMLDivElement>) => e.preventDefault(),
+          onDragEnter: () => setDrag(true),
+          onDragLeave: () => setDrag(false),
+          onDrop: (e: DragEvent<HTMLDivElement>) => {
+            e.preventDefault();
+            setDrag(false);
+            onFiles?.(e.dataTransfer.files);
+          },
+        }
+      : {};
     return (
       <div
+        {...dropHandlers}
         style={{
           ...common,
           background: "var(--bg-2)",
-          border: "1px solid var(--line)",
+          border: drag ? "1px solid var(--accent)" : "1px solid var(--line)",
           boxShadow: "var(--shadow-sm)",
         }}
       >

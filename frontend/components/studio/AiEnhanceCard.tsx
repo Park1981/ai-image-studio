@@ -48,7 +48,7 @@ export default function AiEnhanceCard({ item }: { item: HistoryItem }) {
       style={{
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 12,
+        borderRadius: "var(--radius)",
         padding: "14px 16px",
         display: "flex",
         flexDirection: "column",
@@ -167,7 +167,7 @@ export default function AiEnhanceCard({ item }: { item: HistoryItem }) {
             padding: "8px 10px",
             background: "#FCEDEC",
             border: "1px solid rgba(192,57,43,.32)",
-            borderRadius: 8,
+            borderRadius: "var(--radius-sm)",
             display: "flex",
             alignItems: "flex-start",
             gap: 8,

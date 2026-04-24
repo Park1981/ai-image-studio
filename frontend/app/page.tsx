@@ -34,7 +34,7 @@ function CategorySection({
         gap: 14,
         background: "var(--bg-2)",
         border: "1px solid var(--line)",
-        borderRadius: 20,
+        borderRadius: "var(--radius-xl)",
         padding: "20px 18px 22px",
       }}
     >
@@ -126,7 +126,7 @@ export default function MainMenuPage() {
               color: "var(--ink-3)",
               marginTop: 10,
               marginBottom: 0,
-              letterSpacing: "-0.005em",
+              letterSpacing: 0,
             }}
           >
             자연어로 시작하는 로컬 이미지 생성 워크스페이스

@@ -62,7 +62,7 @@ export default function ResultInfoModal({ open, title, onClose, children }: Prop
         style={{
           background: "var(--surface)",
           color: "var(--ink)",
-          borderRadius: 16,
+          borderRadius: "var(--radius-lg)",
           boxShadow: "0 20px 60px rgba(0,0,0,.35), 0 8px 20px rgba(0,0,0,.18)",
           border: "1px solid var(--line)",
           width: "100%",
@@ -93,7 +93,7 @@ export default function ResultInfoModal({ open, title, onClose, children }: Prop
                 fontSize: 13.5,
                 fontWeight: 600,
                 color: "var(--ink)",
-                letterSpacing: "-0.005em",
+                letterSpacing: 0,
               }}
             >
               {title}
@@ -110,7 +110,7 @@ export default function ResultInfoModal({ open, title, onClose, children }: Prop
                 placeItems: "center",
                 width: 28,
                 height: 28,
-                borderRadius: 8,
+                borderRadius: "var(--radius-sm)",
                 color: "var(--ink-3)",
                 transition: "background .12s, color .12s",
               }}

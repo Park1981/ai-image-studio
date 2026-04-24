@@ -117,7 +117,7 @@ function DrawerHeader({ onClose }: { onClose: () => void }) {
             margin: 0,
             fontSize: 15,
             fontWeight: 600,
-            letterSpacing: "-0.01em",
+            letterSpacing: 0,
           }}
         >
           설정
@@ -131,7 +131,7 @@ function DrawerHeader({ onClose }: { onClose: () => void }) {
           cursor: "pointer",
           width: 28,
           height: 28,
-          borderRadius: 8,
+          borderRadius: "var(--radius-sm)",
           display: "grid",
           placeItems: "center",
           color: "var(--ink-3)",
@@ -421,7 +421,7 @@ function ModelSection() {
             color: "var(--ink-4)",
             background: "var(--bg-2)",
             padding: "8px 10px",
-            borderRadius: 8,
+            borderRadius: "var(--radius-sm)",
           }}
         >
           Ollama 모델 목록 조회 실패. 서버 상태 확인.
@@ -434,7 +434,7 @@ function ModelSection() {
             color: "var(--amber-ink)",
             background: "var(--amber-soft)",
             padding: "8px 10px",
-            borderRadius: 8,
+            borderRadius: "var(--radius-sm)",
             border: "1px solid rgba(250,173,20,.35)",
           }}
         >
@@ -474,7 +474,7 @@ function SelectRow({
           padding: "8px 10px",
           fontSize: 12,
           border: "1px solid var(--line)",
-          borderRadius: 8,
+          borderRadius: "var(--radius-sm)",
           background: "var(--surface)",
           color: "var(--ink)",
         }}
@@ -517,7 +517,7 @@ function TemplatesSection() {
             color: "var(--ink-4)",
             padding: "10px 12px",
             border: "1px dashed var(--line-2)",
-            borderRadius: 8,
+            borderRadius: "var(--radius-sm)",
           }}
         >
           저장된 템플릿이 없습니다. 생성 화면의 프롬프트 입력창 옆

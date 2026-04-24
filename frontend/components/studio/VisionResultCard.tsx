@@ -96,7 +96,7 @@ export default function VisionResultCard({ result, running }: Props) {
           style={{
             display: "inline-flex",
             background: "var(--bg-2)",
-            borderRadius: 8,
+            borderRadius: "var(--radius-sm)",
             padding: 2,
             gap: 2,
           }}
@@ -127,7 +127,7 @@ export default function VisionResultCard({ result, running }: Props) {
                       : "var(--ink-3)",
                   background: active ? "var(--surface)" : "transparent",
                   boxShadow: active ? "var(--shadow-sm)" : "none",
-                  letterSpacing: "-0.005em",
+                  letterSpacing: 0,
                   opacity: disabled ? 0.5 : 1,
                 }}
                 title={disabled ? "번역 실패 — 영문만 사용 가능" : ""}

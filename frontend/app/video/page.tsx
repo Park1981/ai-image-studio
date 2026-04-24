@@ -269,7 +269,7 @@ export default function VideoPage() {
                 position: "relative",
                 background: "var(--surface)",
                 border: "1px solid var(--line)",
-                borderRadius: 12,
+                borderRadius: "var(--radius)",
                 boxShadow: "var(--shadow-sm)",
               }}
             >
@@ -295,7 +295,7 @@ export default function VideoPage() {
                   fontSize: 13.5,
                   lineHeight: 1.55,
                   color: "var(--ink)",
-                  borderRadius: 12,
+                  borderRadius: "var(--radius)",
                   minHeight: 76,
                   maxHeight: "60vh",
                   overflowY: "auto",
@@ -419,7 +419,7 @@ export default function VideoPage() {
                 background: ctaDisabled ? "var(--accent-disabled)" : "var(--accent)",
                 color: "#fff",
                 padding: "14px 20px",
-                borderRadius: 999,
+                borderRadius: "var(--radius-full)",
                 fontSize: 14,
                 fontWeight: 600,
                 display: "flex",

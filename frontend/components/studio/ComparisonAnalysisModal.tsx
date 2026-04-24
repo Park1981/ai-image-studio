@@ -73,7 +73,7 @@ export default function ComparisonAnalysisModal({
           maxHeight: "88vh",
           overflowY: "auto",
           background: "var(--bg)",
-          borderRadius: 14,
+          borderRadius: "var(--radius-card)",
           boxShadow: "0 20px 60px rgba(0,0,0,.4)",
           border: "1px solid var(--line)",
         }}

@@ -17,11 +17,12 @@ ResultInfoModal, BeforeAfterSlider). DB 스키마 v5 (adult/duration_sec/fps/fra
 Generate 입력 UX: Step/CFG/Seed UI 제거(백엔드는 GENERATE_MODEL.defaults 직접 참조 · seed 매번 랜덤).
 
 **2026-04-24 UI Consistency Audit** — `docs/ui-consistency-audit-2026-04-24.md` 참조.
-P0+P1a+P1b+R1+R2 완료. 디자인 토큰 6단계 (`--radius-sm/md/card/lg/xl/full`) +
-기능 토큰 (`--accent-disabled`, `--bg-dark`, `--overlay-dark`).
-edit-source + result 파일 orphan cleanup (path traversal 4/5-layer 방어 · pytest 130).
-공용 shell 5개 신설 (`StudioResultHeader/Card/Empty/Loading/UploadSlot`) + 4 페이지 교체.
-R3 남음: SourceImageCard/CompareImageSlot 를 StudioUploadSlot 기반으로 재작성 (별도 세션 권장).
+P0+P1a+P1b+R1+R2+R3 완료 · 디자인 시스템 중추 완성 (판매 퀄리티 1차 도달).
+- 토큰 6단계 (`--radius-sm/md/card/lg/xl/full`) + 기능 토큰 3개 (`--accent-disabled`, `--bg-dark`, `--overlay-dark`)
+- 공용 shell 5개 (`StudioResultHeader/Card/Empty/Loading/UploadSlot`)
+- `SourceImageCard` / `CompareImageSlot` 을 StudioUploadSlot 기반으로 재작성
+- radius 하드코딩 76건 토큰화 (시각 무변경) · negative letterSpacing 17건 정리
+- edit-source + result 파일 orphan cleanup (path traversal 4/5-layer · pytest 130)
 
 ## Architecture (신규 · 재설계 후)
 - frontend/: Next.js 16, App Router, React 19, TypeScript strict, Tailwind v4, Zustand 5

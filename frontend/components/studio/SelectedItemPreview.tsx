@@ -40,7 +40,7 @@ export default function SelectedItemPreview({
         padding: 16,
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 14,
+        borderRadius: "var(--radius-card)",
         boxShadow: "var(--shadow-sm)",
       }}
     >

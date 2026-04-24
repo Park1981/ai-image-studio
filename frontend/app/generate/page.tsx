@@ -253,7 +253,7 @@ export default function GeneratePage() {
                   fontSize: 12.5,
                   fontWeight: 600,
                   color: "var(--ink-2)",
-                  letterSpacing: "-0.005em",
+                  letterSpacing: 0,
                 }}
               >
                 프롬프트
@@ -270,7 +270,7 @@ export default function GeneratePage() {
                 position: "relative",
                 background: "var(--surface)",
                 border: "1px solid var(--line)",
-                borderRadius: 12,
+                borderRadius: "var(--radius)",
                 transition: "border .15s",
                 boxShadow: "var(--shadow-sm)",
               }}
@@ -308,7 +308,7 @@ export default function GeneratePage() {
                   fontSize: 14,
                   lineHeight: 1.6,
                   color: "var(--ink)",
-                  borderRadius: 12,
+                  borderRadius: "var(--radius)",
                   // auto-grow: 내용만큼만 커지고 상한(60vh) 에서 멈춰 내부 스크롤.
                   minHeight: 96,
                   maxHeight: "60vh",
@@ -448,10 +448,10 @@ export default function GeneratePage() {
                   : "var(--accent)",
               color: "#fff",
               padding: "14px 20px",
-              borderRadius: 999,
+              borderRadius: "var(--radius-full)",
               fontSize: 14,
               fontWeight: 600,
-              letterSpacing: "-0.005em",
+              letterSpacing: 0,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
@@ -700,7 +700,7 @@ function AdvancedAccordion({
       style={{
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 12,
+        borderRadius: "var(--radius)",
         overflow: "hidden",
         transition: "all .2s",
       }}
@@ -844,7 +844,7 @@ function AdvancedAccordion({
                       fontSize: 10.5,
                       fontWeight: 500,
                       padding: "3px 8px",
-                      borderRadius: 999,
+                      borderRadius: "var(--radius-full)",
                       border: `1px solid ${
                         active ? "var(--accent)" : "var(--line)"
                       }`,
@@ -1020,7 +1020,7 @@ function GenerateResultViewer({
         aspectRatio,
         maxHeight: "65vh",
         background: "var(--bg-2)",
-        borderRadius: 14,
+        borderRadius: "var(--radius-card)",
         overflow: "hidden",
         border: "1px solid var(--line)",
         boxShadow: "var(--shadow-sm)",

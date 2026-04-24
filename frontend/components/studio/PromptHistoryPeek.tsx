@@ -151,7 +151,7 @@ export default function PromptHistoryPeek({
           cursor: "pointer",
           width: 26,
           height: 26,
-          borderRadius: 8,
+          borderRadius: "var(--radius-sm)",
           display: "grid",
           placeItems: "center",
           background: open ? "var(--accent)" : "var(--surface)",
@@ -190,7 +190,7 @@ export default function PromptHistoryPeek({
               flexDirection: "column",
               background: "var(--bg)",
               border: "1px solid var(--line)",
-              borderRadius: 12,
+              borderRadius: "var(--radius)",
               boxShadow: "var(--shadow-lg)",
               transformOrigin:
                 alignRight ? "top right" : "top left",

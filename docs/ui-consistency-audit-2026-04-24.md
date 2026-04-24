@@ -1,7 +1,7 @@
 # AI Image Studio UI Consistency Audit
 
 **작성일**: 2026-04-24  
-**상태**: P0+P1a+P1b+R1+R2(Header/Card/Empty/Loading) 완료 · Upload slot 통합은 R3 으로 연기  
+**상태**: P0+P1a+P1b+R1+R2+R3 완료 · 디자인 시스템 중추 완성 (판매 퀄리티 도달)  
 **범위**: 메뉴별 기능 차이를 제외한 디자인/레이아웃/상태 표현 일관성 검토  
 **대상 화면**:
 - `/generate` Image Generate
@@ -785,12 +785,43 @@
   `CompareImageSlot` (140px + A/B badge + 2 pill) 는 고유 UX 가 커서 독립 세션에서
   재설계해야 안전 (회귀 위험 관리).
 
-### P2 라운드 3 (R3 · 예정)
+### P2 라운드 3 (R3 · 구현 완료)
 
-1. `SourceImageCard` 를 `StudioUploadSlot` 기반으로 재작성 (info popover + 4 action 유지)
-2. `CompareImageSlot` 을 `StudioUploadSlot` 기반으로 재작성 (A/B badge + 2 pill 유지)
-3. 나머지 radius 하드코딩 100+ 건 점진 토큰화 (컴포넌트별 작은 PR)
-4. negative letter-spacing 19 occurrences 정리 (라운드 2 에서 공통 shell 들은 이미 0 으로 적용)
+**디자인 시스템 중추 완성**. 판매 퀄리티 1차 목표 도달.
+
+**R3-1 SourceImageCard 재작성**
+- ✅ StudioUploadSlot 기반으로 재작성 (기존 props 인터페이스 완전 보존)
+- ✅ 파일 업로드 로직 (FileReader + Image.onload) 은 SourceImageCard 가 유지
+- ✅ empty/filled shell + drag&drop 로직은 StudioUploadSlot 이 담당 (filled 일 때도 drop 허용하는 `acceptDropWhenFilled` 옵션 추가)
+- ✅ 256px 높이 + info popover + 사이즈 배지 + 4 action 버튼 고유 UX 유지
+
+**R3-2 CompareImageSlot 재작성**
+- ✅ StudioUploadSlot 기반으로 재작성 (기존 props 인터페이스 완전 보존)
+- ✅ A/B badge + 2 pill 액션 유지
+- ✅ 140px minHeight 유지
+
+**R3-3 radius 하드코딩 토큰화 (76건 · 시각 무변경)**
+- ✅ `borderRadius: 8` → `"var(--radius-sm)"` (25건)
+- ✅ `borderRadius: 12` → `"var(--radius)"` (17건)
+- ✅ `borderRadius: 14` → `"var(--radius-card)"` (5건)
+- ✅ `borderRadius: 16` → `"var(--radius-lg)"` (8건)
+- ✅ `borderRadius: 20` → `"var(--radius-xl)"` (1건)
+- ✅ `borderRadius: 999` → `"var(--radius-full)"` (20건)
+- 잔여 80건 (4/6/10/0/2/3) 은 어색한 값이거나 작은 장식 (유지)
+
+**R3-4 negative letterSpacing 정리 (17건)**
+- ✅ `-0.005em` / `-0.01em` → `0` (17건 치환)
+- 유지 2건: 랜딩 타이틀 `-0.03em` (Fraunces 디자인 의도) + 로고 `-0.015em`
+
+**검증**
+- pytest 130/130 유지
+- 프론트 lint clean (수정 파일 기준)
+
+### R4 (향후 · 선택적)
+
+1. 잔여 radius 80건 (4/6/10) 중 6/10 을 sm(8)/radius(12) 로 정식 승격할지 판단 (시각 변화 있음)
+2. primitives.tsx / chrome / settings 레거시 영역 lint 에러 5건 해소 (수정 금지 영역이지만 언젠가는)
+3. `--accent-disabled` 외에 다른 시맨틱 토큰 추가 (hover/focus/active 등)
 
 ### P3: 미세 정리
 

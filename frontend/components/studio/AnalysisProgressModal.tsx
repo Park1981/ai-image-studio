@@ -95,7 +95,7 @@ export default function AnalysisProgressModal({
       <section
         style={{
           background: "var(--bg)",
-          borderRadius: 16,
+          borderRadius: "var(--radius-lg)",
           boxShadow: "var(--shadow-lg)",
           border: "1px solid var(--line)",
           width: "min(560px, 100%)",
@@ -125,7 +125,7 @@ export default function AnalysisProgressModal({
                 margin: 0,
                 fontSize: 15,
                 fontWeight: 600,
-                letterSpacing: "-0.01em",
+                letterSpacing: 0,
               }}
             >
               {running ? title : "분석 완료"}
@@ -141,7 +141,7 @@ export default function AnalysisProgressModal({
               cursor: "pointer",
               width: 28,
               height: 28,
-              borderRadius: 8,
+              borderRadius: "var(--radius-sm)",
               display: "grid",
               placeItems: "center",
               color: "var(--ink-3)",
@@ -183,7 +183,7 @@ export default function AnalysisProgressModal({
             style={{
               height: 6,
               background: "var(--line-2)",
-              borderRadius: 999,
+              borderRadius: "var(--radius-full)",
               overflow: "hidden",
               marginBottom: 14,
               position: "relative",
@@ -200,7 +200,7 @@ export default function AnalysisProgressModal({
                   height: "100%",
                   width: "30%",
                   background: "var(--accent)",
-                  borderRadius: 999,
+                  borderRadius: "var(--radius-full)",
                   animation: "apm-indeterminate 1.4s ease-in-out infinite",
                 }}
               />

@@ -137,7 +137,7 @@ export default function VisionHistoryList({
             padding: "20px 16px",
             background: "var(--surface)",
             border: "1px dashed var(--line-2)",
-            borderRadius: 12,
+            borderRadius: "var(--radius)",
             textAlign: "center",
             color: "var(--ink-4)",
             fontSize: 12,

@@ -219,7 +219,7 @@ export default function VisionComparePage() {
                 padding: "6px 14px",
                 background: "var(--bg-2)",
                 border: "1px solid var(--line)",
-                borderRadius: 999,
+                borderRadius: "var(--radius-full)",
                 fontSize: 12,
                 color: "var(--ink-2)",
                 opacity: !imageA && !imageB ? 0.4 : 1,
@@ -269,7 +269,7 @@ export default function VisionComparePage() {
                 position: "relative",
                 background: "var(--surface)",
                 border: "1px solid var(--line)",
-                borderRadius: 12,
+                borderRadius: "var(--radius)",
                 boxShadow: "var(--shadow-sm)",
               }}
             >
@@ -291,7 +291,7 @@ export default function VisionComparePage() {
                   fontSize: 13.5,
                   lineHeight: 1.55,
                   color: "var(--ink)",
-                  borderRadius: 12,
+                  borderRadius: "var(--radius)",
                   minHeight: 76,
                 }}
               />
@@ -345,7 +345,7 @@ export default function VisionComparePage() {
                 background: canRun ? "var(--accent)" : "var(--accent-disabled)",
                 color: "#fff",
                 padding: "14px 20px",
-                borderRadius: 999,
+                borderRadius: "var(--radius-full)",
                 fontSize: 14,
                 fontWeight: 600,
                 width: "100%",
@@ -419,7 +419,7 @@ function ViewerPanel({
       style={{
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 16,
+        borderRadius: "var(--radius-lg)",
         padding: 14,
         display: "flex",
         flexDirection: "column",
@@ -564,7 +564,7 @@ function SideThumb({
         position: "relative",
         // 검은 배경 제거 — warm neutral 로 변경 (이미지 contain 시 여백이 자연스럽게 어울림)
         background: "var(--bg-2)",
-        borderRadius: 12,
+        borderRadius: "var(--radius)",
         overflow: "hidden",
         border: "1px solid var(--line)",
         display: "flex",
@@ -605,7 +605,7 @@ function AnalysisPanel({
       style={{
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 16,
+        borderRadius: "var(--radius-lg)",
         padding: 16,
         display: "flex",
         flexDirection: "column",
@@ -642,7 +642,7 @@ function AnalysisPanel({
               color: "var(--ink-3)",
               padding: "3px 8px",
               background: "var(--bg-2)",
-              borderRadius: 999,
+              borderRadius: "var(--radius-full)",
             }}
           >
             종합 {analysis.overall}%
@@ -800,7 +800,7 @@ function AxisRow({
         style={{
           height: 6,
           background: "var(--bg-2)",
-          borderRadius: 999,
+          borderRadius: "var(--radius-full)",
           overflow: "hidden",
         }}
       >

@@ -1,7 +1,18 @@
+/**
+ * CompareImageSlot — Vision Compare 페이지의 A/B 이미지 업로드 슬롯.
+ * 2026-04-24 audit R3-2: StudioUploadSlot 기반으로 재작성.
+ *
+ * 역할:
+ *   - 파일 업로드 로직 (FileReader + Image.onload) 내부 담당.
+ *   - empty/filled shell · 드래그/드롭 로직은 StudioUploadSlot 위임.
+ *   - filled 상태의 A/B 배지 + 2 pill (변경/해제) + 사이즈 배지 children 으로 구성.
+ */
+
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Icon from "@/components/ui/Icon";
+import StudioUploadSlot from "@/components/studio/StudioUploadSlot";
 import { toast } from "@/stores/useToastStore";
 import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
 
@@ -18,8 +29,7 @@ export function CompareImageSlot({
   onChange: (img: VisionCompareImage) => void;
   onClear: () => void;
 }) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [drag, setDrag] = useState(false);
+  const [pickFn, setPickFn] = useState<(() => void) | null>(null);
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -28,7 +38,6 @@ export function CompareImageSlot({
       toast.error("이미지 파일만 업로드 가능합니다.");
       return;
     }
-
     const reader = new FileReader();
     reader.onload = () => {
       const dataUrl = reader.result as string;
@@ -48,117 +57,87 @@ export function CompareImageSlot({
     reader.readAsDataURL(file);
   };
 
-  if (!value) {
-    return (
-      <div
-        onClick={() => fileInputRef.current?.click()}
-        onDragOver={(e) => e.preventDefault()}
-        onDragEnter={() => setDrag(true)}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          handleFiles(e.dataTransfer.files);
-        }}
-        style={{
-          minHeight: 140,
-          border: `1.5px dashed ${drag ? "#BDB6AA" : "#D4CEC0"}`,
-          borderRadius: "var(--radius)",
-          background: drag ? "#F1EEE8" : "var(--bg-2)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
-          cursor: "pointer",
-          color: "var(--ink-3)",
-          fontSize: 12,
-          padding: "16px 12px",
-          transition: "all .15s",
-        }}
-      >
-        <CompareSlotBadge>{badge}</CompareSlotBadge>
-        <Icon name="upload" size={20} />
-        <div style={{ fontWeight: 600, color: "var(--ink-2)" }}>{label}</div>
-        <div style={{ fontSize: 11 }}>클릭 또는 드래그로 업로드</div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
-    );
-  }
-
   return (
-    <div
-      style={{
-        position: "relative",
-        minHeight: 140,
-        borderRadius: 12,
-        background: "var(--bg-2)",
-        overflow: "hidden",
-        border: "1px solid var(--line)",
-        boxShadow: "var(--shadow-sm)",
-      }}
+    <StudioUploadSlot
+      filled={!!value}
+      height={160}
+      onFiles={handleFiles}
+      acceptDropWhenFilled
+      onReady={(pick) => setPickFn(() => pick)}
+      style={{ minHeight: 140, borderRadius: "var(--radius)" }}
+      emptyContent={
+        <>
+          <CompareSlotBadge>{badge}</CompareSlotBadge>
+          <Icon
+            name="upload"
+            size={20}
+            style={{ color: "var(--ink-3)", marginTop: 6 }}
+          />
+          <div
+            style={{
+              fontWeight: 600,
+              color: "var(--ink-2)",
+              fontSize: 12,
+              marginTop: 6,
+            }}
+          >
+            {label}
+          </div>
+          <div style={{ fontSize: 11, color: "var(--ink-3)", marginTop: 2 }}>
+            클릭 또는 드래그로 업로드
+          </div>
+        </>
+      }
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={value.dataUrl}
-        alt={label}
-        style={{
-          width: "100%",
-          height: 160,
-          objectFit: "contain",
-          display: "block",
-        }}
-      />
-      <CompareSlotBadge floating>{badge}</CompareSlotBadge>
-      <div
-        style={{
-          position: "absolute",
-          top: 8,
-          right: 8,
-          display: "flex",
-          gap: 6,
-        }}
-      >
-        <ActionPill
-          onClick={() => fileInputRef.current?.click()}
-          title="이미지 변경"
-        >
-          <Icon name="refresh" size={11} /> 변경
-        </ActionPill>
-        <ActionPill onClick={onClear} title="해제">
-          <Icon name="x" size={11} />
-        </ActionPill>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
-      <div
-        className="mono"
-        style={{
-          position: "absolute",
-          bottom: 6,
-          left: 8,
-          fontSize: 10,
-          color: "rgba(255,255,255,.85)",
-          background: "rgba(0,0,0,.5)",
-          padding: "2px 6px",
-          borderRadius: 4,
-          backdropFilter: "blur(4px)",
-        }}
-      >
-        {value.width}×{value.height}
-      </div>
-    </div>
+      {value && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={value.dataUrl}
+            alt={label}
+            style={{
+              width: "100%",
+              height: 160,
+              objectFit: "contain",
+              display: "block",
+            }}
+          />
+          <CompareSlotBadge floating>{badge}</CompareSlotBadge>
+          <div
+            style={{
+              position: "absolute",
+              top: 8,
+              right: 8,
+              display: "flex",
+              gap: 6,
+            }}
+          >
+            <ActionPill onClick={() => pickFn?.()} title="이미지 변경">
+              <Icon name="refresh" size={11} /> 변경
+            </ActionPill>
+            <ActionPill onClick={onClear} title="해제">
+              <Icon name="x" size={11} />
+            </ActionPill>
+          </div>
+          <div
+            className="mono"
+            style={{
+              position: "absolute",
+              bottom: 6,
+              left: 8,
+              fontSize: 10,
+              color: "rgba(255,255,255,.85)",
+              background: "rgba(0,0,0,.5)",
+              padding: "2px 6px",
+              borderRadius: 4,
+              backdropFilter: "blur(4px)",
+            }}
+          >
+            {value.width}×{value.height}
+          </div>
+        </>
+      )}
+    </StudioUploadSlot>
   );
 }
 
@@ -179,7 +158,7 @@ export function CompareSlotBadge({
           left: 8,
           width: 26,
           height: 26,
-          borderRadius: 8,
+          borderRadius: "var(--radius-sm)",
           background: "rgba(255,255,255,.92)",
           color: "var(--ink)",
           display: "grid",
@@ -200,7 +179,7 @@ export function CompareSlotBadge({
       style={{
         width: 26,
         height: 26,
-        borderRadius: 8,
+        borderRadius: "var(--radius-sm)",
         background: "var(--surface)",
         border: "1px solid var(--line)",
         display: "grid",
@@ -240,7 +219,7 @@ function ActionPill({
         backdropFilter: "blur(6px)",
         color: "#fff",
         fontSize: 11,
-        borderRadius: 999,
+        borderRadius: "var(--radius-full)",
       }}
     >
       {children}

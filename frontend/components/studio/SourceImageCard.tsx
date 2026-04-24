@@ -1,25 +1,21 @@
 /**
- * SourceImageCard — Edit 페이지의 원본 이미지 카드 (드롭존 + 오버레이 + 팝오버).
- * 2026-04-23 Opus F5: edit/page.tsx 에서 분리 (~216줄 → 별도 컴포넌트).
+ * SourceImageCard — Edit/Video/Vision 페이지의 원본 이미지 카드.
+ * 2026-04-24 audit R3-1: StudioUploadSlot 기반으로 재작성.
  *
- * 상태:
- *   - 빈 상태: 업로드 유도 dropzone
- *   - 채워진 상태: contain 풀커버 이미지 + 4 오버레이 (ⓘ 팝오버 · × 해제 ·
- *     사이즈배지 좌하 · 변경 버튼 우하)
+ * 역할:
+ *   - 파일 업로드 로직 (FileReader + Image.onload 로 크기 추출) 은 이 컴포넌트 담당.
+ *   - empty/filled shell · 드래그 이벤트는 StudioUploadSlot 이 담당.
+ *   - filled 상태의 4 오버레이 (info popover · × 해제 · 사이즈 배지 · 변경 버튼) 는
+ *     이 컴포넌트가 children 으로 직접 구성.
  *
- * 책임 경계:
- *   - 파일 업로드 (FileReader + Image.onload 로 크기 추출) 내부에서 처리.
- *   - onChange(image, label, w, h) 로 부모에 세 값 동시 전달.
- *   - × 해제는 onClear() 단일 콜백 — 부모가 setSource(null) + 토스트 처리.
- *
- * 에러:
- *   - 이미지 아닌 파일, 로드 실패 시 onError(message) 호출 — 부모가 토스트 판단.
+ * props 인터페이스는 기존과 동일 (edit/video/vision 페이지 무영향).
  */
 
 "use client";
 
-import { useRef, useState } from "react";
+import { useState } from "react";
 import Icon from "@/components/ui/Icon";
+import StudioUploadSlot from "@/components/studio/StudioUploadSlot";
 
 interface SourceImageCardProps {
   sourceImage: string | null;
@@ -43,9 +39,9 @@ export default function SourceImageCard({
   onClear,
   onError,
 }: SourceImageCardProps) {
-  const [drag, setDrag] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // StudioUploadSlot.onReady 로 받아둔 trigger — 변경 버튼 클릭 시 호출.
+  const [pickFn, setPickFn] = useState<(() => void) | null>(null);
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -138,47 +134,35 @@ export default function SourceImageCard({
         </div>
       )}
 
-      {/* 메인 카드 */}
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDrag(true);
-        }}
-        onDragLeave={() => setDrag(false)}
-        onDrop={(e) => {
-          e.preventDefault();
-          setDrag(false);
-          handleFiles(e.dataTransfer.files);
-        }}
-        onClick={() => {
-          if (!sourceImage) fileInputRef.current?.click();
-        }}
-        style={{
-          position: "relative",
-          height: 256,
-          borderRadius: "var(--radius-card)",
-          overflow: "hidden",
-          background: sourceImage
-            ? "var(--bg-2)"
-            : drag
-              ? "#F1EEE8"
-              : "var(--bg-2)",
-          border: sourceImage
-            ? "1px solid var(--line)"
-            : `1.5px dashed ${drag ? "#BDB6AA" : "#D4CEC0"}`,
-          transition: "all .2s",
-          cursor: sourceImage ? "default" : "pointer",
-        }}
+      {/* StudioUploadSlot — shell + 드래그/드롭 로직 담당 */}
+      <StudioUploadSlot
+        filled={!!sourceImage}
+        height={256}
+        onFiles={handleFiles}
+        acceptDropWhenFilled
+        onReady={(pick) => setPickFn(() => pick)}
+        emptyContent={
+          <>
+            <Icon name="upload" size={22} style={{ color: "var(--ink-4)" }} />
+            <div
+              style={{
+                fontSize: 12,
+                fontWeight: 500,
+                color: "var(--ink-3)",
+                marginTop: 8,
+              }}
+            >
+              드래그 또는 클릭
+            </div>
+            <div
+              style={{ fontSize: 10.5, color: "var(--ink-4)", marginTop: 2 }}
+            >
+              PNG · JPG · WebP
+            </div>
+          </>
+        }
       >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          onChange={(e) => handleFiles(e.target.files)}
-          style={{ display: "none" }}
-        />
-
-        {sourceImage ? (
+        {sourceImage && (
           <>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
@@ -189,15 +173,11 @@ export default function SourceImageCard({
                 height: "100%",
                 objectFit: "contain",
                 display: "block",
-                // 레터박스 배경을 warm neutral 로 통일 (audit 2026-04-24 P0-1).
-                // 기존 "#111" 은 다른 메뉴의 CompareImageSlot / VisionResultCard 와
-                // 톤이 어긋나 업로드 이미지가 메뉴마다 다른 앱처럼 보이던 문제.
+                // 레터박스 배경 warm neutral (audit P0-1 유지)
                 background: "var(--bg-2)",
               }}
             />
-            {/* 하단 그라디언트 — 배지/버튼 가독성 보장용 (유지).
-             *   warm neutral 배경에서도 흰색 텍스트 pill 의 대비 확보 필요.
-             *   다만 강도를 .55 → .42 로 낮춰 톤 이질감 감소. */}
+            {/* 하단 그라디언트 — 배지/버튼 가독성용 (audit R1-3 에서 .42 강도로 완화) */}
             <div
               style={{
                 position: "absolute",
@@ -232,7 +212,7 @@ export default function SourceImageCard({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                fileInputRef.current?.click();
+                pickFn?.();
               }}
               style={{
                 position: "absolute",
@@ -307,35 +287,8 @@ export default function SourceImageCard({
               <Icon name="x" size={10} />
             </button>
           </>
-        ) : (
-          /* 빈 상태 */
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "center",
-              justifyContent: "center",
-              height: "100%",
-              gap: 8,
-              color: "var(--ink-4)",
-            }}
-          >
-            <Icon name="upload" size={22} />
-            <div
-              style={{
-                fontSize: 12,
-                fontWeight: 500,
-                color: "var(--ink-3)",
-              }}
-            >
-              드래그 또는 클릭
-            </div>
-            <div style={{ fontSize: 10.5, color: "var(--ink-4)" }}>
-              PNG · JPG · WebP
-            </div>
-          </div>
         )}
-      </div>
+      </StudioUploadSlot>
     </div>
   );
 }

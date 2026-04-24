@@ -53,7 +53,7 @@ export default function VideoPlayerCard({
           padding: "28px 20px",
           background: "var(--surface)",
           border: "1px dashed var(--line-2)",
-          borderRadius: 14,
+          borderRadius: "var(--radius-card)",
           textAlign: "center",
           color: "var(--ink-3)",
           fontSize: 12.5,

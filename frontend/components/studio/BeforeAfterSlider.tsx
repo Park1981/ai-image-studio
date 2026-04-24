@@ -107,7 +107,7 @@ export default function BeforeAfterSlider({
       ref={wrapRef}
       style={{
         position: "relative",
-        borderRadius: 14,
+        borderRadius: "var(--radius-card)",
         overflow: "hidden",
         background: "var(--bg-2)",
         boxShadow: "var(--shadow-sm)",
