@@ -22,7 +22,7 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 - Frontend dev (Mock): `cd frontend && npm run dev`
 - Backend dev: `cd backend && D:\AI-Image-Studio\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8001 --no-access-log`
 - Frontend lint: `cd frontend && npm run lint`
-- Backend test: `cd backend && D:\AI-Image-Studio\.venv\Scripts\python.exe -m pytest tests/studio/` (13 tests)
+- Backend test: `cd backend && D:\AI-Image-Studio\.venv\Scripts\python.exe -m pytest tests/studio/` (91 tests · Edit 비교 분석 추가)
 
 ## Code Style
 - Korean comments in ALL files (한글 주석 필수)
@@ -34,18 +34,19 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 
 ## Key Files (재설계 이후)
 ### 신규 (권위)
-- **backend/studio/router.py**: `/api/studio/*` FastAPI 라우터 (generate/edit/**video** SSE · upgrade-only · research · interrupt · vision-analyze · history · models · process · ollama/models)
+- **backend/studio/router.py**: `/api/studio/*` FastAPI 라우터 (generate/edit/**video** SSE · upgrade-only · research · interrupt · vision-analyze · **compare-analyze** · history · models · process · ollama/models)
 - **backend/studio/comfy_api_builder.py**: ComfyUI flat API format 빌더 (`build_generate_from_request`, `build_edit_from_request`, **`build_video_from_request`**)
 - **backend/studio/comfy_transport.py**: WebSocket + HTTP 전송 (idle 600s / hard 1800s timeout · Video 는 idle 900s / hard 3600s)
-- **backend/studio/{prompt,vision,video}_pipeline.py**: Ollama gemma4 업그레이드 + qwen2.5vl 비전 · Video 는 5-step 체이닝
+- **backend/studio/{prompt,vision,video,comparison}_pipeline.py**: Ollama gemma4 업그레이드 + qwen2.5vl 비전 · Video 는 5-step 체이닝 · **comparison 은 multi-image 5축 평가**
 - **backend/studio/presets.py**: Qwen Image 2512 / Edit 2511 / **LTX Video 2.3** 프리셋 (프론트와 동기화 필수) · `compute_video_resize`, `build_quality_sigmas`, `active_video_loras` 헬퍼 포함
-- **backend/studio/history_db.py**: SQLite studio_history 테이블 (mode: generate/edit/**video**)
+- **backend/studio/history_db.py**: SQLite studio_history 테이블 (mode: generate/edit/**video**) · **source_ref + comparison_analysis 컬럼 (Edit 비교 분석용)**
 - **backend/workflows/qwen_image_2512.json, qwen_image_edit_2511.json**: 워크플로우 참조 (디스패치는 comfy_api_builder 가 Python 으로 구성 · Video 는 38-node flat API 전부 Python 조립)
-- **frontend/app/{page,generate,edit,video}/page.tsx**: 4 라우트
-- **frontend/components/studio/\***: AiEnhanceCard, HistoryTile, ImageLightbox (video 분기 포함), ProgressModal (generate/edit/**video** 3 모드), UpgradeConfirmModal, VideoPlayerCard
-- **frontend/lib/{api-client,model-presets,image-actions}.ts**: 핵심 프론트 유틸
-- **frontend/stores/use*Store.ts**: Zustand 7개 (settings/process/history/generate/edit/**video**/toast) · `useVideoStore` 에 adult/longerEdge/lightning 토글 + computeVideoResize 헬퍼
-- **frontend/app/globals.css**: 디자인 토큰 (warm neutral + cool blue)
+- **frontend/app/{page,generate,edit,video}/page.tsx**: 4 라우트 (Edit 페이지엔 ComparisonAnalysisCard 통합 · BeforeAfter 매칭 규칙)
+- **frontend/components/studio/\***: AiEnhanceCard, HistoryTile, ImageLightbox (video 분기 + InfoPanel 안 ComparisonAnalysisCard), ProgressModal (generate/edit/**video** 3 모드), UpgradeConfirmModal, VideoPlayerCard, **ComparisonAnalysisCard, ComparisonAnalysisModal**
+- **frontend/hooks/useComparisonAnalysis.ts**: 비교 분석 트리거 + per-item busy guard + VRAM 임계 (>13GB skip) + 결과 store inline patch
+- **frontend/lib/{api-client,model-presets,image-actions}.ts**: 핵심 프론트 유틸 · **lib/api/compare.ts** 신규 (compareAnalyze 호출 래퍼)
+- **frontend/stores/use*Store.ts**: Zustand 7개 (settings/process/history/generate/edit/**video**/toast) · `useVideoStore` 에 adult/longerEdge/lightning 토글 + computeVideoResize 헬퍼 · `useSettingsStore` 에 `autoCompareAnalysis` 토글
+- **frontend/app/globals.css**: 디자인 토큰 (warm neutral + cool blue) + `@keyframes fade-in`
 
 ### 레거시 (참조용 · 수정 금지)
 - backend/services/*, backend/routers/*, frontend/components/{Creation,History,Settings}*.tsx, frontend/hooks/*, frontend/stores/slices/*, frontend/lib/api.ts
@@ -108,6 +109,10 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 - `POST /research` (Claude CLI 조사 힌트)
 - `POST /interrupt` (ComfyUI 전역 중단)
 - `POST /vision-analyze` (Vision Analyzer 독립 페이지)
+- `POST /compare-analyze` (multipart source+result+meta) — Edit 결과 vs 원본 5축 평가 (qwen2.5vl multi-image)
+  - meta JSON: `{editPrompt, historyItemId?, visionModel?, ollamaModel?}`
+  - 응답: `{analysis: ComparisonAnalysis, saved: bool}` · HTTP 200 원칙 (fallback 보장)
+  - asyncio.Lock + 30s timeout → 503 (ComfyUI 샘플링과 직렬화)
 - `GET /models`, `GET /ollama/models`
 - `GET /process/status`, `POST /process/{ollama|comfyui}/{start|stop}`
 - `GET/DELETE /history[/{id}]`
@@ -120,3 +125,16 @@ Windows 11 로컬 환경 전용 (RTX 4070 Ti SUPER 16GB VRAM).
 
 ## Design Doc
 - `docs/superpowers/specs/2026-04-22-ai-image-studio-redesign-design.md` — 재설계 전체 통합 spec (12 섹션)
+- `docs/superpowers/specs/2026-04-24-edit-comparison-analysis-design.md` — Edit 비교 분석 spec
+- `docs/superpowers/plans/2026-04-24-edit-comparison-analysis.md` — 15-task TDD implementation plan
+
+## UX 규칙 (BeforeAfter 슬라이더)
+- /edit 페이지의 Before/After 슬라이더는 오직 진짜 완료된 한 쌍만 표시
+- 렌더 조건: `afterItem.sourceRef && afterItem.sourceRef === sourceImage`
+- 히스토리 타일 클릭 → `setSource(sourceRef)` + `setAfterId(id)` 동시 실행 (그 수정의 원본 자동 복원)
+- 옛 row (sourceRef NULL) 클릭 → toast 안내 + 슬라이더 자동 빈 상태
+- useEditPipeline done → `setSource(newItem.sourceRef)` 로 dataURL → backend 영구 URL 교체
+
+## 사용자 노출 텍스트 톤
+- 모든 placeholder / empty state / toast 는 한국어 존댓말 (공식체)
+- 코드 주석 / 로그 메시지는 개발자 톤 그대로 (반말 OK)
