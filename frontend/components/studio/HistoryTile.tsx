@@ -10,7 +10,7 @@
 
 "use client";
 
-import { useState, type CSSProperties, type ReactNode } from "react";
+import { useState, type CSSProperties } from "react";
 import ImageTile from "@/components/ui/ImageTile";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import { deleteHistoryItem, type HistoryItem } from "@/lib/api-client";
@@ -39,16 +39,14 @@ interface Props {
   style?: CSSProperties;
 }
 
-/** hover 바 공통 버튼 — 아이콘 + 라벨. */
+/** hover 바 공통 버튼 — 아이콘 only (좁은 그리드에서 레이아웃 안 깨지게 2026-04-24). */
 function BarButton({
   icon,
-  label,
   title,
   onClick,
   variant = "neutral",
 }: {
   icon: IconName;
-  label: ReactNode;
   title: string;
   onClick: (e: React.MouseEvent) => void;
   variant?: "neutral" | "primary" | "danger";
@@ -80,22 +78,20 @@ function BarButton({
         cursor: "pointer",
         display: "inline-flex",
         alignItems: "center",
-        gap: 4,
-        padding: "5px 10px",
+        justifyContent: "center",
+        // 정사각 원형 아이콘 버튼 — 라벨 제거에 맞춰 padding 도 균일
+        width: 26,
+        height: 26,
         borderRadius: 999,
-        fontSize: 11,
-        fontWeight: 600,
-        letterSpacing: ".02em",
         color: "#fff",
         background: hov ? palette.bgHov : palette.bg,
         backdropFilter: "blur(4px)",
         border: "1px solid rgba(255,255,255,.18)",
         transition: "background .15s, transform .15s",
-        transform: hov ? "scale(1.03)" : "scale(1)",
+        transform: hov ? "scale(1.08)" : "scale(1)",
       }}
     >
-      <Icon name={icon} size={11} stroke={2.2} />
-      {label}
+      <Icon name={icon} size={12} stroke={2.2} />
     </button>
   );
 }
@@ -187,7 +183,6 @@ export default function HistoryTile({
             {triggerExpand && (
               <BarButton
                 icon="zoom-in"
-                label="자세히"
                 title="라이트박스에서 크게 보기"
                 onClick={(e) => {
                   e.stopPropagation();
@@ -201,7 +196,6 @@ export default function HistoryTile({
             {onUseAsSource && (
               <BarButton
                 icon="edit"
-                label="원본으로"
                 title="이 이미지를 수정 원본으로"
                 variant="primary"
                 onClick={(e) => {
@@ -212,13 +206,7 @@ export default function HistoryTile({
             )}
           </div>
           <div style={{ pointerEvents: "auto" }}>
-            <BarButton
-              icon="x"
-              label=""
-              title="삭제"
-              variant="danger"
-              onClick={handleDelete}
-            />
+            <BarButton icon="x" title="삭제" variant="danger" onClick={handleDelete} />
           </div>
         </div>
       )}
