@@ -155,7 +155,15 @@ export default function GeneratePage() {
   const sizeLabel = `${width}×${height}`;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        // 페이지 최소 너비 — 좌 400 + 우 최소 624 = 1024. 그 이하에선 body 가로 스크롤.
+        minWidth: 1024,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {progressOpen && (
         <ProgressModal mode="generate" onClose={() => setProgressOpen(false)} />
       )}
@@ -219,7 +227,8 @@ export default function GeneratePage() {
         style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "2fr 3fr",
+          // 4 페이지 레이아웃 통일 — 좌 400 고정, 우 최소 624 (1024 하한 - 좌 400).
+          gridTemplateColumns: "400px minmax(624px, 1fr)",
           minHeight: "calc(100vh - 52px)",
         }}
       >

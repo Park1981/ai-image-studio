@@ -177,7 +177,15 @@ export default function EditPage() {
   };
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        // 페이지 최소 너비 — 좌 400 + 우 최소 624 = 1024. 그 이하에선 body 가로 스크롤.
+        minWidth: 1024,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
       {progressOpen && (
         <ProgressModal mode="edit" onClose={() => setProgressOpen(false)} />
       )}
@@ -254,7 +262,8 @@ export default function EditPage() {
         style={{
           flex: 1,
           display: "grid",
-          gridTemplateColumns: "400px 1fr",
+          // 4 페이지 레이아웃 통일 — 좌 400 고정, 우 최소 624.
+          gridTemplateColumns: "400px minmax(624px, 1fr)",
           minHeight: "calc(100vh - 52px)",
         }}
       >

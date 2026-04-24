@@ -197,7 +197,16 @@ export default function HistoryGallery({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+    <div
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 18,
+        // 좁은 우측 패널에서 타일 또는 Masonry 내부가 가로로 넘치지 않게 차단.
+        // 세로 스크롤은 호출처 스크롤 박스(overflowY:auto)가 담당.
+        overflowX: "hidden",
+      }}
+    >
       {sections.map((s, i) => {
         const isClosed = isClosedSection(i, s.key);
         return (
