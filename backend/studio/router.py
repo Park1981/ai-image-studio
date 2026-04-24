@@ -32,6 +32,7 @@ import io
 import json
 import logging
 import os
+import re
 import time
 import uuid
 from dataclasses import asdict
@@ -89,6 +90,14 @@ except Exception:
     STUDIO_OUTPUT_DIR = Path("backend/output/images/studio")
     STUDIO_URL_PREFIX = "/images/studio"
 STUDIO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+# Edit 비교 분석용 source 영구 저장 (Task 5)
+EDIT_SOURCE_DIR = STUDIO_OUTPUT_DIR / "edit-source"
+EDIT_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
+EDIT_SOURCE_URL_PREFIX = f"{STUDIO_URL_PREFIX}/edit-source"
+
+# task_id 검증 정규식 — path traversal 방지 (CLAUDE.md 보안 규칙)
+_TASK_ID_RE = re.compile(r"^tsk-[0-9a-f]{12}$")
 
 # 백그라운드로 돌리는 asyncio.Task 참조 보관 — GC 가 중간에 수거하는 이슈 방지.
 # set.add / discard 패턴이 FastAPI 권장.
@@ -876,6 +885,23 @@ async def _run_edit_pipeline(
         await task.emit("step", {"step": 4, "done": True})
         await task.emit("stage", {"type": "save-output", "progress": 98, "stageLabel": "결과 저장"})
 
+        # ── source 영구 저장 (비교 분석용) ──
+        # task.task_id 형식 (tsk-xxxxxxxxxxxx) 보장 — 이미 _new_task 에서 생성한 값.
+        # 정규식 화이트리스트로 path traversal 방지 (CLAUDE.md 규칙).
+        source_ref: str | None = None
+        if _TASK_ID_RE.match(task.task_id):
+            source_path = EDIT_SOURCE_DIR / f"{task.task_id}.png"
+            try:
+                # PIL 로 RGB 변환 후 PNG 로 저장 (JPG 입력도 무손실 PNG 로 통일)
+                with Image.open(io.BytesIO(image_bytes)) as src_im:
+                    src_im.convert("RGB").save(source_path, "PNG")
+                source_ref = f"{EDIT_SOURCE_URL_PREFIX}/{task.task_id}.png"
+            except Exception as src_err:
+                log.warning(
+                    "edit source persist failed (non-fatal): %s", src_err
+                )
+                # 결과는 그대로 살리고 sourceRef=None 으로 진행
+
         # Done
         item = {
             "id": f"edit-{uuid.uuid4().hex[:8]}",
@@ -895,6 +921,7 @@ async def _run_edit_pipeline(
             "upgradedPromptKo": vision.upgrade.translation,
             "visionDescription": vision.image_description,
             "comfyError": comfy_err,
+            "sourceRef": source_ref,
         }
         saved_to_history = await _persist_history(item)
         await task.emit(

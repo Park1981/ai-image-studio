@@ -421,3 +421,81 @@ async def test_translate_section_parsing_uppercase_headers() -> None:
     assert result["comments_ko"]["face_id"] == "눈 보존됨."
     assert result["comments_ko"]["body_pose"] == "어깨 변화."
     assert result["summary_ko"] == "전반적 양호."
+
+
+# ───────── /edit source 영구 저장 ─────────
+
+
+@pytest.mark.asyncio
+async def test_edit_persists_source_to_disk(monkeypatch, tmp_path: Path) -> None:
+    """/edit 호출 시 source 가 STUDIO_OUTPUT_DIR/edit-source/{task_id}.png 로 저장되고
+    history 에 sourceRef 가 기입된다."""
+    from unittest.mock import AsyncMock, patch
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+    from studio import history_db, router as studio_router
+
+    # 임시 STUDIO_OUTPUT_DIR + edit-source 서브디렉토리
+    out_dir = tmp_path / "studio-out"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    edit_src_dir = out_dir / "edit-source"
+    edit_src_dir.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setattr(studio_router, "STUDIO_OUTPUT_DIR", out_dir)
+    monkeypatch.setattr(studio_router, "EDIT_SOURCE_DIR", edit_src_dir)
+
+    # 임시 DB
+    _set_temp_db(monkeypatch, tmp_path)
+    await history_db.init_studio_history_db()
+
+    # ComfyUI 디스패치는 mock-fallback 으로 우회
+    from studio.router import ComfyDispatchResult
+
+    async def fake_dispatch(*args, **kwargs):
+        return ComfyDispatchResult(
+            image_ref="mock-seed://test",
+            width=1024, height=1024, comfy_error=None,
+        )
+
+    fake_vision_result = type("V", (), {
+        "image_description": "x",
+        "final_prompt": "x",
+        "vision_ok": True,
+        "upgrade": type("U", (), {
+            "translation": "x",
+            "provider": "ollama",
+        })(),
+    })()
+
+    with (
+        patch.object(studio_router, "_dispatch_to_comfy", new=AsyncMock(side_effect=fake_dispatch)),
+        patch.object(studio_router, "run_vision_pipeline", new=AsyncMock(return_value=fake_vision_result)),
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as cli:
+            res = await cli.post(
+                "/api/studio/edit",
+                files={"image": ("src.png", _tiny_png_bytes(), "image/png")},
+                data={"meta": json.dumps({"prompt": "make it blue", "lightning": True})},
+            )
+            assert res.status_code == 200
+            stream_url = res.json()["stream_url"]
+            # SSE 스트림 소비 — done 이벤트까지 대기
+            done_item = None
+            async with cli.stream("GET", stream_url) as sr:
+                async for line in sr.aiter_lines():
+                    if line.startswith("data:"):
+                        try:
+                            payload = json.loads(line[5:].strip())
+                        except json.JSONDecodeError:
+                            continue
+                        if isinstance(payload, dict) and "item" in payload:
+                            done_item = payload["item"]
+                            break
+
+    assert done_item is not None
+    assert done_item.get("sourceRef", "").startswith("/images/studio/edit-source/")
+    # 디스크에 파일 존재 — task_id 가 파일명
+    rel = done_item["sourceRef"].replace("/images/studio/", "")
+    assert (out_dir / rel).exists()
