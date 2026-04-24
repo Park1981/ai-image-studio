@@ -25,13 +25,16 @@ import {
 } from "@/components/chrome/Chrome";
 import SettingsButton from "@/components/settings/SettingsButton";
 import VramBadge from "@/components/chrome/VramBadge";
-import AiEnhanceCard from "@/components/studio/AiEnhanceCard";
 import ComparisonAnalysisCard from "@/components/studio/ComparisonAnalysisCard";
 import ComparisonAnalysisModal from "@/components/studio/ComparisonAnalysisModal";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistoryPicker from "@/components/studio/HistoryPicker";
+import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageLightbox from "@/components/studio/ImageLightbox";
+import ResultHoverActionBar, {
+  ActionBarButton,
+} from "@/components/studio/ResultHoverActionBar";
 import PipelineSteps, { type PipelineStepMeta } from "@/components/studio/PipelineSteps";
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
@@ -39,7 +42,7 @@ import SourceImageCard from "@/components/studio/SourceImageCard";
 import { useProcessStore } from "@/stores/useProcessStore";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
-import { SmallBtn, Spinner, Toggle } from "@/components/ui/primitives";
+import { Spinner, Toggle } from "@/components/ui/primitives";
 import { EDIT_MODEL } from "@/lib/model-presets";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
 import { useEditPipeline } from "@/hooks/useEditPipeline";
@@ -116,6 +119,9 @@ export default function EditPage() {
   const cycleGrid = () =>
     setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
+  /* ── 결과 뷰어 호버 상태 (호버 시 액션바 페이드 인) ── */
+  const [viewerHovered, setViewerHovered] = useState(false);
+
   /* ── 진행 모달 open 상태 ──
    * running false→true 전이 시 자동 오픈. React 공식 권장: prev state 비교.
    */
@@ -143,6 +149,17 @@ export default function EditPage() {
     setPrevSource(sourceImage);
     if (afterItem && afterItem.sourceRef !== sourceImage) {
       setAfterId(null);
+    }
+  }
+
+  /* ── afterId 전환 시 비교 슬라이더를 중앙(50) 으로 리셋 ──
+     compareX 는 store state 라 세션 내 드래그 값이 유지되는데, 새 비교는 항상
+     중앙에서 시작하는 게 자연스러움. React 19 권장 render-time prev 비교 패턴. */
+  const [prevAfterIdForX, setPrevAfterIdForX] = useState<string | null>(afterId);
+  if (prevAfterIdForX !== afterId) {
+    setPrevAfterIdForX(afterId);
+    if (afterId && compareX !== 50) {
+      setCompareX(50);
     }
   }
 
@@ -534,83 +551,114 @@ export default function EditPage() {
             minWidth: 0,
           }}
         >
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
-                Before · After
-              </h3>
-              <span
-                className="mono"
-                style={{
-                  fontSize: 11,
-                  color: "var(--ink-4)",
-                  letterSpacing: ".04em",
-                }}
-              >
-                slider compare
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 6 }}>
-              <SmallBtn
-                icon="zoom-in"
-                onClick={() => {
-                  if (!afterItem) return;
-                  setLightboxSrc(afterItem.imageRef);
-                }}
-              >
-                크게
-              </SmallBtn>
-              <SmallBtn
-                icon="download"
-                onClick={() => {
-                  if (!afterItem) return;
-                  downloadImage(
-                    afterItem.imageRef,
-                    filenameFromRef(
-                      afterItem.imageRef,
-                      `ais-edit-${afterItem.id}.png`,
-                    ),
-                  );
-                }}
-              >
-                저장
-              </SmallBtn>
-              <SmallBtn
-                icon="refresh"
-                onClick={() => {
-                  if (!afterItem) return;
-                  // 수정 지시 + Lightning 설정 복원
-                  setPrompt(afterItem.prompt);
-                  setLightning(afterItem.lightning);
-                  toast.info("수정 설정 복원", "[수정 생성] 눌러");
-                }}
-              >
-                다시
-              </SmallBtn>
-            </div>
-          </div>
-
-          {/* Before/After */}
+          {/* ── 결과 뷰어 (Before/After 슬라이더 + 호버 액션바) ── */}
           {sourceImage && afterItem && afterItem.sourceRef && afterItem.sourceRef === sourceImage ? (
             <>
-              <BeforeAfter
-                beforeSrc={sourceImage}
-                afterSeed={afterItem.imageRef || afterItem.id}
-                compareX={compareX}
-                setCompareX={setCompareX}
-                aspectRatio={
-                  sourceWidth && sourceHeight
-                    ? `${sourceWidth} / ${sourceHeight}`
-                    : "16 / 10"
-                }
-              />
-              <AiEnhanceCard item={afterItem} />
+              <div
+                onMouseEnter={() => setViewerHovered(true)}
+                onMouseLeave={() => setViewerHovered(false)}
+                style={{
+                  // 바깥 wrapper — 섹션 가로 꽉 + BeforeAfter 가운데 정렬.
+                  // BeforeAfter 는 aspectRatio + maxHeight 70vh 때문에 세로형 이미지일 땐
+                  // width 가 height × ratio 로 축소됨. flex center 로 뷰어 가운데 정렬.
+                  width: "100%",
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                {/* 내부 wrapper — BeforeAfter 와 크기가 같아 액션바가 이미지 하단에만 깔림 */}
+                <div style={{ position: "relative" }}>
+                  <BeforeAfter
+                    beforeSrc={sourceImage}
+                    afterSeed={afterItem.imageRef || afterItem.id}
+                    compareX={compareX}
+                    setCompareX={setCompareX}
+                    aspectRatio={
+                      sourceWidth && sourceHeight
+                        ? `${sourceWidth} / ${sourceHeight}`
+                        : "16 / 10"
+                    }
+                  />
+                  {/* 호버 액션바 — 이벤트 버블 차단(드래그 핸들과 충돌 방지) */}
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <ResultHoverActionBar
+                    hovered={viewerHovered}
+                    summary={
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <span
+                          style={{
+                            flex: 1,
+                            minWidth: 0,
+                            whiteSpace: "nowrap",
+                            overflow: "hidden",
+                            textOverflow: "ellipsis",
+                            fontSize: 12,
+                          }}
+                          title={afterItem.prompt}
+                        >
+                          {afterItem.prompt}
+                        </span>
+                        <span
+                          className="mono"
+                          style={{
+                            fontSize: 10.5,
+                            color: "rgba(255,255,255,.72)",
+                            letterSpacing: ".04em",
+                            flexShrink: 0,
+                          }}
+                        >
+                          {afterItem.width}×{afterItem.height}
+                        </span>
+                      </div>
+                    }
+                  >
+                    <ActionBarButton
+                      icon="zoom-in"
+                      title="크게 보기"
+                      onClick={() => setLightboxSrc(afterItem.imageRef)}
+                    />
+                    <ActionBarButton
+                      icon="download"
+                      title="저장"
+                      onClick={() =>
+                        downloadImage(
+                          afterItem.imageRef,
+                          filenameFromRef(
+                            afterItem.imageRef,
+                            `ais-edit-${afterItem.id}.png`,
+                          ),
+                        )
+                      }
+                    />
+                    <ActionBarButton
+                      icon="edit"
+                      title="이 결과를 다음 수정의 원본으로"
+                      onClick={() => {
+                        setSource(
+                          afterItem.imageRef,
+                          `${afterItem.label} · ${afterItem.width}×${afterItem.height}`,
+                          afterItem.width,
+                          afterItem.height,
+                        );
+                        setAfterId(null); // 비교 슬라이더 초기화
+                        toast.info("원본으로 지정", afterItem.label);
+                      }}
+                    />
+                    <ActionBarButton
+                      icon="refresh"
+                      title="수정 설정 복원 (다시)"
+                      onClick={() => {
+                        setPrompt(afterItem.prompt);
+                        setLightning(afterItem.lightning);
+                        toast.info("수정 설정 복원", "[수정 생성] 눌러");
+                      }}
+                    />
+                  </ResultHoverActionBar>
+                </div>
+                </div>
+              </div>
+
+              {/* 비교 분석 카드 — 수정 결과 대 원본 5축 평가 (Q2: 1차 유지) */}
               <ComparisonAnalysisCard
                 item={afterItem}
                 busy={isBusy(afterItem.id)}
@@ -641,46 +689,18 @@ export default function EditPage() {
             </div>
           )}
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingTop: 4,
-              borderTop: "1px solid var(--line)",
-              marginTop: 4,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 10,
-                marginTop: 10,
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
-                수정 히스토리
-              </h3>
-              <span
-                className="mono"
-                style={{
-                  fontSize: 11,
-                  color: "var(--ink-4)",
-                  letterSpacing: ".04em",
-                }}
-              >
-                {editResults.length} items
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+          {/* ── 히스토리 섹션 헤더 (4 메뉴 공용) ── */}
+          <HistorySectionHeader
+            title="수정 히스토리"
+            count={editResults.length}
+            actions={
               <IconBtn
                 icon="grid"
                 title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
                 onClick={cycleGrid}
               />
-            </div>
-          </div>
+            }
+          />
 
           {/* 갤러리 스크롤 박스 — 자체 스크롤로 상단 비교뷰 고정 */}
           <div

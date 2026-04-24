@@ -521,8 +521,8 @@ function InfoPanel({
         </section>
       )}
 
-      {/* 비교 분석 (Edit 모드 전용) */}
-      {item.mode === "edit" && (
+      {/* 비교 분석 — Edit 모드 + 분석 결과가 있을 때만 렌더 (없으면 섹션 자체 숨김) */}
+      {item.mode === "edit" && item.comparisonAnalysis && (
         <section style={{ marginBottom: 18 }}>
           <SectionTitle>비교 분석</SectionTitle>
           <ComparisonInPanel item={item} />
