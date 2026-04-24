@@ -195,12 +195,14 @@ export function Range({
   step = 1,
   value,
   onChange,
+  disabled = false,
 }: {
   min: number;
   max: number;
   step?: number;
   value: number;
   onChange: (v: number) => void;
+  disabled?: boolean;
 }) {
   const pct = ((value - min) / (max - min)) * 100;
   return (
@@ -210,11 +212,14 @@ export function Range({
       max={max}
       step={step}
       value={value}
+      disabled={disabled}
       onChange={(e) => onChange(Number(e.target.value))}
       style={{
         width: "100%",
         accentColor: "var(--accent)",
         background: `linear-gradient(to right, var(--accent) ${pct}%, var(--line) ${pct}%)`,
+        opacity: disabled ? 0.45 : 1,
+        cursor: disabled ? "not-allowed" : "pointer",
       }}
     />
   );

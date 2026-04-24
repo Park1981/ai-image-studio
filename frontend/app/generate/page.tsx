@@ -76,12 +76,6 @@ export default function GeneratePage() {
   const setResearch = useGenerateStore((s) => s.setResearch);
   const lightning = useGenerateStore((s) => s.lightning);
   const applyLightning = useGenerateStore((s) => s.applyLightning);
-  const steps = useGenerateStore((s) => s.steps);
-  const setSteps = useGenerateStore((s) => s.setSteps);
-  const cfg = useGenerateStore((s) => s.cfg);
-  const setCfg = useGenerateStore((s) => s.setCfg);
-  const seed = useGenerateStore((s) => s.seed);
-  const setSeed = useGenerateStore((s) => s.setSeed);
   const generating = useGenerateStore((s) => s.generating);
   const progress = useGenerateStore((s) => s.progress);
   const stage = useGenerateStore((s) => s.stage);
@@ -99,7 +93,7 @@ export default function GeneratePage() {
   const handleGenerate = pipeline.generate;
   const handleUpgradeConfirm = pipeline.upgrade.confirm;
   const handleUpgradeRerun = pipeline.upgrade.rerun;
-  const handleResearchNow = pipeline.researchNow;
+  const researchPreview = pipeline.researchPreview;
 
   /* ── 생성 모드에서만 보이는 히스토리 필터 ── */
   const genItems = useMemo(
@@ -376,31 +370,47 @@ export default function GeneratePage() {
                   <button
                     type="button"
                     onClick={() => setPrompt("")}
+                    title="프롬프트 비우기"
                     style={{
+                      // edit/video 와 동일 스타일 — 4 페이지 "비우기" 버튼 통일.
                       all: "unset",
                       cursor: "pointer",
                       fontSize: 11,
-                      color: "var(--ink-3)",
+                      color: "var(--ink-4)",
                       display: "flex",
                       alignItems: "center",
-                      gap: 4,
+                      gap: 3,
+                      padding: "4px 6px",
+                      borderRadius: 6,
+                      transition: "background .12s",
+                    }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background =
+                        "var(--bg-2)";
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.background =
+                        "transparent";
                     }}
                   >
-                    <Icon name="x" size={11} /> 비우기
+                    <Icon name="x" size={10} /> 비우기
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 조사 필요 배너 */}
+          {/* Claude 프롬프트 조사 배너 — 힌트 인라인 표시 */}
           <ResearchBanner
             checked={research}
             onChange={setResearch}
-            onPreview={handleResearchNow}
+            onPreview={researchPreview.run}
+            loading={researchPreview.loading}
+            hints={researchPreview.hints}
+            error={researchPreview.error}
           />
 
-          {/* 고급 accordion */}
+          {/* 고급 accordion — 사이즈·Lightning 만 (Step/CFG/Seed 는 UI 제거 · 2026-04-24) */}
           <AdvancedAccordion
             aspect={aspect}
             sizeLabel={sizeLabel}
@@ -408,17 +418,11 @@ export default function GeneratePage() {
             height={height}
             aspectLocked={aspectLocked}
             lightning={lightning}
-            steps={steps}
-            cfg={cfg}
-            seed={seed}
             onAspect={(v) => setAspect(v)}
             onWidth={setWidth}
             onHeight={setHeight}
             onAspectLocked={setAspectLocked}
             onLightning={applyLightning}
-            onSteps={setSteps}
-            onCfg={setCfg}
-            onSeed={setSeed}
           />
 
           {/* Primary CTA — sticky 하단 (페이지 스크롤 시 viewport 하단에 고정) */}
@@ -582,11 +586,10 @@ export default function GeneratePage() {
                 router.push("/edit");
               }}
               onReuse={() => {
+                // 재생성 = 프롬프트 + 사이즈 + Lightning 복원.
+                // Seed/Step/CFG 는 UI 제거 + 매번 랜덤 정책이라 복원 안 함.
                 setPrompt(selectedItem.prompt);
                 setDimensions(selectedItem.width, selectedItem.height);
-                setSeed(selectedItem.seed);
-                setSteps(selectedItem.steps);
-                setCfg(selectedItem.cfg);
                 if (selectedItem.lightning !== lightning) {
                   applyLightning(selectedItem.lightning);
                 }
@@ -653,6 +656,7 @@ export default function GeneratePage() {
 
 /* ─────────────────────────────────
    고급 accordion (지역 컴포넌트)
+   2026-04-24: Step/CFG/Seed 제거 — 사이즈(W/H 숫자+슬라이더) + Lightning 만.
    ───────────────────────────────── */
 function AdvancedAccordion({
   aspect,
@@ -661,17 +665,11 @@ function AdvancedAccordion({
   height,
   aspectLocked,
   lightning,
-  steps,
-  cfg,
-  seed,
   onAspect,
   onWidth,
   onHeight,
   onAspectLocked,
   onLightning,
-  onSteps,
-  onCfg,
-  onSeed,
 }: {
   aspect: AspectValue;
   sizeLabel: string;
@@ -679,17 +677,11 @@ function AdvancedAccordion({
   height: number;
   aspectLocked: boolean;
   lightning: boolean;
-  steps: number;
-  cfg: number;
-  seed: number;
   onAspect: (v: AspectRatioLabel) => void;
   onWidth: (v: number) => void;
   onHeight: (v: number) => void;
   onAspectLocked: (v: boolean) => void;
   onLightning: (v: boolean) => void;
-  onSteps: (v: number) => void;
-  onCfg: (v: number) => void;
-  onSeed: (v: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   // 입력 중 raw string — blur/Enter 시에만 store 커밋 (중간값 clamp 방지)
@@ -748,7 +740,7 @@ function AdvancedAccordion({
               letterSpacing: ".04em",
             }}
           >
-            {aspect} · {sizeLabel} · {steps} steps · CFG {cfg}
+            {aspect} · {sizeLabel}
             {lightning && " · ⚡"}
           </span>
         </span>
@@ -776,21 +768,26 @@ function AdvancedAccordion({
           <Field
             label={`사이즈 · ${sizeLabel}${aspect === "custom" ? "" : ` · ${aspect}`}`}
           >
-            {/* W × H 숫자 입력 + 비율 잠금 토글 */}
+            {/* W/H 세트 — 각 입력박스 바로 아래에 동일 너비 슬라이더 (컴팩트) */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-              <input
-                className="mono"
-                type="number"
-                min={256}
-                max={2048}
-                step={8}
-                value={rawW}
-                onChange={(e) => setRawW(e.target.value)}
-                onBlur={commitW}
-                onKeyDown={(e) => { if (e.key === "Enter") { commitW(); (e.target as HTMLInputElement).blur(); } }}
-                style={{ ...inputStyle, width: 78, textAlign: "right" }}
-                aria-label="width px"
-              />
+              {/* W 세트 (input + slider 세로) */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 0 }}>
+                <DimInput
+                  label="W"
+                  raw={rawW}
+                  onRaw={setRawW}
+                  onCommit={commitW}
+                />
+                <Range
+                  min={768}
+                  max={2048}
+                  step={8}
+                  value={Math.max(768, width)}
+                  onChange={onWidth}
+                />
+              </div>
+
+              {/* 비율잠금 버튼 — 두 열 사이 수직 가운데 정렬 */}
               <button
                 type="button"
                 onClick={() => onAspectLocked(!aspectLocked)}
@@ -801,6 +798,7 @@ function AdvancedAccordion({
                 }
                 style={{
                   ...iconBtnStyle,
+                  alignSelf: "center",
                   background: aspectLocked
                     ? "var(--accent-soft)"
                     : iconBtnStyle.background,
@@ -812,19 +810,26 @@ function AdvancedAccordion({
               >
                 <Icon name={aspectLocked ? "lock" : "unlock"} size={13} />
               </button>
-              <input
-                className="mono"
-                type="number"
-                min={256}
-                max={2048}
-                step={8}
-                value={rawH}
-                onChange={(e) => setRawH(e.target.value)}
-                onBlur={commitH}
-                onKeyDown={(e) => { if (e.key === "Enter") { commitH(); (e.target as HTMLInputElement).blur(); } }}
-                style={{ ...inputStyle, width: 78, textAlign: "right" }}
-                aria-label="height px"
-              />
+
+              {/* H 세트 — 비율잠금 ON 시 input · slider 모두 disabled */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1, minWidth: 0 }}>
+                <DimInput
+                  label="H"
+                  raw={rawH}
+                  onRaw={setRawH}
+                  onCommit={commitH}
+                  disabled={aspectLocked}
+                  disabledTitle="비율 잠금 해제 후 직접 입력 가능"
+                />
+                <Range
+                  min={768}
+                  max={2048}
+                  step={8}
+                  value={Math.max(768, height)}
+                  onChange={onHeight}
+                  disabled={aspectLocked}
+                />
+              </div>
             </div>
             {/* 프리셋 칩 — 원터치로 익숙한 비율 설정 */}
             <div
@@ -880,36 +885,74 @@ function AdvancedAccordion({
             />
           </Field>
           </div>
-          <Field label={`스텝 · ${steps}`}>
-            <Range min={4} max={50} value={steps} onChange={onSteps} />
-          </Field>
-          <Field label={`CFG · ${cfg}`}>
-            <Range min={1} max={10} step={0.5} value={cfg} onChange={onCfg} />
-          </Field>
-          <Field label="Seed">
-            <div style={{ display: "flex", gap: 8 }}>
-              <input
-                className="mono"
-                value={seed}
-                onChange={(e) =>
-                  onSeed(
-                    Number(e.target.value.replace(/\D/g, "").slice(0, 15)) || 0,
-                  )
-                }
-                style={inputStyle}
-              />
-              <button
-                type="button"
-                onClick={() => onSeed(Math.floor(Math.random() * 1e15))}
-                style={iconBtnStyle}
-                title="랜덤"
-              >
-                <Icon name="refresh" size={14} />
-              </button>
-            </div>
-          </Field>
         </div>
       )}
+    </div>
+  );
+}
+
+/** W/H 차원 입력 — label prefix 를 input 안에 overlay 로 얹음 (컴팩트). */
+function DimInput({
+  label,
+  raw,
+  onRaw,
+  onCommit,
+  disabled = false,
+  disabledTitle,
+}: {
+  label: "W" | "H";
+  raw: string;
+  onRaw: (v: string) => void;
+  onCommit: () => void;
+  disabled?: boolean;
+  disabledTitle?: string;
+}) {
+  return (
+    <div style={{ position: "relative", width: "100%" }}>
+      <span
+        aria-hidden
+        className="mono"
+        style={{
+          position: "absolute",
+          left: 8,
+          top: "50%",
+          transform: "translateY(-50%)",
+          fontSize: 10,
+          color: "var(--ink-4)",
+          pointerEvents: "none",
+          fontWeight: 500,
+          letterSpacing: ".04em",
+        }}
+      >
+        {label}
+      </span>
+      <input
+        className="mono"
+        type="number"
+        min={768}
+        max={2048}
+        step={8}
+        value={raw}
+        disabled={disabled}
+        onChange={(e) => onRaw(e.target.value)}
+        onBlur={onCommit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            onCommit();
+            (e.target as HTMLInputElement).blur();
+          }
+        }}
+        style={{
+          ...inputStyle,
+          width: "100%",
+          paddingLeft: 22,
+          textAlign: "right",
+          opacity: disabled ? 0.5 : 1,
+          cursor: disabled ? "not-allowed" : "auto",
+        }}
+        aria-label={label === "W" ? "width px" : "height px"}
+        title={disabled ? disabledTitle : undefined}
+      />
     </div>
   );
 }

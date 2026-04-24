@@ -41,8 +41,15 @@ export interface UseGeneratePipeline {
     rerun: () => Promise<void>;
     cancel: () => void;
   };
-  /** "조사 필요" 배너의 "미리보기" — 단독 조사 실행 */
-  researchNow: () => Promise<void>;
+  /** "힌트 미리 받기" — 생성 전 Claude 조사 단독 실행 + 결과 state 보유 */
+  researchPreview: {
+    loading: boolean;
+    /** null = 아직 실행 안 함, []=실행했는데 빈 결과, [...]=힌트 */
+    hints: string[] | null;
+    /** 실패 시 메시지 */
+    error: string | null;
+    run: () => Promise<void>;
+  };
 }
 
 export function useGeneratePipeline(): UseGeneratePipeline {
@@ -51,9 +58,6 @@ export function useGeneratePipeline(): UseGeneratePipeline {
   const aspect = useGenerateStore((s) => s.aspect);
   const width = useGenerateStore((s) => s.width);
   const height = useGenerateStore((s) => s.height);
-  const steps = useGenerateStore((s) => s.steps);
-  const cfg = useGenerateStore((s) => s.cfg);
-  const seed = useGenerateStore((s) => s.seed);
   const lightning = useGenerateStore((s) => s.lightning);
   const research = useGenerateStore((s) => s.research);
   // 실행 상태
@@ -78,6 +82,11 @@ export function useGeneratePipeline(): UseGeneratePipeline {
     null,
   );
 
+  // 힌트 미리 받기 (단독 조사) 로컬 상태 — 배너에 인라인 표시 용
+  const [researchLoading, setResearchLoading] = useState(false);
+  const [researchHints, setResearchHints] = useState<string[] | null>(null);
+  const [researchError, setResearchError] = useState<string | null>(null);
+
   /* ── 실제 스트림 소비 루프 ──
    * try/catch/finally — generator 가 done/error 둘 다 emit 안 하고 끝나도
    * finally 가 running=false 보장. resetRunning 은 idempotent 라 중복 호출 안전.
@@ -87,6 +96,12 @@ export function useGeneratePipeline(): UseGeneratePipeline {
     preResearchHints?: string[],
   ) => {
     setRunning(true, 0, "초기화");
+    // Step/CFG/Seed 는 UI 에서 제거됨 → lightning 여부에 따라 defaults/lightning 세트 직접 참조.
+    // Seed 는 매번 랜덤 (같은 시드 재사용으로 결과가 동일해지는 것 방지).
+    const modelCfg = lightning
+      ? GENERATE_MODEL.lightning
+      : GENERATE_MODEL.defaults;
+    const randomSeed = Math.floor(Math.random() * 1e15);
     let completed = false;
     try {
       for await (const evt of generateImageStream({
@@ -94,9 +109,9 @@ export function useGeneratePipeline(): UseGeneratePipeline {
         aspect,
         width,
         height,
-        steps,
-        cfg,
-        seed,
+        steps: modelCfg.steps,
+        cfg: modelCfg.cfg,
+        seed: randomSeed,
         lightning,
         research,
         ollamaModel: ollamaModelSel,
@@ -109,7 +124,7 @@ export function useGeneratePipeline(): UseGeneratePipeline {
           resetRunning();
           toast.success(
             "생성 완료",
-            `${evt.item.width}×${evt.item.height} · seed ${evt.item.seed}`,
+            `${evt.item.width}×${evt.item.height}`,
           );
           if (evt.item.comfyError) {
             toast.error(
@@ -228,13 +243,25 @@ export function useGeneratePipeline(): UseGeneratePipeline {
     toast.info("생성 취소됨");
   };
 
-  const researchNow = async () => {
-    toast.info("Claude CLI 호출 중…", "최신 팁을 조사하는 중이야");
+  const researchPreviewRun = async () => {
+    if (!prompt.trim()) {
+      toast.warn("프롬프트를 먼저 입력해 주세요.");
+      return;
+    }
+    setResearchLoading(true);
+    setResearchError(null);
     try {
-      const { hints } = await researchPrompt(prompt, GENERATE_MODEL.displayName);
-      toast.success("조사 완료", hints.slice(0, 2).join(" · "));
+      const { hints } = await researchPrompt(
+        prompt,
+        GENERATE_MODEL.displayName,
+      );
+      setResearchHints(hints);
     } catch (err) {
-      toast.error("조사 실패", err instanceof Error ? err.message : "");
+      const msg = err instanceof Error ? err.message : "조사 실패";
+      setResearchError(msg);
+      setResearchHints(null);
+    } finally {
+      setResearchLoading(false);
     }
   };
 
@@ -248,6 +275,11 @@ export function useGeneratePipeline(): UseGeneratePipeline {
       rerun,
       cancel,
     },
-    researchNow,
+    researchPreview: {
+      loading: researchLoading,
+      hints: researchHints,
+      error: researchError,
+      run: researchPreviewRun,
+    },
   };
 }
