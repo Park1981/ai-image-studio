@@ -27,6 +27,8 @@ import ResearchBanner from "@/components/studio/ResearchBanner";
 import ResultHoverActionBar, {
   ActionBarButton,
 } from "@/components/studio/ResultHoverActionBar";
+import StudioEmptyState from "@/components/studio/StudioEmptyState";
+import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -538,30 +540,15 @@ export default function GeneratePage() {
 
         {/* ── RIGHT: 갤러리 ── */}
         <StudioRightPanel>
-          {/* ── 결과 영역 헤더 (Vision/Video 와 동일 패턴 · audit P0-2) ── */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
-              생성 결과
-            </h3>
-            <span
-              className="mono"
-              style={{
-                fontSize: 11,
-                color: "var(--ink-4)",
-                letterSpacing: ".04em",
-              }}
-            >
-              {selectedItem
+          {/* ── 결과 영역 헤더 (audit R2-6: 공통 StudioResultHeader 로 교체) ── */}
+          <StudioResultHeader
+            title="생성 결과"
+            meta={
+              selectedItem
                 ? `${selectedItem.width}×${selectedItem.height}`
-                : "PNG"}
-            </span>
-          </div>
+                : "PNG"
+            }
+          />
 
           {/* ── 결과 뷰어 (선택된 아이템 있을 때 · 이미지 + 호버 액션바) ── */}
           {selectedItem ? (
@@ -613,20 +600,11 @@ export default function GeneratePage() {
               }}
             />
           ) : (
-            <div
-              style={{
-                padding: "28px 20px",
-                background: "var(--surface)",
-                border: "1px dashed var(--line-2)",
-                borderRadius: 14,
-                textAlign: "center",
-                color: "var(--ink-4)",
-                fontSize: 12.5,
-              }}
-            >
+            // audit R2-6: 공통 StudioEmptyState 로 교체
+            <StudioEmptyState size="normal">
               아직 생성된 이미지가 없습니다. 프롬프트 입력 후 <b>생성</b> 버튼을
               눌러 주세요.
-            </div>
+            </StudioEmptyState>
           )}
 
           {/* ── 히스토리 섹션 헤더 (4 메뉴 공용) ── */}

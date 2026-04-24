@@ -63,7 +63,7 @@ export function CompareImageSlot({
         style={{
           minHeight: 140,
           border: `1.5px dashed ${drag ? "#BDB6AA" : "#D4CEC0"}`,
-          borderRadius: 12,
+          borderRadius: "var(--radius)",
           background: drag ? "#F1EEE8" : "var(--bg-2)",
           display: "flex",
           flexDirection: "column",

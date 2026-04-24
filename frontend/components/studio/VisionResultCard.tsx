@@ -14,7 +14,9 @@
 
 import { useState } from "react";
 import Icon from "@/components/ui/Icon";
-import { SmallBtn, Spinner } from "@/components/ui/primitives";
+import { SmallBtn } from "@/components/ui/primitives";
+import StudioEmptyState from "@/components/studio/StudioEmptyState";
+import StudioLoadingState from "@/components/studio/StudioLoadingState";
 import { toast } from "@/stores/useToastStore";
 
 interface Props {
@@ -41,48 +43,22 @@ export default function VisionResultCard({ result, running }: Props) {
     }
   };
 
-  // ─── Loading ───
+  // ─── Loading ─── (audit R2-9: 공통 StudioLoadingState 로 교체)
   if (running) {
     return (
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
-          borderRadius: 14,
-          padding: "36px 24px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 10,
-          color: "var(--ink-3)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        <Spinner />
-        <div style={{ fontSize: 13, fontWeight: 500 }}>분석 중…</div>
-        <div style={{ fontSize: 11, color: "var(--ink-4)" }}>
-          비전 모델 호출 + 한글 번역 2단계
-        </div>
-      </div>
+      <StudioLoadingState
+        title="분석 중…"
+        description="비전 모델 호출 + 한글 번역 2단계"
+      />
     );
   }
 
-  // ─── Empty ───
+  // ─── Empty ─── (audit R2-9: 공통 StudioEmptyState 로 교체)
   if (!result) {
     return (
-      <div
-        style={{
-          padding: "28px 20px",
-          background: "var(--surface)",
-          border: "1px dashed var(--line-2)",
-          borderRadius: 14,
-          textAlign: "center",
-          color: "var(--ink-4)",
-          fontSize: 12.5,
-        }}
-      >
+      <StudioEmptyState size="normal">
         이미지를 업로드하고 <b>분석</b> 버튼을 눌러 주세요.
-      </div>
+      </StudioEmptyState>
     );
   }
 
@@ -97,7 +73,7 @@ export default function VisionResultCard({ result, running }: Props) {
       style={{
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 14,
+        borderRadius: "var(--radius-card)",
         boxShadow: "var(--shadow-sm)",
         overflow: "hidden",
       }}

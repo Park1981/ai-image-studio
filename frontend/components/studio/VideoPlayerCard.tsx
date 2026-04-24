@@ -11,7 +11,9 @@
 
 "use client";
 
-import { SmallBtn, Spinner } from "@/components/ui/primitives";
+import { SmallBtn } from "@/components/ui/primitives";
+import StudioEmptyState from "@/components/studio/StudioEmptyState";
+import StudioLoadingState from "@/components/studio/StudioLoadingState";
 import { downloadImage, copyText } from "@/lib/image-actions";
 
 interface Props {
@@ -33,42 +35,13 @@ export default function VideoPlayerCard({
   filename,
   onExpand,
 }: Props) {
-  // ── Loading ── (audit P1b: progress bar + percent 제거, 모달 단일 primary)
+  // ── Loading ── (audit R2-8: 공통 StudioLoadingState 로 교체)
   if (running) {
     return (
-      <div
-        style={{
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
-          borderRadius: 14,
-          padding: "28px 22px",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          gap: 12,
-          color: "var(--ink-3)",
-          boxShadow: "var(--shadow-sm)",
-        }}
-      >
-        <Spinner />
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 500,
-            color: "var(--ink-2)",
-            textAlign: "center",
-            lineHeight: 1.5,
-          }}
-        >
-          {label || "영상 생성 중…"}
-        </div>
-        <div
-          className="mono"
-          style={{ fontSize: 11, color: "var(--ink-4)" }}
-        >
-          평균 소요 5~20분 · 상세 진행은 위 모달
-        </div>
-      </div>
+      <StudioLoadingState
+        title={label || "영상 생성 중…"}
+        description="평균 소요 5~20분 · 상세 진행은 위 모달"
+      />
     );
   }
 
@@ -105,35 +78,24 @@ export default function VideoPlayerCard({
     );
   }
 
-  // ── Empty ──
+  // ── Empty ── (audit R2-8: 공통 StudioEmptyState 로 교체)
   if (!src) {
     return (
-      <div
-        style={{
-          padding: "28px 20px",
-          background: "var(--surface)",
-          border: "1px dashed var(--line-2)",
-          borderRadius: 14,
-          textAlign: "center",
-          color: "var(--ink-4)",
-          fontSize: 12.5,
-          lineHeight: 1.6,
-        }}
-      >
+      <StudioEmptyState size="normal">
         원본 이미지와 영상 지시를 입력하고
         <br />
         <b>영상 생성</b> 버튼을 눌러 주세요.
-      </div>
+      </StudioEmptyState>
     );
   }
 
-  // ── Filled ──
+  // ── Filled ── (audit R2-8: radius 토큰화)
   return (
     <div
       style={{
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 14,
+        borderRadius: "var(--radius-card)",
         boxShadow: "var(--shadow-sm)",
         overflow: "hidden",
       }}

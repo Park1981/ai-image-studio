@@ -29,6 +29,7 @@ import PipelineSteps, {
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -82,7 +83,7 @@ export default function VideoPage() {
   const running = useVideoStore((s) => s.running);
   const currentStep = useVideoStore((s) => s.currentStep);
   const stepDone = useVideoStore((s) => s.stepDone);
-  const pipelineProgress = useVideoStore((s) => s.pipelineProgress);
+  // pipelineProgress 는 audit P1b 에서 CTA/VideoPlayerCard 모두 제거. ProgressModal 에서 직접 구독.
   const pipelineLabel = useVideoStore((s) => s.pipelineLabel);
   const lastVideoRef = useVideoStore((s) => s.lastVideoRef);
 
@@ -475,34 +476,12 @@ export default function VideoPage() {
 
         {/* ── RIGHT: 플레이어 + 히스토리 ── */}
         <StudioRightPanel>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
-              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
-                영상 결과
-              </h3>
-              <span
-                className="mono"
-                style={{
-                  fontSize: 11,
-                  color: "var(--ink-4)",
-                  letterSpacing: ".04em",
-                }}
-              >
-                MP4 · 5s · 25fps
-              </span>
-            </div>
-          </div>
+          {/* audit R2-8: 공통 StudioResultHeader 로 교체 */}
+          <StudioResultHeader title="영상 결과" meta="MP4 · 5s · 25fps" />
 
           <VideoPlayerCard
             src={playingRef}
             running={running}
-            progress={pipelineProgress}
             label={pipelineLabel}
             filename={
               playingRef ? filenameFromRef(playingRef, "ais-video.mp4") : undefined

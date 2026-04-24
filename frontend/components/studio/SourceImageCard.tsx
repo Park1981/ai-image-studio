@@ -91,7 +91,7 @@ export default function SourceImageCard({
             right: 0,
             background: "var(--surface)",
             border: "1px solid var(--line)",
-            borderRadius: 10,
+            borderRadius: "var(--radius)",
             padding: "10px 12px",
             zIndex: 20,
             boxShadow: "0 4px 16px rgba(0,0,0,.1)",
@@ -156,7 +156,7 @@ export default function SourceImageCard({
         style={{
           position: "relative",
           height: 256,
-          borderRadius: 12,
+          borderRadius: "var(--radius-card)",
           overflow: "hidden",
           background: sourceImage
             ? "var(--bg-2)"

@@ -1,7 +1,7 @@
 # AI Image Studio UI Consistency Audit
 
 **작성일**: 2026-04-24  
-**상태**: P0+P1a+P1b+R1 완료 (라운드 2 예정 · 2026-04-24 업데이트 3회차)  
+**상태**: P0+P1a+P1b+R1+R2(Header/Card/Empty/Loading) 완료 · Upload slot 통합은 R3 으로 연기  
 **범위**: 메뉴별 기능 차이를 제외한 디자인/레이아웃/상태 표현 일관성 검토  
 **대상 화면**:
 - `/generate` Image Generate
@@ -759,16 +759,38 @@
 3. ✅ 같은 `source_ref` 참조하는 다른 row 존재 시 파일 보존 (연속 수정 플로우 대응)
 4. ✅ pytest 22건 추가 (정규식/경로 변환 방어 케이스) · 총 113/113 통과
 
-### P2: 구조 리팩터 (라운드 2 예정)
+### P2 라운드 2 (R2): 공통 shell 5개 신설 + 4개 페이지 교체 (구현 완료)
 
-판매 퀄리티 달성을 위한 대규모 디자인 시스템 리팩터. 회귀 위험이 크므로 별도 세션에서 진행.
+판매 퀄리티 목표의 핵심 작업. 디자인 시스템 중추가 완성됨.
 
-1. `StudioResultHeader` 신설 + 4개 페이지 헤더 교체
-2. `StudioResultCard` (media/text/panel variant) 신설
-3. `StudioEmptyState` (compact/normal/panel size) 신설
-4. `StudioLoadingState` 신설 (단 progress 는 실제 이벤트 있을 때만)
-5. `StudioUploadSlot` 신설 + `SourceImageCard` / `CompareImageSlot` 그 기반으로 재작성
-6. 156 occurrences radius 하드코딩 → `var(--radius-*)` 토큰 전면 적용
+**R2-1 ~ R2-5 공통 shell 5개 신설**
+- ✅ `StudioResultHeader` — h3 + mono meta + optional actions 슬롯
+- ✅ `StudioResultCard` — surface + line + radius-card + shadow-sm · media/text/panel variant
+- ✅ `StudioEmptyState` — 점선 카드 · normal/compact/panel size
+- ✅ `StudioLoadingState` — spinner + title + desc · normal/panel size (percent 는 의도적 제외 · 모달 단일 primary)
+- ✅ `StudioUploadSlot` — dropzone shell + filled shell 공통 · badge/action 은 children slot
+  (사용처 교체는 R3 에서 · 자산만 먼저 완성)
+
+**R2-6 ~ R2-10 페이지 교체**
+- ✅ Generate/Edit/Video/Vision 4개 페이지 헤더 → `StudioResultHeader`
+- ✅ 4개 페이지 empty → `StudioEmptyState size=normal`
+- ✅ VideoPlayerCard · VisionResultCard 의 empty/loading → 공통 shell
+- ✅ Compare EmptyViewer · AnalysisLoading · AnalysisEmpty → 공통 shell panel size
+- ✅ VideoPlayerCard · VisionResultCard filled shell radius 14 → `var(--radius-card)` 토큰화
+- ✅ SourceImageCard · CompareImageSlot 주요 radius 하드코딩 → 토큰화
+- ✅ Video `VideoPlayerCard progress` prop 의존성 제거 (audit P1b 에서 이미 미사용화)
+
+**R2-11/12 (Upload slot 기반 재작성) 는 R3 로 연기**
+- `StudioUploadSlot` 은 자산만 완성. `SourceImageCard` (256px + info popover + 4 action) 와
+  `CompareImageSlot` (140px + A/B badge + 2 pill) 는 고유 UX 가 커서 독립 세션에서
+  재설계해야 안전 (회귀 위험 관리).
+
+### P2 라운드 3 (R3 · 예정)
+
+1. `SourceImageCard` 를 `StudioUploadSlot` 기반으로 재작성 (info popover + 4 action 유지)
+2. `CompareImageSlot` 을 `StudioUploadSlot` 기반으로 재작성 (A/B badge + 2 pill 유지)
+3. 나머지 radius 하드코딩 100+ 건 점진 토큰화 (컴포넌트별 작은 PR)
+4. negative letter-spacing 19 occurrences 정리 (라운드 2 에서 공통 shell 들은 이미 0 으로 적용)
 
 ### P3: 미세 정리
 

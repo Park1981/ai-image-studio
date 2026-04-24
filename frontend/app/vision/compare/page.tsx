@@ -29,6 +29,8 @@ import {
   CompareImageSlot,
   CompareSlotBadge,
 } from "@/components/studio/CompareImageSlot";
+import StudioEmptyState from "@/components/studio/StudioEmptyState";
+import StudioLoadingState from "@/components/studio/StudioLoadingState";
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -486,27 +488,14 @@ function ViewerPanel({
 }
 
 function EmptyViewer() {
+  // audit R2-10: 공통 StudioEmptyState panel 로 교체
   return (
-    <div
-      style={{
-        flex: 1,
-        background: "var(--bg-2)",
-        border: "1.5px dashed var(--line-2)",
-        borderRadius: 12,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 8,
-        color: "var(--ink-3)",
-      }}
-    >
-      <Icon name="image" size={28} />
-      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink-2)" }}>
-        이미지 A 와 B 를 모두 업로드하면 비교가 시작됩니다
-      </div>
-      <div style={{ fontSize: 11 }}>좌측 패널에서 두 슬롯을 채워 주세요</div>
-    </div>
+    <StudioEmptyState
+      size="panel"
+      icon="image"
+      title="이미지 A 와 B 를 모두 업로드하면 비교가 시작됩니다"
+      description="좌측 패널에서 두 슬롯을 채워 주세요"
+    />
   );
 }
 
@@ -678,45 +667,25 @@ function AnalysisPanel({
 }
 
 function AnalysisLoading() {
+  // audit R2-10: 공통 StudioLoadingState panel 로 교체
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 10,
-        height: "100%",
-        color: "var(--ink-3)",
-        fontSize: 12,
-      }}
-    >
-      <Icon name="refresh" size={20} className="spin" />
-      qwen2.5vl 이 두 이미지를 비교하는 중입니다 · 5~10초 소요
-    </div>
+    <StudioLoadingState
+      size="panel"
+      title="비교 분석 중…"
+      description="qwen2.5vl 이 두 이미지를 비교하는 중입니다 · 5~10초 소요"
+    />
   );
 }
 
 function AnalysisEmpty() {
+  // audit R2-10: 공통 StudioEmptyState panel 로 교체
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 6,
-        height: "100%",
-        color: "var(--ink-3)",
-        fontSize: 12,
-      }}
-    >
-      <Icon name="sparkle" size={18} />
-      <div style={{ fontWeight: 600, color: "var(--ink-2)" }}>
-        분석 대기 중
-      </div>
-      <div>두 이미지 업로드 후 좌측의 비교 분석 시작 을 눌러 주세요</div>
-    </div>
+    <StudioEmptyState
+      size="panel"
+      icon="sparkle"
+      title="분석 대기 중"
+      description="두 이미지 업로드 후 좌측의 비교 분석 시작 을 눌러 주세요"
+    />
   );
 }
 

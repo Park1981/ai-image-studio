@@ -20,6 +20,7 @@ import VramBadge from "@/components/chrome/VramBadge";
 import SettingsButton from "@/components/settings/SettingsButton";
 import AnalysisProgressModal from "@/components/studio/AnalysisProgressModal";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -276,27 +277,8 @@ export default function VisionPage() {
 
         {/* ── RIGHT: 결과 카드 + 히스토리 ── */}
         <StudioRightPanel>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "baseline",
-              justifyContent: "space-between",
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
-              분석 결과
-            </h3>
-            <span
-              className="mono"
-              style={{
-                fontSize: 11,
-                color: "var(--ink-4)",
-                letterSpacing: ".04em",
-              }}
-            >
-              EN + KO
-            </span>
-          </div>
+          {/* audit R2-9: 공통 StudioResultHeader 로 교체 */}
+          <StudioResultHeader title="분석 결과" meta="EN + KO" />
 
           <VisionResultCard result={lastResult} running={analyzing} />
 
