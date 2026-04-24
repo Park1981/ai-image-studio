@@ -20,6 +20,9 @@ export type {
   VideoRequest,
   VideoStage,
   VisionAnalysisResponse,
+  ComparisonScores,
+  ComparisonComments,
+  ComparisonAnalysis,
 } from "./api/types";
 
 export { USE_MOCK, STUDIO_BASE } from "./api/client";

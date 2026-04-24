@@ -5,6 +5,38 @@
  * 스토어/컴포넌트는 여기에서 import. lib/api-client 는 barrel 재export 만 담당.
  */
 
+/* ──────────── Comparison Analysis (Edit 결과 vs 원본) ──────────── */
+
+/** 비교 분석 5축 점수 (0-100 정수). 누락 축은 null 가능 — UI 에서 dash 표시. */
+export interface ComparisonScores {
+  face_id: number | null;
+  body_pose: number | null;
+  attire: number | null;
+  background: number | null;
+  intent_fidelity: number | null;
+}
+
+/** 5축 각각의 1-2 문장 코멘트 (en 또는 ko). */
+export type ComparisonComments = {
+  [K in keyof ComparisonScores]: string;
+};
+
+/** 비교 분석 단일 결과 — history item 에 영구 저장. */
+export interface ComparisonAnalysis {
+  scores: ComparisonScores;
+  /** 5축 산술 평균 (0-100). null 점수는 평균 계산에서 제외. */
+  overall: number;
+  comments_en: ComparisonComments;
+  comments_ko: ComparisonComments;
+  summary_en: string;
+  summary_ko: string;
+  provider: "ollama" | "fallback";
+  fallback: boolean;
+  /** 분석 시점 unix ms. */
+  analyzedAt: number;
+  visionModel: string;
+}
+
 export interface HistoryItem {
   id: string;
   mode: "generate" | "edit" | "video";
@@ -37,6 +69,13 @@ export interface HistoryItem {
   fps?: number;
   /** 총 프레임 수 */
   frameCount?: number;
+
+  /* ── Edit 모드 비교 분석 (mode === "edit" 일 때만 채워짐) ── */
+  /** 원본 이미지 영구 경로 (예: "/images/studio/edit-source/{id}.png").
+   *  옛 row 또는 generate/video 결과는 undefined. */
+  sourceRef?: string;
+  /** 비교 분석 결과. 분석 안 한 경우 undefined. */
+  comparisonAnalysis?: ComparisonAnalysis;
 }
 
 export interface GenerateRequest {
