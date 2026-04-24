@@ -339,3 +339,85 @@ async def test_analyze_pair_translation_fail_keeps_en() -> None:
     assert result.fallback is False  # 비전은 살아있음
     assert result.comments_ko["face_id"] == "ok"  # en 그대로
     assert "번역 실패" in result.summary_ko
+
+
+# ───────── 회귀 테스트: trailing 텍스트 + 대문자 헤더 ─────────
+
+
+def test_parse_strict_json_handles_trailing_text() -> None:
+    """qwen2.5vl 이 JSON 뒤에 자연어 코멘트 붙여도 첫 균형 JSON 만 추출."""
+    from studio.comparison_pipeline import _parse_strict_json
+
+    raw = '{"scores": {"face_id": 80}, "comments": {}, "summary": "ok"} Confidence: {high}'
+    result = _parse_strict_json(raw)
+    assert result is not None
+    assert result["scores"]["face_id"] == 80
+    assert result["summary"] == "ok"
+
+
+def test_parse_strict_json_handles_nested_braces() -> None:
+    """nested object 도 균형 맞춰 정상 파싱."""
+    from studio.comparison_pipeline import _parse_strict_json
+
+    raw = '{"a": {"b": {"c": 1}}, "d": 2}'
+    result = _parse_strict_json(raw)
+    assert result is not None
+    assert result["a"]["b"]["c"] == 1
+    assert result["d"] == 2
+
+
+def test_parse_strict_json_with_code_fence() -> None:
+    """``` json ... ``` 펜스 제거 후 파싱."""
+    from studio.comparison_pipeline import _parse_strict_json
+
+    raw = '```json\n{"x": 1}\n```'
+    result = _parse_strict_json(raw)
+    assert result == {"x": 1}
+
+
+def test_parse_strict_json_unbalanced_returns_none() -> None:
+    """열린 채 끝나는 JSON 은 None."""
+    from studio.comparison_pipeline import _parse_strict_json
+
+    raw = '{"x": {"y": 1'
+    assert _parse_strict_json(raw) is None
+
+
+@pytest.mark.asyncio
+async def test_translate_section_parsing_uppercase_headers() -> None:
+    """번역 모델이 대문자 헤더 [FACE_ID] 로 응답해도 정상 파싱."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import _translate_comments_to_ko
+
+    raw_ko = (
+        "[FACE_ID]\n눈 보존됨.\n\n"
+        "[Body_Pose]\n어깨 변화.\n\n"
+        "[summary]\n전반적 양호.\n"
+    )
+    # _call_ollama 직접 mock 하기 어려우니 httpx response 자체를 mock
+    fake_response = type("R", (), {
+        "raise_for_status": lambda self: None,
+        "json": lambda self: {"message": {"content": raw_ko}},
+    })()
+
+    class FakeClient:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *a):
+            return None
+        async def post(self, *a, **kw):
+            return fake_response
+
+    with patch("studio.comparison_pipeline.httpx.AsyncClient", lambda **kw: FakeClient()):
+        result = await _translate_comments_to_ko(
+            comments_en={"face_id": "x", "body_pose": "x", "attire": "", "background": "", "intent_fidelity": ""},
+            summary_en="x",
+            text_model="m",
+            timeout=10.0,
+            ollama_url="http://x",
+        )
+    assert result is not None
+    assert result["comments_ko"]["face_id"] == "눈 보존됨."
+    assert result["comments_ko"]["body_pose"] == "어깨 변화."
+    assert result["summary_ko"] == "전반적 양호."

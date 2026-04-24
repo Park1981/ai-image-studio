@@ -168,21 +168,34 @@ async def _call_vision_pair(
 def _parse_strict_json(raw: str) -> dict[str, Any] | None:
     """비전 응답에서 첫 번째 JSON object 추출 → dict, 실패 시 None.
 
-    qwen2.5vl 이 가끔 ```json ... ``` 펜스를 둘러 보내서 fence 제거 + 첫 { ... } 매칭.
-    greedy 정규식으로 마지막 닫는 } 까지 포착해 trailing 텍스트 무시.
+    qwen2.5vl 이 가끔 ```json ... ``` 펜스를 두르거나 JSON 뒤에 자연어 코멘트
+    (예: "{...} Confidence: high") 를 붙임. 따라서:
+      1) ``` 펜스 제거
+      2) 첫 '{' 부터 brace depth 가 0 이 되는 첫 '}' 까지 균형 매칭
+      3) json.loads — 실패 시 None
     """
     if not raw:
         return None
     # ``` 펜스 제거
     cleaned = re.sub(r"```(?:json)?\s*", "", raw, flags=re.IGNORECASE).rstrip("`").strip()
-    # 첫 번째 { ... } 매칭 (greedy — 마지막 닫는 } 까지)
-    m = re.search(r"\{[\s\S]*\}", cleaned)
-    if not m:
+    # 첫 '{' 위치 탐색
+    start = cleaned.find("{")
+    if start == -1:
         return None
-    try:
-        return json.loads(m.group(0))
-    except json.JSONDecodeError:
-        return None
+    # balanced-brace 탐색 — depth 가 0 이 되는 첫 '}' 까지만 추출
+    depth = 0
+    for i in range(start, len(cleaned)):
+        ch = cleaned[i]
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(cleaned[start : i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None  # 균형 안 맞으면 (열린 채 끝남) None
 
 
 def _coerce_scores(raw_scores: Any) -> dict[str, int | None]:
@@ -283,14 +296,15 @@ async def _translate_comments_to_ko(
         log.info("compare translation failed (non-fatal): %s", e)
         return None
 
-    # 섹션 파싱 — [axis_name] 패턴으로 split
+    # 섹션 파싱 — [axis_name] 패턴으로 split (대소문자 무시)
     # re.split 결과: ["", "axis1", "text1", "axis2", "text2", ...]
-    sections_ko = re.split(r"\[([a-z_]+)\]\s*", raw)
+    sections_ko = re.split(r"\[([a-zA-Z_]+)\]\s*", raw)
     comments_ko: dict[str, str] = {}
     summary_ko = ""
     # 짝수 인덱스(1,3,5,...) = 키, 홀수 인덱스(2,4,6,...) = 값
     for i in range(1, len(sections_ko) - 1, 2):
-        key = sections_ko[i].strip()
+        # 모델이 대문자/혼합 케이스로 응답해도 lower() 로 정규화
+        key = sections_ko[i].strip().lower()
         val = sections_ko[i + 1].strip()
         if key == "summary":
             summary_ko = val
