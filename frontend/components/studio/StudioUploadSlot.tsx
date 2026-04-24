@@ -110,21 +110,27 @@ export default function StudioUploadSlot({
   useEffect(() => {
     if (!pasteEnabled) return;
     const handler = (e: ClipboardEvent) => {
-      // Focus 가드 — textarea / input / contenteditable 에 있으면 skip.
-      // 텍스트 paste 를 방해하지 않음 (브라우저 기본 동작 먼저 처리 후 bubble).
       const active = document.activeElement as HTMLElement | null;
-      if (active) {
-        const tag = active.tagName;
-        if (
-          tag === "TEXTAREA" ||
-          tag === "INPUT" ||
-          active.isContentEditable
-        ) {
-          return;
-        }
+      const activeIsInput =
+        !!active &&
+        (active.tagName === "TEXTAREA" ||
+          active.tagName === "INPUT" ||
+          active.isContentEditable);
+
+      // 가드 정책 (Compare 버그 fix 2026-04-25):
+      //   - 단일 slot (pasteRequireHover=false): focus 가드 필수.
+      //     textarea 에서 Ctrl+V 하면 텍스트 paste 가 정답 → 이미지 로직 skip.
+      //   - 멀티 slot (pasteRequireHover=true): 호버 자체가 명시적 의도.
+      //     textarea 에 이전 focus 가 남아 있어도 slot 호버 + Ctrl+V 면 업로드.
+      //     (텍스트 paste 는 브라우저 기본 동작으로 textarea 에 먼저 들어가고,
+      //      우리 리스너는 bubble 단계에서 이미지만 처리 — 충돌 없음.)
+      if (requireHoverRef.current) {
+        // 호버 중인 slot 만 응답. 호버 없으면 무시.
+        if (!hoverRef.current) return;
+      } else {
+        // 단일 slot 모드: textarea/input focus 시 skip.
+        if (activeIsInput) return;
       }
-      // 멀티 slot 페이지에서는 호버 중인 slot 만 응답.
-      if (requireHoverRef.current && !hoverRef.current) return;
 
       // 클립보드에서 이미지 추출.
       const items = e.clipboardData?.items;
