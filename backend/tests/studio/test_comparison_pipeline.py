@@ -153,3 +153,189 @@ async def test_update_comparison_unknown_id_returns_false(
 
     ok = await history_db.update_comparison("tsk-nonexistent00", {"overall": 50})
     assert ok is False
+
+
+# ───────── comparison_pipeline 코어 ─────────
+
+
+@pytest.mark.asyncio
+async def test_analyze_pair_happy_path() -> None:
+    """비전 + 번역 모두 성공 시 ComparisonAnalysisResult 풀로 채워짐."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import analyze_pair
+
+    raw_json = json.dumps({
+        "scores": {
+            "face_id": 92, "body_pose": 75, "attire": 60,
+            "background": 88, "intent_fidelity": 95,
+        },
+        "comments": {
+            "face_id": "Eyes and jaw preserved.",
+            "body_pose": "Shoulder slightly narrower.",
+            "attire": "Top color changed as requested.",
+            "background": "Curtain pattern preserved.",
+            "intent_fidelity": "Earrings added accurately.",
+        },
+        "summary": "Solid result with minor body drift.",
+    })
+
+    with (
+        patch(
+            "studio.comparison_pipeline._call_vision_pair",
+            new=AsyncMock(return_value=raw_json),
+        ),
+        patch(
+            "studio.comparison_pipeline._translate_comments_to_ko",
+            new=AsyncMock(return_value={
+                "comments_ko": {
+                    "face_id": "눈과 턱 보존됨.",
+                    "body_pose": "어깨가 약간 좁아짐.",
+                    "attire": "상의 색상이 요청대로 변경됨.",
+                    "background": "커튼 패턴 보존됨.",
+                    "intent_fidelity": "귀걸이가 정확히 추가됨.",
+                },
+                "summary_ko": "신원 보존 양호 · 약간의 체형 변화.",
+            }),
+        ),
+    ):
+        result = await analyze_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="add earrings",
+        )
+    assert result.fallback is False
+    assert result.provider == "ollama"
+    assert result.scores["face_id"] == 92
+    # 5축 산술 평균 (92+75+60+88+95)/5 = 82
+    assert result.overall == 82
+    assert "신원 보존" in result.summary_ko
+
+
+@pytest.mark.asyncio
+async def test_analyze_pair_vision_fail_fallback() -> None:
+    """비전 호출 실패 (빈 응답) 시 fallback=True · scores 모두 null · 번역 미호출."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import analyze_pair
+
+    translate_mock = AsyncMock(return_value={"comments_ko": {}, "summary_ko": ""})
+    with (
+        patch(
+            "studio.comparison_pipeline._call_vision_pair",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
+            "studio.comparison_pipeline._translate_comments_to_ko",
+            new=translate_mock,
+        ),
+    ):
+        result = await analyze_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="x",
+        )
+    assert result.fallback is True
+    assert result.provider == "fallback"
+    assert all(v is None for v in result.scores.values())
+    assert result.overall == 0  # 빈 평균은 0 으로 표기
+    translate_mock.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_analyze_pair_json_parse_fail_fallback() -> None:
+    """비전이 JSON 깨진 응답 → fallback · summary 에 파싱 실패 마커."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import analyze_pair
+
+    with (
+        patch(
+            "studio.comparison_pipeline._call_vision_pair",
+            new=AsyncMock(return_value="{invalid: not json"),
+        ),
+        patch(
+            "studio.comparison_pipeline._translate_comments_to_ko",
+            new=AsyncMock(),
+        ),
+    ):
+        result = await analyze_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="x",
+        )
+    assert result.fallback is True
+    assert "파싱" in result.summary_ko or "parse" in result.summary_en.lower()
+
+
+@pytest.mark.asyncio
+async def test_analyze_pair_partial_scores_average_only_present() -> None:
+    """일부 축 누락 시 null 로 보존 + overall 평균은 받은 점수만으로."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import analyze_pair
+
+    raw_json = json.dumps({
+        "scores": {
+            "face_id": 80, "body_pose": 60,
+            # attire / background / intent_fidelity 누락
+        },
+        "comments": {"face_id": "ok", "body_pose": "ok"},
+        "summary": "Partial result.",
+    })
+    with (
+        patch(
+            "studio.comparison_pipeline._call_vision_pair",
+            new=AsyncMock(return_value=raw_json),
+        ),
+        patch(
+            "studio.comparison_pipeline._translate_comments_to_ko",
+            new=AsyncMock(return_value={
+                "comments_ko": {"face_id": "괜찮음", "body_pose": "괜찮음"},
+                "summary_ko": "부분 결과.",
+            }),
+        ),
+    ):
+        result = await analyze_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="x",
+        )
+    assert result.scores["attire"] is None
+    assert result.scores["face_id"] == 80
+    # overall = (80+60)/2 = 70
+    assert result.overall == 70
+
+
+@pytest.mark.asyncio
+async def test_analyze_pair_translation_fail_keeps_en() -> None:
+    """비전 OK · 번역 실패 시 ko 자리에 en 그대로 + summary_ko 에 마커."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import analyze_pair
+
+    raw_json = json.dumps({
+        "scores": {"face_id": 90, "body_pose": 80, "attire": 70,
+                   "background": 85, "intent_fidelity": 95},
+        "comments": {"face_id": "ok", "body_pose": "ok", "attire": "ok",
+                     "background": "ok", "intent_fidelity": "ok"},
+        "summary": "All good.",
+    })
+    with (
+        patch(
+            "studio.comparison_pipeline._call_vision_pair",
+            new=AsyncMock(return_value=raw_json),
+        ),
+        patch(
+            "studio.comparison_pipeline._translate_comments_to_ko",
+            new=AsyncMock(return_value=None),  # 번역 실패
+        ),
+    ):
+        result = await analyze_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="x",
+        )
+    assert result.fallback is False  # 비전은 살아있음
+    assert result.comments_ko["face_id"] == "ok"  # en 그대로
+    assert "번역 실패" in result.summary_ko
