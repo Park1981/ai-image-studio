@@ -9,6 +9,8 @@ studio/router.py - FastAPI 라우터: /api/studio/*
   POST /api/studio/upgrade-only      → { upgradedPrompt, ... } (sync)
   POST /api/studio/research          → { hints: [] } (sync)
   POST /api/studio/interrupt         → { ok }
+  POST /api/studio/vision-analyze    → { en, ko, provider, ... } (multipart, sync)
+  POST /api/studio/compare-analyze   → { analysis, saved } (multipart, sync · mutex 보호)
   GET  /api/studio/models            → 모델 프리셋 (프론트 lib/model-presets.ts 미러)
   GET  /api/studio/ollama/models     → 설치된 Ollama 모델 목록
   GET  /api/studio/process/status    → {ollama:{running}, comfyui:{running}}
@@ -1337,10 +1339,12 @@ async def vision_analyze(
 
 
 # ComfyUI 샘플링과 직렬화하기 위한 mutex — vision 호출이 ComfyUI 와 동시 활성 시
-# VRAM 충돌 방지. 30s 대기 후에도 안 풀리면 503.
+# VRAM 16GB 환경에서 충돌 방지. analyze_pair 내부 timeout 은 240s (DEFAULT_TIMEOUT)
+# 이라, 선행 호출이 길게 걸리면 후속은 30s 후 503 반환 — 이는 의도된 backpressure 설계
+# (단일 프로세스 + 단일 GPU 보호).
 _COMPARE_LOCK = asyncio.Lock()
 _COMPARE_LOCK_TIMEOUT_SEC = 30.0
-_COMPARE_MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MB (Edit 와 동일)
+_COMPARE_MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MB (vision/video 라우트 동일값)
 
 
 @router.post("/compare-analyze")
@@ -1357,7 +1361,8 @@ async def compare_analyze(
       meta: JSON {editPrompt, historyItemId?, visionModel?, ollamaModel?}
 
     historyItemId 가 주어지면 분석 결과를 DB 에 영구 저장 (saved=True).
-    HTTP 200 원칙 — 비전 실패해도 fallback 결과로 200 반환.
+    HTTP 200 원칙 — 비전 실패해도 fallback 결과로 200 반환 (analysis.fallback=True).
+    동시 호출 시 _COMPARE_LOCK 으로 직렬화 → 30s 대기 후 락이면 503 (의도 설계).
     """
     try:
         meta_obj = json.loads(meta)
