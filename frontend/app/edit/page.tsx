@@ -136,26 +136,22 @@ export default function EditPage() {
   /* ── 매칭 안 되는 afterId 정리 (시각 selection 일관성) ──
      슬라이더 자체는 afterItem.sourceRef === sourceImage 조건으로 자동 빈 상태 처리되지만,
      히스토리 타일의 selected 표시도 같이 정리해주면 사용자 혼란 감소.
-     매칭되는 경우 (수정 완료 / 히스토리 타일 클릭) 는 그대로 유지.
-     React 19 권장: render-time prev state 비교 패턴. */
-  const [prevSource, setPrevSource] = useState<string | null>(sourceImage);
-  if (prevSource !== sourceImage) {
-    setPrevSource(sourceImage);
+     Zustand setter 는 외부 구독자도 리렌더시키므로 useEffect 로 지연 호출
+     (렌더 중 호출 시 React 19 가 "다른 컴포넌트 setState" 경고). */
+  useEffect(() => {
     if (afterItem && afterItem.sourceRef !== sourceImage) {
       setAfterId(null);
     }
-  }
+  }, [sourceImage, afterItem, setAfterId]);
 
   /* ── afterId 전환 시 비교 슬라이더를 중앙(50) 으로 리셋 ──
      compareX 는 store state 라 세션 내 드래그 값이 유지되는데, 새 비교는 항상
-     중앙에서 시작하는 게 자연스러움. React 19 권장 render-time prev 비교 패턴. */
-  const [prevAfterIdForX, setPrevAfterIdForX] = useState<string | null>(afterId);
-  if (prevAfterIdForX !== afterId) {
-    setPrevAfterIdForX(afterId);
-    if (afterId && compareX !== 50) {
-      setCompareX(50);
-    }
-  }
+     중앙에서 시작하는 게 자연스러움. compareX 는 의존성에서 제외 —
+     포함 시 50 리셋 직후 다시 트리거되는 불필요 루프 발생. */
+  useEffect(() => {
+    if (afterId) setCompareX(50);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [afterId]);
 
   /* ── 진입 시 Lightning 기본값 ── */
   const appliedRef = useRef(false);
