@@ -17,19 +17,34 @@
 
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Logo, TopBar, BackBtn } from "@/components/chrome/Chrome";
+import { Logo, TopBar, BackBtn, ModelBadge } from "@/components/chrome/Chrome";
 import VramBadge from "@/components/chrome/VramBadge";
 import SettingsButton from "@/components/settings/SettingsButton";
 import Icon from "@/components/ui/Icon";
 import BeforeAfterSlider from "@/components/studio/BeforeAfterSlider";
+import AnalysisProgressModal from "@/components/studio/AnalysisProgressModal";
+import {
+  CompareImageSlot,
+  CompareSlotBadge,
+} from "@/components/studio/CompareImageSlot";
+import {
+  StudioLeftPanel,
+  StudioModeHeader,
+  StudioPage,
+  StudioRightPanel,
+  StudioWorkspace,
+} from "@/components/studio/StudioLayout";
+import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import { SegControl } from "@/components/ui/primitives";
 import {
   useVisionCompareStore,
   type VisionCompareImage,
 } from "@/stores/useVisionCompareStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore } from "@/stores/useProcessStore";
+import { usePromptHistoryStore } from "@/stores/usePromptHistoryStore";
 import { compareAnalyze } from "@/lib/api-client";
 import { toast } from "@/stores/useToastStore";
 import type { VisionCompareAnalysis } from "@/lib/api/types";
@@ -71,10 +86,30 @@ export default function VisionComparePage() {
   const setRunning = useVisionCompareStore((s) => s.setRunning);
   const setAnalysis = useVisionCompareStore((s) => s.setAnalysis);
   const setViewerMode = useVisionCompareStore((s) => s.setViewerMode);
+  const addPromptHistory = usePromptHistoryStore((s) => s.add);
 
   const visionModel = useSettingsStore((s) => s.visionModel);
   const ollamaModel = useSettingsStore((s) => s.ollamaModel);
   const ollamaOn = useProcessStore((s) => s.ollama) === "running";
+
+  useEffect(() => {
+    setHint("");
+  }, [setHint]);
+
+  /* ── 진행 모달 open 상태 ── */
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [prevRunning, setPrevRunning] = useState(running);
+  if (prevRunning !== running) {
+    setPrevRunning(running);
+    if (running) setProgressOpen(true);
+  }
+
+  useEffect(() => {
+    if (running) return;
+    if (!progressOpen) return;
+    const t = setTimeout(() => setProgressOpen(false), 1000);
+    return () => clearTimeout(t);
+  }, [running, progressOpen]);
 
   /* ── 분석 실행 ── */
   const runAnalyze = async () => {
@@ -86,6 +121,7 @@ export default function VisionComparePage() {
 
     setRunning(true);
     setAnalysis(null);
+    addPromptHistory("compare", hint);
 
     try {
       const { analysis: rawAnalysis } = await compareAnalyze({
@@ -119,7 +155,14 @@ export default function VisionComparePage() {
   const canRun = !!imageA && !!imageB && !running;
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+    <StudioPage>
+      {progressOpen && (
+        <AnalysisProgressModal
+          mode="compare"
+          running={running}
+          onClose={() => setProgressOpen(false)}
+        />
+      )}
       <TopBar
         left={
           <>
@@ -127,40 +170,30 @@ export default function VisionComparePage() {
             <Logo />
           </>
         }
+        center={
+          <ModelBadge
+            name={visionModel || "vision"}
+            tag="Compare · Ollama"
+            status={ollamaOn ? "ready" : "loading"}
+          />
+        }
         right={
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <>
             <VramBadge />
             <SettingsButton />
-          </div>
+          </>
         }
       />
 
-      <main
-        style={{
-          flex: 1,
-          display: "grid",
-          gridTemplateColumns: "400px minmax(624px, 1fr)",
-          gap: 24,
-          padding: "24px 32px 32px",
-          maxWidth: 1600,
-          width: "100%",
-          margin: "0 auto",
-          minWidth: 1024,
-        }}
-      >
+      <StudioWorkspace>
         {/* ───────── 좌 패널 (입력) ───────── */}
-        <aside
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 14,
-            position: "relative",
-          }}
-        >
-          <PageTitle />
-
+        <StudioLeftPanel>
+          <StudioModeHeader
+            title="Vision Compare"
+            description="두 이미지의 차이와 품질을 5축 기준으로 비교합니다."
+          />
           {/* 이미지 A 슬롯 */}
-          <ImageSlot
+          <CompareImageSlot
             label="이미지 A"
             badge="A"
             value={imageA}
@@ -196,7 +229,7 @@ export default function VisionComparePage() {
           </div>
 
           {/* 이미지 B 슬롯 */}
-          <ImageSlot
+          <CompareImageSlot
             label="이미지 B"
             badge="B"
             value={imageB}
@@ -238,6 +271,7 @@ export default function VisionComparePage() {
                 boxShadow: "var(--shadow-sm)",
               }}
             >
+              <PromptHistoryPeek mode="compare" onSelect={(p) => setHint(p)} />
               <textarea
                 value={hint}
                 onChange={(e) => setHint(e.target.value)}
@@ -250,7 +284,7 @@ export default function VisionComparePage() {
                   outline: "none",
                   resize: "none",
                   background: "transparent",
-                  padding: "12px 14px",
+                  padding: "12px 42px 30px 14px",
                   fontFamily: "inherit",
                   fontSize: 13.5,
                   lineHeight: 1.55,
@@ -259,6 +293,29 @@ export default function VisionComparePage() {
                   minHeight: 76,
                 }}
               />
+              {hint.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setHint("")}
+                  title="비교 지시 비우기"
+                  style={{
+                    all: "unset",
+                    cursor: "pointer",
+                    position: "absolute",
+                    bottom: 6,
+                    right: 10,
+                    fontSize: 11,
+                    color: "var(--ink-4)",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 3,
+                    padding: "4px 6px",
+                    borderRadius: 6,
+                  }}
+                >
+                  <Icon name="x" size={10} /> 비우기
+                </button>
+              )}
             </div>
           </div>
 
@@ -310,17 +367,10 @@ export default function VisionComparePage() {
               )}
             </button>
           </div>
-        </aside>
+        </StudioLeftPanel>
 
         {/* ───────── 우 패널 (뷰어 + 결과) ───────── */}
-        <section
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            minWidth: 0,
-          }}
-        >
+        <StudioRightPanel>
           {/* 상단 뷰어 — /edit 와 동일한 자연 높이 (BeforeAfterSlider 의 기본 maxHeight 70vh) */}
           <ViewerPanel
             imageA={imageA}
@@ -331,278 +381,9 @@ export default function VisionComparePage() {
 
           {/* 하단 분석 결과 카드 — 콘텐츠 높이 만큼 */}
           <AnalysisPanel running={running} analysis={analysis} />
-        </section>
-      </main>
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────────────
- * 페이지 타이틀 (좌 패널 상단)
- * ──────────────────────────────────────────────────────────────────── */
-function PageTitle() {
-  return (
-    <div style={{ marginBottom: 4 }}>
-      <div
-        className="display"
-        style={{
-          fontSize: 22,
-          fontWeight: 500,
-          letterSpacing: "-0.005em",
-          color: "var(--ink)",
-          textTransform: "uppercase",
-          lineHeight: 1.1,
-        }}
-      >
-        Vision Compare
-      </div>
-      <div style={{ fontSize: 12, color: "var(--ink-3)", marginTop: 4 }}>
-        두 이미지를 비전 모델로 5축 비교 (구성·색감·피사체·분위기·품질)
-      </div>
-    </div>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────────────
- * 컴팩트 이미지 업로드 슬롯 (좌 패널용)
- * ──────────────────────────────────────────────────────────────────── */
-function ImageSlot({
-  label,
-  badge,
-  value,
-  onChange,
-  onClear,
-}: {
-  label: string;
-  badge: "A" | "B";
-  value: VisionCompareImage | null;
-  onChange: (img: VisionCompareImage) => void;
-  onClear: () => void;
-}) {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const handleFiles = (files: FileList | null) => {
-    if (!files || files.length === 0) return;
-    const file = files[0];
-    if (!file.type.startsWith("image/")) {
-      toast.error("이미지 파일만 업로드 가능합니다.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        onChange({
-          dataUrl,
-          label: file.name,
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-      img.onerror = () => toast.error("이미지 로드 실패");
-      img.src = dataUrl;
-    };
-    reader.onerror = () => toast.error("파일 읽기 실패");
-    reader.readAsDataURL(file);
-  };
-
-  if (!value) {
-    return (
-      <div
-        onClick={() => fileInputRef.current?.click()}
-        onDragOver={(e) => e.preventDefault()}
-        onDrop={(e) => {
-          e.preventDefault();
-          handleFiles(e.dataTransfer.files);
-        }}
-        style={{
-          minHeight: 140,
-          border: "1.5px dashed var(--line-2)",
-          borderRadius: 12,
-          background: "var(--bg-2)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 6,
-          cursor: "pointer",
-          color: "var(--ink-3)",
-          fontSize: 12,
-          padding: "16px 12px",
-          transition: "all .15s",
-        }}
-      >
-        <SlotBadge>{badge}</SlotBadge>
-        <Icon name="upload" size={20} />
-        <div style={{ fontWeight: 600, color: "var(--ink-2)" }}>{label}</div>
-        <div style={{ fontSize: 11 }}>클릭 또는 드래그로 업로드</div>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
-    );
-  }
-
-  return (
-    <div
-      style={{
-        position: "relative",
-        minHeight: 140,
-        borderRadius: 12,
-        // 검은 배경 제거 — warm neutral 로 통일
-        background: "var(--bg-2)",
-        overflow: "hidden",
-        border: "1px solid var(--line)",
-        boxShadow: "var(--shadow-sm)",
-      }}
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={value.dataUrl}
-        alt={label}
-        style={{
-          width: "100%",
-          height: 160,
-          objectFit: "contain",
-          display: "block",
-        }}
-      />
-      <SlotBadge floating>{badge}</SlotBadge>
-      {/* 우상단 액션 — 변경 / 해제 */}
-      <div
-        style={{
-          position: "absolute",
-          top: 8,
-          right: 8,
-          display: "flex",
-          gap: 6,
-        }}
-      >
-        <ActionPill
-          onClick={() => fileInputRef.current?.click()}
-          title="이미지 변경"
-        >
-          <Icon name="refresh" size={11} /> 변경
-        </ActionPill>
-        <ActionPill onClick={onClear} title="해제">
-          <Icon name="x" size={11} />
-        </ActionPill>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          style={{ display: "none" }}
-          onChange={(e) => handleFiles(e.target.files)}
-        />
-      </div>
-      {/* 좌하단 메타 */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 6,
-          left: 8,
-          fontSize: 10,
-          color: "rgba(255,255,255,.85)",
-          background: "rgba(0,0,0,.5)",
-          padding: "2px 6px",
-          borderRadius: 4,
-          backdropFilter: "blur(4px)",
-        }}
-        className="mono"
-      >
-        {value.width}×{value.height}
-      </div>
-    </div>
-  );
-}
-
-function SlotBadge({
-  children,
-  floating,
-}: {
-  children: React.ReactNode;
-  floating?: boolean;
-}) {
-  if (floating) {
-    return (
-      <div
-        className="display"
-        style={{
-          position: "absolute",
-          top: 8,
-          left: 8,
-          width: 26,
-          height: 26,
-          borderRadius: 8,
-          background: "rgba(255,255,255,.92)",
-          color: "var(--ink)",
-          display: "grid",
-          placeItems: "center",
-          fontSize: 13,
-          fontWeight: 600,
-          boxShadow: "0 2px 6px rgba(0,0,0,.2)",
-        }}
-      >
-        {children}
-      </div>
-    );
-  }
-  return (
-    <div
-      className="display"
-      style={{
-        width: 26,
-        height: 26,
-        borderRadius: 8,
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        display: "grid",
-        placeItems: "center",
-        fontSize: 13,
-        fontWeight: 600,
-        color: "var(--ink-2)",
-      }}
-    >
-      {children}
-    </div>
-  );
-}
-
-function ActionPill({
-  children,
-  onClick,
-  title,
-}: {
-  children: React.ReactNode;
-  onClick: () => void;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      style={{
-        all: "unset",
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "4px 8px",
-        background: "rgba(0,0,0,.55)",
-        backdropFilter: "blur(6px)",
-        color: "#fff",
-        fontSize: 11,
-        borderRadius: 999,
-      }}
-    >
-      {children}
-    </button>
+        </StudioRightPanel>
+      </StudioWorkspace>
+    </StudioPage>
   );
 }
 
@@ -641,7 +422,7 @@ function ViewerPanel({
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        minHeight: 0,
+        minHeight: 304,
       }}
     >
       {/* 헤더 + 모드 토글 */}
@@ -679,7 +460,15 @@ function ViewerPanel({
             </span>
           )}
         </div>
-        <ModeToggle mode={mode} onChange={onModeChange} disabled={!both} />
+        <SegControl
+          disabled={!both}
+          value={mode}
+          onChange={(v) => onModeChange(v as "slider" | "sidebyside")}
+          options={[
+            { value: "slider", label: "슬라이더" },
+            { value: "sidebyside", label: "나란히" },
+          ]}
+        />
       </div>
 
       {/* 본문 */}
@@ -692,56 +481,6 @@ function ViewerPanel({
           <SideBySideViewer imageA={imageA!} imageB={imageB!} />
         )}
       </div>
-    </div>
-  );
-}
-
-function ModeToggle({
-  mode,
-  onChange,
-  disabled,
-}: {
-  mode: "slider" | "sidebyside";
-  onChange: (m: "slider" | "sidebyside") => void;
-  disabled: boolean;
-}) {
-  const opts: Array<{ key: "slider" | "sidebyside"; label: string }> = [
-    { key: "slider", label: "↔ 슬라이더" },
-    { key: "sidebyside", label: "◫ 나란히" },
-  ];
-  return (
-    <div
-      style={{
-        display: "inline-flex",
-        background: "var(--bg-2)",
-        border: "1px solid var(--line)",
-        borderRadius: 999,
-        padding: 2,
-        opacity: disabled ? 0.4 : 1,
-      }}
-    >
-      {opts.map((o) => (
-        <button
-          key={o.key}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange(o.key)}
-          style={{
-            all: "unset",
-            cursor: disabled ? "not-allowed" : "pointer",
-            padding: "5px 12px",
-            fontSize: 11,
-            fontWeight: 500,
-            borderRadius: 999,
-            background: mode === o.key ? "var(--surface)" : "transparent",
-            color: mode === o.key ? "var(--ink)" : "var(--ink-3)",
-            boxShadow: mode === o.key ? "var(--shadow-sm)" : "none",
-            transition: "all .15s",
-          }}
-        >
-          {o.label}
-        </button>
-      ))}
     </div>
   );
 }
@@ -804,11 +543,6 @@ function SideBySideViewer({
   imageA: VisionCompareImage;
   imageB: VisionCompareImage;
 }) {
-  // 두 이미지 비율 평균을 박스 aspectRatio 로 사용 (/edit 의 70vh 패턴과 비슷한 자연 높이)
-  const ratioA = imageA.width / imageA.height;
-  const ratioB = imageB.width / imageB.height;
-  // 가로 두 박스라 합산 가로 = 2 × max-side · 평균 비율로 박스 높이 결정
-  const avgRatio = (ratioA + ratioB) / 2;
   return (
     <div
       style={{
@@ -862,7 +596,7 @@ function SideThumb({
           display: "block",
         }}
       />
-      <SlotBadge floating>{badge}</SlotBadge>
+      <CompareSlotBadge floating>{badge}</CompareSlotBadge>
     </div>
   );
 }
@@ -887,7 +621,7 @@ function AnalysisPanel({
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        minHeight: 0,
+        minHeight: 262,
         overflow: "hidden",
       }}
     >

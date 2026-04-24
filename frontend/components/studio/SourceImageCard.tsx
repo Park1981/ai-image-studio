@@ -161,11 +161,11 @@ export default function SourceImageCard({
           background: sourceImage
             ? "var(--bg-2)"
             : drag
-              ? "var(--accent-soft)"
-              : "rgba(74,158,255,.04)",
+              ? "#F1EEE8"
+              : "var(--bg-2)",
           border: sourceImage
             ? "1px solid var(--line)"
-            : `1.5px dashed ${drag ? "var(--accent)" : "rgba(74,158,255,.45)"}`,
+            : `1.5px dashed ${drag ? "#BDB6AA" : "#D4CEC0"}`,
           transition: "all .2s",
           cursor: sourceImage ? "default" : "pointer",
         }}
@@ -189,16 +189,21 @@ export default function SourceImageCard({
                 height: "100%",
                 objectFit: "contain",
                 display: "block",
-                background: "#111",
+                // 레터박스 배경을 warm neutral 로 통일 (audit 2026-04-24 P0-1).
+                // 기존 "#111" 은 다른 메뉴의 CompareImageSlot / VisionResultCard 와
+                // 톤이 어긋나 업로드 이미지가 메뉴마다 다른 앱처럼 보이던 문제.
+                background: "var(--bg-2)",
               }}
             />
-            {/* 하단 그라디언트 — 배지 가독성 */}
+            {/* 하단 그라디언트 — 배지/버튼 가독성 보장용 (유지).
+             *   warm neutral 배경에서도 흰색 텍스트 pill 의 대비 확보 필요.
+             *   다만 강도를 .55 → .42 로 낮춰 톤 이질감 감소. */}
             <div
               style={{
                 position: "absolute",
                 inset: 0,
                 background:
-                  "linear-gradient(to top, rgba(0,0,0,.55) 0%, transparent 55%)",
+                  "linear-gradient(to top, rgba(0,0,0,.42) 0%, transparent 55%)",
                 pointerEvents: "none",
               }}
             />

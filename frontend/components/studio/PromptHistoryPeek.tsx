@@ -19,12 +19,15 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
-import type { HistoryItem } from "@/lib/api-client";
 import { useHistoryStore } from "@/stores/useHistoryStore";
+import {
+  usePromptHistoryStore,
+  type PromptHistoryMode,
+} from "@/stores/usePromptHistoryStore";
 import { toast } from "@/stores/useToastStore";
 
 interface Props {
-  mode: "generate" | "edit" | "video";
+  mode: PromptHistoryMode;
   /** 프롬프트 선택 시 호출 — 입력창에 주입 */
   onSelect: (prompt: string) => void;
   /** 패널 정렬. "right" = 트리거 오른쪽 끝 기준 (기본). "left" = 왼쪽 끝 기준. */
@@ -35,11 +38,19 @@ const MODE_LABEL: Record<Props["mode"], string> = {
   generate: "생성",
   edit: "수정",
   video: "영상",
+  compare: "비교",
 };
 
 const MAX_ITEMS = 20;
 const ENTER_DELAY = 150;
 const LEAVE_DELAY = 300;
+
+interface PromptPeekItem {
+  id: string;
+  prompt: string;
+  createdAt: number;
+  meta?: string;
+}
 
 export default function PromptHistoryPeek({
   mode,
@@ -47,6 +58,7 @@ export default function PromptHistoryPeek({
   align = "right",
 }: Props) {
   const items = useHistoryStore((s) => s.items);
+  const promptEntries = usePromptHistoryStore((s) => s.entries);
   const [open, setOpen] = useState(false);
   // hover 타이머 — 진입/이탈 지연 처리
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -54,18 +66,34 @@ export default function PromptHistoryPeek({
 
   // mode 별 prompt 추출 + dedupe (최신 우선)
   const prompts = useMemo(() => {
+    if (mode === "compare") {
+      return promptEntries
+        .filter((it) => it.mode === "compare")
+        .slice(0, MAX_ITEMS)
+        .map((it) => ({
+          id: it.id,
+          prompt: it.prompt,
+          createdAt: it.createdAt,
+        }));
+    }
+
     const seen = new Set<string>();
-    const out: HistoryItem[] = [];
+    const out: PromptPeekItem[] = [];
     for (const it of items) {
       if (it.mode !== mode) continue;
       const key = it.prompt.trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);
-      out.push(it);
+      out.push({
+        id: it.id,
+        prompt: it.prompt,
+        createdAt: it.createdAt,
+        meta: `${it.width}×${it.height}`,
+      });
       if (out.length >= MAX_ITEMS) break;
     }
     return out;
-  }, [items, mode]);
+  }, [items, mode, promptEntries]);
 
   const scheduleOpen = () => {
     if (leaveTimer.current) {
@@ -99,9 +127,6 @@ export default function PromptHistoryPeek({
     setOpen(false);
     toast.info("프롬프트 적용", prompt.slice(0, 40));
   };
-
-  // 빈 히스토리면 트리거 자체 숨김 (깔끔함 우선)
-  if (prompts.length === 0) return null;
 
   const alignRight = align === "right";
 
@@ -204,24 +229,38 @@ export default function PromptHistoryPeek({
               </span>
             </div>
 
-            <ul
-              style={{
-                listStyle: "none",
-                margin: 0,
-                padding: "4px 0",
-                overflowY: "auto",
-                flex: 1,
-              }}
-            >
-              {prompts.map((it) => (
-                <PeekRow
-                  key={it.id}
-                  item={it}
-                  onCopy={() => handleCopy(it.prompt)}
-                  onSelect={() => handleSelect(it.prompt)}
-                />
-              ))}
-            </ul>
+            {prompts.length === 0 ? (
+              <div
+                style={{
+                  padding: "18px 14px",
+                  color: "var(--ink-4)",
+                  fontSize: 12,
+                  textAlign: "center",
+                  lineHeight: 1.5,
+                }}
+              >
+                아직 저장된 {MODE_LABEL[mode]} 프롬프트가 없습니다.
+              </div>
+            ) : (
+              <ul
+                style={{
+                  listStyle: "none",
+                  margin: 0,
+                  padding: "4px 0",
+                  overflowY: "auto",
+                  flex: 1,
+                }}
+              >
+                {prompts.map((it) => (
+                  <PeekRow
+                    key={it.id}
+                    item={it}
+                    onCopy={() => handleCopy(it.prompt)}
+                    onSelect={() => handleSelect(it.prompt)}
+                  />
+                ))}
+              </ul>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -235,7 +274,7 @@ function PeekRow({
   onCopy,
   onSelect,
 }: {
-  item: HistoryItem;
+  item: PromptPeekItem;
   onCopy: () => void;
   onSelect: () => void;
 }) {
@@ -279,7 +318,8 @@ function PeekRow({
             letterSpacing: ".03em",
           }}
         >
-          {formatRelativeTime(item.createdAt)} · {item.width}×{item.height}
+          {formatRelativeTime(item.createdAt)}
+          {item.meta ? ` · ${item.meta}` : ""}
         </div>
       </div>
       <div

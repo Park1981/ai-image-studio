@@ -4,34 +4,34 @@
  * ⚠️ 변경 시 사용자 확인 필수
  */
 
-// 컬러 팔레트 (Phase 0.5에서 사용자 피드백 후 확정)
+// 컬러 팔레트 (globals.css 의 warm neutral 시스템과 동기화)
 export const colors = {
-  // 다크 테마 기본
+  // 라이트 테마 기본
   bg: {
-    primary: '#0a0a0a',
-    secondary: '#141414',
-    tertiary: '#1e1e1e',
-    hover: '#262626',
+    primary: '#FAF9F7',
+    secondary: '#F4F2EE',
+    tertiary: '#FFFFFF',
+    hover: '#F4F2EE',
   },
   text: {
-    primary: '#fafafa',
-    secondary: '#a1a1aa',
-    muted: '#71717a',
+    primary: '#1F1F1F',
+    secondary: '#46464A',
+    muted: '#7A7A80',
   },
   accent: {
-    primary: '#6366f1',    // 인디고 (메인 액센트)
-    hover: '#818cf8',
-    muted: '#6366f1/20',
+    primary: '#4A9EFF',
+    hover: '#1E7BE0',
+    muted: '#EAF3FF',
   },
   status: {
-    success: '#22c55e',
-    error: '#ef4444',
-    warning: '#f59e0b',
-    info: '#3b82f6',
+    success: '#52C41A',
+    error: '#D94A5C',
+    warning: '#FAAD14',
+    info: '#4A9EFF',
   },
   border: {
-    default: '#27272a',
-    hover: '#3f3f46',
+    default: '#E8E5DF',
+    hover: '#DCD8D0',
   },
 } as const
 
@@ -65,17 +65,17 @@ export const typography = {
 
 // 그림자
 export const shadows = {
-  sm: '0 1px 2px rgba(0, 0, 0, 0.3)',
-  md: '0 4px 6px rgba(0, 0, 0, 0.4)',
-  lg: '0 10px 15px rgba(0, 0, 0, 0.5)',
+  sm: '0 1px 2px rgba(23, 20, 14, 0.04), 0 2px 8px rgba(23, 20, 14, 0.04)',
+  md: '0 2px 4px rgba(23, 20, 14, 0.04), 0 8px 24px rgba(23, 20, 14, 0.06)',
+  lg: '0 4px 10px rgba(23, 20, 14, 0.05), 0 20px 48px rgba(23, 20, 14, 0.08)',
 } as const
 
 // 라운딩
 export const borderRadius = {
-  sm: '6px',
-  md: '8px',
-  lg: '12px',
-  xl: '16px',
+  sm: '8px',
+  md: '12px',
+  lg: '16px',
+  xl: '20px',
   full: '9999px',
 } as const
 

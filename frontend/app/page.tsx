@@ -18,7 +18,7 @@ import SettingsButton from "@/components/settings/SettingsButton";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 
-/** 카테고리 섹션 래퍼 — 옅은 배경 박스 + Unbounded 디스플레이 헤더 */
+/** 카테고리 섹션 래퍼 — 옅은 배경 박스 + 디스플레이 헤더 */
 function CategorySection({
   label,
   children,
@@ -43,10 +43,10 @@ function CategorySection({
         style={{
           fontSize: 24,
           color: "var(--ink)",
-          letterSpacing: "-0.005em",
-          textTransform: "uppercase",
-          fontWeight: 500,
+          letterSpacing: 0,
+          fontWeight: 620,
           lineHeight: 1.1,
+          fontVariationSettings: '"opsz" 72, "SOFT" 42, "WONK" 0',
           paddingLeft: 4,
           paddingBottom: 2,
         }}
@@ -145,14 +145,14 @@ export default function MainMenuPage() {
           <CategorySection label="Image">
             <MenuCard
               icon="image"
-              title="이미지 생성"
+              title="Image Generate"
               desc="자연어 프롬프트를 gemma4로 업그레이드한 뒤 ComfyUI 워크플로우에 전달합니다."
               bgImage="/menu/generate.png"
               onClick={() => router.push("/generate")}
             />
             <MenuCard
               icon="edit"
-              title="이미지 수정"
+              title="Image Edit"
               desc="참조 이미지와 자연어 지시를 비전 모델로 분석해 수정본을 생성합니다."
               bgImage="/menu/edit.png"
               onClick={() => router.push("/edit")}
@@ -163,14 +163,14 @@ export default function MainMenuPage() {
           <CategorySection label="Vision">
             <MenuCard
               icon="search"
-              title="비전 분석"
+              title="Vision Analyze"
               desc="이미지 한 장을 비전 모델로 분석해 상세 영/한 설명을 추출합니다."
               bgImage="/menu/vision.png"
               onClick={() => router.push("/vision")}
             />
             <MenuCard
               icon="grid"
-              title="비전 비교"
+              title="Vision Compare"
               desc="두 이미지를 비전 모델로 비교해 구성·색·피사체·분위기·품질 5축 차이를 분석합니다."
               bgImage="/menu/compare.png"
               tag="NEW"
@@ -182,7 +182,7 @@ export default function MainMenuPage() {
           <CategorySection label="Video">
             <MenuCard
               icon="play"
-              title="영상 생성"
+              title="Video Generate"
               desc="이미지 한 장에서 LTX-2.3 로 5초 · 25fps 오디오+영상 MP4 를 생성합니다."
               bgImage="/menu/video.png"
               tag="LTX-2.3"
@@ -190,7 +190,7 @@ export default function MainMenuPage() {
             />
             <MenuCard
               icon="upscale"
-              title="영상 업스케일"
+              title="Video Upscale"
               desc="LTX-2.3 공간 업스케일러로 영상 해상도를 2배로 향상합니다."
               bgImage="/menu/upscale.png"
               tag="준비 중"

@@ -122,7 +122,7 @@ export const useVideoStore = create<VideoState>((set) => ({
   sourceWidth: null,
   sourceHeight: null,
 
-  prompt: "피사체는 그대로 유지. 부드러운 창가 빛과 느린 달리 인, 잔잔한 앰비언스.",
+  prompt: "",
   adult: false,
   longerEdge: VIDEO_LONGER_EDGE_DEFAULT,
   lightning: true,

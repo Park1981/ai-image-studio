@@ -29,9 +29,16 @@ import PipelineSteps, {
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import {
+  StudioLeftPanel,
+  StudioModeHeader,
+  StudioPage,
+  StudioRightPanel,
+  StudioWorkspace,
+} from "@/components/studio/StudioLayout";
 import VideoPlayerCard from "@/components/studio/VideoPlayerCard";
 import Icon from "@/components/ui/Icon";
-import { Spinner } from "@/components/ui/primitives";
+import { Spinner, Toggle } from "@/components/ui/primitives";
 import { useVideoPipeline } from "@/hooks/useVideoPipeline";
 import { filenameFromRef } from "@/lib/image-actions";
 import type { HistoryItem } from "@/lib/api-client";
@@ -129,6 +136,14 @@ export default function VideoPage() {
     if (promptTextareaRef.current) autoGrow(promptTextareaRef.current);
   }, [prompt]);
 
+  /* ── 진입 시 영상 지시는 빈 입력으로 시작 ── */
+  const promptClearedRef = useRef(false);
+  useEffect(() => {
+    if (promptClearedRef.current) return;
+    promptClearedRef.current = true;
+    setPrompt("");
+  }, [setPrompt]);
+
   const handleSourceChange = (
     image: string,
     label: string,
@@ -146,15 +161,7 @@ export default function VideoPage() {
   const ctaDisabled = running || !sourceImage || !prompt.trim();
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        // 페이지 최소 너비 — 좌 400 + 우 최소 624 = 1024. 그 이하에선 body 가로 스크롤.
-        minWidth: 1024,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <StudioPage>
       {progressOpen && (
         <ProgressModal mode="video" onClose={() => setProgressOpen(false)} />
       )}
@@ -189,26 +196,13 @@ export default function VideoPage() {
         }
       />
 
-      <div
-        style={{
-          flex: 1,
-          display: "grid",
-          // 4 페이지 레이아웃 통일 — 좌 400 고정, 우 최소 624.
-          gridTemplateColumns: "400px minmax(624px, 1fr)",
-          minHeight: "calc(100vh - 52px)",
-        }}
-      >
+      <StudioWorkspace>
         {/* ── LEFT: 업로드 + 프롬프트 + CTA ── */}
-        <section
-          style={{
-            padding: "24px 20px",
-            borderRight: "1px solid var(--line)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            background: "var(--bg)",
-          }}
-        >
+        <StudioLeftPanel>
+          <StudioModeHeader
+            title="Video Generate"
+            description="원본 이미지와 영상 지시로 5초 MP4를 생성합니다."
+          />
           <div>
             <div
               style={{
@@ -340,205 +334,27 @@ export default function VideoPage() {
             sourceHeight={sourceHeight}
           />
 
-          {/* Lightning 토글 — ON (기본): 4-step 초고속, OFF: full 30-step (얼굴 보존) */}
-          <button
-            type="button"
-            onClick={() => setLightning(!lightning)}
-            aria-pressed={lightning}
-            title={
+          <Toggle
+            checked={lightning}
+            onChange={setLightning}
+            label={lightning ? "Lightning 4-step" : "고품질 30-step"}
+            desc={
               lightning
-                ? "빠른 생성 ON — 4-step distilled LoRA · 5분 내외 · 얼굴 drift 가능"
-                : "고품질 모드 — full 30-step · 20분+ · 얼굴 보존 최강"
+                ? "빠른 생성 · 약 5분 · 얼굴 변할 수 있음"
+                : "Full step · 약 20분+ · 얼굴 보존 우선"
             }
-            style={{
-              all: "unset",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 10,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: lightning
-                ? "1px solid rgba(250, 173, 20, .45)"
-                : "1px solid var(--line)",
-              background: lightning
-                ? "linear-gradient(135deg, rgba(250,173,20,.12), rgba(250,173,20,.04))"
-                : "var(--surface)",
-              transition: "all .18s",
-            }}
-            onMouseEnter={(e) => {
-              if (!lightning)
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "var(--line-2)";
-            }}
-            onMouseLeave={(e) => {
-              if (!lightning)
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "var(--line)";
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span
-                style={{
-                  fontSize: 16,
-                  filter: lightning ? "none" : "grayscale(.8) opacity(.5)",
-                  transition: "filter .2s",
-                }}
-              >
-                ⚡
-              </span>
-              <div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: lightning ? "var(--amber-ink)" : "var(--ink)",
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  빠른 생성 (Lightning)
-                </div>
-                <div
-                  style={{
-                    fontSize: 10.5,
-                    color: "var(--ink-4)",
-                    marginTop: 2,
-                  }}
-                >
-                  {lightning
-                    ? "4-step · 약 5분 · 얼굴 변할 수 있음"
-                    : "Full 30-step · 약 20분+ · 얼굴 보존 최강"}
-                </div>
-              </div>
-            </div>
-            {/* 스위치 인디케이터 */}
-            <div
-              style={{
-                width: 36,
-                height: 20,
-                borderRadius: 999,
-                background: lightning ? "#FAAD14" : "var(--line-2)",
-                position: "relative",
-                transition: "background .2s",
-                flexShrink: 0,
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  left: lightning ? 18 : 2,
-                  width: 16,
-                  height: 16,
-                  borderRadius: "50%",
-                  background: "#fff",
-                  boxShadow: "0 1px 3px rgba(0,0,0,.2)",
-                  transition: "left .2s",
-                }}
-              />
-            </div>
-          </button>
+          />
 
-          {/* 성인 모드 토글 — ON: gemma4 NSFW clause + eros LoRA 체인 포함 */}
-          <button
-            type="button"
-            onClick={() => setAdult(!adult)}
-            aria-pressed={adult}
-            title={
+          <Toggle
+            checked={adult}
+            onChange={setAdult}
+            label={adult ? "성인 모드 켜짐" : "성인 모드 꺼짐"}
+            desc={
               adult
-                ? "성인 모드 ON — gemma4 가 에로틱 모션 프롬프트를 만들고 eros LoRA 가 적용됨"
-                : "성인 모드 OFF — SFW 프롬프트 + distilled LoRA 만"
+                ? "에로틱 모션 + NSFW LoRA 적용"
+                : "SFW 프롬프트 · 얼굴 보존 안정"
             }
-            style={{
-              all: "unset",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              gap: 10,
-              padding: "10px 14px",
-              borderRadius: 10,
-              border: adult
-                ? "1px solid rgba(220, 80, 100, .5)"
-                : "1px solid var(--line)",
-              background: adult
-                ? "linear-gradient(135deg, rgba(220,80,100,.12), rgba(220,80,100,.04))"
-                : "var(--surface)",
-              transition: "all .18s",
-            }}
-            onMouseEnter={(e) => {
-              if (!adult)
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "var(--line-2)";
-            }}
-            onMouseLeave={(e) => {
-              if (!adult)
-                (e.currentTarget as HTMLButtonElement).style.borderColor =
-                  "var(--line)";
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <span
-                style={{
-                  fontSize: 16,
-                  filter: adult ? "none" : "grayscale(.8) opacity(.5)",
-                  transition: "filter .2s",
-                }}
-              >
-                🔥
-              </span>
-              <div>
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: adult ? "#B23A58" : "var(--ink)",
-                    letterSpacing: "-0.01em",
-                  }}
-                >
-                  성인 모드
-                </div>
-                <div
-                  style={{
-                    fontSize: 10.5,
-                    color: "var(--ink-4)",
-                    marginTop: 2,
-                  }}
-                >
-                  {adult
-                    ? "에로틱 모션 + NSFW LoRA 적용"
-                    : "SFW · 얼굴 보존 안정"}
-                </div>
-              </div>
-            </div>
-            {/* 스위치 인디케이터 */}
-            <div
-              style={{
-                width: 36,
-                height: 20,
-                borderRadius: 999,
-                background: adult ? "#B23A58" : "var(--line-2)",
-                position: "relative",
-                transition: "background .2s",
-                flexShrink: 0,
-              }}
-            >
-              <div
-                style={{
-                  position: "absolute",
-                  top: 2,
-                  left: adult ? 18 : 2,
-                  width: 16,
-                  height: 16,
-                  borderRadius: "50%",
-                  background: "#fff",
-                  boxShadow: "0 1px 3px rgba(0,0,0,.2)",
-                  transition: "left .2s",
-                }}
-              />
-            </div>
-          </button>
+          />
 
           {/* Pipeline (5단계 초록박스) */}
           <PipelineSteps
@@ -653,18 +469,10 @@ export default function VideoPage() {
               · 5초 영상 · 로컬 처리
             </div>
           </div>
-        </section>
+        </StudioLeftPanel>
 
         {/* ── RIGHT: 플레이어 + 히스토리 ── */}
-        <section
-          style={{
-            padding: "24px 32px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            minWidth: 0,
-          }}
-        >
+        <StudioRightPanel>
           <div
             style={{
               display: "flex",
@@ -742,9 +550,9 @@ export default function VideoPage() {
           </div>
 
           <div style={{ flex: 1 }} />
-        </section>
-      </div>
-    </div>
+        </StudioRightPanel>
+      </StudioWorkspace>
+    </StudioPage>
   );
 }
 

@@ -60,10 +60,12 @@ export function SegControl({
   options,
   value,
   onChange,
+  disabled = false,
 }: {
   options: SegOption[];
   value: string;
   onChange: (v: string) => void;
+  disabled?: boolean;
 }) {
   const items = options.map((o) =>
     typeof o === "string" ? { label: o, value: o } : o,
@@ -77,16 +79,20 @@ export function SegControl({
         borderRadius: 8,
         gap: 2,
         flexWrap: "wrap",
+        opacity: disabled ? 0.45 : 1,
       }}
     >
       {items.map((o) => (
         <button
           key={o.value}
-          onClick={() => onChange(o.value)}
+          disabled={disabled}
+          onClick={() => {
+            if (!disabled) onChange(o.value);
+          }}
           className="mono"
           style={{
             all: "unset",
-            cursor: "pointer",
+            cursor: disabled ? "not-allowed" : "pointer",
             padding: "4px 8px",
             fontSize: 11,
             letterSpacing: ".02em",

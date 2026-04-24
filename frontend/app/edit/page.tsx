@@ -34,6 +34,13 @@ import PipelineSteps, { type PipelineStepMeta } from "@/components/studio/Pipeli
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import {
+  StudioLeftPanel,
+  StudioModeHeader,
+  StudioPage,
+  StudioRightPanel,
+  StudioWorkspace,
+} from "@/components/studio/StudioLayout";
 import { useProcessStore } from "@/stores/useProcessStore";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
@@ -161,6 +168,14 @@ export default function EditPage() {
     if (lightningByDefault && !lightning) setLightning(true);
   }, [lightningByDefault, lightning, setLightning]);
 
+  /* ── 진입 시 수정 지시는 빈 입력으로 시작 ── */
+  const promptClearedRef = useRef(false);
+  useEffect(() => {
+    if (promptClearedRef.current) return;
+    promptClearedRef.current = true;
+    setPrompt("");
+  }, [setPrompt]);
+
   /* ── 프롬프트 textarea auto-grow (내용 높이에 맞춰 자동 확장) ── */
   const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const autoGrow = (el: HTMLTextAreaElement) => {
@@ -184,15 +199,7 @@ export default function EditPage() {
   };
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        // 페이지 최소 너비 — 좌 400 + 우 최소 624 = 1024. 그 이하에선 body 가로 스크롤.
-        minWidth: 1024,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <StudioPage>
       {progressOpen && (
         <ProgressModal mode="edit" onClose={() => setProgressOpen(false)} />
       )}
@@ -265,26 +272,13 @@ export default function EditPage() {
         }
       />
 
-      <div
-        style={{
-          flex: 1,
-          display: "grid",
-          // 4 페이지 레이아웃 통일 — 좌 400 고정, 우 최소 624.
-          gridTemplateColumns: "400px minmax(624px, 1fr)",
-          minHeight: "calc(100vh - 52px)",
-        }}
-      >
+      <StudioWorkspace>
         {/* ── LEFT column ── */}
-        <section
-          style={{
-            padding: "24px 20px",
-            borderRight: "1px solid var(--line)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            background: "var(--bg)",
-          }}
-        >
+        <StudioLeftPanel>
+          <StudioModeHeader
+            title="Image Edit"
+            description="원본 이미지와 수정 지시로 새로운 결과 이미지를 만듭니다."
+          />
           {/* Dropzone */}
           <div>
             <div
@@ -529,18 +523,33 @@ export default function EditPage() {
             )}
           </button>
           </div>
-        </section>
+        </StudioLeftPanel>
 
         {/* ── RIGHT column ── */}
-        <section
-          style={{
-            padding: "24px 32px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            minWidth: 0,
-          }}
-        >
+        <StudioRightPanel>
+          {/* ── 결과 영역 헤더 (Vision/Video 와 동일 패턴 · audit P0-2) ── */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+              수정 결과
+            </h3>
+            <span
+              className="mono"
+              style={{
+                fontSize: 11,
+                color: "var(--ink-4)",
+                letterSpacing: ".04em",
+              }}
+            >
+              BEFORE · AFTER
+            </span>
+          </div>
+
           {/* ── 결과 뷰어 (Before/After 슬라이더 + 호버 액션바) ── */}
           {sourceImage && afterItem && afterItem.sourceRef && afterItem.sourceRef === sourceImage ? (
             <>
@@ -660,17 +669,19 @@ export default function EditPage() {
           ) : (
             <div
               style={{
+                // empty 상태 밀도를 Generate/Video/Vision 과 통일 (audit P0-3).
+                // 기존 minHeight:56 + padding "16px 20px" 은 유독 얕아서
+                // 결과 영역이 갑자기 줄어든 듯한 체감을 줬음.
                 background: "var(--surface)",
                 border: "1px dashed var(--line-2)",
-                borderRadius: 12,
+                borderRadius: 14,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "var(--ink-4)",
                 fontSize: 12.5,
                 textAlign: "center",
-                padding: "16px 20px",
-                minHeight: 56,
+                padding: "28px 20px",
               }}
             >
               {!sourceImage
@@ -742,9 +753,9 @@ export default function EditPage() {
               emptyMessage="아직 수정 결과가 없습니다. 왼쪽에서 이미지를 업로드하고 [수정 생성]을 눌러주세요."
             />
           </div>
-        </section>
-      </div>
-    </div>
+        </StudioRightPanel>
+      </StudioWorkspace>
+    </StudioPage>
   );
 }
 

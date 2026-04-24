@@ -82,7 +82,7 @@ export const useEditStore = create<EditState>((set) => ({
   sourceWidth: null,
   sourceHeight: null,
 
-  prompt: "배경을 바다로 바꿔줘. 오후의 햇살이 물결에 반사되도록.",
+  prompt: "",
   lightning: false,
 
   running: false,

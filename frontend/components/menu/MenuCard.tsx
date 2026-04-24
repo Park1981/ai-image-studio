@@ -163,12 +163,14 @@ export default function MenuCard({
           }}
         >
           <div
+            className="display"
             style={{
               fontSize: 19,
-              fontWeight: 600,
-              letterSpacing: "-0.02em",
+              fontWeight: 650,
+              letterSpacing: 0,
               color: "var(--ink)",
-              lineHeight: 1.2,
+              lineHeight: 1.12,
+              fontVariationSettings: '"opsz" 72, "SOFT" 42, "WONK" 0',
             }}
           >
             {title}
@@ -178,7 +180,7 @@ export default function MenuCard({
               fontSize: 12.5,
               color: "var(--ink-3)",
               lineHeight: 1.5,
-              letterSpacing: "-0.003em",
+              letterSpacing: 0,
               display: "-webkit-box",
               WebkitLineClamp: 2,
               WebkitBoxOrient: "vertical",
@@ -286,12 +288,15 @@ export default function MenuCard({
       </div>
 
       <div
+        className="display"
         style={{
           fontSize: 20,
-          fontWeight: 600,
-          letterSpacing: "-0.02em",
+          fontWeight: 650,
+          letterSpacing: 0,
           marginBottom: 8,
           color: "var(--ink)",
+          lineHeight: 1.12,
+          fontVariationSettings: '"opsz" 72, "SOFT" 42, "WONK" 0',
         }}
       >
         {title}

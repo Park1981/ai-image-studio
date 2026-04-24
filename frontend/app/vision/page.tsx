@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BackBtn,
@@ -18,7 +18,15 @@ import {
 } from "@/components/chrome/Chrome";
 import VramBadge from "@/components/chrome/VramBadge";
 import SettingsButton from "@/components/settings/SettingsButton";
+import AnalysisProgressModal from "@/components/studio/AnalysisProgressModal";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import {
+  StudioLeftPanel,
+  StudioModeHeader,
+  StudioPage,
+  StudioRightPanel,
+  StudioWorkspace,
+} from "@/components/studio/StudioLayout";
 import VisionHistoryList from "@/components/studio/VisionHistoryList";
 import VisionResultCard from "@/components/studio/VisionResultCard";
 import Icon from "@/components/ui/Icon";
@@ -56,6 +64,21 @@ export default function VisionPage() {
   /* ── 파이프라인 훅 ── */
   const { analyze, analyzing } = useVisionPipeline();
 
+  /* ── 진행 모달 open 상태 ── */
+  const [progressOpen, setProgressOpen] = useState(false);
+  const [prevAnalyzing, setPrevAnalyzing] = useState(analyzing);
+  if (prevAnalyzing !== analyzing) {
+    setPrevAnalyzing(analyzing);
+    if (analyzing) setProgressOpen(true);
+  }
+
+  useEffect(() => {
+    if (analyzing) return;
+    if (!progressOpen) return;
+    const t = setTimeout(() => setProgressOpen(false), 1000);
+    return () => clearTimeout(t);
+  }, [analyzing, progressOpen]);
+
   /* ── 소스 이미지 핸들러 ── */
   const handleSourceChange = (
     image: string,
@@ -74,15 +97,14 @@ export default function VisionPage() {
   const analyzeDisabled = analyzing || !currentImage;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        // 페이지 최소 너비 — 좌 400 + 우 최소 624 = 1024. 그 이하에선 body 가로 스크롤.
-        minWidth: 1024,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <StudioPage>
+      {progressOpen && (
+        <AnalysisProgressModal
+          mode="vision"
+          running={analyzing}
+          onClose={() => setProgressOpen(false)}
+        />
+      )}
       <TopBar
         left={
           <>
@@ -105,26 +127,13 @@ export default function VisionPage() {
         }
       />
 
-      <div
-        style={{
-          flex: 1,
-          display: "grid",
-          // 4 페이지 레이아웃 통일 — 좌 400 고정, 우 최소 624.
-          gridTemplateColumns: "400px minmax(624px, 1fr)",
-          minHeight: "calc(100vh - 52px)",
-        }}
-      >
+      <StudioWorkspace>
         {/* ── LEFT: 업로드 + CTA ── */}
-        <section
-          style={{
-            padding: "24px 20px",
-            borderRight: "1px solid var(--line)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            background: "var(--bg)",
-          }}
-        >
+        <StudioLeftPanel>
+          <StudioModeHeader
+            title="Vision Analyze"
+            description="이미지 한 장의 구도, 분위기, 품질을 분석하고 번역합니다."
+          />
           <div>
             <div
               style={{
@@ -263,18 +272,10 @@ export default function VisionPage() {
               전송 없음
             </div>
           </div>
-        </section>
+        </StudioLeftPanel>
 
         {/* ── RIGHT: 결과 카드 + 히스토리 ── */}
-        <section
-          style={{
-            padding: "24px 32px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            minWidth: 0,
-          }}
-        >
+        <StudioRightPanel>
           <div
             style={{
               display: "flex",
@@ -308,8 +309,8 @@ export default function VisionPage() {
             onCycleGrid={cycleGrid}
             maxEntries={MAX_VISION_HISTORY}
           />
-        </section>
-      </div>
-    </div>
+        </StudioRightPanel>
+      </StudioWorkspace>
+    </StudioPage>
   );
 }

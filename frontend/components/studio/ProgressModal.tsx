@@ -192,7 +192,10 @@ function StatusBar({ mode }: { mode: "generate" | "edit" | "video" }) {
   const editSamplingStep = useEditStore((s) => s.samplingStep);
   const editSamplingTotal = useEditStore((s) => s.samplingTotal);
   const editRunning = useEditStore((s) => s.running);
-  const editStepDone = useEditStore((s) => s.stepDone);
+  // audit P1a: Edit 진행률 기준을 본문 bar 와 동일한 pipelineProgress 로 통일.
+  // 기존 stepDone/4 기반은 Step4(ComfyUI 샘플링) 내부 세부 진행을 반영 못 해서
+  // 상단 % 가 75% 에 정체되는데 본문 bar 는 계속 움직이는 불일치가 있었음.
+  const editProgress = useEditStore((s) => s.pipelineProgress);
 
   const videoStartedAt = useVideoStore((s) => s.startedAt);
   const videoSamplingStep = useVideoStore((s) => s.samplingStep);
@@ -224,13 +227,13 @@ function StatusBar({ mode }: { mode: "generate" | "edit" | "video" }) {
       : mode === "edit"
         ? editRunning
         : videoRunning;
-  // 에디트는 4-step 진행도, 제너레이트는 stage progress 0~100,
-  // 비디오는 pipelineProgress (백엔드 계산 0~100) 사용
+  // Generate/Edit/Video 모두 백엔드 stream 기반 progress (0~100) 사용.
+  // Edit 는 audit P1a 에서 stepDone/4 → pipelineProgress 로 통일.
   const progress =
     mode === "generate"
       ? genProgress
       : mode === "edit"
-        ? Math.round((editStepDone / 4) * 100)
+        ? editProgress
         : videoProgress;
 
   // 경과 시간 500ms tick

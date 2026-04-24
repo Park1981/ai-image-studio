@@ -1,6 +1,6 @@
 /**
  * useGenerateStore - 생성 모드 입력/진행 상태.
- * 페이지 전환에도 입력값은 유지 (부분 영속 — prompt/aspect/width/height/aspectLocked/research/lightning).
+ * 사이즈/옵션만 유지하고 prompt 는 페이지 진입 시 빈 값으로 시작.
  * 진행 상태(generating/progress)는 세션 내에서만 유효.
  *
  * 2026-04-24: Step/CFG/Seed UI 제거 — 해당 값은 이제 useGeneratePipeline 에서
@@ -84,16 +84,13 @@ export interface GenerateState {
   applyLightning: (on: boolean) => void;
 }
 
-const DEFAULT_PROMPT =
-  "따뜻한 창가에서 책을 읽는 검은 고양이, 늦은 오후 햇빛, 필름 그레인, 미묘한 보케";
-
 export const useGenerateStore = create<GenerateState>()(
   persist(
     (set) => {
       const defaultAspect = GENERATE_MODEL.defaults.aspect;
       const defaultPreset = getAspect(defaultAspect);
       return {
-        prompt: DEFAULT_PROMPT,
+        prompt: "",
         aspect: defaultAspect,
         width: defaultPreset.width,
         height: defaultPreset.height,
@@ -192,7 +189,8 @@ export const useGenerateStore = create<GenerateState>()(
     {
       name: "ais:generate",
       storage: createJSONStorage(() => localStorage),
-      version: 3,
+      version: 4,
+      // v3 → v4: prompt 영속 제거. 프롬프트는 히스토리/템플릿에서 복원.
       // v2 → v3: steps/cfg/seed 필드 제거 (UI 삭제에 맞춰 store 정리)
       // v1 → v2: width/height/aspectLocked 신규 필드 추가
       migrate: (persistedState: unknown, version: number) => {
@@ -217,11 +215,15 @@ export const useGenerateStore = create<GenerateState>()(
           void seed;
           state = rest;
         }
+        if (version < 4) {
+          const { prompt, ...rest } = state;
+          void prompt;
+          state = rest;
+        }
         return state;
       },
       // 진행 상태 제외 (영속 X)
       partialize: (s) => ({
-        prompt: s.prompt,
         aspect: s.aspect,
         width: s.width,
         height: s.height,

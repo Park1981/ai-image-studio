@@ -27,6 +27,13 @@ import ResearchBanner from "@/components/studio/ResearchBanner";
 import ResultHoverActionBar, {
   ActionBarButton,
 } from "@/components/studio/ResultHoverActionBar";
+import {
+  StudioLeftPanel,
+  StudioModeHeader,
+  StudioPage,
+  StudioRightPanel,
+  StudioWorkspace,
+} from "@/components/studio/StudioLayout";
 import UpgradeConfirmModal from "@/components/studio/UpgradeConfirmModal";
 import Icon from "@/components/ui/Icon";
 import {
@@ -140,6 +147,14 @@ export default function GeneratePage() {
     if (lightningByDefault && !lightning) applyLightning(true);
   }, [lightningByDefault, lightning, applyLightning]);
 
+  /* ── 진입 시 프롬프트는 빈 입력으로 시작 ── */
+  const promptClearedRef = useRef(false);
+  useEffect(() => {
+    if (promptClearedRef.current) return;
+    promptClearedRef.current = true;
+    setPrompt("");
+  }, [setPrompt]);
+
   /* ── 프롬프트 textarea auto-grow (내용 높이에 맞춰 자동 확장) ── */
   const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
   const autoGrow = (el: HTMLTextAreaElement) => {
@@ -155,15 +170,7 @@ export default function GeneratePage() {
   const sizeLabel = `${width}×${height}`;
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        // 페이지 최소 너비 — 좌 400 + 우 최소 624 = 1024. 그 이하에선 body 가로 스크롤.
-        minWidth: 1024,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <StudioPage>
       {progressOpen && (
         <ProgressModal mode="generate" onClose={() => setProgressOpen(false)} />
       )}
@@ -223,26 +230,13 @@ export default function GeneratePage() {
         }
       />
 
-      <div
-        style={{
-          flex: 1,
-          display: "grid",
-          // 4 페이지 레이아웃 통일 — 좌 400 고정, 우 최소 624 (1024 하한 - 좌 400).
-          gridTemplateColumns: "400px minmax(624px, 1fr)",
-          minHeight: "calc(100vh - 52px)",
-        }}
-      >
+      <StudioWorkspace>
         {/* ── LEFT: 입력 영역 ── */}
-        <section
-          style={{
-            padding: "28px 32px",
-            borderRight: "1px solid var(--line)",
-            display: "flex",
-            flexDirection: "column",
-            gap: 20,
-            background: "var(--bg)",
-          }}
-        >
+        <StudioLeftPanel>
+          <StudioModeHeader
+            title="Image Generate"
+            description="프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다."
+          />
           <div>
             <div
               style={{
@@ -538,18 +532,35 @@ export default function GeneratePage() {
             데이터 전송 없음
           </div>
           </div>
-        </section>
+        </StudioLeftPanel>
 
         {/* ── RIGHT: 갤러리 ── */}
-        <section
-          style={{
-            padding: "24px 32px",
-            display: "flex",
-            flexDirection: "column",
-            gap: 18,
-            minWidth: 0,
-          }}
-        >
+        <StudioRightPanel>
+          {/* ── 결과 영역 헤더 (Vision/Video 와 동일 패턴 · audit P0-2) ── */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
+              생성 결과
+            </h3>
+            <span
+              className="mono"
+              style={{
+                fontSize: 11,
+                color: "var(--ink-4)",
+                letterSpacing: ".04em",
+              }}
+            >
+              {selectedItem
+                ? `${selectedItem.width}×${selectedItem.height}`
+                : "PNG"}
+            </span>
+          </div>
+
           {/* ── 결과 뷰어 (선택된 아이템 있을 때 · 이미지 + 호버 액션바) ── */}
           {selectedItem ? (
             <GenerateResultViewer
@@ -648,9 +659,9 @@ export default function GeneratePage() {
               emptyMessage={null}
             />
           </div>
-        </section>
-      </div>
-    </div>
+        </StudioRightPanel>
+      </StudioWorkspace>
+    </StudioPage>
   );
 }
 
