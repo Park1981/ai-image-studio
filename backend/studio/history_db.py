@@ -275,11 +275,76 @@ async def delete_item(item_id: str) -> bool:
         return cur.rowcount > 0
 
 
+async def delete_item_with_refs(
+    item_id: str,
+) -> tuple[bool, str | None, str | None]:
+    """item 삭제 + 삭제된 row 의 (source_ref, image_ref) 동시 반환.
+
+    audit P1b: DELETE /history/{id} 에서 orphan 파일 정리용으로
+    source_ref 를 알아야 함. race condition 없이 DB 내부에서 원자적으로
+    조회→삭제 수행 (같은 커넥션으로 순차 실행).
+
+    Returns:
+        (deleted, source_ref, image_ref). deleted=False 면 나머지는 None.
+    """
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT source_ref, image_ref FROM studio_history WHERE id = ?",
+            (item_id,),
+        )
+        row = await cur.fetchone()
+        if row is None:
+            return (False, None, None)
+        source_ref = row["source_ref"]
+        image_ref = row["image_ref"]
+        cur = await db.execute(
+            "DELETE FROM studio_history WHERE id = ?", (item_id,)
+        )
+        await db.commit()
+        return (cur.rowcount > 0, source_ref, image_ref)
+
+
 async def clear_all() -> int:
     async with aiosqlite.connect(_DB_PATH) as db:
         cur = await db.execute("DELETE FROM studio_history")
         await db.commit()
         return cur.rowcount
+
+
+async def clear_all_with_refs() -> tuple[int, list[str], list[str]]:
+    """전체 삭제 + 삭제된 모든 row 의 (source_refs, image_refs) 반환.
+
+    audit P1b: edit-source/*.png orphan 파일 일괄 정리용.
+    Returns:
+        (deleted_count, source_refs, image_refs). refs 리스트는 NULL 제외.
+    """
+    async with aiosqlite.connect(_DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT source_ref, image_ref FROM studio_history"
+        )
+        rows = await cur.fetchall()
+        source_refs = [r["source_ref"] for r in rows if r["source_ref"]]
+        image_refs = [r["image_ref"] for r in rows if r["image_ref"]]
+        cur = await db.execute("DELETE FROM studio_history")
+        await db.commit()
+        return (cur.rowcount, source_refs, image_refs)
+
+
+async def count_source_ref_usage(source_ref: str) -> int:
+    """특정 source_ref 를 참조하는 row 개수.
+
+    같은 원본에서 여러 수정을 만드는 경우가 있으므로
+    파일 삭제 전에 0건인지 확인해야 안전 (다른 row 가 같은 원본 쓸 수 있음).
+    """
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT COUNT(*) FROM studio_history WHERE source_ref = ?",
+            (source_ref,),
+        )
+        row = await cur.fetchone()
+        return int(row[0]) if row else 0
 
 
 _VALID_MODES = ("generate", "edit", "video")

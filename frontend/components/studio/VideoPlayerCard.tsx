@@ -1,9 +1,10 @@
 /**
  * VideoPlayerCard — LTX-2.3 i2v 결과 영상 재생 카드.
- * 2026-04-24 · V6.
+ * 2026-04-24 · V6 → audit P1b: loading 상태 축소 (progress bar + % 제거).
  *
  * 3 상태:
- *  - loading (running=true): Spinner + 단계 라벨 + progress bar
+ *  - loading (running=true): Spinner + 단계 라벨 + 평균 소요시간 안내
+ *    (상세 진행률은 ProgressModal 이 단일 primary — 중복 제거)
  *  - empty (src=null, !running): 업로드 후 생성 대기 안내
  *  - filled (src 존재): <video controls> 재생 + 저장/URL 복사 버튼
  */
@@ -16,6 +17,7 @@ import { downloadImage, copyText } from "@/lib/image-actions";
 interface Props {
   src: string | null;
   running: boolean;
+  /** @deprecated audit P1b 에서 loading 내부 progress bar 제거됨. props 는 하위호환 용도로만 유지. */
   progress?: number;
   label?: string;
   /** 다운로드 시 제안할 파일명 */
@@ -27,14 +29,12 @@ interface Props {
 export default function VideoPlayerCard({
   src,
   running,
-  progress = 0,
   label,
   filename,
   onExpand,
 }: Props) {
-  // ── Loading ──
+  // ── Loading ── (audit P1b: progress bar + percent 제거, 모달 단일 primary)
   if (running) {
-    const clampedProgress = Math.max(0, Math.min(100, Math.round(progress)));
     return (
       <div
         style={{
@@ -45,7 +45,7 @@ export default function VideoPlayerCard({
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: 14,
+          gap: 12,
           color: "var(--ink-3)",
           boxShadow: "var(--shadow-sm)",
         }}
@@ -63,28 +63,10 @@ export default function VideoPlayerCard({
           {label || "영상 생성 중…"}
         </div>
         <div
-          style={{
-            width: "100%",
-            height: 6,
-            background: "var(--bg-2)",
-            borderRadius: 999,
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              width: `${clampedProgress}%`,
-              height: "100%",
-              background: "var(--accent)",
-              transition: "width .35s ease",
-            }}
-          />
-        </div>
-        <div
           className="mono"
           style={{ fontSize: 11, color: "var(--ink-4)" }}
         >
-          {clampedProgress}% · 평균 소요 5~20분 (로컬)
+          평균 소요 5~20분 · 상세 진행은 위 모달
         </div>
       </div>
     );

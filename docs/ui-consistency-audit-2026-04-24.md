@@ -1,7 +1,7 @@
 # AI Image Studio UI Consistency Audit
 
 **작성일**: 2026-04-24  
-**상태**: 검증 완료, P0+P1a 구현 진행 중 (2026-04-24 업데이트)  
+**상태**: P0+P1a+P1b 구현 완료 · edit-source cleanup 구현 완료 (2026-04-24 업데이트 2회차)  
 **범위**: 메뉴별 기능 차이를 제외한 디자인/레이아웃/상태 표현 일관성 검토  
 **대상 화면**:
 - `/generate` Image Generate
@@ -701,11 +701,20 @@
 1. **`ProgressModal` Edit StatusBar 기준 교체** — `Math.round((editStepDone / 4) * 100)` → `editPipelineProgress` (내부 bar 와 동일 기준)
 2. **`AnalysisProgressModal` 가짜 percent 제거** — `66/50/100` 하드코딩 → indeterminate bar + % 숫자 제거. step state 는 단순화 (running 중 1단계 done + 2단계 active 로 유지, 체크리스트는 busy 의 보조 표현 정도로만).
 
-### P1b: 진행 UI 구조 개편 (다음 라운드)
+### P1b: 진행 UI 구조 개편 (구현 완료)
 
-1. Edit/Video 좌측 `PipelineSteps` 를 안내용/접힘형으로 조정
-2. Video `VideoPlayerCard` 내부 progress bar 와 CTA percent 중복 축소
-3. Video CTA 의 `{percent}%` 제거 (모달에 집중)
+1. ✅ Edit/Video 좌측 `PipelineSteps` 가 `running=true` 일 때 compact 1줄 요약으로 자동 전환 (실행 전/후에는 기존 상세 안내 유지)
+2. ✅ Video `VideoPlayerCard` loading 내부 progress bar + `{%}` 제거 → spinner + 평균 소요시간 안내로 축소
+3. ✅ Video CTA 의 `{percent}%` 제거 → `처리 중…` 만 (Edit 과 통일)
+
+### 별도: edit-source orphan 파일 정리 (구현 완료)
+
+`project_pending_issues.md` 에 남아 있던 "edit-source/*.png cleanup 미구현 (DELETE history 시 파일 잔류)" 해결.
+
+1. ✅ `history_db.delete_item_with_refs` / `clear_all_with_refs` / `count_source_ref_usage` 신설
+2. ✅ `router._cleanup_edit_source_file` helper 에서 path traversal 3-layer 방어 (화이트리스트 정규식 + prefix 검증 + `Path.is_relative_to`)
+3. ✅ 같은 `source_ref` 참조하는 다른 row 존재 시 파일 보존 (연속 수정 플로우 대응)
+4. ✅ pytest 22건 추가 (정규식/경로 변환 방어 케이스) · 총 113/113 통과
 
 ### P2: 구조 리팩터
 

@@ -1,9 +1,14 @@
 /**
- * PipelineSteps — Edit 페이지의 4단계 자동 처리 초록 박스.
- * 2026-04-23 Opus F5: edit/page.tsx 에서 분리 (~129줄 → 별도 컴포넌트).
+ * PipelineSteps — Edit/Video 페이지의 자동 처리 초록 박스.
+ * 2026-04-23 Opus F5: edit/page.tsx 에서 분리.
+ * 2026-04-24 audit P1b: 실행 중에는 compact 1줄 요약으로 자동 축소
+ *   (정보 중복 해소 — 상세 진행은 ProgressModal 이 primary).
  *
- * step 번호 + 라벨 + 모델명 + 진행 상태(done/running/pending) 아이콘.
- * 하단 바: ComfyUI LoRA 수 + 예상 소요 시간.
+ * 모드별 표시:
+ *   - 실행 전 (running=false, stepDone=0): 전체 상세 (예정 단계 안내 가치)
+ *   - 실행 중 (running=true): compact 1줄 "진행 중 · {currentStep}/{total}"
+ *     → 좌측 패널 공간 절약 + 사용자 시선을 모달에 집중
+ *   - 완료 후 (running=false, stepDone>=total): 전체 상세 (참고용)
  */
 
 "use client";
@@ -37,6 +42,56 @@ export default function PipelineSteps({
   running,
   lightning,
 }: PipelineStepsProps) {
+  // audit P1b: 실행 중 compact 뷰 — 상세 진행은 ProgressModal 에서만 표시.
+  if (running) {
+    const runningStep = steps.find((s) => s.n === currentStep);
+    const runningLabel = runningStep?.label ?? "대기";
+    return (
+      <div
+        style={{
+          background: "var(--green-soft)",
+          border: "1px solid rgba(82,196,26,.28)",
+          borderRadius: 12,
+          padding: "10px 14px",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontSize: 12,
+          color: "var(--green-ink)",
+        }}
+      >
+        <Icon name="cpu" size={13} />
+        <span
+          style={{
+            fontWeight: 600,
+            letterSpacing: "-0.005em",
+          }}
+        >
+          자동 처리 중
+        </span>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10.5,
+            opacity: 0.8,
+            letterSpacing: ".04em",
+          }}
+        >
+          STEP {currentStep ?? "-"}/{steps.length} · {runningLabel}
+        </span>
+        <span
+          style={{
+            marginLeft: "auto",
+            fontSize: 10.5,
+            color: "var(--ink-4)",
+          }}
+        >
+          자세히는 진행 모달
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div
       style={{

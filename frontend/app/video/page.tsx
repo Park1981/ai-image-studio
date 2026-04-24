@@ -444,8 +444,10 @@ export default function VideoPage() {
               }}
             >
               {running ? (
+                // audit P1b: CTA 의 {percent}% 제거 (Edit 과 통일).
+                // 상세 진행률은 ProgressModal 이 단일 primary.
                 <>
-                  <Spinner /> 처리 중… {Math.round(pipelineProgress)}%
+                  <Spinner /> 처리 중…
                 </>
               ) : (
                 <>

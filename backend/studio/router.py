@@ -103,6 +103,67 @@ EDIT_SOURCE_URL_PREFIX = f"{STUDIO_URL_PREFIX}/edit-source"
 # task_id 검증 정규식 — path traversal 방지 (CLAUDE.md 보안 규칙)
 _TASK_ID_RE = re.compile(r"^tsk-[0-9a-f]{12}$")
 
+# edit-source 파일명 화이트리스트 (path traversal 방지).
+# 저장 시 uuid4 hex 12자리 + ".png" 포맷이므로 이 정규식 외엔 삭제 거부.
+_EDIT_SOURCE_FILENAME_RE = re.compile(r"^[0-9a-zA-Z_\-]{1,64}\.(png|jpg|jpeg|webp)$")
+
+
+def _edit_source_path_from_url(url: str) -> Path | None:
+    """edit-source URL 을 실제 파일 경로로 변환. 안전하지 않으면 None.
+
+    보안 방어선:
+      1. URL 이 `/images/studio/edit-source/` prefix 로 시작해야 함
+      2. 파일명이 `_EDIT_SOURCE_FILENAME_RE` 화이트리스트 통과해야 함
+      3. 최종 경로가 EDIT_SOURCE_DIR 내부여야 함 (resolve 후 is_relative_to)
+    """
+    if not url or not url.startswith(EDIT_SOURCE_URL_PREFIX + "/"):
+        return None
+    filename = url[len(EDIT_SOURCE_URL_PREFIX) + 1 :].split("?", 1)[0].split("#", 1)[0]
+    if not _EDIT_SOURCE_FILENAME_RE.match(filename):
+        return None
+    candidate = (EDIT_SOURCE_DIR / filename).resolve()
+    try:
+        if not candidate.is_relative_to(EDIT_SOURCE_DIR.resolve()):
+            return None
+    except ValueError:
+        return None
+    return candidate
+
+
+async def _cleanup_edit_source_file(
+    url: str | None, *, already_deleted_from_db: bool = True
+) -> bool:
+    """edit-source URL 에 해당하는 파일을 안전하게 삭제.
+
+    다른 history row 가 같은 source_ref 를 참조하면 (같은 원본에서 연속 수정한 경우)
+    삭제하지 않음. url 이 edit-source 가 아니면 아무것도 안 함.
+
+    Args:
+        url: source_ref URL
+        already_deleted_from_db: DB 에서 이미 삭제된 row 의 source_ref 이면 True.
+            False 이면 count >= 1 허용 (= 자기 자신 외 참조 없음).
+
+    Returns:
+        True 면 실제로 파일 1개 삭제됨. False 면 스킵/오류.
+    """
+    if not url:
+        return False
+    path = _edit_source_path_from_url(url)
+    if path is None:
+        return False
+    # 다른 row 가 이 source_ref 를 참조하는지 확인 (race 는 허용 — 최악의 경우
+    # 참조 추가된 직후 삭제되면 해당 row 가 404 source 를 가리킴. 프론트는 graceful).
+    remaining = await history_db.count_source_ref_usage(url)
+    threshold = 0 if already_deleted_from_db else 1
+    if remaining > threshold:
+        return False
+    try:
+        path.unlink(missing_ok=True)
+        return True
+    except OSError as e:
+        log.warning("edit-source 삭제 실패 %s: %s", path, e)
+        return False
+
 # 백그라운드로 돌리는 asyncio.Task 참조 보관 — GC 가 중간에 수거하는 이슈 방지.
 # set.add / discard 패턴이 FastAPI 권장.
 _BACKGROUND_TASKS: set[asyncio.Task[Any]] = set()
@@ -1547,16 +1608,26 @@ async def get_history(item_id: str):
 
 @router.delete("/history/{item_id}")
 async def delete_history(item_id: str):
-    ok = await history_db.delete_item(item_id)
+    # audit P1b: DB 삭제 + orphan 된 edit-source 원본 파일 정리.
+    # 같은 source_ref 를 참조하는 다른 row 가 있으면 파일은 보존.
+    ok, source_ref, _image_ref = await history_db.delete_item_with_refs(item_id)
     if not ok:
         raise HTTPException(404, "not found")
-    return {"ok": True, "id": item_id}
+    cleaned = await _cleanup_edit_source_file(source_ref)
+    return {"ok": True, "id": item_id, "source_cleaned": cleaned}
 
 
 @router.delete("/history")
 async def clear_history():
-    count = await history_db.clear_all()
-    return {"ok": True, "deleted": count}
+    # audit P1b: 전체 삭제 시 edit-source 디렉토리도 함께 정리.
+    # DB 에서 삭제된 row 의 source_ref 목록을 받아 각 파일 삭제.
+    count, source_refs, _image_refs = await history_db.clear_all_with_refs()
+    cleaned = 0
+    for url in set(source_refs):
+        # 전체 삭제 후이므로 count_source_ref_usage 는 무조건 0. 안전.
+        if await _cleanup_edit_source_file(url):
+            cleaned += 1
+    return {"ok": True, "deleted": count, "sources_cleaned": cleaned}
 
 
 @router.post(
