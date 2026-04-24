@@ -169,8 +169,9 @@ async def insert_item(item: dict[str, Any]) -> None:
             """INSERT OR REPLACE INTO studio_history
             (id, mode, prompt, label, width, height, seed, steps, cfg, lightning,
              model, created_at, image_ref, upgraded_prompt, upgraded_prompt_ko,
-             prompt_provider, research_hints, vision_description, comfy_error)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             prompt_provider, research_hints, vision_description, comfy_error,
+             source_ref, comparison_analysis)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 item["id"],
                 item["mode"],
@@ -191,6 +192,9 @@ async def insert_item(item: dict[str, Any]) -> None:
                 json.dumps(item.get("researchHints") or [], ensure_ascii=False),
                 item.get("visionDescription"),
                 item.get("comfyError"),
+                item.get("sourceRef"),
+                # 분석은 별도 update_comparison 으로 갱신 — insert 시점엔 항상 None
+                None,
             ),
         )
         await db.commit()
@@ -264,6 +268,24 @@ async def count_items(mode: str | None = None) -> int:
     return int(row[0]) if row else 0
 
 
+async def update_comparison(
+    item_id: str, analysis: dict[str, Any]
+) -> bool:
+    """비교 분석 결과를 JSON 직렬화로 저장.
+
+    Returns:
+        rowcount > 0 (해당 id 의 row 가 존재하고 갱신됐으면 True).
+    """
+    payload = json.dumps(analysis, ensure_ascii=False)
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE studio_history SET comparison_analysis = ? WHERE id = ?",
+            (payload, item_id),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
 def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
     """row → 프론트 HistoryItem shape."""
     hints_raw = row["research_hints"]
@@ -276,6 +298,17 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
         upgraded_ko = row["upgraded_prompt_ko"]
     except (IndexError, KeyError):
         upgraded_ko = None
+    # v4 컬럼 (source_ref, comparison_analysis) — 마이그레이션 전 row 호환
+    try:
+        source_ref = row["source_ref"]
+    except (IndexError, KeyError):
+        source_ref = None
+    try:
+        comp_raw = row["comparison_analysis"]
+        comp_obj = json.loads(comp_raw) if comp_raw else None
+    except (IndexError, KeyError, json.JSONDecodeError):
+        comp_obj = None
+
     return {
         "id": row["id"],
         "mode": row["mode"],
@@ -296,4 +329,6 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
         "researchHints": hints,
         "visionDescription": row["vision_description"],
         "comfyError": row["comfy_error"],
+        "sourceRef": source_ref,
+        "comparisonAnalysis": comp_obj,
     }
