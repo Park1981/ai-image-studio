@@ -32,6 +32,8 @@ export interface SettingsState {
   showUpgradeStep: boolean;
   lightningByDefault: boolean;
   autoStartComfy: boolean;
+  /** Edit 결과 완료 후 자동 비교 분석 (백그라운드). 기본 false. */
+  autoCompareAnalysis: boolean;
 
   /* 프롬프트 템플릿 */
   templates: PromptTemplate[];
@@ -44,6 +46,7 @@ export interface SettingsState {
   setShowUpgradeStep: (v: boolean) => void;
   setLightningByDefault: (v: boolean) => void;
   setAutoStartComfy: (v: boolean) => void;
+  setAutoCompareAnalysis: (v: boolean) => void;
   addTemplate: (t: Omit<PromptTemplate, "id">) => void;
   removeTemplate: (id: string) => void;
 }
@@ -79,6 +82,7 @@ export const useSettingsStore = create<SettingsState>()(
       showUpgradeStep: true,
       lightningByDefault: false,
       autoStartComfy: false,
+      autoCompareAnalysis: false,
 
       templates: DEFAULT_TEMPLATES,
 
@@ -89,6 +93,7 @@ export const useSettingsStore = create<SettingsState>()(
       setShowUpgradeStep: (v) => set({ showUpgradeStep: v }),
       setLightningByDefault: (v) => set({ lightningByDefault: v }),
       setAutoStartComfy: (v) => set({ autoStartComfy: v }),
+      setAutoCompareAnalysis: (v) => set({ autoCompareAnalysis: v }),
 
       addTemplate: (t) =>
         set((s) => ({
@@ -103,7 +108,15 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "ais:settings",
       storage: createJSONStorage(() => localStorage),
-      version: 1,
+      version: 2,
+      migrate: (persisted: unknown, fromVersion: number) => {
+        // v1 → v2: autoCompareAnalysis 기본 false 추가
+        const obj = (persisted as Record<string, unknown>) || {};
+        if (fromVersion < 2) {
+          obj.autoCompareAnalysis = false;
+        }
+        return obj as unknown as SettingsState;
+      },
     },
   ),
 );

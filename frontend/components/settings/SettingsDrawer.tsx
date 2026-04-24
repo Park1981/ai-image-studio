@@ -623,9 +623,11 @@ function PreferencesSection() {
     showUpgradeStep,
     lightningByDefault,
     autoStartComfy,
+    autoCompareAnalysis,
     setShowUpgradeStep,
     setLightningByDefault,
     setAutoStartComfy,
+    setAutoCompareAnalysis,
   } = useSettingsStore();
 
   return (
@@ -647,6 +649,12 @@ function PreferencesSection() {
         }}
         label="Lightning 모드 기본 ON"
         desc="생성 화면 진입 시 ⚡ 4-step 자동 선택"
+      />
+      <Toggle
+        checked={autoCompareAnalysis}
+        onChange={setAutoCompareAnalysis}
+        label="수정 후 자동 비교 분석"
+        desc="Edit 결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 skip)"
       />
       <Toggle
         checked={autoStartComfy}
