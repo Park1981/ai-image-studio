@@ -45,7 +45,9 @@ CREATE TABLE IF NOT EXISTS studio_history (
   prompt_provider TEXT,
   research_hints TEXT,
   vision_description TEXT,
-  comfy_error TEXT
+  comfy_error TEXT,
+  source_ref TEXT,
+  comparison_analysis TEXT
 );
 """
 CREATE_IDX_CREATED = (
@@ -96,9 +98,19 @@ async def _migrate_add_video_mode(db: aiosqlite.Connection) -> None:
             "CREATE TABLE studio_history_new",
         )
         await db.execute(create_new_sql)
-        # 데이터 복사 (컬럼 순서 기준 SELECT *)
+        # 데이터 복사 — SELECT * 대신 명시적 컬럼 목록 사용.
+        # CREATE_TABLE 에 컬럼이 추가되어도 구 테이블 컬럼 수와 불일치가 나지 않도록
+        # 기존 19개 컬럼만 이름 지정, 신규 컬럼(source_ref/comparison_analysis)은 NULL 로 채움.
         await db.execute(
-            "INSERT INTO studio_history_new SELECT * FROM studio_history"
+            """INSERT INTO studio_history_new
+               (id, mode, prompt, label, width, height, seed, steps, cfg, lightning,
+                model, created_at, image_ref, upgraded_prompt, upgraded_prompt_ko,
+                prompt_provider, research_hints, vision_description, comfy_error)
+               SELECT
+                id, mode, prompt, label, width, height, seed, steps, cfg, lightning,
+                model, created_at, image_ref, upgraded_prompt, upgraded_prompt_ko,
+                prompt_provider, research_hints, vision_description, comfy_error
+               FROM studio_history"""
         )
         await db.execute("DROP TABLE studio_history")
         await db.execute(
@@ -135,6 +147,18 @@ async def init_studio_history_db() -> None:
         # v3 (2026-04-24): CHECK(mode IN ...) 에 'video' 추가
         if await _needs_video_mode_migration(db):
             await _migrate_add_video_mode(db)
+    # v4 (2026-04-24): comparison 분석 영구 저장 컬럼 두 개 추가
+    async with aiosqlite.connect(_DB_PATH) as db:
+        for col_name in ("source_ref", "comparison_analysis"):
+            try:
+                await db.execute(
+                    f"ALTER TABLE studio_history ADD COLUMN {col_name} TEXT"
+                )
+                log.info("Migrated studio_history: added %s column", col_name)
+            except Exception:
+                # 이미 존재하면 정상 (idempotent)
+                pass
+        await db.commit()
     log.info("studio_history DB ready at %s", _DB_PATH)
 
 
