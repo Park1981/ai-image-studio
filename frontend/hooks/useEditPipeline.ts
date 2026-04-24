@@ -57,11 +57,11 @@ export function useEditPipeline({
   const generate = async () => {
     if (running) return;
     if (!sourceImage) {
-      toast.warn("원본 이미지 먼저 업로드해줘");
+      toast.warn("원본 이미지를 먼저 업로드해 주세요.");
       return;
     }
     if (!prompt.trim()) {
-      toast.warn("수정 지시를 입력해줘");
+      toast.warn("수정 지시를 입력해 주세요.");
       return;
     }
 
@@ -128,7 +128,7 @@ export function useEditPipeline({
           if (!evt.savedToHistory) {
             toast.warn(
               "히스토리 DB 저장 실패",
-              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
+              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있습니다.",
             );
           }
           // 자동 비교 분석 — 토글 ON + edit 모드 + sourceRef 있음 + busy 아님 조건 모두 만족 시
@@ -149,8 +149,8 @@ export function useEditPipeline({
       // generator 가 done 없이 끝남 — 비정상 종료
       if (!completed) {
         toast.warn(
-          "수정 스트림이 도중에 끊겼어",
-          "백엔드 로그 확인. 결과는 저장 안 됐어.",
+          "수정 스트림이 도중에 끊겼습니다.",
+          "백엔드 로그를 확인해 주세요. 결과는 저장되지 않았습니다.",
         );
       }
     } catch (err) {

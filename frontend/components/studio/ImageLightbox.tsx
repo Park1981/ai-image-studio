@@ -287,7 +287,7 @@ function LightboxInner({
               <div style={{ fontSize: 12, color: "rgba(255,255,255,.6)" }}>
                 실제 재생을 보려면 백엔드 연결 (NEXT_PUBLIC_USE_MOCK=false) 후
                 <br />
-                다시 생성해줘.
+                다시 생성해 주세요.
               </div>
             </div>
           ) : (

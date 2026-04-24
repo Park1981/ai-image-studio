@@ -106,7 +106,7 @@ export default function VideoPlayerCard({
           Mock 영상 생성 완료
         </div>
         <div style={{ fontSize: 11.5, color: "var(--ink-4)" }}>
-          실제 mp4 는 없어. 실 ComfyUI 연결은
+          실제 mp4가 없는 Mock 결과입니다. 실 ComfyUI 연결은
           <br />
           <code
             className="mono"
@@ -114,7 +114,7 @@ export default function VideoPlayerCard({
           >
             NEXT_PUBLIC_USE_MOCK=false
           </code>{" "}
-          환경변수로 켜줘.
+          환경변수로 활성화해 주세요.
         </div>
       </div>
     );
@@ -135,9 +135,9 @@ export default function VideoPlayerCard({
           lineHeight: 1.6,
         }}
       >
-        원본 이미지 + 영상 지시를 입력하고
+        원본 이미지와 영상 지시를 입력하고
         <br />
-        <b>영상 생성</b> 버튼을 눌러봐.
+        <b>영상 생성</b> 버튼을 눌러 주세요.
       </div>
     );
   }

@@ -119,13 +119,13 @@ export function useGeneratePipeline(): UseGeneratePipeline {
           } else if (evt.item.promptProvider === "fallback") {
             toast.warn(
               "gemma4 업그레이드 실패",
-              "원본 프롬프트로 생성됨. Ollama 상태 확인 또는 설정에서 재시작해봐.",
+              "원본 프롬프트로 생성됐습니다. Ollama 상태 확인 또는 설정에서 재시작해 주세요.",
             );
           }
           if (!evt.savedToHistory) {
             toast.warn(
               "히스토리 DB 저장 실패",
-              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
+              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있습니다.",
             );
           }
           completed = true;
@@ -144,8 +144,8 @@ export function useGeneratePipeline(): UseGeneratePipeline {
       // generator 가 done 없이 끝남 — 비정상 종료
       if (!completed) {
         toast.warn(
-          "생성 스트림이 도중에 끊겼어",
-          "백엔드 로그 확인. 결과는 저장 안 됐어.",
+          "생성 스트림이 도중에 끊겼습니다.",
+          "백엔드 로그를 확인해 주세요. 결과는 저장되지 않았습니다.",
         );
       }
     } catch (err) {
@@ -163,7 +163,7 @@ export function useGeneratePipeline(): UseGeneratePipeline {
   const generate = async () => {
     if (generating) return;
     if (!prompt.trim()) {
-      toast.warn("프롬프트를 입력해줘");
+      toast.warn("프롬프트를 입력해 주세요.");
       return;
     }
     if (comfyuiStatus === "stopped") {

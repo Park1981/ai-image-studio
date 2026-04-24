@@ -368,7 +368,7 @@ export default function EditPage() {
                   setPrompt(e.target.value);
                   autoGrow(e.target);
                 }}
-                placeholder="어떻게 수정할까요? 예: 배경을 바다로 바꿔줘"
+                placeholder="어떻게 수정할까요? 예: 배경을 바다로 바꿔주세요"
                 rows={3}
                 style={{
                   display: "block",
@@ -615,19 +615,20 @@ export default function EditPage() {
               style={{
                 background: "var(--surface)",
                 border: "1px dashed var(--line-2)",
-                borderRadius: 14,
-                aspectRatio: "16 / 10",
-                display: "grid",
-                placeItems: "center",
+                borderRadius: 12,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
                 color: "var(--ink-4)",
                 fontSize: 12.5,
                 textAlign: "center",
-                padding: 20,
+                padding: "16px 20px",
+                minHeight: 56,
               }}
             >
               {!sourceImage
-                ? "왼쪽에서 원본 이미지부터 올려봐"
-                : "아직 이 원본의 수정 결과가 없어. [수정 생성] 또는 아래 히스토리에서 선택하면 표시돼."}
+                ? "왼쪽에서 원본 이미지를 업로드해 주세요."
+                : "이 원본의 수정 결과가 아직 없습니다. [수정 생성] 또는 아래 히스토리에서 선택하면 표시됩니다."}
             </div>
           )}
 
@@ -692,7 +693,7 @@ export default function EditPage() {
                   fontSize: 12.5,
                 }}
               >
-                아직 수정 결과가 없어. 왼쪽에서 이미지 올리고 [수정 생성] 눌러봐.
+                아직 수정 결과가 없습니다. 왼쪽에서 이미지를 업로드하고 [수정 생성]을 눌러주세요.
               </div>
             ) : (
               <div
@@ -721,7 +722,7 @@ export default function EditPage() {
                       } else {
                         toast.info(
                           "옛 항목 · 원본 미저장",
-                          "Before/After 슬라이더는 표시되지 않아요",
+                          "Before/After 슬라이더는 표시되지 않습니다.",
                         );
                       }
                       setAfterId(it.id);

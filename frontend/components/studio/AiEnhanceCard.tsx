@@ -39,7 +39,7 @@ export default function AiEnhanceCard({ item }: { item: HistoryItem }) {
       await navigator.clipboard.writeText(text);
       toast.success(`${label} 복사됨`);
     } catch {
-      toast.error("복사 실패", "권한을 확인해줘");
+      toast.error("복사 실패", "클립보드 권한을 확인해 주세요.");
     }
   };
 

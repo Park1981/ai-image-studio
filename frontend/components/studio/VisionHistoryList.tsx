@@ -124,7 +124,7 @@ export default function VisionHistoryList({
             fontSize: 12,
           }}
         >
-          아직 분석 기록이 없어.
+          아직 분석 기록이 없습니다.
         </div>
       ) : (
         <div

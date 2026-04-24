@@ -331,7 +331,7 @@ export default function GeneratePage() {
                     type="button"
                     onClick={() => {
                       if (!prompt.trim()) {
-                        toast.warn("저장할 프롬프트가 없어");
+                        toast.warn("저장할 프롬프트가 없습니다.");
                         return;
                       }
                       const name =
@@ -570,7 +570,7 @@ export default function GeneratePage() {
                   if (selectedItem?.imageRef) {
                     setLightboxSrc(selectedItem.imageRef);
                   } else {
-                    toast.warn("선택된 이미지가 없어");
+                    toast.warn("선택된 이미지가 없습니다.");
                   }
                 }}
               />
@@ -642,8 +642,8 @@ export default function GeneratePage() {
                 fontSize: 12.5,
               }}
             >
-              아직 생성된 이미지가 없어요. 프롬프트 입력 후 <b>생성</b> 버튼을
-              눌러봐.
+              아직 생성된 이미지가 없습니다. 프롬프트 입력 후 <b>생성</b> 버튼을
+              눌러 주세요.
             </div>
           )}
 

@@ -86,13 +86,13 @@ export function useComparisonAnalysis() {
 
       // 2) sourceRef 없는 옛 항목 (재설계 이전 생성) 는 스킵
       if (!item.sourceRef) {
-        if (!opts.silent) toast.warn("원본 이미지가 저장돼 있지 않은 옛 항목");
+        if (!opts.silent) toast.warn("원본 이미지가 저장되지 않은 이전 항목입니다.");
         return;
       }
 
       // 3) 동일 item 중복 호출 차단
       if (_busy.has(item.id)) {
-        if (!opts.silent) toast.warn("이미 분석 진행 중", "잠시 후 다시 시도");
+        if (!opts.silent) toast.warn("이미 분석이 진행 중입니다.", "잠시 후 다시 시도해 주세요.");
         return;
       }
 
@@ -148,7 +148,7 @@ export function useComparisonAnalysis() {
 
         // DB 저장 실패 경고 — historyItemId 전달했는데 saved=false
         if (item.id.startsWith("tsk-") && !saved) {
-          toast.warn("DB 저장 실패", "재시작 후 결과 사라질 수 있어");
+          toast.warn("DB 저장 실패", "재시작 후 결과가 사라질 수 있습니다.");
         }
       } catch (err) {
         toast.error(

@@ -30,7 +30,7 @@ export default function VisionResultCard({ result, running }: Props) {
 
   const handleCopy = async (text: string, label: string) => {
     if (!text) {
-      toast.warn("복사할 내용이 없어");
+      toast.warn("복사할 내용이 없습니다.");
       return;
     }
     try {
@@ -81,7 +81,7 @@ export default function VisionResultCard({ result, running }: Props) {
           fontSize: 12.5,
         }}
       >
-        이미지를 업로드하고 <b>분석</b> 버튼을 눌러봐.
+        이미지를 업로드하고 <b>분석</b> 버튼을 눌러 주세요.
       </div>
     );
   }
@@ -221,7 +221,7 @@ export default function VisionResultCard({ result, running }: Props) {
           }}
         >
           <Icon name="search" size={12} />
-          Ollama 비전 호출이 실패했어. 상태 확인 후 다시 시도.
+          Ollama 비전 호출이 실패했습니다. 상태 확인 후 다시 시도해 주세요.
         </div>
       )}
     </div>

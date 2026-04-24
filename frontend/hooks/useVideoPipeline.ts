@@ -53,17 +53,17 @@ export function useVideoPipeline(
   const generate = async () => {
     if (running) return;
     if (!sourceImage) {
-      toast.warn("원본 이미지 먼저 업로드해줘");
+      toast.warn("원본 이미지를 먼저 업로드해 주세요.");
       return;
     }
     if (!prompt.trim()) {
-      toast.warn("영상 지시를 입력해줘");
+      toast.warn("영상 지시를 입력해 주세요.");
       return;
     }
     if (comfyuiStatus === "stopped") {
       toast.warn(
-        "ComfyUI 정지 상태",
-        "설정에서 시작해도 되고, Mock 은 그대로 돌아가.",
+        "ComfyUI가 정지 상태입니다.",
+        "설정에서 시작하실 수 있고, Mock은 그대로 동작합니다.",
       );
     }
 
@@ -124,7 +124,7 @@ export function useVideoPipeline(
           if (!evt.savedToHistory) {
             toast.warn(
               "히스토리 DB 저장 실패",
-              "영상은 화면에서 유지되지만 서버 재기동 후 사라질 수 있어.",
+              "영상은 화면에서 유지되지만 서버 재기동 후 사라질 수 있습니다.",
             );
           }
           completed = true;
@@ -134,8 +134,8 @@ export function useVideoPipeline(
       // generator 가 done 없이 끝남 — 비정상 종료
       if (!completed) {
         toast.warn(
-          "영상 스트림이 도중에 끊겼어",
-          "백엔드 로그 확인. 결과는 저장 안 됐어.",
+          "영상 스트림이 도중에 끊겼습니다.",
+          "백엔드 로그를 확인해 주세요. 결과는 저장되지 않았습니다.",
         );
       }
     } catch (err) {

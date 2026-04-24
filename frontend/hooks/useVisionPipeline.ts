@@ -49,13 +49,13 @@ export function useVisionPipeline(): UseVisionPipeline {
   const analyze = async () => {
     if (running) return;
     if (!currentImage) {
-      toast.warn("이미지를 먼저 업로드해줘");
+      toast.warn("이미지를 먼저 업로드해 주세요.");
       return;
     }
     if (ollamaStatus === "stopped") {
       toast.warn(
-        "Ollama 정지 상태",
-        "설정에서 시작해도 되고, Mock 은 그대로 돌아가.",
+        "Ollama가 정지 상태입니다.",
+        "설정에서 시작하실 수 있고, Mock은 그대로 동작합니다.",
       );
     }
 
@@ -90,12 +90,12 @@ export function useVisionPipeline(): UseVisionPipeline {
       if (result.fallback) {
         toast.error(
           "Vision 분석 실패",
-          "Ollama 호출이 실패했어. 상태 확인 후 다시 시도해줘.",
+          "Ollama 호출이 실패했습니다. 상태 확인 후 다시 시도해 주세요.",
         );
       } else if (result.ko === null) {
         toast.warn(
           "번역만 실패",
-          "영문 결과는 정상이야. 한글 탭은 비어있어.",
+          "영문 결과는 정상입니다. 한글 탭은 비어있습니다.",
         );
       } else {
         toast.success("Vision 분석 완료", `${result.en.length} chars · EN/KO`);

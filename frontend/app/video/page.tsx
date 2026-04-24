@@ -894,7 +894,7 @@ function VideoResolutionSlider({
             <span style={{ color: "var(--ink-4)" }}>({ratio})</span>
           </>
         ) : (
-          "원본 이미지를 올리면 예상 출력 해상도가 표시돼."
+          "원본 이미지를 업로드하면 예상 출력 해상도가 표시됩니다."
         )}
       </div>
     </div>
