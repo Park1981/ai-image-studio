@@ -38,3 +38,8 @@ export {
   setProcessStatus,
   listOllamaModels,
 } from "./api/process";
+export {
+  compareAnalyze,
+  type CompareAnalyzeRequest,
+  type CompareAnalyzeResponse,
+} from "./api/compare";
