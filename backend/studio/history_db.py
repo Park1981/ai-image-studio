@@ -47,7 +47,11 @@ CREATE TABLE IF NOT EXISTS studio_history (
   vision_description TEXT,
   comfy_error TEXT,
   source_ref TEXT,
-  comparison_analysis TEXT
+  comparison_analysis TEXT,
+  adult INTEGER,
+  duration_sec REAL,
+  fps INTEGER,
+  frame_count INTEGER
 );
 """
 CREATE_IDX_CREATED = (
@@ -159,6 +163,24 @@ async def init_studio_history_db() -> None:
                 # 이미 존재하면 정상 (idempotent)
                 pass
         await db.commit()
+    # v5 (2026-04-24): video 전용 메타 4개 — adult(bool) / duration_sec / fps / frame_count
+    async with aiosqlite.connect(_DB_PATH) as db:
+        v5_cols = (
+            ("adult", "INTEGER"),
+            ("duration_sec", "REAL"),
+            ("fps", "INTEGER"),
+            ("frame_count", "INTEGER"),
+        )
+        for col_name, col_type in v5_cols:
+            try:
+                await db.execute(
+                    f"ALTER TABLE studio_history ADD COLUMN {col_name} {col_type}"
+                )
+                log.info("Migrated studio_history: added %s column", col_name)
+            except Exception:
+                # 이미 존재하면 정상 (idempotent)
+                pass
+        await db.commit()
     log.info("studio_history DB ready at %s", _DB_PATH)
 
 
@@ -170,8 +192,9 @@ async def insert_item(item: dict[str, Any]) -> None:
             (id, mode, prompt, label, width, height, seed, steps, cfg, lightning,
              model, created_at, image_ref, upgraded_prompt, upgraded_prompt_ko,
              prompt_provider, research_hints, vision_description, comfy_error,
-             source_ref, comparison_analysis)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             source_ref, comparison_analysis,
+             adult, duration_sec, fps, frame_count)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 item["id"],
                 item["mode"],
@@ -195,6 +218,11 @@ async def insert_item(item: dict[str, Any]) -> None:
                 item.get("sourceRef"),
                 # 분석은 별도 update_comparison 으로 갱신 — insert 시점엔 항상 None
                 None,
+                # v5: video 전용 메타 — generate/edit 은 None
+                (1 if item.get("adult") else 0) if item.get("adult") is not None else None,
+                item.get("durationSec"),
+                item.get("fps"),
+                item.get("frameCount"),
             ),
         )
         await db.commit()
@@ -309,7 +337,19 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
     except (IndexError, KeyError, json.JSONDecodeError):
         comp_obj = None
 
-    return {
+    # v5 컬럼 (video 전용 — adult/duration_sec/fps/frame_count) — 마이그레이션 전 row 호환
+    def _safe(name: str) -> Any:
+        try:
+            return row[name]
+        except (IndexError, KeyError):
+            return None
+
+    adult_raw = _safe("adult")
+    duration_sec = _safe("duration_sec")
+    fps = _safe("fps")
+    frame_count = _safe("frame_count")
+
+    item: dict[str, Any] = {
         "id": row["id"],
         "mode": row["mode"],
         "prompt": row["prompt"],
@@ -332,3 +372,13 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
         "sourceRef": source_ref,
         "comparisonAnalysis": comp_obj,
     }
+    # v5 video 전용 메타는 값이 있을 때만 노출 (generate/edit 은 undefined 유지)
+    if adult_raw is not None:
+        item["adult"] = bool(adult_raw)
+    if duration_sec is not None:
+        item["durationSec"] = duration_sec
+    if fps is not None:
+        item["fps"] = fps
+    if frame_count is not None:
+        item["frameCount"] = frame_count
+    return item

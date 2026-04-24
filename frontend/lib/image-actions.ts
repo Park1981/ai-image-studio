@@ -72,13 +72,16 @@ export async function copyText(text: string, label = "텍스트"): Promise<boole
   }
 }
 
-/** 이미지 URL에서 파일명 추론 (없으면 기본값) */
+/** 이미지·영상 URL에서 파일명 추론 (없으면 기본값).
+ *  지원 확장자: 이미지(png/jpg/jpeg/webp/gif) + 영상(mp4/webm/mov). */
 export function filenameFromRef(
   ref: string,
   fallback = "image.png",
 ): string {
   if (!ref) return fallback;
-  const m = ref.match(/\/([^\/?#]+\.(png|jpg|jpeg|webp))(\?|#|$)/i);
+  const m = ref.match(
+    /\/([^\/?#]+\.(png|jpg|jpeg|webp|gif|mp4|webm|mov))(\?|#|$)/i,
+  );
   return m ? m[1] : fallback;
 }
 

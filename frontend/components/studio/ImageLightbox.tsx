@@ -586,15 +586,58 @@ function InfoPanel({
       >
         <SectionTitle>Meta</SectionTitle>
         <MetaRow k="모델" v={item.model} />
-        <MetaRow k="사이즈" v={`${item.width}×${item.height}`} />
         <MetaRow
-          k="Seed"
-          v={<span className="mono">{item.seed}</span>}
+          k="사이즈"
+          v={
+            item.width > 0 && item.height > 0
+              ? `${item.width}×${item.height}`
+              : "—"
+          }
         />
-        <MetaRow
-          k="스텝/CFG"
-          v={`${item.steps} · ${item.cfg}${item.lightning ? " ⚡" : ""}`}
-        />
+        {/* video 모드 — LTX 전용 메타 (길이/FPS/프레임/빠른생성/성인모드). Step/CFG/Seed 숨김. */}
+        {item.mode === "video" ? (
+          <>
+            {item.durationSec !== undefined && (
+              <MetaRow k="길이" v={`${item.durationSec}s`} />
+            )}
+            {item.fps !== undefined && (
+              <MetaRow k="FPS" v={<span className="mono">{item.fps}</span>} />
+            )}
+            {item.frameCount !== undefined && (
+              <MetaRow
+                k="프레임"
+                v={<span className="mono">{item.frameCount}</span>}
+              />
+            )}
+            <MetaRow
+              k="빠른 생성"
+              v={item.lightning ? "⚡ Lightning LoRA" : "표준"}
+            />
+            {item.adult !== undefined && (
+              <MetaRow
+                k="성인 모드"
+                v={
+                  item.adult ? (
+                    <span style={{ color: "#ff6b9d" }}>ON</span>
+                  ) : (
+                    "OFF"
+                  )
+                }
+              />
+            )}
+          </>
+        ) : (
+          <>
+            <MetaRow
+              k="Seed"
+              v={<span className="mono">{item.seed}</span>}
+            />
+            <MetaRow
+              k="스텝/CFG"
+              v={`${item.steps} · ${item.cfg}${item.lightning ? " ⚡" : ""}`}
+            />
+          </>
+        )}
         {item.promptProvider && (
           <MetaRow
             k="Prompt Provider"

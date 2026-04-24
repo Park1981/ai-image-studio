@@ -69,6 +69,8 @@ export interface HistoryItem {
   fps?: number;
   /** 총 프레임 수 */
   frameCount?: number;
+  /** Adult LoRA 토글 여부 */
+  adult?: boolean;
 
   /* ── Edit 모드 비교 분석 (mode === "edit" 일 때만 채워짐) ── */
   /** 원본 이미지 영구 경로 (예: "/images/studio/edit-source/{id}.png").

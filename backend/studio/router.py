@@ -52,6 +52,7 @@ from .presets import (
     EDIT_MODEL,
     GENERATE_MODEL,
     VIDEO_MODEL,
+    compute_video_resize,
     get_aspect,
 )
 from .prompt_pipeline import upgrade_generate_prompt
@@ -1226,18 +1227,23 @@ async def _run_video_pipeline_task(
 
         # ── Done ──
         s = VIDEO_MODEL.sampling
+        # 최종 영상 해상도 계산 — compute_video_resize 는 base(pre-upscale) 을 반환.
+        # LTX-2.3 은 spatial upscaler x2 로 공간 해상도만 2배 → 최종 = base × 2.
+        base_w, base_h = compute_video_resize(
+            source_width or 0, source_height or 0, longer_edge
+        )
+        final_w, final_h = base_w * 2, base_h * 2
         item = {
             "id": f"vid-{uuid.uuid4().hex[:8]}",
             "mode": "video",
             "prompt": prompt,
             "label": prompt[:28] + ("…" if len(prompt) > 28 else ""),
-            # video 는 프레임 해상도 정확 계산 어려움 — 0 유지, 프론트가 fps/frames 쓰도록
-            "width": 0,
-            "height": 0,
+            "width": final_w,
+            "height": final_h,
             "seed": actual_seed,
             "steps": 0,  # LTX 는 ManualSigmas 기반 — 전통 step 개념 없음
             "cfg": s.base_cfg,
-            "lightning": False,
+            "lightning": lightning,  # 실제 요청값 저장 (Lightning LoRA 토글)
             "model": VIDEO_MODEL.display_name,
             "createdAt": int(time.time() * 1000),
             "imageRef": video_ref,
@@ -1246,7 +1252,8 @@ async def _run_video_pipeline_task(
             "visionDescription": video_res.image_description,
             "promptProvider": video_res.upgrade.provider,
             "comfyError": comfy_err,
-            # video 전용 메타
+            # video 전용 메타 — adult/fps/frameCount/durationSec
+            "adult": adult,
             "fps": s.fps,
             "frameCount": s.frame_count,
             "durationSec": s.seconds,

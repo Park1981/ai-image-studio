@@ -21,6 +21,7 @@ import {
 import VramBadge from "@/components/chrome/VramBadge";
 import SettingsButton from "@/components/settings/SettingsButton";
 import HistoryGallery from "@/components/studio/HistoryGallery";
+import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageLightbox from "@/components/studio/ImageLightbox";
 import PipelineSteps, {
   type PipelineStepMeta,
@@ -696,45 +697,31 @@ export default function VideoPage() {
             filename={
               playingRef ? filenameFromRef(playingRef, "ais-video.mp4") : undefined
             }
+            onExpand={
+              // 현재 재생 중 ref 에 해당하는 history item 을 라이트박스에 띄움
+              playingRef
+                ? () => {
+                    const hit = videoResults.find(
+                      (v) => v.imageRef === playingRef,
+                    );
+                    if (hit) setLightboxItem(hit);
+                  }
+                : undefined
+            }
           />
 
-          {/* 영상 히스토리 */}
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              paddingTop: 4,
-              borderTop: "1px solid var(--line)",
-              marginTop: 4,
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                gap: 10,
-                marginTop: 10,
-              }}
-            >
-              <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600 }}>
-                영상 히스토리
-              </h3>
-              <span
-                className="mono"
-                style={{ fontSize: 11, color: "var(--ink-4)" }}
-              >
-                {videoResults.length} items
-              </span>
-            </div>
-            <div style={{ display: "flex", gap: 6, marginTop: 6 }}>
+          {/* ── 영상 히스토리 (4 메뉴 공용 헤더) ── */}
+          <HistorySectionHeader
+            title="영상 히스토리"
+            count={videoResults.length}
+            actions={
               <IconBtn
                 icon="grid"
                 title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
                 onClick={cycleGrid}
               />
-            </div>
-          </div>
+            }
+          />
 
           <div style={{ maxHeight: "55vh", overflowY: "auto", paddingRight: 4 }}>
             <HistoryGallery

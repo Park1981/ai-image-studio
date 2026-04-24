@@ -20,6 +20,8 @@ interface Props {
   label?: string;
   /** 다운로드 시 제안할 파일명 */
   filename?: string;
+  /** 크게 보기 (라이트박스 열기). 있을 때만 버튼 노출. */
+  onExpand?: () => void;
 }
 
 export default function VideoPlayerCard({
@@ -28,6 +30,7 @@ export default function VideoPlayerCard({
   progress = 0,
   label,
   filename,
+  onExpand,
 }: Props) {
   // ── Loading ──
   if (running) {
@@ -190,12 +193,14 @@ export default function VideoPlayerCard({
           >
             저장
           </SmallBtn>
-          <SmallBtn
-            icon="copy"
-            onClick={() => copyText(src, "영상 URL")}
-          >
+          <SmallBtn icon="copy" onClick={() => copyText(src, "영상 URL")}>
             URL
           </SmallBtn>
+          {onExpand && (
+            <SmallBtn icon="zoom-in" onClick={onExpand}>
+              크게
+            </SmallBtn>
+          )}
         </div>
       </div>
     </div>
