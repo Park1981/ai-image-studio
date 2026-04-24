@@ -19,7 +19,9 @@ export async function downloadImage(
     return false;
   }
   try {
-    const res = await fetch(url);
+    // cache: "no-store" — 과거에 CORS 헤더 없이 캐시된 응답을 재사용해
+    // "blocked by CORS policy" 로 차단되는 현상 방지.
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const href = URL.createObjectURL(blob);
@@ -48,7 +50,9 @@ export async function copyImageToClipboard(url: string): Promise<boolean> {
     return false;
   }
   try {
-    const res = await fetch(url);
+    // cache: "no-store" — 과거에 CORS 헤더 없이 캐시된 응답을 재사용해
+    // "blocked by CORS policy" 로 차단되는 현상 방지.
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const item = new ClipboardItem({ [blob.type || "image/png"]: blob });
@@ -140,7 +144,7 @@ export async function urlToDataUrl(
 ): Promise<{ dataUrl: string; width: number; height: number } | null> {
   if (!url || url.startsWith("mock-seed://")) return null;
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) return null;
     const blob = await res.blob();
     const dataUrl = await new Promise<string>((resolve, reject) => {
