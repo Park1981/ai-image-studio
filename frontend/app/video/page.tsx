@@ -23,9 +23,6 @@ import SettingsButton from "@/components/settings/SettingsButton";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageLightbox from "@/components/studio/ImageLightbox";
-import PipelineSteps, {
-  type PipelineStepMeta,
-} from "@/components/studio/PipelineSteps";
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import SourceImageCard from "@/components/studio/SourceImageCard";
@@ -54,15 +51,6 @@ import {
   VIDEO_LONGER_EDGE_STEP,
 } from "@/stores/useVideoStore";
 
-/* LTX-2.3 i2v 파이프라인 5단계 — qwen2.5vl + gemma4 + ComfyUI 2-stage + save */
-const PIPELINE_META: PipelineStepMeta[] = [
-  { n: 1, label: "이미지 비전 분석", model: "qwen2.5vl" },
-  { n: 2, label: "영상 프롬프트 통합", model: "gemma4-un" },
-  { n: 3, label: "워크플로우 구성", model: "LTX i2v builder" },
-  { n: 4, label: "ComfyUI 샘플링 (2-stage)", model: "ltx-2.3-22b-fp8" },
-  { n: 5, label: "MP4 저장", model: "CreateVideo + SaveVideo" },
-];
-
 export default function VideoPage() {
   const router = useRouter();
 
@@ -81,8 +69,6 @@ export default function VideoPage() {
   const lightning = useVideoStore((s) => s.lightning);
   const setLightning = useVideoStore((s) => s.setLightning);
   const running = useVideoStore((s) => s.running);
-  const currentStep = useVideoStore((s) => s.currentStep);
-  const stepDone = useVideoStore((s) => s.stepDone);
   // pipelineProgress 는 audit P1b 에서 CTA/VideoPlayerCard 모두 제거. ProgressModal 에서 직접 구독.
   const pipelineLabel = useVideoStore((s) => s.pipelineLabel);
   const lastVideoRef = useVideoStore((s) => s.lastVideoRef);
@@ -103,9 +89,10 @@ export default function VideoPage() {
   const cycleGrid = () =>
     setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
-  /* ── 현재 재생할 mp4: lastVideoRef (세션) 우선, 없으면 최근 video 히스토리 ── */
-  const playingRef =
-    lastVideoRef ?? (videoResults.length > 0 ? videoResults[0].imageRef : null);
+  /* ── 현재 재생할 mp4: lastVideoRef (세션) 만 ──
+   *  2026-04-25: 진입 시 빈 상태로 시작 (히스토리 fallback 제거).
+   *  generate/edit/vision 과 동일 패턴 — 히스토리 클릭 시에만 결과 영역에 표시. */
+  const playingRef = lastVideoRef ?? null;
 
   /* ── 진행 모달 open 상태 ──
    * running false→true 전이 시 자동 오픈. React 공식 권장: prev state 비교.
@@ -357,15 +344,7 @@ export default function VideoPage() {
             }
           />
 
-          {/* Pipeline (5단계 초록박스) */}
-          <PipelineSteps
-            steps={PIPELINE_META}
-            stepDone={stepDone}
-            currentStep={currentStep}
-            running={running}
-            footerLabel="ComfyUI · LTX-2.3 22B"
-            footerEta={lightning ? "약 5~10분 예상" : "약 25~40분 예상"}
-          />
+          {/* 2026-04-25: PipelineSteps 좌측 패널 제거 — 진행 모달이 primary */}
 
           {/* VRAM 주의 배너 */}
           <div

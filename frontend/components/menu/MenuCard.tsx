@@ -110,46 +110,8 @@ export default function MenuCard({
               pointerEvents: "none",
             }}
           />
-          {/* 우상단 태그 */}
-          {tag && (
-            <div
-              style={{
-                position: "absolute",
-                top: 14,
-                right: 14,
-                padding: "4px 10px",
-                background: "rgba(10,12,16,.65)",
-                backdropFilter: "blur(8px)",
-                border: "1px solid rgba(255,255,255,.18)",
-                borderRadius: "var(--radius-full)",
-                fontSize: 10.5,
-                fontWeight: 500,
-                color: "rgba(255,255,255,.92)",
-                letterSpacing: ".03em",
-              }}
-            >
-              {tag}
-            </div>
-          )}
-          {/* 좌상단 아이콘 pill */}
-          <div
-            style={{
-              position: "absolute",
-              top: 14,
-              left: 14,
-              width: 36,
-              height: 36,
-              borderRadius: "var(--radius)",
-              background: "rgba(255,255,255,.92)",
-              backdropFilter: "blur(8px)",
-              display: "grid",
-              placeItems: "center",
-              color: "var(--ink)",
-              boxShadow: "0 4px 14px rgba(0,0,0,.18)",
-            }}
-          >
-            <Icon name={icon} size={18} stroke={1.6} />
-          </div>
+          {/* 2026-04-25: 좌상단 아이콘 pill + 우상단 태그 모두 제거 — 신규 인물 시리즈 사진이
+              의미 전달하니 오버레이 노이즈 최소화. disabled 카드는 grayscale + "곧 만나요" 로 안내. */}
         </div>
 
         {/* 본문 영역 (하단 ~32%) */}

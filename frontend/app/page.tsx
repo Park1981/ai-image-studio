@@ -16,7 +16,6 @@ import MenuCard from "@/components/menu/MenuCard";
 import Icon from "@/components/ui/Icon";
 import SettingsButton from "@/components/settings/SettingsButton";
 import { useHistoryStore } from "@/stores/useHistoryStore";
-import { useProcessStore } from "@/stores/useProcessStore";
 
 /** 카테고리 섹션 래퍼 — 옅은 배경 박스 + 디스플레이 헤더 */
 function CategorySection({
@@ -61,8 +60,6 @@ function CategorySection({
 export default function MainMenuPage() {
   const router = useRouter();
   const historyCount = useHistoryStore((s) => s.items.length);
-  const comfyuiStatus = useProcessStore((s) => s.comfyui);
-  const comfyuiOn = comfyuiStatus === "running";
 
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
@@ -81,34 +78,8 @@ export default function MainMenuPage() {
           margin: "0 auto",
         }}
       >
-        {/* 인사말 + 상태 스트립 */}
+        {/* 인사말 — 상단 mono "Local Runtime · ComfyUI ..." 스트립 제거 (2026-04-25) */}
         <div style={{ marginBottom: 44, textAlign: "center" }}>
-          <div
-            className="mono"
-            style={{
-              fontSize: 11,
-              color: "var(--ink-4)",
-              letterSpacing: ".18em",
-              marginBottom: 14,
-              textTransform: "uppercase",
-            }}
-          >
-            <span
-              style={{
-                display: "inline-block",
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: comfyuiOn ? "var(--green)" : "var(--ink-4)",
-                marginRight: 8,
-                verticalAlign: "middle",
-                boxShadow: comfyuiOn
-                  ? "0 0 0 3px rgba(82,196,26,.15)"
-                  : "none",
-              }}
-            />
-            Local Runtime · ComfyUI {comfyuiOn ? "연결됨" : "정지"}
-          </div>
           <h1
             style={{
               fontSize: 32,
@@ -118,7 +89,7 @@ export default function MainMenuPage() {
               color: "var(--ink)",
             }}
           >
-            어떤 걸 만들까요?
+            AI Image Studio
           </h1>
           <p
             style={{
@@ -173,7 +144,6 @@ export default function MainMenuPage() {
               title="Vision Compare"
               desc="두 이미지를 비전 모델로 비교해 구성·색·피사체·분위기·품질 5축 차이를 분석합니다."
               bgImage="/menu/compare.png"
-              tag="NEW"
               onClick={() => router.push("/vision/compare")}
             />
           </CategorySection>
@@ -185,7 +155,6 @@ export default function MainMenuPage() {
               title="Video Generate"
               desc="이미지 한 장에서 LTX-2.3 로 5초 · 25fps 오디오+영상 MP4 를 생성합니다."
               bgImage="/menu/video.png"
-              tag="LTX-2.3"
               onClick={() => router.push("/video")}
             />
             <MenuCard
@@ -193,7 +162,6 @@ export default function MainMenuPage() {
               title="Video Upscale"
               desc="LTX-2.3 공간 업스케일러로 영상 해상도를 2배로 향상합니다."
               bgImage="/menu/upscale.png"
-              tag="준비 중"
               disabled
             />
           </CategorySection>

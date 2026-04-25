@@ -30,7 +30,6 @@ import ImageLightbox from "@/components/studio/ImageLightbox";
 import ResultHoverActionBar, {
   ActionBarButton,
 } from "@/components/studio/ResultHoverActionBar";
-import PipelineSteps, { type PipelineStepMeta } from "@/components/studio/PipelineSteps";
 import ProgressModal from "@/components/studio/ProgressModal";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import SourceImageCard from "@/components/studio/SourceImageCard";
@@ -46,21 +45,13 @@ import {
 import { useProcessStore } from "@/stores/useProcessStore";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
-import { EDIT_MODEL, countExtraLoras } from "@/lib/model-presets";
+import { EDIT_MODEL } from "@/lib/model-presets";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
 import { useEditPipeline } from "@/hooks/useEditPipeline";
 import { useEditStore } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
-
-/* 자동 파이프라인 4단계 정의 — PipelineSteps 컴포넌트에 전달 */
-const PIPELINE_META: PipelineStepMeta[] = [
-  { n: 1, label: "이미지 비전 분석", model: "gemma4-heretic:vision-q4km" },
-  { n: 2, label: "설명 + 수정 요청 통합", model: "gemma4-un" },
-  { n: 3, label: "사이즈/스타일 자동 추출", model: "auto-param-extractor" },
-  { n: 4, label: "ComfyUI 실행", model: "qwen-image-edit-2511" },
-];
 
 export default function EditPage() {
   const router = useRouter();
@@ -76,8 +67,6 @@ export default function EditPage() {
   const lightning = useEditStore((s) => s.lightning);
   const setLightning = useEditStore((s) => s.setLightning);
   const running = useEditStore((s) => s.running);
-  const currentStep = useEditStore((s) => s.currentStep);
-  const stepDone = useEditStore((s) => s.stepDone);
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
 
@@ -449,15 +438,7 @@ export default function EditPage() {
             }
           />
 
-          {/* Pipeline (4단계 초록박스) */}
-          <PipelineSteps
-            steps={PIPELINE_META}
-            stepDone={stepDone}
-            currentStep={currentStep}
-            running={running}
-            footerLabel={`ComfyUI · LoRA +${countExtraLoras(EDIT_MODEL)}`}
-            footerEta={lightning ? "~12s 예상" : "~38s 예상"}
-          />
+          {/* 2026-04-25: PipelineSteps 좌측 패널 제거 — 진행 모달이 primary */}
 
           <div style={{ flex: 1 }} />
 
