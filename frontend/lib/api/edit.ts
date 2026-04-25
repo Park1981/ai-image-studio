@@ -12,7 +12,12 @@ import {
   sleep,
   uid,
 } from "./client";
-import type { EditRequest, EditStage, HistoryItem } from "./types";
+import type {
+  EditRequest,
+  EditStage,
+  EditVisionAnalysis,
+  HistoryItem,
+} from "./types";
 
 /* ─────────────────────────────────
    Edit stream — Mock vs Real 분기
@@ -117,6 +122,8 @@ async function* realEditStream(
         step: 1 | 2 | 3 | 4;
         done: boolean;
         description?: string;
+        /** Phase 1 (2026-04-25): step 1 done 에 구조 분석 JSON 포함 가능 (휘발) */
+        editVisionAnalysis?: EditVisionAnalysis;
         finalPrompt?: string;
         finalPromptKo?: string | null;
         provider?: string;

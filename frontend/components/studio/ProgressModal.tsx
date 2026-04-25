@@ -26,6 +26,7 @@ import {
 } from "@/stores/useGenerateStore";
 import { useEditStore } from "@/stores/useEditStore";
 import { useVideoStore } from "@/stores/useVideoStore";
+import EditVisionBlock from "@/components/studio/EditVisionBlock";
 
 const GEN_STAGE_ORDER = [
   { type: "prompt-parse", label: "프롬프트 해석" },
@@ -482,6 +483,8 @@ function EditTimeline() {
   // 백엔드가 계산한 전체 파이프라인 진행률 (0~100) — 상단 얇은 바로 표시
   const pipelineProgress = useEditStore((s) => s.pipelineProgress);
   const pipelineLabel = useEditStore((s) => s.pipelineLabel);
+  // Phase 1 (2026-04-25): step 1 의 구조 분석 (휘발). 있으면 단락 대신 칩 UI.
+  const editVisionAnalysis = useEditStore((s) => s.editVisionAnalysis);
 
   return (
     <>
@@ -550,12 +553,20 @@ function EditTimeline() {
               state={isDone ? "done" : isRunning ? "running" : "pending"}
               elapsed={elapsed}
             />
-            {/* step 1 비전 설명 */}
-            {m.n === 1 && detail?.description && isDone && (
+            {/* step 1 비전 설명 —
+                 Phase 1 (2026-04-25): 구조 분석 있으면 칩 UI, 없으면 기존 단락. */}
+            {m.n === 1 && isDone && editVisionAnalysis ? (
+              <div style={{ marginLeft: 34, marginTop: 4 }}>
+                <EditVisionBlock
+                  analysis={editVisionAnalysis}
+                  showHeader={false}
+                />
+              </div>
+            ) : m.n === 1 && detail?.description && isDone ? (
               <DetailBox kind="info" title="비전 설명">
                 {detail.description}
               </DetailBox>
-            )}
+            ) : null}
             {/* step 2 최종 프롬프트 (영문) */}
             {m.n === 2 && detail?.finalPrompt && isDone && (
               <DetailBox

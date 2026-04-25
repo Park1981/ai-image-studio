@@ -160,22 +160,20 @@ async def test_update_comparison_unknown_id_returns_false(
 
 @pytest.mark.asyncio
 async def test_analyze_pair_happy_path() -> None:
-    """비전 + 번역 모두 성공 시 ComparisonAnalysisResult 풀로 채워짐."""
+    """v3: 비전 + 번역 모두 성공 시 domain + slots 5축 + 종합 평균 계산."""
     from unittest.mock import AsyncMock, patch
 
     from studio.comparison_pipeline import analyze_pair
 
+    # v3 형식: domain + slots × {intent, score, comment}
     raw_json = json.dumps({
-        "scores": {
-            "face_id": 92, "body_pose": 75, "attire": 60,
-            "background": 88, "intent_fidelity": 95,
-        },
-        "comments": {
-            "face_id": "Eyes and jaw preserved.",
-            "body_pose": "Shoulder slightly narrower.",
-            "attire": "Top color changed as requested.",
-            "background": "Curtain pattern preserved.",
-            "intent_fidelity": "Earrings added accurately.",
+        "domain": "person",
+        "slots": {
+            "face_expression": {"intent": "preserve", "score": 92, "comment": "Eyes and jaw preserved."},
+            "hair":            {"intent": "preserve", "score": 88, "comment": "Same hairstyle."},
+            "attire":          {"intent": "edit",     "score": 100, "comment": "Top color changed as requested."},
+            "body_pose":       {"intent": "preserve", "score": 75, "comment": "Shoulder slightly narrower."},
+            "background":      {"intent": "preserve", "score": 95, "comment": "Curtain pattern preserved."},
         },
         "summary": "Solid result with minor body drift.",
     })
@@ -189,11 +187,11 @@ async def test_analyze_pair_happy_path() -> None:
             "studio.comparison_pipeline._translate_comments_to_ko",
             new=AsyncMock(return_value={
                 "comments_ko": {
-                    "face_id": "눈과 턱 보존됨.",
-                    "body_pose": "어깨가 약간 좁아짐.",
+                    "face_expression": "눈과 턱 보존됨.",
+                    "hair": "동일 헤어스타일.",
                     "attire": "상의 색상이 요청대로 변경됨.",
+                    "body_pose": "어깨가 약간 좁아짐.",
                     "background": "커튼 패턴 보존됨.",
-                    "intent_fidelity": "귀걸이가 정확히 추가됨.",
                 },
                 "summary_ko": "신원 보존 양호 · 약간의 체형 변화.",
             }),
@@ -202,22 +200,76 @@ async def test_analyze_pair_happy_path() -> None:
         result = await analyze_pair(
             source_bytes=_tiny_png_bytes(),
             result_bytes=_tiny_png_bytes(),
-            edit_prompt="add earrings",
+            edit_prompt="change top color",
         )
     assert result.fallback is False
     assert result.provider == "ollama"
-    assert result.scores["face_id"] == 92
-    # 5축 산술 평균 (92+75+60+88+95)/5 = 82
-    assert result.overall == 82
+    assert result.domain == "person"
+    # 슬롯 5개 모두 채워짐
+    assert result.slots["face_expression"].score == 92
+    assert result.slots["face_expression"].intent == "preserve"
+    assert result.slots["attire"].intent == "edit"
+    assert result.slots["attire"].score == 100
+    # 종합 = (92+88+100+75+95)/5 = 90
+    assert result.overall == 90
+    # 한글 코멘트 정상 매핑
+    assert result.slots["face_expression"].comment_ko == "눈과 턱 보존됨."
     assert "신원 보존" in result.summary_ko
 
 
 @pytest.mark.asyncio
-async def test_analyze_pair_vision_fail_fallback() -> None:
-    """비전 호출 실패 (빈 응답) 시 fallback=True · scores 모두 null · 번역 미호출."""
+async def test_analyze_pair_object_scene_domain() -> None:
+    """v3: 물체·풍경 모드 정상 응답 → 다른 슬롯 키 셋 + intent 컨텍스트."""
     from unittest.mock import AsyncMock, patch
 
-    from studio.comparison_pipeline import analyze_pair
+    from studio.comparison_pipeline import (
+        OBJECT_SCENE_AXES, PERSON_AXES, analyze_pair,
+    )
+
+    raw_json = json.dumps({
+        "domain": "object_scene",
+        "slots": {
+            "subject":             {"intent": "preserve", "score": 95, "comment": "Same mug."},
+            "color_material":      {"intent": "edit",     "score": 100, "comment": "Color changed to blue as requested."},
+            "layout_composition":  {"intent": "preserve", "score": 90, "comment": "Same framing."},
+            "background_setting":  {"intent": "preserve", "score": 100, "comment": "Identical background."},
+            "mood_style":          {"intent": "preserve", "score": 85, "comment": "Mood preserved."},
+        },
+        "summary": "Color change applied; rest preserved.",
+    })
+    with (
+        patch(
+            "studio.comparison_pipeline._call_vision_pair",
+            new=AsyncMock(return_value=raw_json),
+        ),
+        patch(
+            "studio.comparison_pipeline._translate_comments_to_ko",
+            new=AsyncMock(return_value={
+                "comments_ko": {k: f"{k}_ko" for k in OBJECT_SCENE_AXES},
+                "summary_ko": "색상 변경 적용 · 나머지 보존.",
+            }),
+        ),
+    ):
+        result = await analyze_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="change color to blue",
+        )
+    assert result.domain == "object_scene"
+    for k in OBJECT_SCENE_AXES:
+        assert k in result.slots
+    # 인물 슬롯 키는 없어야 함
+    for k in PERSON_AXES:
+        if k not in OBJECT_SCENE_AXES:
+            assert k not in result.slots
+
+
+@pytest.mark.asyncio
+async def test_analyze_pair_vision_fail_fallback() -> None:
+    """v3: 비전 빈 응답 → fallback=True · slots 5개 모두 score=None · 번역 미호출."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import OBJECT_SCENE_AXES, analyze_pair
 
     translate_mock = AsyncMock(return_value={"comments_ko": {}, "summary_ko": ""})
     with (
@@ -237,8 +289,13 @@ async def test_analyze_pair_vision_fail_fallback() -> None:
         )
     assert result.fallback is True
     assert result.provider == "fallback"
-    assert all(v is None for v in result.scores.values())
-    assert result.overall == 0  # 빈 평균은 0 으로 표기
+    assert result.domain == "object_scene"  # fallback 기본 도메인
+    # 5 슬롯 모두 존재 + score=None
+    assert len(result.slots) == 5
+    for k in OBJECT_SCENE_AXES:
+        assert k in result.slots
+        assert result.slots[k].score is None
+    assert result.overall == 0
     translate_mock.assert_not_called()
 
 
@@ -269,18 +326,19 @@ async def test_analyze_pair_json_parse_fail_fallback() -> None:
 
 
 @pytest.mark.asyncio
-async def test_analyze_pair_partial_scores_average_only_present() -> None:
-    """일부 축 누락 시 null 로 보존 + overall 평균은 받은 점수만으로."""
+async def test_analyze_pair_partial_slots_average_only_present() -> None:
+    """v3: 일부 슬롯 score 누락 → score=None 보존 + 평균은 받은 점수만으로."""
     from unittest.mock import AsyncMock, patch
 
     from studio.comparison_pipeline import analyze_pair
 
     raw_json = json.dumps({
-        "scores": {
-            "face_id": 80, "body_pose": 60,
-            # attire / background / intent_fidelity 누락
+        "domain": "person",
+        "slots": {
+            "face_expression": {"intent": "preserve", "score": 80, "comment": "ok"},
+            "hair":            {"intent": "preserve", "score": 60, "comment": "ok"},
+            # attire / body_pose / background 누락
         },
-        "comments": {"face_id": "ok", "body_pose": "ok"},
         "summary": "Partial result.",
     })
     with (
@@ -291,7 +349,7 @@ async def test_analyze_pair_partial_scores_average_only_present() -> None:
         patch(
             "studio.comparison_pipeline._translate_comments_to_ko",
             new=AsyncMock(return_value={
-                "comments_ko": {"face_id": "괜찮음", "body_pose": "괜찮음"},
+                "comments_ko": {"face_expression": "괜찮음", "hair": "괜찮음"},
                 "summary_ko": "부분 결과.",
             }),
         ),
@@ -301,24 +359,32 @@ async def test_analyze_pair_partial_scores_average_only_present() -> None:
             result_bytes=_tiny_png_bytes(),
             edit_prompt="x",
         )
-    assert result.scores["attire"] is None
-    assert result.scores["face_id"] == 80
+    # 누락 슬롯 — None 으로 채워짐
+    assert result.slots["attire"].score is None
+    assert result.slots["body_pose"].score is None
+    # 받은 슬롯
+    assert result.slots["face_expression"].score == 80
+    assert result.slots["hair"].score == 60
     # overall = (80+60)/2 = 70
     assert result.overall == 70
 
 
 @pytest.mark.asyncio
 async def test_analyze_pair_translation_fail_keeps_en() -> None:
-    """비전 OK · 번역 실패 시 ko 자리에 en 그대로 + summary_ko 에 마커."""
+    """v3: 비전 OK · 번역 실패 시 슬롯 comment_ko 에 comment_en 그대로 + summary 에 마커."""
     from unittest.mock import AsyncMock, patch
 
     from studio.comparison_pipeline import analyze_pair
 
     raw_json = json.dumps({
-        "scores": {"face_id": 90, "body_pose": 80, "attire": 70,
-                   "background": 85, "intent_fidelity": 95},
-        "comments": {"face_id": "ok", "body_pose": "ok", "attire": "ok",
-                     "background": "ok", "intent_fidelity": "ok"},
+        "domain": "person",
+        "slots": {
+            "face_expression": {"intent": "preserve", "score": 90, "comment": "ok"},
+            "hair":            {"intent": "preserve", "score": 80, "comment": "ok"},
+            "attire":          {"intent": "edit",     "score": 70, "comment": "ok"},
+            "body_pose":       {"intent": "preserve", "score": 85, "comment": "ok"},
+            "background":      {"intent": "preserve", "score": 95, "comment": "ok"},
+        },
         "summary": "All good.",
     })
     with (
@@ -337,7 +403,7 @@ async def test_analyze_pair_translation_fail_keeps_en() -> None:
             edit_prompt="x",
         )
     assert result.fallback is False  # 비전은 살아있음
-    assert result.comments_ko["face_id"] == "ok"  # en 그대로
+    assert result.slots["face_expression"].comment_ko == "ok"  # en 그대로
     assert "번역 실패" in result.summary_ko
 
 

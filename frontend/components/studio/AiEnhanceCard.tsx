@@ -15,6 +15,7 @@
 
 import { useState } from "react";
 import Icon from "@/components/ui/Icon";
+import EditVisionBlock from "@/components/studio/EditVisionBlock";
 import { toast } from "@/stores/useToastStore";
 import type { HistoryItem } from "@/lib/api-client";
 
@@ -26,11 +27,19 @@ export default function AiEnhanceCard({ item }: { item: HistoryItem }) {
     item.upgradedPrompt && item.upgradedPrompt !== item.prompt;
   const hasHints = (item.researchHints?.length ?? 0) > 0;
   const hasVision = !!item.visionDescription;
+  const hasVisionAnalysis = !!item.editVisionAnalysis;
   const hasError = !!item.comfyError;
   const isFallback = item.promptProvider === "fallback";
 
   // 표시할 게 아무것도 없으면 카드 자체를 숨김
-  if (!hasUpgrade && !hasHints && !hasVision && !hasError && !isFallback) {
+  if (
+    !hasUpgrade &&
+    !hasHints &&
+    !hasVision &&
+    !hasVisionAnalysis &&
+    !hasError &&
+    !isFallback
+  ) {
     return null;
   }
 
@@ -149,8 +158,12 @@ export default function AiEnhanceCard({ item }: { item: HistoryItem }) {
         </div>
       )}
 
-      {/* 비전 설명 (수정 모드) */}
-      {hasVision && (
+      {/* 비전 설명 (수정 모드) — Phase 1 (2026-04-25):
+           editVisionAnalysis 있으면 구조 분석 요약 + 라벨 표시.
+           없으면 기존 visionDescription 단락 폴백 (옛 히스토리 호환). */}
+      {item.editVisionAnalysis ? (
+        <EditVisionBlock analysis={item.editVisionAnalysis} />
+      ) : hasVision ? (
         <div>
           <div style={labelStyle}>
             <Icon name="image" size={11} />
@@ -158,7 +171,7 @@ export default function AiEnhanceCard({ item }: { item: HistoryItem }) {
           </div>
           <p style={{ ...textStyle, marginTop: 6 }}>{item.visionDescription}</p>
         </div>
-      )}
+      ) : null}
 
       {/* ComfyUI 에러 */}
       {hasError && (

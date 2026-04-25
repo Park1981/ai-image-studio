@@ -7,8 +7,8 @@
 
 /* ──────────── Comparison Analysis (Edit 결과 vs 원본) ──────────── */
 
-/** 비교 분석 5축 점수 (0-100 정수). 누락 축은 null 가능 — UI 에서 dash 표시. */
-export interface ComparisonScores {
+/** v1 (옛 형식 · 호환만 유지) — 5축 유사도 점수 */
+export interface ComparisonScoresLegacy {
   face_id: number | null;
   body_pose: number | null;
   attire: number | null;
@@ -16,26 +16,155 @@ export interface ComparisonScores {
   intent_fidelity: number | null;
 }
 
-/** 5축 각각의 1-2 문장 코멘트 (en 또는 ko). */
-export type ComparisonComments = {
-  [K in keyof ComparisonScores]: string;
+/** v1 5축 코멘트 (옛 형식) */
+export type ComparisonCommentsLegacy = {
+  [K in keyof ComparisonScoresLegacy]: string;
 };
 
-/** 비교 분석 단일 결과 — history item 에 영구 저장. */
+/** v3 슬롯 엔트리 (spec 16) — intent + score + comment(en/ko) */
+export interface ComparisonSlotEntry {
+  intent: "edit" | "preserve";
+  /** 0-100. 보존 의도면 유사도, 변경 의도면 의도부합도. fallback 시 null. */
+  score: number | null;
+  commentEn: string;
+  commentKo: string;
+}
+
+/**
+ * 비교 분석 단일 결과 — history item 에 영구 저장.
+ * v1 (옛) 와 v3 (신규) 모두 호환 — 프론트가 키 셋으로 자동 분기:
+ *   - slots 있음 → v3 (domain + 5 슬롯 매트릭스 + 의도 컨텍스트 점수)
+ *   - slots 없고 scores 있음 → v1 (옛 5축 유사도)
+ */
 export interface ComparisonAnalysis {
-  scores: ComparisonScores;
-  /** 5축 산술 평균 (0-100). null 점수는 평균 계산에서 제외. */
+  /** v3 (analyze_pair) — domain + slots */
+  domain?: "person" | "object_scene";
+  slots?: Record<string, ComparisonSlotEntry>;
+
+  /** v1 (옛 row 호환) — scores + comments */
+  scores?: ComparisonScoresLegacy;
+  comments_en?: ComparisonCommentsLegacy;
+  comments_ko?: ComparisonCommentsLegacy;
+
+  /** 산술평균 종합 점수 (양 형식 공통) */
   overall: number;
-  comments_en: ComparisonComments;
-  comments_ko: ComparisonComments;
   summary_en: string;
   summary_ko: string;
   provider: "ollama" | "fallback";
   fallback: boolean;
-  /** 분석 시점 unix ms. */
   analyzedAt: number;
   visionModel: string;
 }
+
+/** v3 도메인별 슬롯 키 순서 + 한글 라벨 (사전 분석과 동일) */
+export const COMPARISON_PERSON_SLOTS: readonly string[] = [
+  "face_expression",
+  "hair",
+  "attire",
+  "body_pose",
+  "background",
+] as const;
+
+export const COMPARISON_OBJECT_SCENE_SLOTS: readonly string[] = [
+  "subject",
+  "color_material",
+  "layout_composition",
+  "background_setting",
+  "mood_style",
+] as const;
+
+/** v1 옛 5축 키 순서 + 한글 라벨 (호환만) */
+export const COMPARISON_LEGACY_AXES: readonly (keyof ComparisonScoresLegacy)[] = [
+  "face_id",
+  "body_pose",
+  "attire",
+  "background",
+  "intent_fidelity",
+] as const;
+
+export const COMPARISON_LEGACY_LABELS_KO: Record<
+  keyof ComparisonScoresLegacy,
+  string
+> = {
+  face_id: "얼굴 ID",
+  body_pose: "체형/포즈",
+  attire: "의상/누드 상태",
+  background: "배경 보존",
+  intent_fidelity: "의도 충실도",
+};
+
+/* ──────────── Edit 이미지 구조 분석 v2 (spec 15장 · 2026-04-25) ────────────
+ * 도메인별 5 슬롯 매트릭스 × {action, note}.
+ * 비교 분석 (ComparisonAnalysis) 5축 점수표 UX 와 시각적 쌍둥이.
+ * DB persist X (휘발) · SSE step 1 event + done item 에만 포함.
+ *
+ * 백엔드:
+ *   - clarify_edit_intent (gemma4) → intent: 영어 1-2문장 정제
+ *   - analyze_edit_source (qwen2.5vl) → domain + slots 매트릭스
+ *
+ * 도메인별 슬롯 키:
+ *   person:        face_expression / hair / attire / body_pose / background
+ *   object_scene:  subject / color_material / layout_composition /
+ *                  background_setting / mood_style
+ */
+
+export type EditDomain = "person" | "object_scene";
+export type EditSlotAction = "edit" | "preserve";
+
+export interface EditSlotEntry {
+  action: EditSlotAction;
+  /** 한 줄 설명 — qwen2.5vl 출력 언어 자율 (입력 언어 추종) */
+  note: string;
+}
+
+export interface EditVisionAnalysis {
+  domain: EditDomain;
+  /** gemma4 정제 영어 intent (1-2 문장). 정제 실패 시 빈 문자열. */
+  intent: string;
+  /** qwen2.5vl 요약 1줄 (영어 권장). DB visionDescription 으로도 저장됨. */
+  summary: string;
+  /** 도메인에 따라 키 셋 다름. 항상 5개 키 유지 (백엔드가 강제). */
+  slots: Record<string, EditSlotEntry>;
+
+  provider: "ollama" | "fallback";
+  fallback: boolean;
+  analyzedAt: number;
+  visionModel: string;
+}
+
+/** 인물 도메인 슬롯 키 순서 (UI 렌더 순서) */
+export const PERSON_SLOT_ORDER: readonly string[] = [
+  "face_expression",
+  "hair",
+  "attire",
+  "body_pose",
+  "background",
+] as const;
+
+/** 물체·풍경 도메인 슬롯 키 순서 */
+export const OBJECT_SCENE_SLOT_ORDER: readonly string[] = [
+  "subject",
+  "color_material",
+  "layout_composition",
+  "background_setting",
+  "mood_style",
+] as const;
+
+/** 슬롯 키 → 한국어 UI 라벨 매핑 */
+export const SLOT_LABELS_KO: Record<string, string> = {
+  // person
+  face_expression: "얼굴/표정",
+  hair: "헤어",
+  attire: "의상/액세서리",
+  body_pose: "바디/포즈",
+  background: "배경/환경",
+  // object_scene
+  subject: "주체",
+  color_material: "색·재질",
+  layout_composition: "배치·구도",
+  background_setting: "배경·환경",
+  mood_style: "분위기·스타일",
+};
 
 /* ──────────── Vision Compare Analysis (임의 두 이미지 비교 · 신규) ──────────── */
 
@@ -107,6 +236,9 @@ export interface HistoryItem {
   sourceRef?: string;
   /** 비교 분석 결과. 분석 안 한 경우 undefined. */
   comparisonAnalysis?: ComparisonAnalysis;
+  /** Edit 비전 구조 분석 (Phase 1 · 휘발). 이 세션에서 실행된 edit 에만 포함.
+   *  옛 히스토리 로드 시 undefined → AiEnhanceCard 는 visionDescription 단락으로 폴백. */
+  editVisionAnalysis?: EditVisionAnalysis;
 }
 
 export interface GenerateRequest {
@@ -173,6 +305,8 @@ export type EditStage =
       done: boolean;
       /** step 1 done 에서 도착하는 비전 설명 */
       description?: string;
+      /** step 1 done 에서 도착하는 구조 분석 (Phase 1 · 2026-04-25 · 휘발) */
+      editVisionAnalysis?: EditVisionAnalysis;
       /** step 2 done 에서 도착하는 최종 프롬프트 (영문) */
       finalPrompt?: string;
       /** step 2 done 에서 도착하는 한국어 번역 (v2 · 2026-04-23) */

@@ -28,6 +28,7 @@ import { copyText } from "@/lib/image-actions";
 import BeforeAfterSlider from "./BeforeAfterSlider";
 import ComparisonAnalysisCard from "./ComparisonAnalysisCard";
 import ComparisonAnalysisModal from "./ComparisonAnalysisModal";
+import EditVisionBlock from "./EditVisionBlock";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 
 const MIN_ZOOM = 0.2;
@@ -508,8 +509,18 @@ function InfoPanel({
         </section>
       )}
 
-      {/* 비전 설명 (Edit 모드) */}
-      {item.visionDescription && (
+      {/* 비전 설명 / 구조 분석 (Edit 모드) —
+           Phase 1 (2026-04-25): editVisionAnalysis 있으면 칩 UI,
+           없으면 기존 visionDescription 단락 폴백 (옛 히스토리 호환). */}
+      {item.editVisionAnalysis ? (
+        <section style={{ marginBottom: 18 }}>
+          <SectionTitle>비전 모델 분석</SectionTitle>
+          <EditVisionBlock
+            analysis={item.editVisionAnalysis}
+            showHeader={false}
+          />
+        </section>
+      ) : item.visionDescription ? (
         <section style={{ marginBottom: 18 }}>
           <SectionTitle
             action={
@@ -523,7 +534,7 @@ function InfoPanel({
           </SectionTitle>
           <PromptBlock text={item.visionDescription} />
         </section>
-      )}
+      ) : null}
 
       {/* Claude 개선 힌트 */}
       {item.researchHints && item.researchHints.length > 0 && (

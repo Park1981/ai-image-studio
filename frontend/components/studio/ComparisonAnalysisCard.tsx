@@ -17,7 +17,13 @@
 import type { CSSProperties } from "react";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
-import type { ComparisonAnalysis, HistoryItem } from "@/lib/api-client";
+import {
+  COMPARISON_OBJECT_SCENE_SLOTS,
+  COMPARISON_PERSON_SLOTS,
+  SLOT_LABELS_KO,
+  type ComparisonAnalysis,
+  type HistoryItem,
+} from "@/lib/api/types";
 
 export interface Props {
   item: HistoryItem;
@@ -85,20 +91,41 @@ export default function ComparisonAnalysisCard({
   }
 
   // filled — 분석 결과 있음 (analysis 가 null-safe 하게 접근됨)
+  // v3 vs v1 분기: slots 있으면 도메인별 첫 3 슬롯, 없으면 옛 face_id/body_pose/attire
+  const isV3 = !!analysis.slots && Object.keys(analysis.slots).length > 0;
+  const previewAxes = isV3
+    ? (analysis.domain === "person"
+        ? COMPARISON_PERSON_SLOTS
+        : COMPARISON_OBJECT_SCENE_SLOTS
+      ).slice(0, 3)
+    : null;
+
   return (
     <CardShell>
       <Icon name="search" size={13} style={{ color: "var(--ink-3)" }} />
-      {/* 종합 점수 색상 도트 */}
       <Dot score={analysis.overall} />
       <span style={{ fontSize: 12, fontWeight: 600, color: "var(--ink)" }}>
         {analysis.overall}% match
       </span>
       <span style={{ fontSize: 11, color: "var(--ink-4)" }}>·</span>
-      {/* 인라인에선 face/body/attire 3축만 (background/intent_fidelity 는 모달에서 보임) */}
-      <AxisDot label="얼굴" v={analysis.scores.face_id} />
-      <AxisDot label="체형" v={analysis.scores.body_pose} />
-      <AxisDot label="의상" v={analysis.scores.attire} />
-      {/* 남은 공간 채우기 */}
+      {isV3 && previewAxes
+        ? previewAxes.map((key) => {
+            const entry = analysis.slots?.[key];
+            return (
+              <AxisDot
+                key={key}
+                label={SLOT_LABELS_KO[key]?.split("/")[0] ?? key}
+                v={entry?.score ?? null}
+              />
+            );
+          })
+        : (
+            <>
+              <AxisDot label="얼굴" v={analysis.scores?.face_id ?? null} />
+              <AxisDot label="체형" v={analysis.scores?.body_pose ?? null} />
+              <AxisDot label="의상" v={analysis.scores?.attire ?? null} />
+            </>
+          )}
       <span style={{ flex: 1 }} />
       <button
         type="button"
@@ -107,7 +134,6 @@ export default function ComparisonAnalysisCard({
       >
         자세히
       </button>
-      {/* ghost 재분석 버튼 (아이콘만) */}
       <button
         type="button"
         onClick={onReanalyze}

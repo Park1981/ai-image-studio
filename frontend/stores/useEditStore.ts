@@ -7,6 +7,7 @@
 "use client";
 
 import { create } from "zustand";
+import type { EditVisionAnalysis } from "@/lib/api/types";
 
 export interface EditStepDetail {
   n: 1 | 2 | 3 | 4;
@@ -54,6 +55,13 @@ export interface EditState {
   // 비교 슬라이더
   compareX: number;
 
+  /**
+   * Edit 비전 구조 분석 (Phase 1 · 2026-04-25 · 휘발).
+   * SSE step 1 done 에서 수신한 구조 JSON. resetPipeline 으로 초기화.
+   * persist X — 새로고침/세션 종료 시 사라짐 (Vision Compare 패턴).
+   */
+  editVisionAnalysis: EditVisionAnalysis | null;
+
   // actions
   setSource: (
     image: string | null,
@@ -71,6 +79,8 @@ export interface EditState {
   ) => void;
   setCompareX: (v: number) => void;
   setPipelineProgress: (progress: number, label?: string) => void;
+  /** Phase 1: step 1 done 에서 받은 구조 분석 저장 (휘발). */
+  setEditVisionAnalysis: (analysis: EditVisionAnalysis | null) => void;
   resetPipeline: () => void;
   /** ComfyUI 샘플링 스텝 업데이트 */
   setSampling: (step: number | null, total: number | null) => void;
@@ -97,6 +107,8 @@ export const useEditStore = create<EditState>((set) => ({
 
   compareX: 50,
 
+  editVisionAnalysis: null,
+
   setSource: (image, label, w, h) =>
     set({
       sourceImage: image,
@@ -119,6 +131,8 @@ export const useEditStore = create<EditState>((set) => ({
             samplingTotal: null,
             pipelineProgress: 0,
             pipelineLabel: "초기화",
+            // 새 실행 시작 시 이전 분석 결과 비움
+            editVisionAnalysis: null,
           }
         : { running },
     ),
@@ -149,6 +163,7 @@ export const useEditStore = create<EditState>((set) => ({
       return { stepHistory: [...s.stepHistory, fresh] };
     }),
   setCompareX: (v) => set({ compareX: v }),
+  setEditVisionAnalysis: (analysis) => set({ editVisionAnalysis: analysis }),
   setPipelineProgress: (progress, label) =>
     set((s) => ({
       pipelineProgress: progress,

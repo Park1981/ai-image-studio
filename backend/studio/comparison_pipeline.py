@@ -1,15 +1,20 @@
 """
 comparison_pipeline.py - Edit 결과 vs 원본 비교 분석 (qwen2.5vl multi-image).
 
-흐름:
-1. SOURCE + RESULT 두 이미지를 qwen2.5vl 에 동시 전달 (Ollama messages.images 배열)
-2. SYSTEM_COMPARE 가 5축 점수 (0-100) + 코멘트 + summary 를 STRICT JSON 으로 강제
-3. _parse_strict_json() 로 점수/코멘트 추출 (누락 점수는 null 보존)
-4. gemma4-un (think:False) 로 5축 코멘트 + summary 를 한 번에 한국어 번역
-5. ComparisonAnalysisResult 반환 — fallback 경로도 항상 같은 shape 유지
+spec 16 (2026-04-25 v3 패러다임 전환):
+  - 5축 키 = 사전 분석 슬롯과 동일 (도메인별 인물 5 / 물체·풍경 5)
+  - 점수 의미 = 의도 컨텍스트 (보존이면 유사도, 변경이면 의도부합도)
+  - domain 필드 추가 (analyze_pair 만 적용; analyze_pair_generic 영향 없음)
 
-비전 호출 실패 시 → fallback=True, scores 전부 null, summary 에 사유 명시.
-번역만 실패 시 → comments_ko = comments_en (그대로), summary_ko = "한글 번역 실패".
+흐름:
+1. SOURCE + RESULT 두 이미지를 qwen2.5vl 에 동시 전달
+2. SYSTEM_COMPARE 가 (a) 도메인 분류, (b) 슬롯별 의도 판정, (c) 의도-맞춰 점수
+3. _parse_strict_json() 로 slots 매트릭스 추출
+4. gemma4-un (think:False) 로 슬롯 코멘트 + summary 를 한국어 번역
+5. ComparisonAnalysisResult 반환 — fallback 경로도 동일 shape
+
+비전 호출 실패 시 → fallback=True, slots 전부 null score / 빈 comment.
+번역만 실패 시 → comments_ko = comments_en, summary_ko = "한글 번역 실패".
 """
 
 from __future__ import annotations
@@ -29,14 +34,33 @@ from .prompt_pipeline import _DEFAULT_OLLAMA_URL, DEFAULT_TIMEOUT
 
 log = logging.getLogger(__name__)
 
-# 5축 키 — Edit context 전용 (순서 고정 · UI 막대 순서와 일치)
-AXES: tuple[str, str, str, str, str] = (
+# 5축 키 — Edit context 전용 (순서 고정 · UI 막대 순서와 일치).
+# spec 16: 사전 분석 PERSON_SLOTS / OBJECT_SCENE_SLOTS 와 동일하게 정렬.
+PERSON_AXES: tuple[str, str, str, str, str] = (
+    "face_expression",
+    "hair",
+    "attire",
+    "body_pose",
+    "background",
+)
+OBJECT_SCENE_AXES: tuple[str, str, str, str, str] = (
+    "subject",
+    "color_material",
+    "layout_composition",
+    "background_setting",
+    "mood_style",
+)
+# 옛 5축 (호환용 · 폐기 예정 · analyze_pair_generic 의 COMPARE_AXES 와 다름)
+LEGACY_EDIT_AXES: tuple[str, str, str, str, str] = (
     "face_id",
     "body_pose",
     "attire",
     "background",
     "intent_fidelity",
 )
+# 하위 호환을 위해 AXES alias 유지 — analyze_pair_generic 등이 default 값으로 사용.
+# 새 analyze_pair 는 도메인 동적 결정.
+AXES: tuple[str, str, str, str, str] = LEGACY_EDIT_AXES
 
 # 5축 키 — Vision Compare context 전용 (사용자가 임의로 고른 두 이미지)
 COMPARE_AXES: tuple[str, str, str, str, str] = (
@@ -47,39 +71,68 @@ COMPARE_AXES: tuple[str, str, str, str, str] = (
     "quality",
 )
 
-# 비전 응답 강제 — STRICT JSON only (Edit context · 기존 동작 보존 · 절대 수정 금지)
-SYSTEM_COMPARE = """You are a vision evaluator comparing TWO images of the same scene:
-  SOURCE = original image (before user edit)
-  RESULT = edited image (after user edit)
+# 비전 응답 강제 — STRICT JSON only (Edit context v3 · spec 16).
+# 도메인 분류 + 슬롯별 의도 판정 + 의도-컨텍스트 점수.
+SYSTEM_COMPARE = """You are a vision evaluator comparing TWO images:
+  SOURCE = original image (before edit)
+  RESULT = edited image (after the user's edit)
 
 The user's edit instruction was: "{edit_prompt}"
 
-Evaluate identity preservation and intent fidelity on FIVE axes.
-Score each axis 0-100 (integer):
-  - face_id: identity preservation of person's face (eyes, nose, jaw,
-    overall facial structure). 100 = identical, 0 = entirely different person.
-  - body_pose: body shape, proportions, and pose preservation.
-  - attire: clothing/nudity state vs the user's intent. 100 = exactly as
-    requested, 0 = entirely opposite to request.
-  - background: unintended background changes. 100 = background fully
-    preserved, 0 = background completely different.
-  - intent_fidelity: how faithfully the result follows the edit prompt.
+Step 1 — Classify domain:
+  - "person" if a human or anthropomorphic character is the main subject.
+  - "object_scene" otherwise (products, landscapes, animals, food, vehicles,
+    interiors, abstract scenes, etc.).
 
-Write a 1-2 sentence comment per axis (English).
-Then write a 3-5 sentence overall summary (English).
+Step 2 — For each of the 5 domain-specific slots, decide intent and score.
 
-Return STRICT JSON only (no markdown, no preamble, no trailing text):
+  Intent decision (per slot):
+    - intent: "edit"     if the user's instruction explicitly asks to change
+      this aspect.
+    - intent: "preserve" if the user's instruction does NOT mention changing
+      this aspect (default to preserve).
+
+  Score 0-100 (integer), based on intent:
+    - If intent == "preserve": score = visual SIMILARITY between SOURCE and
+      RESULT on this slot. 100 = identical, 0 = completely changed.
+    - If intent == "edit":     score = how well the edit FOLLOWS the user's
+      instruction on this slot. 100 = fully followed, 0 = ignored.
+
+Step 3 — Write a 1-2 sentence comment per slot (English) explaining the score.
+Step 4 — Write a 3-5 sentence overall summary (English).
+
+Return STRICT JSON only (no markdown, no preamble, no trailing text).
+
+If domain == "person":
 {
-  "scores": {
-    "face_id": <int>, "body_pose": <int>, "attire": <int>,
-    "background": <int>, "intent_fidelity": <int>
-  },
-  "comments": {
-    "face_id": "<en>", "body_pose": "<en>", "attire": "<en>",
-    "background": "<en>", "intent_fidelity": "<en>"
+  "domain": "person",
+  "slots": {
+    "face_expression": {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "hair":            {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "attire":          {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "body_pose":       {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "background":      {"intent": "edit|preserve", "score": <int>, "comment": "<en>"}
   },
   "summary": "<en, 3-5 sentences>"
-}"""
+}
+
+If domain == "object_scene":
+{
+  "domain": "object_scene",
+  "slots": {
+    "subject":             {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "color_material":      {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "layout_composition":  {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "background_setting":  {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "mood_style":          {"intent": "edit|preserve", "score": <int>, "comment": "<en>"}
+  },
+  "summary": "<en, 3-5 sentences>"
+}
+
+Rules:
+- Always fill ALL 5 slots for the chosen domain. Never omit a slot.
+- Always provide an integer score 0-100 (no nulls).
+- Comments are concise (max 2 sentences each)."""
 
 # 비전 응답 강제 — STRICT JSON only (Vision Compare context · 신규 · edit 무영향)
 # 사용자가 직접 고른 두 이미지를 5축 (composition/color/subject/mood/quality)으로 비교
@@ -137,13 +190,47 @@ REQUIRED behavior:
 
 
 @dataclass
-class ComparisonAnalysisResult:
-    """analyze_pair() 결과 — DB 저장용 dict 와 같은 shape (camelCase 매핑은 호출처)."""
+class ComparisonSlotEntry:
+    """v3 슬롯 엔트리 — intent + score + comment (en/ko 둘 다)."""
 
+    intent: str = "preserve"  # "edit" | "preserve"
+    score: int | None = None  # 0-100, fallback 시 None
+    comment_en: str = ""
+    comment_ko: str = ""
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "intent": self.intent,
+            "score": self.score,
+            "commentEn": self.comment_en,
+            "commentKo": self.comment_ko,
+        }
+
+
+@dataclass
+class ComparisonAnalysisResult:
+    """analyze_pair / analyze_pair_generic 공용 결과.
+
+    v3 형식 (analyze_pair 만 사용):
+      - domain + slots (인물 5 / 물체·풍경 5)
+      - 점수 의미 = 의도 컨텍스트 (보존이면 유사도, 변경이면 의도부합도)
+
+    옛 형식 (analyze_pair_generic 만 사용 · Vision Compare 메뉴):
+      - scores + comments_en/ko + summary_en/ko (5축 유사도)
+
+    to_dict() 가 두 형식 모두 직렬화 — 프론트가 키 셋으로 자동 분기.
+    """
+
+    # v3 신규 필드 (analyze_pair · spec 16)
+    domain: str = ""  # "person" | "object_scene" | "" (옛 형식 또는 fallback)
+    slots: dict[str, ComparisonSlotEntry] = field(default_factory=dict)
+
+    # 옛 형식 (analyze_pair_generic + 호환용)
     scores: dict[str, int | None] = field(default_factory=dict)
-    overall: int = 0
     comments_en: dict[str, str] = field(default_factory=dict)
     comments_ko: dict[str, str] = field(default_factory=dict)
+
+    overall: int = 0
     summary_en: str = ""
     summary_ko: str = ""
     provider: str = "fallback"  # "ollama" | "fallback"
@@ -152,12 +239,9 @@ class ComparisonAnalysisResult:
     vision_model: str = ""
 
     def to_dict(self) -> dict[str, Any]:
-        """API 응답 / DB 저장용 직렬화 (camelCase 일부 매핑)."""
-        return {
-            "scores": self.scores,
+        """API 응답 / DB 저장용 직렬화. v3 와 옛 형식 모두 포함 — 프론트 자동 분기."""
+        out: dict[str, Any] = {
             "overall": self.overall,
-            "comments_en": self.comments_en,
-            "comments_ko": self.comments_ko,
             "summary_en": self.summary_en,
             "summary_ko": self.summary_ko,
             "provider": self.provider,
@@ -165,6 +249,18 @@ class ComparisonAnalysisResult:
             "analyzedAt": self.analyzed_at,
             "visionModel": self.vision_model,
         }
+        # v3 형식 — analyze_pair 가 채움
+        if self.domain and self.slots:
+            out["domain"] = self.domain
+            out["slots"] = {k: v.to_dict() for k, v in self.slots.items()}
+        # 옛 형식 — analyze_pair_generic 또는 fallback 시 채움
+        if self.scores:
+            out["scores"] = self.scores
+        if self.comments_en:
+            out["comments_en"] = self.comments_en
+        if self.comments_ko:
+            out["comments_ko"] = self.comments_ko
+        return out
 
 
 def _empty_scores(axes: tuple[str, ...] = AXES) -> dict[str, int | None]:
@@ -384,6 +480,55 @@ async def _translate_comments_to_ko(
     return {"comments_ko": comments_ko, "summary_ko": summary_ko}
 
 
+def _coerce_intent(raw: Any) -> str:
+    """슬롯 intent 정규화 — edit/preserve 외 값은 preserve 기본."""
+    s = (raw or "").strip().lower() if isinstance(raw, str) else ""
+    return s if s in ("edit", "preserve") else "preserve"
+
+
+def _coerce_score(raw: Any) -> int | None:
+    """0-100 정수로 정규화. None / 비정수 → None."""
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, (int, float)):
+        return max(0, min(100, int(raw)))
+    return None
+
+
+def _coerce_v3_slots(
+    raw: Any, axes: tuple[str, ...]
+) -> dict[str, ComparisonSlotEntry]:
+    """v3 슬롯 매트릭스 정규화 — 도메인 키 5개 강제."""
+    out: dict[str, ComparisonSlotEntry] = {}
+    raw_dict = raw if isinstance(raw, dict) else {}
+    for key in axes:
+        item = raw_dict.get(key)
+        if isinstance(item, dict):
+            out[key] = ComparisonSlotEntry(
+                intent=_coerce_intent(item.get("intent")),
+                score=_coerce_score(item.get("score")),
+                comment_en=(
+                    item.get("comment", "").strip()
+                    if isinstance(item.get("comment"), str)
+                    else ""
+                ),
+                comment_ko="",  # 번역 단계에서 채움
+            )
+        else:
+            out[key] = ComparisonSlotEntry(
+                intent="preserve", score=None, comment_en="", comment_ko=""
+            )
+    return out
+
+
+def _v3_overall(slots: dict[str, ComparisonSlotEntry]) -> int:
+    """v3 종합 = 슬롯 점수 산술평균 (None 제외, 모두 None 이면 0)."""
+    valid = [s.score for s in slots.values() if s.score is not None]
+    if not valid:
+        return 0
+    return round(sum(valid) / len(valid))
+
+
 async def analyze_pair(
     source_bytes: bytes,
     result_bytes: bytes,
@@ -394,18 +539,16 @@ async def analyze_pair(
     ollama_url: str | None = None,
     timeout: float = DEFAULT_TIMEOUT,
 ) -> ComparisonAnalysisResult:
-    """SOURCE + RESULT 비교 분석 (HTTP 200 원칙 — 항상 결과 dataclass 반환).
+    """SOURCE + RESULT 비교 분석 v3 (spec 16 · 도메인 분기 + 의도 컨텍스트 점수).
+
+    HTTP 200 원칙 — 모든 fallback 경로도 ComparisonAnalysisResult shape 유지.
 
     Args:
-        source_bytes / result_bytes: PIL 로 읽기 가능한 이미지 바이트
-        edit_prompt: 사용자가 친 수정 지시 (시스템 프롬프트에 주입)
+        source_bytes / result_bytes: PIL 호환 이미지 바이트
+        edit_prompt: 사용자 수정 지시 (시스템 프롬프트에 주입)
         vision_model: 기본 settings.visionModel (qwen2.5vl:7b)
         text_model: 번역용 (기본 gemma4-un:latest)
-
-    Returns:
-        ComparisonAnalysisResult — 모든 fallback 경로도 동일 shape 보장.
     """
-    # 모델/URL 기본값 해석
     resolved_vision = vision_model or DEFAULT_OLLAMA_ROLES.vision
     resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
@@ -420,11 +563,14 @@ async def analyze_pair(
         ollama_url=resolved_url,
     )
     if not raw:
-        # 비전 호출 자체 실패 → 번역도 불필요
         return ComparisonAnalysisResult(
-            scores=_empty_scores(),
-            comments_en=_empty_comments(),
-            comments_ko=_empty_comments(),
+            domain="object_scene",
+            slots={
+                k: ComparisonSlotEntry(
+                    intent="preserve", score=None, comment_en="", comment_ko=""
+                )
+                for k in OBJECT_SCENE_AXES
+            },
             summary_en="Vision model unavailable.",
             summary_ko="비전 모델 응답 없음.",
             provider="fallback",
@@ -438,9 +584,13 @@ async def analyze_pair(
     if parsed is None:
         log.warning("compare JSON parse failed; raw head: %s", raw[:200])
         return ComparisonAnalysisResult(
-            scores=_empty_scores(),
-            comments_en=_empty_comments(),
-            comments_ko=_empty_comments(),
+            domain="object_scene",
+            slots={
+                k: ComparisonSlotEntry(
+                    intent="preserve", score=None, comment_en="", comment_ko=""
+                )
+                for k in OBJECT_SCENE_AXES
+            },
             summary_en="Vision response parse failed.",
             summary_ko="비전 응답 파싱 실패.",
             provider="fallback",
@@ -449,38 +599,45 @@ async def analyze_pair(
             vision_model=resolved_vision,
         )
 
-    # ── 3단계: 점수/코멘트 정규화 ──
-    scores = _coerce_scores(parsed.get("scores"))
-    comments_en = _coerce_comments(parsed.get("comments"))
+    # ── 3단계: domain + slots 정규화 ──
+    raw_domain = parsed.get("domain")
+    domain = (
+        raw_domain.strip().lower()
+        if isinstance(raw_domain, str) and raw_domain.strip().lower() in ("person", "object_scene")
+        else "object_scene"
+    )
+    axes = PERSON_AXES if domain == "person" else OBJECT_SCENE_AXES
+    slots = _coerce_v3_slots(parsed.get("slots"), axes)
     summary_raw = parsed.get("summary")
     summary_en = summary_raw.strip() if isinstance(summary_raw, str) else ""
-    overall = _compute_overall(scores)
+    overall = _v3_overall(slots)
 
-    # ── 4단계: 한글 번역 (실패해도 en 으로 폴백) ──
+    # ── 4단계: 한글 번역 (코멘트 + summary 한 호출) ──
+    comments_en_for_translate = {k: s.comment_en for k, s in slots.items()}
     translation = await _translate_comments_to_ko(
-        comments_en,
+        comments_en_for_translate,
         summary_en,
         text_model=resolved_text,
-        timeout=60.0,  # 번역은 짧은 텍스트라 60s 충분
+        timeout=60.0,
         ollama_url=resolved_url,
+        axes=axes,
     )
     if translation is None:
-        # 번역 실패 — comments 는 en 그대로, summary 에 마커
-        comments_ko = dict(comments_en)
+        # 번역 실패 — 코멘트는 en 그대로, summary 에 마커
+        for k, s in slots.items():
+            s.comment_ko = s.comment_en
         summary_ko = "한글 번역 실패"
     else:
-        # 번역 누락된 축은 en 으로 폴백
-        comments_ko = {
-            axis: translation["comments_ko"].get(axis) or comments_en.get(axis, "")
-            for axis in AXES
-        }
+        for k, s in slots.items():
+            s.comment_ko = (
+                translation["comments_ko"].get(k) or s.comment_en
+            )
         summary_ko = translation["summary_ko"] or summary_en
 
     return ComparisonAnalysisResult(
-        scores=scores,
+        domain=domain,
+        slots=slots,
         overall=overall,
-        comments_en=comments_en,
-        comments_ko=comments_ko,
         summary_en=summary_en,
         summary_ko=summary_ko,
         provider="ollama",

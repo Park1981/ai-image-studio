@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import re
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 
@@ -57,14 +58,25 @@ SYSTEM_EDIT = """You are an image-edit prompt engineer for Qwen Image Edit 2511.
 
 The user wants to modify an existing image. You receive:
 1. A brief description of the original image (from a vision model).
-2. The user's edit instruction.
+2. Optionally a STRICT MATRIX DIRECTIVES block listing slot-level intent.
+3. The user's edit instruction.
 
-Your job: compose ONE final English edit prompt that tells the model exactly what to change, while explicitly preserving identity, facial features, body proportions, and other unchanged elements.
+Your job: compose ONE final English edit prompt that tells the model exactly
+what to change, while explicitly preserving every aspect the user did NOT
+ask to change.
 
 RULES:
 - Output ONLY the final English prompt — no preamble, no explanation, no quotes, no markdown.
-- Always include identity-preservation clauses: "keep the exact same face, identical face, same person, same identity, same facial features, same eye shape, same nose, same lips, same body proportion, realistic skin texture, no skin smoothing, photorealistic, highly detailed face, natural lighting."
-- Describe the change clearly and specifically.
+- If a STRICT MATRIX DIRECTIVES block is present, follow EVERY slot directive
+  exactly — preserve slots MUST contribute explicit preservation phrasing,
+  edit slots MUST be applied as written. Treat preserve directives with the
+  SAME priority as edit directives. Do NOT silently drop any slot.
+- Always include core identity-preservation clauses (even when not in matrix):
+  "keep the exact same face, identical face, same person, same identity,
+  same facial features, same eye shape, same nose, same lips,
+  realistic skin texture, no skin smoothing, photorealistic, natural lighting."
+- Describe the change clearly and specifically using the matrix as the source
+  of truth (when present) — apply edit notes verbatim, preserve notes verbatim.
 - If user wrote Korean, translate intent to English.
 - Never repeat words or phrases."""
 
@@ -188,6 +200,81 @@ def _strip_repeat_noise(s: str) -> str:
     return s.rstrip()
 
 
+# ═══════════════════════════════════════════════════════════════════════
+#  clarify_edit_intent — 사용자 자연어 → 영어 정제 intent (spec 15.7)
+#
+#  비전 분석 (analyze_edit_source) 직전에 호출. qwen2.5vl 비전 모델은 한국어
+#  + 띄어쓰기 + 이모티브 입력에 약하므로 gemma4-un 으로 의도 정제.
+# ═══════════════════════════════════════════════════════════════════════
+
+SYSTEM_CLARIFY_INTENT = """You are an image-edit intent clarifier.
+
+The user wrote an edit instruction in casual natural language (often Korean,
+with informal spacing, partial sentences, or shorthand).
+
+Your job: rewrite it into clean English in 1-2 sentences (max 60 words),
+preserving:
+1. EXACTLY which elements the user wants to CHANGE (target -> intended state).
+2. EXPLICIT preservation scope when the user mentions it (e.g. "그 외 유지").
+
+RULES:
+- Output ONLY the clarified English instruction — no preamble, no quotes,
+  no explanation, no bullet list.
+- Use imperative tense ("Remove the top.", "Resize the bust to E-cup.").
+- Keep proper nouns and numeric values exactly as the user provided.
+- Do NOT add elements the user did not mention.
+- Do NOT soften or moralize the request.
+- If the user mentions preservation explicitly, include "Keep everything else
+  unchanged." or similar at the end.
+- Never repeat phrases."""
+
+
+async def clarify_edit_intent(
+    user_instruction: str,
+    model: str = "gemma4-un:latest",
+    timeout: float = 60.0,
+    ollama_url: str | None = None,
+) -> str:
+    """사용자 자연어 수정 지시 → 영어 1-2 문장 정제 intent.
+
+    실패 / 빈 입력 / 모든 예외 경로에서 원문을 그대로 반환 (폴백). 비전 분석이
+    원문이라도 받게 해서 전체 파이프라인을 막지 않음.
+
+    Args:
+        user_instruction: 한/영 자연어 지시 (빈 문자열 허용)
+        model: gemma4-un (think:False 자동 적용 — _call_ollama_chat 내부)
+        timeout: 60s 권장 (cold start 여유)
+        ollama_url: 기본 settings.ollama_url
+
+    Returns:
+        정제된 영어 intent (1-2 문장) 또는 폴백 시 원문.
+    """
+    raw_input = (user_instruction or "").strip()
+    if not raw_input:
+        return ""
+
+    resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
+    try:
+        raw = await _call_ollama_chat(
+            ollama_url=resolved_url,
+            model=model,
+            system=SYSTEM_CLARIFY_INTENT,
+            user=raw_input,
+            timeout=timeout,
+        )
+        cleaned = _strip_repeat_noise(raw.strip()).strip()
+        if not cleaned:
+            log.info("clarify_edit_intent: empty response, falling back to raw")
+            return raw_input
+        # 너무 길면 600자 cap (비전 SYSTEM 프롬프트 보호)
+        if len(cleaned) > 600:
+            cleaned = cleaned[:600].rstrip()
+        return cleaned
+    except Exception as e:
+        log.info("clarify_edit_intent failed (non-fatal): %s", e)
+        return raw_input
+
+
 async def translate_to_korean(
     text: str,
     model: str = "gemma4-un:latest",
@@ -285,6 +372,73 @@ async def upgrade_generate_prompt(
     )
 
 
+def _slot_label(key: str) -> str:
+    """슬롯 키 → 사람이 읽을 수 있는 영문 라벨 (matrix directive block 전용)."""
+    table = {
+        # person
+        "face_expression": "face / expression",
+        "hair": "hair",
+        "attire": "attire / accessories",
+        "body_pose": "body / pose",
+        "background": "background / environment",
+        # object_scene
+        "subject": "subject",
+        "color_material": "color / material",
+        "layout_composition": "layout / composition",
+        "background_setting": "background / setting",
+        "mood_style": "mood / style",
+    }
+    return table.get(key, key.replace("_", " "))
+
+
+def _build_matrix_directive_block(analysis: Any) -> str:
+    """EditVisionAnalysis 객체 → SYSTEM_EDIT 에 주입할 STRICT MATRIX directive.
+
+    analysis 가 None / fallback=True / slots 비어있으면 빈 문자열 반환 (블록 미주입).
+    각 슬롯별로 [preserve] / [edit] tag + note + 강제 instruction 행.
+    """
+    if analysis is None:
+        return ""
+    fallback = getattr(analysis, "fallback", True)
+    slots = getattr(analysis, "slots", None) or {}
+    if fallback or not slots:
+        return ""
+
+    domain = getattr(analysis, "domain", "object_scene")
+    intent_text = getattr(analysis, "intent", "") or ""
+    summary_text = getattr(analysis, "summary", "") or ""
+
+    lines: list[str] = []
+    lines.append("=== STRICT MATRIX DIRECTIVES ===")
+    lines.append(f"Domain: {domain}")
+    if intent_text:
+        lines.append(f"Refined intent: {intent_text}")
+    if summary_text:
+        lines.append(f"Source summary: {summary_text}")
+    lines.append("")
+    lines.append("For each slot, follow the directive EXACTLY:")
+    lines.append("")
+
+    for key, entry in slots.items():
+        action = getattr(entry, "action", "preserve")
+        note = (getattr(entry, "note", "") or "").strip()
+        label = _slot_label(key)
+        if action == "edit":
+            lines.append(f"[edit] {label}")
+            lines.append(
+                f"  -> APPLY EXACTLY: {note or '(follow user instruction)'}"
+            )
+        else:
+            lines.append(f"[preserve] {label}")
+            lines.append(
+                "  -> INCLUDE preservation phrasing for this slot. "
+                f"Current state: {note or '(unchanged from source)'}"
+            )
+
+    lines.append("=================================")
+    return "\n".join(lines)
+
+
 async def upgrade_edit_prompt(
     edit_instruction: str,
     image_description: str,
@@ -292,8 +446,17 @@ async def upgrade_edit_prompt(
     timeout: float = DEFAULT_TIMEOUT,
     ollama_url: str | None = None,
     include_translation: bool = True,
+    *,
+    analysis: Any = None,
 ) -> UpgradeResult:
-    """수정용 프롬프트 업그레이드 (v3: 2-call)."""
+    """수정용 프롬프트 업그레이드 (v3 + spec 16 매트릭스 directive 통합).
+
+    Args:
+        edit_instruction: 사용자 자연어 수정 지시
+        image_description: 비전 분석 결과 (compact_context 또는 fallback 캡션)
+        analysis: EditVisionAnalysis 객체 (optional). 매트릭스 directive 주입에 사용.
+                  None / fallback=True / slots 비어있으면 directive 미주입.
+    """
     if not edit_instruction.strip():
         return UpgradeResult(
             upgraded=edit_instruction,
@@ -303,10 +466,14 @@ async def upgrade_edit_prompt(
         )
 
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
-    user_msg = (
-        f"[Image description]\n{image_description.strip()}\n\n"
-        f"[Edit instruction]\n{edit_instruction.strip()}"
-    )
+
+    # 매트릭스 directive 동적 주입 (있을 때만)
+    matrix_block = _build_matrix_directive_block(analysis)
+    user_msg_parts = [f"[Image description]\n{image_description.strip()}"]
+    if matrix_block:
+        user_msg_parts.append(matrix_block)
+    user_msg_parts.append(f"[Edit instruction]\n{edit_instruction.strip()}")
+    user_msg = "\n\n".join(user_msg_parts)
 
     try:
         upgraded_raw = await _call_ollama_chat(

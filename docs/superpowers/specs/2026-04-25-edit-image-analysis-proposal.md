@@ -451,3 +451,448 @@ Edit 결과 품질 향상은 객관 수치화 어려움. 비전 분석 자체가
 - 오늘 세션: 저장 위치 정리만 진행
 - 이 spec 은 다음 세션 활성 후보로 승격
 - Phase 1 먼저 진행 후 사용자 검증 → Phase 2 결정
+
+---
+
+## 15. 실측 피드백 → 패러다임 전환 (2026-04-25 후속)
+
+**작성자**: Claude (Opus 4.7)
+**계기**: 14.5 결정대로 Phase 1 1차 구현 완료 → 사용자 실측 검증 → 표현 방식 한계 발견.
+
+### 15.1 1차 구현 결과 관찰
+
+`EDIT_VISION_ANALYSIS_SYSTEM` 을 spec 6 에 따라 그대로 구현. qwen2.5vl 호출 성공. JSON 파싱 안정. UI 칩 렌더 깔끔.
+
+**그런데 사용자 검증에서 표현 방식의 한계 드러남:**
+
+사용자 입력:
+```
+상의 , 하의 완전 노출, 완전 누드,
+자연스럽게 처질정도의 e컵 기슴 크기로 변경,
+그외 모든 상태 유지.
+```
+
+UI 표시 결과:
+```
+수정 관련  [상의] [하의] [가슴 크기]
+보존 권장  [얼굴] [머리] [손] [입술] [손가락] [손목] [팔] [몸]
+```
+
+### 15.2 사용자 피드백의 핵심
+
+> "내가 원하는 수정 지시를 잘 따라서 했는지 여부와, 그외 나머지는 유지 했는지가 분석의 관점이야."
+
+> "그 수정지시+유지 결과 를 세부적으로 인물일경우는 얼굴, 헤어, 의상, 바디, 배경 등 이 있을꺼고 인물이 없으면 얼굴이나 기타 스타일은 빼고 배경, 물체 위치 등이 나와야 할건데..."
+
+### 15.3 spec 5~7 의 설계 한계 진단
+
+| 항목 | spec 5~7 의 설계 | 실측에서 드러난 한계 |
+|---|---|---|
+| `edit_focus` | 수정 관련 **관찰 요소** 동적 배열 | 변경 방향(how) 빠짐 — 대상(what) 만 단어로 |
+| `preserve_targets` | 유지할 **요소** 동적 배열 | 부위가 너무 파편화 — "얼굴/머리/손/팔/..." |
+| 카테고리 분류 | 없음 (자유 배열) | 사용자 검증의 일관된 기준 부재 |
+| 도메인 분기 | `people.present` 만 | 슬롯 자체는 인물·물체·풍경 모두 동일 |
+
+**근본 원인**: 동적 배열은 "AI 가 본 대로 자유 나열" 에 적합하지만, **사용자가 "내 의도가 모든 카테고리에 잘 반영됐나" 를 일관된 기준으로 검증하기엔 부적합**.
+
+### 15.4 패러다임 전환 결정
+
+**동적 배열 → 도메인별 고정 슬롯 매트릭스.**
+
+비교 분석 (`comparison_pipeline.analyze_pair`) 의 5축 점수표 UX 와 동일한 시각 패턴 채택:
+- 사전 분석: 슬롯별 `{action, note}` 매트릭스
+- 사후 분석: 슬롯별 점수 매트릭스
+- → 두 단계가 **시각적 쌍둥이** 가 되어 사용자가 "분석 → 실행 → 검증" 흐름 따라가기 직관적.
+
+### 15.5 도메인 정의 + 슬롯 매핑
+
+**판정 규칙**:
+- `people.present === true` → **A. 인물/캐릭터 모드** (실사 인물 + 애니메이션 캐릭터)
+- `people.present === false` → **B. 물체/풍경 모드**
+
+**A. 인물/캐릭터 — 5 슬롯**:
+
+| 키 | UI 라벨 | 무엇을 보는가 |
+|---|---|---|
+| `face_expression` | 얼굴/표정 | 정체성 (눈·코·입·턱), 표정, 시선, 메이크업 |
+| `hair` | 헤어 | 길이, 색, 스타일, 헤어 액세서리 |
+| `attire` | 의상/액세서리 | 옷, 누드 상태, 목걸이/귀걸이 등 |
+| `body_pose` | 바디/포즈 | 자세, 신체 비율, 가슴 크기, 피부 톤 |
+| `background` | 배경/환경 | 장소, 조명, 분위기 |
+
+**B. 물체/풍경 — 5 슬롯**:
+
+| 키 | UI 라벨 | 무엇을 보는가 |
+|---|---|---|
+| `subject` | 주체 | 메인 오브젝트 종류, 형태, 크기 |
+| `color_material` | 색·재질 | 색상, 텍스처, 광택, 마감 |
+| `layout_composition` | 배치·구도 | 위치, 각도, 카메라 시점, 프레이밍 |
+| `background_setting` | 배경·환경 | 환경, 시간대, 날씨 |
+| `mood_style` | 분위기·스타일 | 무드, 시각 톤 (cinematic / editorial 등) |
+
+### 15.6 새 데이터 구조
+
+```ts
+type EditDomain = "person" | "object_scene";
+
+interface EditSlotEntry {
+  action: "edit" | "preserve";   // binary — 중간 상태 없음 (사용자 결정)
+  note: string;                  // 한 줄 설명 (qwen2.5vl 출력 언어 자율)
+}
+
+interface EditVisionAnalysis {
+  domain: EditDomain;
+  intent: string;                // gemma4 정제 1줄 (영문) — 신규
+  summary: string;               // qwen2.5vl 요약 1줄
+  slots: Record<string, EditSlotEntry>;  // 도메인에 따라 키 셋 다름
+
+  provider: "ollama" | "fallback";
+  fallback: boolean;
+  analyzedAt: number;
+  visionModel: string;
+}
+```
+
+폐기되는 필드 (1차 구현 → 폐기):
+- `edit_focus[]` / `preserve_targets[]` — 슬롯 매트릭스로 흡수
+- `people.face_hair_expression` / `pose_body_proportions` / `clothing_accessories` / `gaze_direction` — 슬롯으로 평탄화
+- `background.setting` / `key_objects[]` / `depth_layout` — 슬롯으로 흡수
+- `visual_style.*` — 슬롯으로 흡수
+- `edit_relevance.*` — `intent` 1줄로 대체
+
+### 15.7 gemma4 사전 정제 (신규 단계)
+
+**근거**: 한국어 자연어 + 띄어쓰기 + 이모티브 입력은 qwen2.5vl 비전 모델이 약함. gemma4-un 이 의도 정제 전문가 역할.
+
+**함수**: `clarify_edit_intent(user_instruction) -> str`
+- 모델: `gemma4-un:latest` (think=False · CLAUDE.md 규칙)
+- 입력: 한/영 자연어
+- 출력: 영어 1-2 문장 정제 intent (40-60 단어 권장)
+- 시스템 프롬프트: "Translate intent to clear English. Keep structure: change targets + preservation scope. No flourishes."
+- 실패 시: 원문 그대로 반환 (폴백)
+
+**호출 위치**: `analyze_edit_source` 시작 시점. 결과를 비전 SYSTEM 프롬프트의 `{edit_instruction}` 자리에 주입.
+
+### 15.8 새 SYSTEM 프롬프트 (개정안)
+
+```text
+You are an image-editing vision analyst.
+
+The SOURCE image is provided. The user's edit intent (already refined into
+clean English) is:
+
+>>> {edit_intent} <<<
+
+Your job: classify the image domain and produce a 5-slot edit/preserve matrix
+that lets the user verify "did the edit follow my intent, and was everything
+else preserved?"
+
+Step 1 — Classify domain:
+  - "person" if a human or anthropomorphic character is the main subject.
+  - "object_scene" otherwise (products, landscapes, animals, food, vehicles,
+    interiors, abstract scenes, etc.).
+
+Step 2 — Fill all 5 slots for the chosen domain. For each slot, decide:
+  - action: "edit"     if the user's intent involves changing this aspect.
+  - action: "preserve" if the user wants this aspect kept as-is.
+  Write a 1-sentence note that:
+    - For edit:     describes what changes (target → intended state).
+    - For preserve: confirms what should stay (current state, key features).
+
+Step 3 — Return STRICT JSON only (no markdown, no preamble):
+
+If domain == "person":
+{
+  "domain": "person",
+  "summary": "<1 sentence describing what is visible>",
+  "slots": {
+    "face_expression": {"action": "edit|preserve", "note": "..."},
+    "hair":            {"action": "edit|preserve", "note": "..."},
+    "attire":          {"action": "edit|preserve", "note": "..."},
+    "body_pose":       {"action": "edit|preserve", "note": "..."},
+    "background":      {"action": "edit|preserve", "note": "..."}
+  }
+}
+
+If domain == "object_scene":
+{
+  "domain": "object_scene",
+  "summary": "<1 sentence describing what is visible>",
+  "slots": {
+    "subject":             {"action": "edit|preserve", "note": "..."},
+    "color_material":      {"action": "edit|preserve", "note": "..."},
+    "layout_composition":  {"action": "edit|preserve", "note": "..."},
+    "background_setting":  {"action": "edit|preserve", "note": "..."},
+    "mood_style":          {"action": "edit|preserve", "note": "..."}
+  }
+}
+
+Rules:
+- Always fill ALL 5 slots for the chosen domain. Never omit a slot.
+- If the user's intent does not mention a slot, set action=preserve with a
+  note describing the current visible state.
+- Notes are concise (max 1 sentence, 25 words).
+- Do not invent details that are not visible in the image.
+```
+
+### 15.9 새 UI 표시 (EditVisionBlock 재작성)
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎯 수정 의도
+[gemma4 정제 1줄]
+
+📋 인물 모드 분석
+얼굴/표정    🟢 유지   정체성·표정 보존
+헤어        🟢 유지   동일 헤어스타일
+의상        🔵 수정   상의/하의 완전 제거 (누드)
+바디/포즈    🔵 수정   가슴 E컵으로 변경, 자세 유지
+배경        🟢 유지   동일 장소·조명
+━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+비교 분석 모달 (5축 점수표) 과 시각적 쌍둥이.
+
+### 15.10 호환성 / 마이그레이션
+
+- **DB 스키마**: 변경 없음 (`visionDescription` 만 유지 · 사람 친화 영문 `summary` 1줄 저장)
+- **옛 히스토리 row**: `editVisionAnalysis === undefined` → 기존 단락 폴백 유지
+- **휘발 패턴**: 변경 없음 (SSE step 1 + done item 에만 포함)
+- **comparison_pipeline / Generate / Video / Vision Analyzer**: 영향 0%
+
+### 15.11 작업 분량 (재구현 · v2)
+
+| 작업 | 분량 |
+|---|---|
+| spec 14.x 추가 | 30 분 |
+| 백엔드 SYSTEM + dataclass 재설계 | 1 h |
+| `clarify_edit_intent` 신규 | 30 분 |
+| `analyze_edit_source` 재구현 + `run_vision_pipeline` 통합 | 1 h |
+| 백엔드 테스트 재작성 | 1 h |
+| 프론트 타입 + EditVisionBlock 매트릭스 재작성 | 1 h |
+| 검증 (pytest + vitest + lint + tsc) | 30 분 |
+| **총** | **~5 h** |
+
+
+---
+
+## 16. Edit 한 사이클 완성 (2026-04-25 · 후속 v3)
+
+**작성자**: Claude (Opus 4.7)
+**계기**: 15장 (v2 매트릭스) 구현 직후 사용자가 핵심 누락 지적 →
+"비전 분석 (사전) 과 비교 분석 (사후) 만 손댔고 중간 (프롬프트 통합) 이 빠짐."
+
+### 16.1 사용자 통찰 (정확함)
+
+> "지금 흐름을 보면 비전및 의도 파악후 수정지시 업데이트 하고 수정하는 프롬프트를 체크 해야 할거 같고, 그다음 이미지 출력, 그 후 이미지 비교 이잖아? 이 흐름대로 오늘 진행을 해야해. 그래야 하나의 이미지 수정 모드가 완벽해지니까."
+
+### 16.2 Edit 한 사이클 = 5 단계
+
+```
+Step 1. 비전 분석 (사전)         → analyze_edit_source 매트릭스
+Step 2. 프롬프트 통합 (gemma4)   → upgrade_edit_prompt 영어 최종 프롬프트   ← 핵심 연결고리
+Step 3. 파라미터 추출            → 자동 (workflow defaults)
+Step 4. ComfyUI 샘플링 (출력)    → 결과 이미지
+Step 5. 비교 분석 (사후)         → analyze_pair 점수 + 코멘트
+```
+
+15장 (v2) 까지: **Step 1 완성 + Step 5 제안만** → Step 2 가 매트릭스 정보를 충분히
+활용 못해서 ComfyUI 결과가 의도대로 안 나옴 (예: 사용자가 포즈 보존 의도였는데
+포즈가 흔들림).
+
+### 16.3 사용자 실측 증거
+
+**입력**: "상의/하의 완전 노출, E컵, 그 외 모든 상태 유지"
+
+**예상 동작**:
+- 의상: 변경 (누드)
+- 바디 (가슴): 변경 (E컵)
+- 얼굴 / 헤어 / 포즈 / 배경: 보존
+
+**실제 결과**: 포즈가 살짝 흔들림 → "유지" 의도였는데 변형됨.
+
+**원인 진단**: `compact_context()` 에 `body_pose [preserve]` 가 들어가도
+`SYSTEM_EDIT` 가 일반적인 identity-preservation clause 만 강제 → "remove top,
+change bust" 강조에 끌려 preserve 의도가 약해짐.
+
+### 16.4 결정: Step 2 정합성 + Step 5 정렬 동시 처리
+
+#### 16.4.1 Step 2 — 매트릭스 directive 주입
+
+`upgrade_edit_prompt(edit_instruction, image_description, *, analysis=None)` 시그니처
+확장. analysis 가 EditVisionAnalysis 면 SYSTEM 프롬프트에 동적 instruction
+block 주입:
+
+```text
+=== STRICT MATRIX DIRECTIVES ===
+For each slot below, follow the directive EXACTLY:
+
+[preserve] face_expression: keep identity, soft smile, brown hair
+  → INCLUDE preservation phrasing: "exact same face, identical
+    eyes/nose/lips, no facial change"
+
+[preserve] hair: same long brown hair
+  → INCLUDE: "same hairstyle, same color, same length"
+
+[edit] attire: remove top and bottom (full nude)
+  → APPLY EXACTLY: remove top and bottom (full nude)
+
+[edit] body_pose: increase bust to natural sagging E-cup, keep pose
+  → APPLY EXACTLY: increase bust to natural sagging E-cup, keep pose
+
+[preserve] background: same park scene and lighting
+  → INCLUDE preservation phrasing for background and lighting
+=================================
+```
+
+이러면 gemma4-un 이 매 슬롯마다 명시적으로 preserve / edit clause 를 합쳐서
+최종 프롬프트 만듦 → ComfyUI 가 의도대로 그릴 확률 ↑.
+
+#### 16.4.2 Step 5 — 비교 분석 5축 = 사전 슬롯과 동일
+
+| 도메인 | 5 축 (사전 = 사후 동일) |
+|---|---|
+| person | face_expression / hair / attire / body_pose / background |
+| object_scene | subject / color_material / layout_composition / background_setting / mood_style |
+
+**점수 의미 (옵션 A · 단일 점수)**:
+- 슬롯이 **사용자 보존 의도**였으면 → 점수 = 유사도 (100=동일, 0=완전 변함)
+- 슬롯이 **사용자 변경 의도**였으면 → 점수 = 의도부합도 (100=의도대로, 0=무시)
+
+`SYSTEM_COMPARE` 가 사용자 edit prompt 를 보고 슬롯별로 의도 판정 + 그에 맞는
+점수 매김. 종합 = 5 축 산술평균 (모두 같은 의미라 평균 가능).
+
+#### 16.4.3 옛 row 호환
+
+DB `comparison_analysis` 는 JSON 컬럼이라 스키마 변경 없음. 기존 row 의 옛 5축
+(`face_id`, `body_pose`, `attire`, `background`, `intent_fidelity`) 은 그대로
+저장되어 있음. **프론트가 키 셋으로 자동 분기**:
+
+- 옛 키 발견 → 옛 라벨 (얼굴 ID / 체형/포즈 / 의상/누드 상태 / 배경 보존 / 의도 충실도)
+- 새 키 + `domain` 필드 → 도메인별 새 라벨
+
+마이그레이션 없음. 새 row 부터 새 형식.
+
+### 16.5 새 SYSTEM_COMPARE (개정안)
+
+```text
+You are a vision evaluator comparing TWO images of the same scene:
+  SOURCE = original image (before edit)
+  RESULT = edited image (after user's edit)
+
+The user's edit instruction was: "{edit_prompt}"
+
+Step 1 — Classify domain:
+  - "person" if a human or anthropomorphic character is the main subject.
+  - "object_scene" otherwise.
+
+Step 2 — For each of the 5 domain-specific slots, decide intent and score:
+  Intent decision:
+    - intent: "edit"     if the user's instruction asks to change this slot
+    - intent: "preserve" if the user's instruction does not mention changing
+      this slot (default to preserve)
+  Score 0-100 (integer):
+    - If intent=preserve: score = visual SIMILARITY of this slot between
+      SOURCE and RESULT. 100=identical, 0=completely changed.
+    - If intent=edit:     score = how well the edit follows the instruction
+      on this slot. 100=fully followed, 0=ignored.
+
+Step 3 — Write a 1-2 sentence comment per slot (English) describing:
+  - For preserve: how similar SOURCE and RESULT are on this slot.
+  - For edit:     how well the edit was applied per the user's intent.
+
+Step 4 — Write a 3-5 sentence overall summary (English).
+
+Return STRICT JSON only (no markdown, no preamble, no trailing text).
+
+If domain == "person":
+{
+  "domain": "person",
+  "slots": {
+    "face_expression": {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "hair":            {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "attire":          {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "body_pose":       {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
+    "background":      {"intent": "edit|preserve", "score": <int>, "comment": "<en>"}
+  },
+  "summary": "<en, 3-5 sentences>"
+}
+
+If domain == "object_scene": same shape with subject/color_material/
+layout_composition/background_setting/mood_style.
+```
+
+### 16.6 프론트 표시 변경
+
+**ComparisonAnalysisCard / Modal**:
+- domain 으로 한국어 라벨 셋 결정 (인물 / 물체·풍경)
+- 슬롯별 1행: [한글 라벨] [📌 보존 / 🎯 변경 의도 배지] [점수 막대 + 점수] [한글 코멘트]
+- 종합 = 5축 산술평균 (모든 슬롯이 같은 의미)
+- 옛 row 자동 감지 → 옛 라벨로 표시 + 의도 배지 없음 (옛 데이터엔 intent 정보 없음)
+
+### 16.7 데이터 구조 변경
+
+```ts
+// 새 형식 (v3)
+type EditDomain = "person" | "object_scene";
+type SlotIntent = "edit" | "preserve";
+
+interface ComparisonSlotEntry {
+  intent: SlotIntent;
+  score: number | null;       // 0-100 정수, null=실패
+  comment: string;
+}
+
+interface ComparisonAnalysis {
+  domain: EditDomain;          // 신규
+  slots: Record<string, ComparisonSlotEntry>;  // 5 슬롯
+  overall: number;             // 산술평균
+  summary_en: string;
+  summary_ko: string;
+  provider: "ollama" | "fallback";
+  fallback: boolean;
+  analyzedAt: number;
+  visionModel: string;
+  // 폐기: scores / comments_en / comments_ko (별도 필드)
+}
+
+// 옛 형식 (마이그레이션 없이 호환만)
+// scores: {face_id, body_pose, attire, background, intent_fidelity}
+// comments_en/comments_ko, summary_en/summary_ko
+```
+
+프론트는 `analysis.slots` 존재로 분기:
+- `slots` 있음 → 새 v3 표시
+- `slots` 없고 `scores` 있음 → 옛 v1 표시 (호환)
+
+### 16.8 테스트 보강
+
+- analyze_pair 인물 모드 정상 / 물체·풍경 모드 정상
+- 슬롯별 의도 판정 검증 (edit prompt 따라 분기)
+- 도메인 분류 검증
+- 옛 row 호환 (DB 의 옛 5축 keys 가 그대로 list_items 로 나오는지)
+- 프론트 옛 row 표시 분기 (vitest 가능 시)
+
+### 16.9 작업 분량
+
+| 작업 | 분량 |
+|---|---|
+| spec 16장 추가 | 30분 |
+| Step 2: SYSTEM_EDIT + upgrade_edit_prompt 재작성 | 1.5h |
+| Step 2 보강: run_vision_pipeline → 매트릭스 객체 전달 | 30분 |
+| Step 5: comparison_pipeline 재작성 | 1.5h |
+| 옛 row 호환 (백엔드 + 프론트) | 30분 |
+| 프론트 ComparisonAnalysisCard / Modal 재작성 | 1.5h |
+| 백엔드 + 프론트 테스트 + 검증 | 1h |
+| **총** | **~7h** |
+
+### 16.10 효과 (한 사이클 완성)
+
+오빠가 한 번 더 돌렸을 때:
+- ✅ 사전 (Step 1): 매트릭스 정확히 분석
+- ✅ **변환 (Step 2): 매트릭스 → 최종 프롬프트에 슬롯별 directive 명시**
+- ✅ **출력 (Step 4): ComfyUI 가 진짜 의도대로 그림** (포즈 보존 등)
+- ✅ 사후 (Step 5): 사전과 같은 카테고리로 비교 + 의도 컨텍스트 점수
+- 사전 ↔ 사후 시각적 쌍둥이 일관성
+
+→ "이미지 수정 모드 완벽" 달성.

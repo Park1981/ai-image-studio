@@ -1140,14 +1140,19 @@ async def _run_edit_pipeline(
             vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
             text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
         )
-        await task.emit(
-            "step",
-            {
-                "step": 1,
-                "done": True,
-                "description": vision.image_description,
-            },
-        )
+        # step 1 done payload — Phase 1 (2026-04-25):
+        #   기존 description (사용자 표시용 요약) 은 그대로 유지.
+        #   신규 editVisionAnalysis 는 구조 분석 성공 시에만 payload 포함 (휘발 · DB X).
+        step1_done_payload: dict[str, Any] = {
+            "step": 1,
+            "done": True,
+            "description": vision.image_description,
+        }
+        # getattr 로 안전 접근 — 기존 테스트의 경량 mock (속성 없음) 호환.
+        _analysis = getattr(vision, "edit_vision_analysis", None)
+        if _analysis is not None:
+            step1_done_payload["editVisionAnalysis"] = _analysis.to_dict()
+        await task.emit("step", step1_done_payload)
         await task.emit("stage", {"type": "vision-analyze", "progress": 30, "stageLabel": "비전 분석 완료"})
 
         # Step 2: prompt merge (이미 vision 파이프라인에서 완료) — 40 → 50
@@ -1247,6 +1252,10 @@ async def _run_edit_pipeline(
             "comfyError": comfy_err,
             "sourceRef": source_ref,
         }
+        # Phase 1 (2026-04-25): 구조 분석은 item 에만 붙여 SSE done 으로 전달.
+        # insert_item 이 알려진 컬럼만 INSERT 하므로 DB persist X (휘발 패턴 유지).
+        if _analysis is not None:
+            item["editVisionAnalysis"] = _analysis.to_dict()
         saved_to_history = await _persist_history(item)
         await task.emit(
             "done", {"item": item, "savedToHistory": saved_to_history}

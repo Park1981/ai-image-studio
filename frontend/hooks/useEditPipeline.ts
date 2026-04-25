@@ -44,6 +44,7 @@ export function useEditPipeline({
   const recordStepDetail = useEditStore((s) => s.recordStepDetail);
   const setSampling = useEditStore((s) => s.setSampling);
   const setPipelineProgress = useEditStore((s) => s.setPipelineProgress);
+  const setEditVisionAnalysis = useEditStore((s) => s.setEditVisionAnalysis);
   const resetPipeline = useEditStore((s) => s.resetPipeline);
   // 히스토리
   const addItem = useHistoryStore((s) => s.add);
@@ -98,6 +99,11 @@ export function useEditPipeline({
               finalPromptKo: evt.finalPromptKo,
               provider: evt.provider,
             });
+            // Phase 1 (2026-04-25): step 1 done 에 구조 분석 payload 포함 가능.
+            // 휘발 저장 — useEditStore 에만 두고 DB persist X.
+            if (evt.step === 1 && evt.editVisionAnalysis) {
+              setEditVisionAnalysis(evt.editVisionAnalysis);
+            }
           }
         } else if (evt.type === "stage") {
           setPipelineProgress(evt.progress, evt.stageLabel);
