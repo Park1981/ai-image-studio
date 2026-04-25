@@ -1,6 +1,8 @@
-@import "tailwindcss";
+/* 2026-04-25: 외부 @import 를 tailwind 보다 먼저 — Tailwind v4 가 layer 펼치면서
+   @import 가 다른 rules 뒤로 밀려 PostCSS 에러 발생하던 문제 해결. */
 @import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..700,0..100,0..1&display=swap");
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css");
+@import "tailwindcss";
 
 /* ═══════════════════════════════════════════════
    AI Image Studio — Design System (Claude Design handoff 기반)

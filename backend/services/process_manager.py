@@ -39,8 +39,21 @@ class ProcessManager:
         self._last_generation_at: float | None = None
         # ComfyUI start/stop 경로 직렬화 락 (동시 기동 경쟁 방지)
         self._comfyui_lifecycle_lock = asyncio.Lock()
+        # ComfyUI stdout/stderr 로 사용한 파일 핸들 — 종료 시 close 필요
+        self._comfyui_log_handles: tuple | None = None
         # Ollama 서브프로세스 핸들 (수동 시작 시만 보관)
         self._ollama_process: subprocess.Popen | None = None
+
+    def _close_comfyui_log_handles(self) -> None:
+        """ComfyUI subprocess 가 사용한 stdout/stderr 파일 핸들 close."""
+        if self._comfyui_log_handles is None:
+            return
+        for h in self._comfyui_log_handles:
+            try:
+                h.close()
+            except OSError:
+                pass
+        self._comfyui_log_handles = None
 
     # ─────────────────────────────────────────────
     # Ollama 헬스체크
@@ -73,13 +86,99 @@ class ProcessManager:
     # ComfyUI 시작
     # ─────────────────────────────────────────────
 
+    def _resolve_comfyui_launch_args(
+        self,
+    ) -> tuple[list[str] | None, str | None, str]:
+        """
+        실행 모드 결정 + Popen 인자 생성.
+
+        반환: (popen_args, popen_cwd, mode_label)
+          - 실패 시 (None, None, "")
+          - mode_label: "Headless Python" | "Electron GUI"
+
+        분기 규칙:
+          1) python + main_py + extra_paths_config 셋 모두 비어있지 않고 파일 존재
+             → Headless Python 모드
+          2) 그 외 → Electron executable 폴백
+        """
+        # ── 1순위: Headless Python 모드 (3 키 다 있음) ──
+        py = settings.comfyui_python.strip()
+        main_py = settings.comfyui_main_py.strip()
+        extra_cfg = settings.comfyui_extra_paths_config.strip()
+
+        if py and main_py and extra_cfg:
+            py_path = Path(py)
+            main_path = Path(main_py)
+            cfg_path = Path(extra_cfg)
+            missing: list[str] = []
+            if not py_path.exists():
+                missing.append(f"python={py_path}")
+            if not main_path.exists():
+                missing.append(f"main_py={main_path}")
+            if not cfg_path.exists():
+                missing.append(f"extra_cfg={cfg_path}")
+
+            if missing:
+                logger.warning(
+                    "Headless Python 모드 경로 검증 실패 → Electron 폴백: %s",
+                    ", ".join(missing),
+                )
+            else:
+                # 포트는 comfyui_url 에서 추출 (기본 8000)
+                port = self._extract_port_from_url(settings.comfyui_url, default=8000)
+                args = [
+                    str(py_path),
+                    str(main_path),
+                    "--listen", "127.0.0.1",
+                    "--port", str(port),
+                    "--extra-model-paths-config", str(cfg_path),
+                    "--disable-auto-launch",
+                ]
+                # --base-directory: 표준 ComfyUI 모델 폴더 자동 인식
+                # (Desktop yaml 은 desktop_extensions custom_nodes 만 정의해서 모델 누락됨)
+                base_dir = settings.comfyui_base_dir.strip()
+                if base_dir and Path(base_dir).exists():
+                    args.extend(["--base-directory", str(Path(base_dir))])
+                return args, str(main_path.parent), "Headless Python"
+
+        # ── 2순위: Electron 폴백 ──
+        executable = settings.comfyui_executable.strip()
+        if not executable:
+            logger.error(
+                "ComfyUI 실행 경로 미설정 — "
+                "(headless) COMFYUI_PYTHON+COMFYUI_MAIN_PY+COMFYUI_EXTRA_PATHS_CONFIG 또는 "
+                "(electron) COMFYUI_EXECUTABLE 중 하나는 .env 에 설정 필요",
+            )
+            return None, None, ""
+
+        exe_path = Path(executable)
+        if not exe_path.exists():
+            logger.error("ComfyUI 실행 파일 없음: %s", exe_path)
+            return None, None, ""
+
+        return [str(exe_path)], str(exe_path.parent), "Electron GUI"
+
+    @staticmethod
+    def _extract_port_from_url(url: str, *, default: int) -> int:
+        """URL 에서 포트 추출 (실패 시 default 반환)"""
+        try:
+            from urllib.parse import urlparse
+
+            parsed = urlparse(url)
+            return parsed.port or default
+        except (ValueError, AttributeError):
+            return default
+
     async def start_comfyui(self) -> bool:
         """
         ComfyUI 프로세스 시작 (subprocess, shell=False)
-        - 실행 파일 경로를 설정에서 가져옴
-        - 헬스체크 폴링으로 기동 완료 대기
-        - 이미 실행 중이면 True 반환
-        - asyncio.Lock으로 동시 기동 경쟁 방지 (double-check 패턴)
+        - 우선 모드 (Headless · 권장): COMFYUI_PYTHON + COMFYUI_MAIN_PY +
+          COMFYUI_EXTRA_PATHS_CONFIG 3 키 모두 설정 시 Python 직접 호출
+          → Electron GUI 창 안 뜸
+        - 폴백 모드 (Backward-compat): 위 3 키 중 하나라도 비면
+          COMFYUI_EXECUTABLE (Electron) 으로 실행 → GUI 창 뜸
+        - 헬스체크 폴링으로 기동 완료 대기 / 이미 실행 중이면 True 반환
+        - asyncio.Lock 으로 동시 기동 경쟁 방지 (double-check 패턴)
         """
         # 락 내부에서 재확인하는 double-check 패턴 (GPU 프로세스 중복 실행 방지)
         async with self._comfyui_lifecycle_lock:
@@ -88,17 +187,13 @@ class ProcessManager:
                 logger.info("ComfyUI 이미 실행 중")
                 return True
 
-            executable = settings.comfyui_executable
-            if not executable:
-                logger.error("comfyui_executable 미설정 — .env 파일 확인 필요")
+            # ── 모드 분기: Headless (Python 직접) vs Electron (GUI) ──
+            popen_args, popen_cwd, mode_label = self._resolve_comfyui_launch_args()
+            if popen_args is None:
+                # _resolve_comfyui_launch_args 가 이미 logger.error 출력함
                 return False
 
-            exe_path = Path(executable)
-            if not exe_path.exists():
-                logger.error("ComfyUI 실행 파일 없음: %s", exe_path)
-                return False
-
-            logger.info("ComfyUI 시작 중: %s", exe_path)
+            logger.info("ComfyUI 시작 중 (%s): %s", mode_label, popen_args[0])
 
             try:
                 # Windows: 별도 콘솔 없이 백그라운드 실행 + 출력 버퍼 차단 방지
@@ -109,18 +204,32 @@ class ProcessManager:
                         | subprocess.CREATE_NEW_PROCESS_GROUP
                     )
 
-                # shell=False 필수 (보안), DEVNULL로 출력 버퍼 막힘 방지
+                # 2026-04-25: stdout/stderr 를 파일로 redirect (이전 DEVNULL 시 ComfyUI
+                # 가 즉시 종료되는 케이스 발생 — 일부 native lib 가 DEVNULL stdout 에서
+                # write 실패로 죽었을 가능성). 동시에 디버깅 가능 (logs/comfyui.log).
+                # 로그 파일은 매 기동 시 덮어쓰기 (overwrite, append X — 누적 방지).
+                logs_dir = (Path(__file__).resolve().parents[2] / "logs")
+                logs_dir.mkdir(parents=True, exist_ok=True)
+                comfy_log = logs_dir / "comfyui.log"
+                comfy_err = logs_dir / "comfyui.err.log"
+                self._comfyui_log_handles = (
+                    comfy_log.open("w", encoding="utf-8", errors="replace"),
+                    comfy_err.open("w", encoding="utf-8", errors="replace"),
+                )
+
+                # shell=False 필수 (보안)
                 self._comfyui_process = subprocess.Popen(
-                    [str(exe_path)],
-                    cwd=str(exe_path.parent),
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
+                    popen_args,
+                    cwd=popen_cwd,
+                    stdout=self._comfyui_log_handles[0],
+                    stderr=self._comfyui_log_handles[1],
                     stdin=subprocess.DEVNULL,
-                    shell=False,  # 보안: 명시적 False
+                    shell=False,
                     creationflags=creation_flags,
                 )
             except OSError as exc:
                 logger.error("ComfyUI 프로세스 생성 실패: %s", exc)
+                self._close_comfyui_log_handles()
                 return False
 
             # 헬스체크 폴링으로 기동 완료 대기
@@ -149,6 +258,7 @@ class ProcessManager:
         finally:
             self._comfyui_process = None
             self._comfyui_started_at = None
+            self._close_comfyui_log_handles()
 
     async def _wait_for_comfyui_ready(self) -> bool:
         """ComfyUI /system_stats 응답 대기 (폴링)"""
@@ -211,6 +321,7 @@ class ProcessManager:
             finally:
                 self._comfyui_process = None
                 self._comfyui_started_at = None
+                self._close_comfyui_log_handles()
 
             return True
 

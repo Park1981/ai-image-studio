@@ -17,6 +17,14 @@ $Root = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 $VenvPython = Join-Path $Root ".venv\Scripts\python.exe"
 $OllamaExe  = "C:\ollama\ollama.exe"
 
+# 로그 디렉토리 — Backend/Frontend 가 Hidden 으로 돌아도 여기서 로그 확인 가능
+$LogsDir       = Join-Path $Root "logs"
+$LogBackend    = Join-Path $LogsDir "backend.log"
+$LogBackendErr = Join-Path $LogsDir "backend.err.log"
+$LogFrontend   = Join-Path $LogsDir "frontend.log"
+$LogFrontendErr= Join-Path $LogsDir "frontend.err.log"
+if (-not (Test-Path $LogsDir)) { New-Item -ItemType Directory -Path $LogsDir | Out-Null }
+
 # 추적용 글로벌 상태
 $Global:S = [ordered]@{
     Backend              = $null
@@ -32,17 +40,16 @@ function Write-Stage([string]$msg, [string]$color = "Cyan") {
     Write-Host ("=== " + $msg) -ForegroundColor $color
 }
 
-function Wait-ForUrl([string]$url, [int]$timeoutSec = 60) {
-    # 주어진 URL 이 200/404 등 응답이 돌아올 때까지 대기 (연결 성공만 확인)
+function Wait-ForPort([int]$port, [int]$timeoutSec = 60) {
+    # 2026-04-25: HTTP Invoke-WebRequest 폴링이 PowerShell HTTP client 의
+    # 누적 timeout 으로 backend 정상 listen 후에도 fail 하는 케이스 발견 →
+    # TCP 포트 listen 여부만 확인하는 단순 polling 으로 교체.
+    # 메인 대기 루프(240 라인 부근) 의 Test-NetConnection 패턴과 동일.
     $sw = [System.Diagnostics.Stopwatch]::StartNew()
     while ($sw.Elapsed.TotalSeconds -lt $timeoutSec) {
-        try {
-            $null = Invoke-WebRequest -Uri $url -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
-            return $true
-        } catch [System.Net.WebException] {
-            # 404, 500 등 HTTP 응답이면 연결은 된 것
-            if ($_.Exception.Response) { return $true }
-        } catch {}
+        $alive = Test-NetConnection -ComputerName 127.0.0.1 -Port $port `
+            -WarningAction SilentlyContinue -InformationLevel Quiet
+        if ($alive) { return $true }
         Start-Sleep -Milliseconds 500
         Write-Host "." -NoNewline
     }
@@ -147,12 +154,13 @@ try {
     if ($ollamaRunning) {
         Write-Host "[v] 이미 실행 중 - 그대로 사용 (종료 시에도 유지)" -ForegroundColor Yellow
     } elseif (Test-Path $OllamaExe) {
-        Write-Host ("시작: {0} serve" -f $OllamaExe)
-        Start-Process -FilePath $OllamaExe -ArgumentList "serve" -WindowStyle Minimized | Out-Null
+        Write-Host ("시작 (Hidden): {0} serve" -f $OllamaExe)
+        # Hidden — 작업표시줄에서도 안 보임. 종료는 taskkill /PID 로 처리됨.
+        Start-Process -FilePath $OllamaExe -ArgumentList "serve" -WindowStyle Hidden | Out-Null
         $Global:S.OllamaStartedByUs = $true
         Start-Sleep 2
         Write-Host "헬스체크" -NoNewline
-        if (Wait-ForUrl "http://127.0.0.1:11434/" 10) {
+        if (Wait-ForPort 11434 10) {
             Write-Host ""
             Write-Host " [v] Ollama 준비 완료" -ForegroundColor Green
         } else {
@@ -166,18 +174,23 @@ try {
     # --- 2/3  Backend (ComfyUI lifespan 자동 기동) ---
     Write-Stage "2/3  Backend (8001) - ComfyUI lifespan 포함"
 
-    $backendCmd = @"
-`$Host.UI.RawUI.WindowTitle = 'AI Image Studio - Backend (uvicorn :8001)'
-chcp 65001 > `$null
-Set-Location '$Root\backend'
-& '$VenvPython' -m uvicorn main:app --host 127.0.0.1 --port 8001 --no-access-log
-"@
-    $Global:S.Backend = Start-Process powershell.exe `
-        -ArgumentList @("-NoExit", "-Command", $backendCmd) `
+    # Hidden + 로그 파일 redirect — PS wrapper 없이 venv python 직접 실행
+    # 로그는 logs/backend.log / backend.err.log 에서 실시간 확인 가능 (tail 로 추적)
+    $Global:S.Backend = Start-Process -FilePath $VenvPython `
+        -ArgumentList @(
+            "-m", "uvicorn", "main:app",
+            "--host", "127.0.0.1",
+            "--port", "8001",
+            "--no-access-log"
+        ) `
+        -WorkingDirectory "$Root\backend" `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $LogBackend `
+        -RedirectStandardError  $LogBackendErr `
         -PassThru
 
     Write-Host "대기" -NoNewline
-    if (Wait-ForUrl "http://127.0.0.1:8001/api/health" 120) {
+    if (Wait-ForPort 8001 120) {
         Write-Host ""
         Write-Host " [v] Backend 준비 완료" -ForegroundColor Green
         Write-Host "     (ComfyUI 는 첫 기동이면 모델 로드까지 추가 시간 소요)" -ForegroundColor DarkGray
@@ -189,20 +202,20 @@ Set-Location '$Root\backend'
     # --- 3/3  Frontend ---
     Write-Stage "3/3  Frontend (3000)"
 
-    $frontendCmd = @"
-`$Host.UI.RawUI.WindowTitle = 'AI Image Studio - Frontend (next dev :3000)'
-chcp 65001 > `$null
-Set-Location '$Root\frontend'
-`$env:NEXT_PUBLIC_USE_MOCK = 'false'
-`$env:NEXT_PUBLIC_STUDIO_API = 'http://localhost:8001'
-npm run dev
-"@
-    $Global:S.Frontend = Start-Process powershell.exe `
-        -ArgumentList @("-NoExit", "-Command", $frontendCmd) `
+    # Hidden + 로그 파일 redirect — npm.cmd 직접 실행 (PS wrapper 제거)
+    # 환경변수는 자식 프로세스에 그대로 상속됨
+    $env:NEXT_PUBLIC_USE_MOCK    = 'false'
+    $env:NEXT_PUBLIC_STUDIO_API  = 'http://localhost:8001'
+    $Global:S.Frontend = Start-Process -FilePath "npm.cmd" `
+        -ArgumentList @("run", "dev") `
+        -WorkingDirectory "$Root\frontend" `
+        -WindowStyle Hidden `
+        -RedirectStandardOutput $LogFrontend `
+        -RedirectStandardError  $LogFrontendErr `
         -PassThru
 
     Write-Host "대기" -NoNewline
-    if (Wait-ForUrl "http://127.0.0.1:3000" 60) {
+    if (Wait-ForPort 3000 60) {
         Write-Host ""
         Write-Host " [v] Frontend 준비 완료" -ForegroundColor Green
     } else {
@@ -217,8 +230,12 @@ npm run dev
     Write-Host "============================================" -ForegroundColor Green
     Write-Host "  Frontend : http://localhost:3000"          -ForegroundColor White
     Write-Host "  Backend  : http://localhost:8001/api/health" -ForegroundColor Gray
-    Write-Host "  ComfyUI  : http://localhost:8000 (backend 관리)" -ForegroundColor Gray
-    Write-Host "  Ollama   : http://localhost:11434"         -ForegroundColor Gray
+    Write-Host "  ComfyUI  : http://localhost:8000 (backend 관리, GUI 없음)" -ForegroundColor Gray
+    Write-Host "  Ollama   : http://localhost:11434 (Hidden)"   -ForegroundColor Gray
+    Write-Host "--------------------------------------------" -ForegroundColor Green
+    Write-Host "  로그 파일 (실시간):" -ForegroundColor DarkGray
+    Write-Host ("    {0}" -f $LogBackend)  -ForegroundColor DarkGray
+    Write-Host ("    {0}" -f $LogFrontend) -ForegroundColor DarkGray
     Write-Host "--------------------------------------------" -ForegroundColor Green
     Write-Host "  이 창에서  Ctrl+C  ->  모두 정상 종료"       -ForegroundColor Yellow
     Write-Host "============================================" -ForegroundColor Green

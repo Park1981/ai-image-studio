@@ -44,6 +44,14 @@ class Settings(BaseSettings):
     # ComfyUI 설정
     # 기본값: ComfyUI Desktop 설치(8000) 기준. 원본 ComfyUI 기본 8188 을 쓰는 환경에선 .env 로 override.
     comfyui_url: str = "http://127.0.0.1:8000"
+    # Headless 모드 (권장 · GUI 창 안 뜸): 신규 3 키 다 설정되어 있으면 Python 직접 호출
+    # process_manager 가 아래 3 키 모두 비어있지 않으면 Python 모드, 하나라도 비면 executable 폴백
+    comfyui_python: str = ""
+    comfyui_main_py: str = ""
+    comfyui_extra_paths_config: str = ""
+    # 모델 폴더 root — 표준 ComfyUI 구조 자동 인식 (checkpoints/, vae/, clip/, ...)
+    comfyui_base_dir: str = ""
+    # Backward-compat: Electron GUI 모드 (위 3 키 미설정 시 폴백)
     comfyui_executable: str = ""
     comfyui_models_path: str = ""
     comfyui_auto_shutdown_minutes: int = 10

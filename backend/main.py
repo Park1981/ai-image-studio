@@ -79,11 +79,16 @@ async def lifespan(app: FastAPI):
     # 재설계 studio_history 테이블 (같은 DB 파일, 별도 테이블)
     await init_studio_history_db()
 
-    # ComfyUI 자동 시작 (앱과 함께 실행)
+    # ComfyUI 자동 시작 (background task — lifespan 차단 방지)
+    # 2026-04-25: Headless Python 모드에서 첫 부팅이 길어지면 lifespan await 가
+    # backend listen 시작을 막아 health check 가 timeout 났음. 이제는 fire-and-forget
+    # 으로 즉시 listen 시작 + ComfyUI 부팅은 별도 task. 동시 호출은 process_manager
+    # 의 _comfyui_lifecycle_lock 으로 자연 직렬화됨.
     comfyui_ok = await process_manager.check_comfyui()
     if not comfyui_ok:
-        logger.info("ComfyUI 자동 시작 중...")
-        comfyui_ok = await process_manager.start_comfyui()
+        logger.info("ComfyUI 백그라운드 시작 (backend 는 즉시 listen)...")
+        # 결과 무시 — 실패해도 backend 자체는 정상. 사용자 generate 시점에 재확인됨.
+        asyncio.create_task(process_manager.start_comfyui())
 
     # Ollama 상태 확인 (온디맨드 — AI 보강 시 자동 시작됨)
     ollama_ok = await process_manager.check_ollama()
