@@ -25,6 +25,7 @@ import {
   type StageEvent,
 } from "@/stores/useGenerateStore";
 import { useEditStore } from "@/stores/useEditStore";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useVideoStore } from "@/stores/useVideoStore";
 import EditVisionBlock from "@/components/studio/EditVisionBlock";
 
@@ -485,6 +486,8 @@ function EditTimeline() {
   const pipelineLabel = useEditStore((s) => s.pipelineLabel);
   // Phase 1 (2026-04-25): step 1 의 구조 분석 (휘발). 있으면 단락 대신 칩 UI.
   const editVisionAnalysis = useEditStore((s) => s.editVisionAnalysis);
+  // 진행 모달 prompt 토글 (2026-04-25 후속). true 면 step detail 박스 안 그림.
+  const hideEditPrompts = useSettingsStore((s) => s.hideEditPrompts);
 
   return (
     <>
@@ -554,21 +557,22 @@ function EditTimeline() {
               elapsed={elapsed}
             />
             {/* step 1 비전 설명 —
-                 Phase 1 (2026-04-25): 구조 분석 있으면 칩 UI, 없으면 기존 단락. */}
-            {m.n === 1 && isDone && editVisionAnalysis ? (
+                 Phase 1 (2026-04-25): 구조 분석 있으면 칩 UI, 없으면 기존 단락.
+                 hideEditPrompts=true 면 안 그림 (깔끔 모드). */}
+            {!hideEditPrompts && m.n === 1 && isDone && editVisionAnalysis ? (
               <div style={{ marginLeft: 34, marginTop: 4 }}>
                 <EditVisionBlock
                   analysis={editVisionAnalysis}
                   showHeader={false}
                 />
               </div>
-            ) : m.n === 1 && detail?.description && isDone ? (
+            ) : !hideEditPrompts && m.n === 1 && detail?.description && isDone ? (
               <DetailBox kind="info" title="비전 설명">
                 {detail.description}
               </DetailBox>
             ) : null}
-            {/* step 2 최종 프롬프트 (영문) */}
-            {m.n === 2 && detail?.finalPrompt && isDone && (
+            {/* step 2 최종 프롬프트 (영문) — hideEditPrompts 분기 */}
+            {!hideEditPrompts && m.n === 2 && detail?.finalPrompt && isDone && (
               <DetailBox
                 kind={detail.provider === "fallback" ? "warn" : "info"}
                 title={`최종 프롬프트 (${detail.provider})`}
@@ -576,8 +580,8 @@ function EditTimeline() {
                 {detail.finalPrompt}
               </DetailBox>
             )}
-            {/* step 2 한국어 번역 (있을 때만 · v2) */}
-            {m.n === 2 && detail?.finalPromptKo && isDone && (
+            {/* step 2 한국어 번역 — hideEditPrompts 분기 */}
+            {!hideEditPrompts && m.n === 2 && detail?.finalPromptKo && isDone && (
               <DetailBox kind="muted" title="한국어 번역">
                 {detail.finalPromptKo}
               </DetailBox>

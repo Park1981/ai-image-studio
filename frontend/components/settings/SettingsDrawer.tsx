@@ -620,11 +620,13 @@ interface PromptTemplateLike {
    ───────────────────────────────── */
 function PreferencesSection() {
   const {
-    showUpgradeStep,
+    hideGeneratePrompts,
+    hideEditPrompts,
     lightningByDefault,
     autoStartComfy,
     autoCompareAnalysis,
-    setShowUpgradeStep,
+    setHideGeneratePrompts,
+    setHideEditPrompts,
     setLightningByDefault,
     setAutoStartComfy,
     setAutoCompareAnalysis,
@@ -633,10 +635,16 @@ function PreferencesSection() {
   return (
     <Section title="프리퍼런스" desc="기본 동작 토글 · 모든 변경 즉시 저장">
       <Toggle
-        checked={showUpgradeStep}
-        onChange={setShowUpgradeStep}
-        label="프롬프트 업그레이드 확인 단계 보이기"
-        desc="gemma4 보강 결과를 모달로 먼저 확인"
+        checked={hideGeneratePrompts}
+        onChange={setHideGeneratePrompts}
+        label="생성 프롬프트 숨기기"
+        desc="ON: 바로 생성 + 진행 모달 프롬프트 접힘 / OFF: 생성 전 AI 프롬프트 검수 모달 + 진행 중 펼침"
+      />
+      <Toggle
+        checked={hideEditPrompts}
+        onChange={setHideEditPrompts}
+        label="수정 프롬프트 숨기기"
+        desc="ON: 진행 모달 프롬프트 접힘 (깔끔) / OFF: 진행 중 비전 분석·영어 프롬프트 펼침"
       />
       <Toggle
         checked={lightningByDefault}

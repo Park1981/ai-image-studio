@@ -255,7 +255,7 @@ export interface GenerateRequest {
   /** 설정 override (없으면 백엔드 기본값) */
   ollamaModel?: string;
   visionModel?: string;
-  /** showUpgradeStep 사용 시: 모달에서 사용자가 확정한 영문 프롬프트 */
+  /** hideGeneratePrompts=false 시: 사전 검수 모달에서 사용자가 확정한 영문 프롬프트 */
   preUpgradedPrompt?: string;
   /** upgrade-only 단계에서 이미 얻은 Claude 힌트 — 빈 배열 [] 도 "조사 완료" 로 간주됨.
    *  undefined 이면 백엔드가 research 플래그대로 조사 실행. */

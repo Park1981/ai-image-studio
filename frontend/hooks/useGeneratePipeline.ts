@@ -4,7 +4,7 @@
  * 실행 로직(~135줄) 을 훅으로 이동. 페이지는 스토어 + 훅 조합만 담당.
  *
  * 반환:
- *   - generate(): handleGenerate 진입점 (조건 체크 + showUpgradeStep 분기).
+ *   - generate(): handleGenerate 진입점 (조건 체크 + hideGeneratePrompts 분기).
  *   - upgrade: { open, loading, result, confirm(), rerun(), cancel() } — 모달 상태.
  *   - researchNow(): 조사만 단독 실행 (토스트 힌트).
  *
@@ -30,7 +30,7 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 
 export interface UseGeneratePipeline {
-  /** [생성] 버튼 진입점 — showUpgradeStep 이면 모달 경유, 아니면 바로 스트림. */
+  /** [생성] 버튼 진입점 — hideGeneratePrompts=false 면 모달 경유, true 면 바로 스트림. */
   generate: () => Promise<void>;
   /** 업그레이드 확인 모달 상태 + 핸들러 번들 */
   upgrade: {
@@ -69,7 +69,9 @@ export function useGeneratePipeline(): UseGeneratePipeline {
   // 히스토리
   const addItem = useHistoryStore((s) => s.add);
   // 설정
-  const showUpgradeStep = useSettingsStore((s) => s.showUpgradeStep);
+  // hideGeneratePrompts (기본 true · 깔끔 모드).
+  // false 시 사전 검수 모달 (UpgradeConfirmModal) 띄움 + 진행 모달 펼침.
+  const hideGeneratePrompts = useSettingsStore((s) => s.hideGeneratePrompts);
   const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
   const visionModelSel = useSettingsStore((s) => s.visionModel);
   // 프로세스 상태 (ComfyUI 정지 경고용)
@@ -188,7 +190,7 @@ export function useGeneratePipeline(): UseGeneratePipeline {
       );
     }
 
-    if (showUpgradeStep) {
+    if (!hideGeneratePrompts) {
       setUpgradeOpen(true);
       setUpgradeLoading(true);
       setUpgradeResult(null);

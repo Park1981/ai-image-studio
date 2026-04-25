@@ -29,7 +29,20 @@ export interface SettingsState {
   visionModel: string;
 
   /* 프리퍼런스 토글 */
-  showUpgradeStep: boolean;
+  /**
+   * 생성 진행 모달의 detail 영역 (gemma4 영어 프롬프트 / 한글 번역 등) 숨김.
+   * 기본 true (깔끔 모드). false 시:
+   *   - 생성 전 사전 검수 모달 (UpgradeConfirmModal) 띄움
+   *   - 진행 모달의 step detail 박스 자동 펼침
+   * spec: 진행 모달 prompt 토글 (2026-04-25)
+   */
+  hideGeneratePrompts: boolean;
+  /**
+   * 수정 진행 모달의 detail 영역 (비전 분석 / 영어 프롬프트 등) 숨김.
+   * 기본 true (깔끔 모드). false 시 진행 모달의 step detail 박스 자동 펼침.
+   * 사전 모달 분기는 Edit 에 없음 — 단순 표시 토글.
+   */
+  hideEditPrompts: boolean;
   lightningByDefault: boolean;
   autoStartComfy: boolean;
   /** Edit 결과 완료 후 자동 비교 분석 (백그라운드). 기본 false. */
@@ -43,7 +56,8 @@ export interface SettingsState {
   setEditModel: (v: string) => void;
   setOllamaModel: (v: string) => void;
   setVisionModel: (v: string) => void;
-  setShowUpgradeStep: (v: boolean) => void;
+  setHideGeneratePrompts: (v: boolean) => void;
+  setHideEditPrompts: (v: boolean) => void;
   setLightningByDefault: (v: boolean) => void;
   setAutoStartComfy: (v: boolean) => void;
   setAutoCompareAnalysis: (v: boolean) => void;
@@ -79,7 +93,8 @@ export const useSettingsStore = create<SettingsState>()(
       ollamaModel: DEFAULT_OLLAMA_MODELS.text,
       visionModel: DEFAULT_OLLAMA_MODELS.vision,
 
-      showUpgradeStep: true,
+      hideGeneratePrompts: true,
+      hideEditPrompts: true,
       lightningByDefault: false,
       autoStartComfy: false,
       autoCompareAnalysis: false,
@@ -90,7 +105,8 @@ export const useSettingsStore = create<SettingsState>()(
       setEditModel: (v) => set({ editModel: v }),
       setOllamaModel: (v) => set({ ollamaModel: v }),
       setVisionModel: (v) => set({ visionModel: v }),
-      setShowUpgradeStep: (v) => set({ showUpgradeStep: v }),
+      setHideGeneratePrompts: (v) => set({ hideGeneratePrompts: v }),
+      setHideEditPrompts: (v) => set({ hideEditPrompts: v }),
       setLightningByDefault: (v) => set({ lightningByDefault: v }),
       setAutoStartComfy: (v) => set({ autoStartComfy: v }),
       setAutoCompareAnalysis: (v) => set({ autoCompareAnalysis: v }),
@@ -108,12 +124,25 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "ais:settings",
       storage: createJSONStorage(() => localStorage),
-      version: 2,
+      version: 3,
       migrate: (persisted: unknown, fromVersion: number) => {
-        // v1 → v2: autoCompareAnalysis 기본 false 추가
         const obj = (persisted as Record<string, unknown>) || {};
+        // v1 → v2: autoCompareAnalysis 기본 false 추가
         if (fromVersion < 2) {
           obj.autoCompareAnalysis = false;
+        }
+        // v2 → v3: showUpgradeStep → hideGeneratePrompts (의미 반전) +
+        //         hideEditPrompts 신설. spec: 진행 모달 prompt 토글 분리.
+        if (fromVersion < 3) {
+          if (obj.showUpgradeStep !== undefined) {
+            // 옛 사용자 설정 보존 — showUpgradeStep=true (사전 모달 + 펼침)
+            // = hideGeneratePrompts=false (= 보이게 + 사전 모달).
+            obj.hideGeneratePrompts = !obj.showUpgradeStep;
+            delete obj.showUpgradeStep;
+          } else {
+            obj.hideGeneratePrompts = true;
+          }
+          obj.hideEditPrompts = true;
         }
         return obj as unknown as SettingsState;
       },

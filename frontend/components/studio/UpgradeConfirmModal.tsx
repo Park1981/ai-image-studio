@@ -1,7 +1,7 @@
 /**
  * UpgradeConfirmModal - gemma4 업그레이드 결과를 생성 전에 사용자가 확인/수정.
  *
- * showUpgradeStep 프리퍼런스가 ON 일 때 Generate 페이지 handleGenerate 에서:
+ * hideGeneratePrompts 프리퍼런스가 false 일 때 Generate 페이지 handleGenerate 에서:
  *   1. upgradeOnly() 호출 → 업그레이드 결과 받음
  *   2. 이 모달 띄우기 → 사용자가 확인 또는 수정
  *   3. 사용자가 [이대로 생성] 클릭 → preUpgradedPrompt 로 최종 /generate 호출
