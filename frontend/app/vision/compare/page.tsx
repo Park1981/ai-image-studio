@@ -52,6 +52,37 @@ import { toast } from "@/stores/useToastStore";
 import type { VisionCompareAnalysis } from "@/lib/api/types";
 
 /* ──────────────────────────────────────────────────────────────────────
+ * 파일 → VisionCompareImage 로더 (paste fallback 용)
+ * CompareImageSlot.handleFiles 와 동일 로직. 페이지 paste 핸들러 재사용.
+ * ──────────────────────────────────────────────────────────────────── */
+function loadCompareImageFromFile(
+  file: File,
+  onLoad: (img: VisionCompareImage) => void,
+) {
+  if (!file.type.startsWith("image/")) {
+    toast.error("이미지 파일만 업로드 가능합니다.");
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result as string;
+    const img = new Image();
+    img.onload = () => {
+      onLoad({
+        dataUrl,
+        label: file.name,
+        width: img.naturalWidth,
+        height: img.naturalHeight,
+      });
+    };
+    img.onerror = () => toast.error("이미지 로드 실패");
+    img.src = dataUrl;
+  };
+  reader.onerror = () => toast.error("파일 읽기 실패");
+  reader.readAsDataURL(file);
+}
+
+/* ──────────────────────────────────────────────────────────────────────
  * Vision Compare 5축 한국어 라벨
  * ──────────────────────────────────────────────────────────────────── */
 const AXIS_LABELS_KO: Record<keyof VisionCompareAnalysis["scores"], string> = {
@@ -97,6 +128,54 @@ export default function VisionComparePage() {
   useEffect(() => {
     setHint("");
   }, [setHint]);
+
+  /* ── Ctrl+V 페이지 레벨 fallback (2026-04-25) ──
+   * 정책: 호버 슬롯이 있으면 그 슬롯 우선 (CompareImageSlot 내부 처리).
+   *       호버 슬롯 없으면 → A 비면 A, B 비면 B, 둘 다 차면 토스트 안내.
+   * 충돌 가드: 슬롯이 paste 처리하면 e.preventDefault() → 여기선 defaultPrevented skip.
+   *           textarea/input focus 시는 텍스트 paste 보존 위해 skip. */
+  useEffect(() => {
+    const handler = (e: ClipboardEvent) => {
+      if (e.defaultPrevented) return;
+
+      const active = document.activeElement as HTMLElement | null;
+      const activeIsInput =
+        !!active &&
+        (active.tagName === "TEXTAREA" ||
+          active.tagName === "INPUT" ||
+          active.isContentEditable);
+      if (activeIsInput) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+      let imageItem: DataTransferItem | null = null;
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith("image/")) {
+          imageItem = items[i];
+          break;
+        }
+      }
+      if (!imageItem) return;
+
+      e.preventDefault();
+      const file = imageItem.getAsFile();
+      if (!file) return;
+
+      // fallback 분배 — A 우선, A 차있으면 B, 둘 다 차면 안내
+      if (!imageA) {
+        loadCompareImageFromFile(file, setImageA);
+      } else if (!imageB) {
+        loadCompareImageFromFile(file, setImageB);
+      } else {
+        toast.warn(
+          "두 슬롯이 모두 채워졌습니다",
+          "교체할 슬롯에 마우스를 올린 뒤 Ctrl+V 를 누르세요.",
+        );
+      }
+    };
+    document.addEventListener("paste", handler);
+    return () => document.removeEventListener("paste", handler);
+  }, [imageA, imageB, setImageA, setImageB]);
 
   /* ── 진행 모달 open 상태 ── */
   const [progressOpen, setProgressOpen] = useState(false);
