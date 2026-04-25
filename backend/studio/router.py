@@ -38,6 +38,7 @@ import re
 import time
 import uuid
 from dataclasses import asdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
@@ -107,11 +108,19 @@ _TASK_ID_RE = re.compile(r"^tsk-[0-9a-f]{12}$")
 # 저장 시 uuid4 hex + ".png/.jpg/.jpeg/.webp" 포맷이므로 이 정규식 외엔 삭제 거부.
 _EDIT_SOURCE_FILENAME_RE = re.compile(r"^[0-9a-zA-Z_\-]{1,64}\.(png|jpg|jpeg|webp)$")
 
-# result 파일명 화이트리스트 (audit R1-6 · STUDIO_OUTPUT_DIR 직속).
+# result 파일명 화이트리스트 (audit R1-6).
 # 영상 결과는 .mp4 확장자 허용. 이미지는 edit-source 와 동일 확장자 세트.
+# 두 가지 형식 모두 매치:
+#   - 레거시 UUID 형식 (STUDIO_OUTPUT_DIR 직속): `<uuid32>.png`
+#   - 신규 날짜/카운터 형식 (2026-04-25~, mode/date/ 서브폴더): `gen-1430-001.png`
 _RESULT_FILENAME_RE = re.compile(
     r"^[0-9a-zA-Z_\-]{1,64}\.(png|jpg|jpeg|webp|mp4)$"
 )
+
+# 신규 저장 구조의 mode 서브폴더 화이트리스트.
+_VALID_MODE_DIRS = frozenset({"generate", "edit", "video"})
+# 신규 저장 구조의 date 서브폴더 형식 (YYYY-MM-DD).
+_DATE_DIR_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _edit_source_path_from_url(url: str) -> Path | None:
@@ -139,14 +148,19 @@ def _edit_source_path_from_url(url: str) -> Path | None:
 def _result_path_from_url(url: str) -> Path | None:
     """result(image_ref) URL 을 실제 파일 경로로 변환. 안전하지 않으면 None.
 
-    audit R1-6: DELETE history 시 orphan 된 결과 이미지/영상 파일 정리용.
+    audit R1-6 (+ 2026-04-25 저장 구조 변경): DELETE history 시 orphan 된 결과 파일 정리용.
+
+    허용 경로 2종 (둘 다 STUDIO_OUTPUT_DIR 내부):
+      - 레거시 직속: `/images/studio/<uuid>.png`
+      - 신규 계층: `/images/studio/{generate|edit|video}/YYYY-MM-DD/<filename>.<ext>`
 
     보안 방어선:
       1. URL 이 `/images/studio/` prefix 로 시작해야 함
-      2. edit-source sub-path (`/images/studio/edit-source/...`) 는 제외
-         → edit-source 는 별도 _cleanup_edit_source_file 로만 처리 (이중 삭제 방지)
-      3. 파일명이 `_RESULT_FILENAME_RE` 화이트리스트 통과 (png/jpg/jpeg/webp/mp4)
-      4. 최종 경로가 STUDIO_OUTPUT_DIR 직속 (sub-directory 거부 — edit-source 재진입 방지)
+      2. edit-source sub-path 는 제외 (이중 삭제 방지 — 별도 _cleanup_edit_source_file)
+      3. 직속이면 파일명만 `_RESULT_FILENAME_RE` 통과
+      4. 계층이면 [mode ∈ _VALID_MODE_DIRS] / [date = YYYY-MM-DD] / [filename 통과]
+         (mode/date 외 다른 서브폴더 구조는 거부 — backslash 포함)
+      5. 최종 경로가 STUDIO_OUTPUT_DIR 내부인지 resolve 후 is_relative_to 확인 (symlink 방어)
     """
     if not url:
         return None
@@ -156,16 +170,35 @@ def _result_path_from_url(url: str) -> Path | None:
     # edit-source sub 는 별도 처리. mock 결과나 타 도메인 URL 도 함께 제외.
     if url.startswith(EDIT_SOURCE_URL_PREFIX + "/"):
         return None
-    filename = url[len(prefix) :].split("?", 1)[0].split("#", 1)[0]
-    if "/" in filename or "\\" in filename:
-        # STUDIO_OUTPUT_DIR 직속만 허용 (sub-directory 경로 거부)
+    rel = url[len(prefix) :].split("?", 1)[0].split("#", 1)[0]
+    # backslash 는 Windows path separator — URL 에 포함되면 조작 의심 · 거부
+    if "\\" in rel:
         return None
-    if not _RESULT_FILENAME_RE.match(filename):
+
+    parts = rel.split("/")
+    if len(parts) == 1:
+        # 레거시 직속 UUID 파일 (하위호환)
+        filename = parts[0]
+        if not _RESULT_FILENAME_RE.match(filename):
+            return None
+        candidate = (STUDIO_OUTPUT_DIR / filename).resolve()
+    elif len(parts) == 3:
+        # 신규 mode/date/filename 계층
+        mode_dir, date_dir, filename = parts
+        if mode_dir not in _VALID_MODE_DIRS:
+            return None
+        if not _DATE_DIR_RE.match(date_dir):
+            return None
+        if not _RESULT_FILENAME_RE.match(filename):
+            return None
+        candidate = (STUDIO_OUTPUT_DIR / mode_dir / date_dir / filename).resolve()
+    else:
+        # 기타 depth (예: edit-source 는 위에서 걸렀으므로 여긴 알 수 없는 구조)
         return None
-    candidate = (STUDIO_OUTPUT_DIR / filename).resolve()
+
+    # 최종 symlink 우회 방어 — 실제 경로가 STUDIO_OUTPUT_DIR 안인지 검증
     try:
-        if candidate.parent.resolve() != STUDIO_OUTPUT_DIR.resolve():
-            # 직속 확인 (symlink 등 우회 방어)
+        if not candidate.is_relative_to(STUDIO_OUTPUT_DIR.resolve()):
             return None
     except (OSError, ValueError):
         return None
@@ -233,6 +266,83 @@ async def _cleanup_result_file(url: str | None) -> bool:
     except OSError as e:
         log.warning("result 파일 삭제 실패 %s: %s", path, e)
         return False
+
+# ──────────────────────────────────────────────────────────────────────
+# 저장 경로 헬퍼 (2026-04-25 · 저장 구조 정리)
+#
+# 새 구조: STUDIO_OUTPUT_DIR/{mode}/{YYYY-MM-DD}/{prefix}-{HHMM}-{NNN}.{ext}
+#   예: data/images/studio/generate/2026-04-25/gen-1430-001.png
+#   예: data/images/studio/edit/2026-04-25/edit-1502-002.png
+#   예: data/images/studio/video/2026-04-25/video-1530-001.mp4
+#
+# 카운터는 해당 폴더 내 통합 (매일 리셋). 충돌 시 retry loop 로 +1.
+# 기존 UUID 파일 (STUDIO_OUTPUT_DIR 직속) 은 path traversal 가드에서 여전히 허용.
+# ──────────────────────────────────────────────────────────────────────
+
+# mode → 파일명 prefix 매핑
+_MODE_PREFIX = {
+    "generate": "gen",
+    "edit": "edit",
+    "video": "video",
+}
+
+
+def _resolve_save_dir(mode: str) -> Path:
+    """mode/date 계층 디렉토리 보장 후 반환.
+
+    Args:
+        mode: "generate" | "edit" | "video"
+
+    Returns:
+        STUDIO_OUTPUT_DIR / mode / YYYY-MM-DD (존재 보장)
+    """
+    if mode not in _MODE_PREFIX:
+        raise ValueError(f"Invalid mode: {mode!r}")
+    today = datetime.now().strftime("%Y-%m-%d")
+    target = STUDIO_OUTPUT_DIR / mode / today
+    target.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+def _next_save_path(mode: str, ext: str) -> tuple[Path, str]:
+    """mode/date 폴더 안에서 다음 사용 가능한 저장 경로 생성.
+
+    포맷: {prefix}-{HHMM}-{NNN}.{ext}  (예: gen-1430-001.png)
+      - HHMM: 현재 시각 (하루 안 카운터 흐름 이해 용)
+      - NNN: 해당 폴더 내 순차 번호 (001 부터, 충돌 시 +1 재시도)
+
+    Args:
+        mode: "generate" | "edit" | "video"
+        ext: 확장자 ("png", "jpg", "mp4" 등. dot 있어도 허용)
+
+    Returns:
+        (절대 경로, URL 상대경로) 튜플.
+        URL 상대경로는 STUDIO_URL_PREFIX 뒤에 붙일 `mode/date/file.ext` 형태.
+    """
+    prefix = _MODE_PREFIX[mode]
+    save_dir = _resolve_save_dir(mode)
+    now = datetime.now()
+    date_str = now.strftime("%Y-%m-%d")
+    hhmm = now.strftime("%H%M")
+    ext = ext.lstrip(".")
+
+    # 폴더 내 기존 파일 수 기반으로 시작 번호 추정 (retry 횟수 최소화)
+    try:
+        start_n = sum(1 for _ in save_dir.iterdir()) + 1
+    except OSError:
+        start_n = 1
+
+    n = start_n
+    while n <= 9999:
+        filename = f"{prefix}-{hhmm}-{n:03d}.{ext}"
+        candidate = save_dir / filename
+        if not candidate.exists():
+            relative = f"{mode}/{date_str}/{filename}"
+            return candidate, relative
+        n += 1
+    # 극단 방어: 한 폴더에 9999개 넘으면 에러
+    raise RuntimeError(f"{save_dir} 폴더가 가득 찼음 (9999 초과)")
+
 
 # 백그라운드로 돌리는 asyncio.Task 참조 보관 — GC 가 중간에 수거하는 이슈 방지.
 # set.add / discard 패턴이 FastAPI 권장.
@@ -637,6 +747,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
         dispatch = await _dispatch_to_comfy(
             task,
             _make_generate_prompt,
+            mode="generate",
             progress_start=70,
             progress_span=25,
             client_prefix="ais",
@@ -713,15 +824,17 @@ class ComfyDispatchResult(BaseModel):
 
 
 SaveOutputFn = Callable[
-    [ComfyUITransport, str], Awaitable[tuple[str, int, int]]
+    [ComfyUITransport, str, str], Awaitable[tuple[str, int, int]]
 ]
-"""save_output 콜백 타입. 반환: (url, width, height) · video 는 0,0 반환 가능."""
+"""save_output 콜백 타입. 인자: (comfy, prompt_id, mode). mode 는 _next_save_path 에 전달.
+반환: (url, width, height) · video 는 0,0 반환 가능."""
 
 
 async def _dispatch_to_comfy(
     task: Task,
     api_prompt_factory: Callable[[str | None], dict[str, Any]],
     *,
+    mode: str,
     progress_start: int,
     progress_span: int,
     client_prefix: str = "ais",
@@ -789,7 +902,7 @@ async def _dispatch_to_comfy(
                     image_ref=_mock_ref_or_raise(comfy_err), comfy_error=comfy_err
                 )
 
-            output_ref, width, height = await save_fn(comfy, prompt_id)
+            output_ref, width, height = await save_fn(comfy, prompt_id, mode)
         log.info("ComfyUI output saved: %s (%dx%d)", output_ref, width, height)
         return ComfyDispatchResult(image_ref=output_ref, width=width, height=height)
 
@@ -810,14 +923,80 @@ def _mock_ref_or_raise(reason: str) -> str:
     raise RuntimeError(reason)
 
 
+# ComfyUI output 폴더 경로 — 임시 파일 삭제용 (선택 설정)
+# .env 에 COMFYUI_OUTPUT_PATH 없으면 cleanup no-op (안전 디폴트).
+_COMFYUI_OUTPUT_BASE: Path | None = None
+try:
+    _env_comfy_out = os.getenv("COMFYUI_OUTPUT_PATH")
+    if _env_comfy_out:
+        _candidate = Path(_env_comfy_out).resolve()
+        if _candidate.is_dir():
+            _COMFYUI_OUTPUT_BASE = _candidate
+        else:
+            log.warning(
+                "COMFYUI_OUTPUT_PATH 가 디렉토리가 아님: %s (cleanup 비활성)",
+                _env_comfy_out,
+            )
+except Exception as _e:
+    log.warning("COMFYUI_OUTPUT_PATH resolve 실패: %s (cleanup 비활성)", _e)
+
+# 우리가 ComfyUI 에 만든 결과물만 식별 — 다른 워크플로우/사용자 직접 작업 건드리지 않음.
+_OUR_COMFY_PREFIXES = ("AIS-Gen", "AIS-Edit", "AIS-Video")
+
+
+async def _cleanup_comfy_temp(
+    comfy: "ComfyUITransport", file_info: dict[str, Any]
+) -> None:
+    """ComfyUI output 의 임시 파일 삭제 (다운로드 성공 후 호출).
+
+    우리 백엔드가 파일을 영구 보관하므로 ComfyUI 측은 중복 저장. 디스크 절약 위해
+    AIS-Gen / AIS-Edit / AIS-Video prefix 로 우리 것만 식별해 삭제.
+
+    .env 의 COMFYUI_OUTPUT_PATH 가 설정되지 않았거나 유효하지 않으면 no-op
+    (안전 디폴트 — 잘못된 경로 삭제 방지).
+
+    Args:
+        comfy: (향후 HTTP API 기반 삭제 대비 · 현재는 미사용)
+        file_info: extract_output_* 가 반환한 {filename, subfolder, type} dict.
+    """
+    _ = comfy  # 현재는 파일 시스템 직접 접근이라 미사용 (API reserve)
+    if _COMFYUI_OUTPUT_BASE is None:
+        return
+    filename = file_info.get("filename", "")
+    subfolder = file_info.get("subfolder", "") or ""
+    file_type = file_info.get("type", "output")
+
+    # temp 타입은 ComfyUI 가 자동 정리 — 건드리지 않음
+    if file_type != "output":
+        return
+
+    # 우리 prefix 만 (다른 워크플로우 결과 보호)
+    if not any(filename.startswith(p) for p in _OUR_COMFY_PREFIXES):
+        return
+
+    # 경로 조립 + path traversal 방어
+    try:
+        target = (_COMFYUI_OUTPUT_BASE / subfolder / filename).resolve()
+        if not target.is_relative_to(_COMFYUI_OUTPUT_BASE):
+            log.warning("comfy cleanup skip - path escapes base: %s", target)
+            return
+        if target.exists():
+            target.unlink()
+            log.info("ComfyUI 임시 파일 삭제: %s", target.name)
+    except OSError as e:
+        log.warning("ComfyUI 임시 파일 삭제 실패 %s: %s", filename, e)
+
+
 async def _save_comfy_video(
-    comfy: ComfyUITransport, prompt_id: str
+    comfy: ComfyUITransport, prompt_id: str, mode: str
 ) -> tuple[str, int, int]:
     """ComfyUI 완료 prompt 의 영상 파일을 다운로드·저장.
 
     SaveVideo 노드의 outputs 키는 ComfyUI 버전마다 다름 —
     extract_output_files 가 videos/gifs/animated/files/images 순서 탐색.
     width/height 는 PIL 로 못 읽어서 (mp4 이므로) 0 반환. 프론트가 표기 생략.
+
+    2026-04-25: mode/date 계층 저장 구조 적용. ComfyUI 측 임시 파일은 다운로드 후 삭제.
     """
     history = await comfy.get_history(prompt_id)
     files = extract_output_files(history)
@@ -834,19 +1013,25 @@ async def _save_comfy_video(
         subfolder=chosen["subfolder"],
         file_type=chosen["type"],
     )
-    ext = os.path.splitext(chosen["filename"])[1] or ".mp4"
-    save_name = f"{uuid.uuid4().hex}{ext}"
-    (STUDIO_OUTPUT_DIR / save_name).write_bytes(raw)
-    return (f"{STUDIO_URL_PREFIX}/{save_name}", 0, 0)
+    ext = os.path.splitext(chosen["filename"])[1].lstrip(".") or "mp4"
+    save_path, url_rel = _next_save_path(mode, ext)
+    save_path.write_bytes(raw)
+
+    # ComfyUI 측 임시 파일 정리 (디스크 절약 · AIS-Video prefix 로 식별)
+    await _cleanup_comfy_temp(comfy, chosen)
+
+    return (f"{STUDIO_URL_PREFIX}/{url_rel}", 0, 0)
 
 
 async def _save_comfy_output(
-    comfy: ComfyUITransport, prompt_id: str
+    comfy: ComfyUITransport, prompt_id: str, mode: str
 ) -> tuple[str, int, int]:
     """ComfyUI 완료 prompt 의 첫 이미지를 다운로드·저장하고 (url, width, height) 반환.
 
     PIL 로 실제 해상도를 읽어 히스토리 메타데이터에 반영 (Edit 결과는 원본+스케일 후 크기가
     프리셋과 다를 수 있음 — 하드코딩 1024 이슈 해소).
+
+    2026-04-25: mode/date 계층 저장 구조 적용. ComfyUI 측 임시 파일은 다운로드 후 삭제.
     """
     history = await comfy.get_history(prompt_id)
     images = extract_output_images(history)
@@ -858,8 +1043,11 @@ async def _save_comfy_output(
         subfolder=img["subfolder"],
         image_type=img["type"],
     )
-    save_name = f"{uuid.uuid4().hex}.png"
-    (STUDIO_OUTPUT_DIR / save_name).write_bytes(raw)
+    save_path, url_rel = _next_save_path(mode, "png")
+    save_path.write_bytes(raw)
+
+    # ComfyUI 측 임시 파일 정리 (디스크 절약 · AIS-Gen/Edit prefix 로 식별)
+    await _cleanup_comfy_temp(comfy, img)
 
     # 실해상도 추출 — 실패해도 이미지 자체는 살리고 0 으로 폴백
     try:
@@ -869,7 +1057,7 @@ async def _save_comfy_output(
         log.warning("PIL size read failed: %s", e)
         width, height = 0, 0
 
-    return (f"{STUDIO_URL_PREFIX}/{save_name}", width, height)
+    return (f"{STUDIO_URL_PREFIX}/{url_rel}", width, height)
 
 
 # ─────────────────────────────────────────────
@@ -1005,6 +1193,7 @@ async def _run_edit_pipeline(
         dispatch = await _dispatch_to_comfy(
             task,
             _make_edit_prompt,
+            mode="edit",
             progress_start=70,
             progress_span=25,
             client_prefix="ais-e",
@@ -1334,6 +1523,7 @@ async def _run_video_pipeline_task(
         dispatch = await _dispatch_to_comfy(
             task,
             _make_video_prompt,
+            mode="video",
             progress_start=35,
             progress_span=57,
             client_prefix="ais-v",
