@@ -85,10 +85,13 @@ export const GENERATE_MODEL = {
     seed: 464857551335368,
   },
 
-  /** Lightning 4-step 모드 (토글 ON 시) */
+  /** Lightning 모드 (토글 ON 시).
+   *  2026-04-25 픽스: 4-step 의 살짝 블러 → 8/1.5 로 디테일 향상 확인.
+   *  사용자 비교 평가 (4/1.0 · 6/1.2 · 8/1.5) 결과 8/1.5 채택.
+   *  백엔드 backend/studio/presets.py 의 GENERATE_MODEL.lightning 와 동기화 유지. */
   lightning: {
-    steps: 4,
-    cfg: 1.0,
+    steps: 8,
+    cfg: 1.5,
   },
 
   /** 네거티브 프롬프트 (워크플로우 고정) */

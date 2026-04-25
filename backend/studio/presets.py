@@ -132,7 +132,12 @@ GENERATE_MODEL = GenerateModelPreset(
         batch_size=1,
         seed=464857551335368,
     ),
-    lightning=LightningOverride(steps=4, cfg=1.0),
+    # 2026-04-25 픽스: Lightning 디테일 개선 (4/1.0 → 8/1.5).
+    # 4-step 의 살짝 블러 느낌 → 사용자 비교 평가 (4/1.0 · 6/1.2 · 8/1.5) 결과:
+    #   8/1.5 에서 머리카락 / 얼굴 / 의상 텍스처 모두 뚜렷하게 향상되고
+    #   color over-saturation 없이 자연스러움. 시간은 4-step 대비 ~2배.
+    # frontend/lib/model-presets.ts 의 GENERATE_MODEL.lightning 와 동기화 유지.
+    lightning=LightningOverride(steps=8, cfg=1.5),
     negative_prompt=(
         "低分辨率，低画质，肢体畸形，手指畸形，画面过饱和，蜡像感，人脸无细节，"
         "过度光滑，画面具有AI感。构图混乱。文字模糊，扭曲"
