@@ -139,7 +139,7 @@ export default function MenuCard({
               left: 14,
               width: 36,
               height: 36,
-              borderRadius: 10,
+              borderRadius: "var(--radius)",
               background: "rgba(255,255,255,.92)",
               backdropFilter: "blur(8px)",
               display: "grid",

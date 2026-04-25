@@ -20,7 +20,7 @@ export function Logo() {
         style={{
           width: 22,
           height: 22,
-          borderRadius: 6,
+          borderRadius: "var(--radius-sm)",
           background: "var(--ink)",
           display: "grid",
           placeItems: "center",

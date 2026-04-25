@@ -373,7 +373,7 @@ function IconBtn({
         cursor: "pointer",
         width: 24,
         height: 24,
-        borderRadius: 6,
+        borderRadius: "var(--radius-sm)",
         display: "grid",
         placeItems: "center",
         color: accent ? "var(--accent)" : "var(--ink-3)",

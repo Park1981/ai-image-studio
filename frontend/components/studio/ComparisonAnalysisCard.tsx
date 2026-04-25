@@ -129,7 +129,7 @@ function CardShell({ children }: { children: React.ReactNode }) {
       style={{
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 10,
+        borderRadius: "var(--radius)",
         padding: "8px 12px",
         display: "flex",
         alignItems: "center",
@@ -203,7 +203,7 @@ function btnStyle(kind: "primary" | "secondary" | "ghost"): CSSProperties {
     cursor: "pointer",
     fontSize: 11,
     padding: "4px 10px",
-    borderRadius: 6,
+    borderRadius: "var(--radius-sm)",
     transition: "background .12s",
     // 버튼 기본 flex 정렬
     display: "inline-flex",

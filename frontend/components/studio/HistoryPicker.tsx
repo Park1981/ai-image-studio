@@ -30,7 +30,7 @@ export default function HistoryPicker({
         padding: 10,
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 10,
+        borderRadius: "var(--radius)",
         maxHeight: 220,
         overflowY: "auto",
       }}
@@ -62,7 +62,7 @@ export default function HistoryPicker({
               style={{
                 all: "unset",
                 cursor: "pointer",
-                borderRadius: 6,
+                borderRadius: "var(--radius-sm)",
                 overflow: "hidden",
               }}
               title={it.label}

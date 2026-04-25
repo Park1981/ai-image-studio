@@ -129,7 +129,7 @@ export default function ComparisonAnalysisModal({
               all: "unset",
               cursor: "pointer",
               padding: 6,
-              borderRadius: 6,
+              borderRadius: "var(--radius-sm)",
               color: "var(--ink-3)",
             }}
             title="닫기"
@@ -374,7 +374,7 @@ function LangToggle({
         display: "inline-flex",
         background: "var(--bg-2)",
         border: "1px solid var(--line)",
-        borderRadius: 6,
+        borderRadius: "var(--radius-sm)",
         overflow: "hidden",
       }}
     >

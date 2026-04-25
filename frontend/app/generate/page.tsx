@@ -377,7 +377,7 @@ export default function GeneratePage() {
                       alignItems: "center",
                       gap: 3,
                       padding: "4px 6px",
-                      borderRadius: 6,
+                      borderRadius: "var(--radius-sm)",
                       transition: "background .12s",
                     }}
                     onMouseEnter={(e) => {

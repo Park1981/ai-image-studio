@@ -176,7 +176,7 @@ export default function VisionPage() {
               padding: "12px 14px",
               background: "var(--bg-2)",
               border: "1px solid var(--line)",
-              borderRadius: 10,
+              borderRadius: "var(--radius)",
               fontSize: 12,
               color: "var(--ink-3)",
               lineHeight: 1.55,

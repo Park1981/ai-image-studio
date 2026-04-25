@@ -120,7 +120,7 @@ export default function VisionHistoryList({
                 fontSize: 11,
                 color: "var(--ink-4)",
                 padding: "4px 8px",
-                borderRadius: 6,
+                borderRadius: "var(--radius-sm)",
                 border: "1px solid var(--line)",
               }}
             >
@@ -215,7 +215,7 @@ function VisionCard({
         position: "relative",
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: 10,
+        borderRadius: "var(--radius)",
         overflow: "hidden",
         boxShadow: "var(--shadow-sm)",
         cursor: "pointer",

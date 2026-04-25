@@ -141,7 +141,7 @@ function ToastItem({
           color: "var(--ink-4)",
           padding: 4,
           marginTop: -2,
-          borderRadius: 6,
+          borderRadius: "var(--radius-sm)",
           flexShrink: 0,
         }}
         aria-label="닫기"

@@ -391,7 +391,7 @@ export default function VisionComparePage() {
                     alignItems: "center",
                     gap: 3,
                     padding: "4px 6px",
-                    borderRadius: 6,
+                    borderRadius: "var(--radius-sm)",
                   }}
                 >
                   <Icon name="x" size={10} /> 비우기
@@ -774,7 +774,7 @@ function AnalysisFallback({ summary }: { summary: string }) {
       style={{
         background: "var(--amber-soft)",
         border: "1px solid var(--amber)",
-        borderRadius: 10,
+        borderRadius: "var(--radius)",
         padding: "12px 14px",
         fontSize: 12,
         color: "var(--amber-ink)",
@@ -808,7 +808,7 @@ function AnalysisFilled({ analysis }: { analysis: VisionCompareAnalysis }) {
           style={{
             background: "var(--bg-2)",
             border: "1px solid var(--line)",
-            borderRadius: 10,
+            borderRadius: "var(--radius)",
             padding: "10px 12px",
             fontSize: 12,
             color: "var(--ink-2)",

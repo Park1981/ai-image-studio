@@ -48,7 +48,7 @@ export default function ResearchBanner({
         padding: "14px 16px",
         background: "var(--amber-soft)",
         border: "1px solid rgba(250,173,20,.35)",
-        borderRadius: 10,
+        borderRadius: "var(--radius)",
       }}
     >
       {/* 상단 — 체크박스 + 제목 + 배지 + 버튼 */}

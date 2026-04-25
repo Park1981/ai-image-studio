@@ -259,7 +259,7 @@ function ProcessSection() {
               padding: "10px 12px",
               background: "var(--surface)",
               border: "1px solid var(--line)",
-              borderRadius: 10,
+              borderRadius: "var(--radius)",
             }}
           >
             <span
@@ -308,7 +308,7 @@ function ProcessSection() {
                 padding: "5px 10px",
                 fontSize: 11.5,
                 fontWeight: 500,
-                borderRadius: 6,
+                borderRadius: "var(--radius-sm)",
                 border: `1px solid ${running ? "var(--line)" : "var(--accent)"}`,
                 background: running ? "var(--bg)" : "var(--accent)",
                 color: running ? "var(--ink-2)" : "#fff",
@@ -535,7 +535,7 @@ function TemplatesSection() {
             padding: "10px 12px",
             background: "var(--surface)",
             border: "1px solid var(--line)",
-            borderRadius: 10,
+            borderRadius: "var(--radius)",
             display: "flex",
             flexDirection: "column",
             gap: 4,
@@ -704,7 +704,7 @@ function HistorySection() {
           padding: "10px 12px",
           background: "var(--surface)",
           border: "1px solid var(--line)",
-          borderRadius: 10,
+          borderRadius: "var(--radius)",
         }}
       >
         <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
@@ -730,7 +730,7 @@ function HistorySection() {
             padding: "5px 10px",
             fontSize: 11.5,
             fontWeight: 500,
-            borderRadius: 6,
+            borderRadius: "var(--radius-sm)",
             border: "1px solid var(--line)",
             background: "var(--bg)",
             color: count === 0 ? "var(--ink-4)" : "#C0392B",

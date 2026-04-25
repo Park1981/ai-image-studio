@@ -83,7 +83,7 @@ export default function ImageTile({
         style={{
           position: "relative",
           aspectRatio: aspect,
-          borderRadius: 10,
+          borderRadius: "var(--radius)",
           overflow: "hidden",
           background: "#0a0a0a",
           cursor: onClick ? "pointer" : "default",
@@ -167,7 +167,7 @@ export default function ImageTile({
         style={{
           position: "relative",
           aspectRatio: aspect,
-          borderRadius: 10,
+          borderRadius: "var(--radius)",
           overflow: "hidden",
           background: "var(--bg-2)", // letterbox 배경
           cursor: onClick ? "pointer" : "default",
@@ -231,7 +231,7 @@ export default function ImageTile({
       style={{
         position: "relative",
         aspectRatio: aspect,
-        borderRadius: 10,
+        borderRadius: "var(--radius)",
         overflow: "hidden",
         background: c1,
         cursor: onClick ? "pointer" : "default",
@@ -321,7 +321,7 @@ export function StripedPH({
         background:
           "repeating-linear-gradient(135deg, #F4F1EB 0 10px, #EEEAE1 10px 20px)",
         border: "1px dashed #D4CEC0",
-        borderRadius: 10,
+        borderRadius: "var(--radius)",
         ...style,
       }}
     >

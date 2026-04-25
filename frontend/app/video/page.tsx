@@ -318,7 +318,7 @@ export default function VideoPage() {
                     alignItems: "center",
                     gap: 3,
                     padding: "4px 6px",
-                    borderRadius: 6,
+                    borderRadius: "var(--radius-sm)",
                   }}
                 >
                   <Icon name="x" size={10} /> 비우기
@@ -373,7 +373,7 @@ export default function VideoPage() {
               padding: "10px 12px",
               background: "var(--amber-soft)",
               border: "1px solid rgba(250,173,20,.35)",
-              borderRadius: 10,
+              borderRadius: "var(--radius)",
               fontSize: 11.5,
               color: "var(--amber-ink)",
               lineHeight: 1.55,
@@ -578,7 +578,7 @@ function VideoResolutionSlider({
     <div
       style={{
         padding: "12px 14px",
-        borderRadius: 10,
+        borderRadius: "var(--radius)",
         border: "1px solid var(--line)",
         background: "var(--surface)",
         opacity: hasSource ? 1 : 0.55,

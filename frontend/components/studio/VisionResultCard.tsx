@@ -119,7 +119,7 @@ export default function VisionResultCard({ result, running }: Props) {
                   padding: "5px 12px",
                   fontSize: 12,
                   fontWeight: 600,
-                  borderRadius: 6,
+                  borderRadius: "var(--radius-sm)",
                   color: active
                     ? "var(--ink)"
                     : disabled

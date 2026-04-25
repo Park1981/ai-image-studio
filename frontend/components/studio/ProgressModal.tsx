@@ -367,7 +367,7 @@ function Header({
             fontSize: 11.5,
             fontWeight: 500,
             padding: "5px 10px",
-            borderRadius: 6,
+            borderRadius: "var(--radius-sm)",
             border: "1px solid rgba(192,57,43,.32)",
             background: "#FCEDEC",
             color: "#C0392B",
