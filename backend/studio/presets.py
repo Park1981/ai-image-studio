@@ -86,6 +86,30 @@ class LightningOverride:
     cfg: float
 
 
+# ── 스타일 프리셋 (LoRA + sampling override + 트리거) ──
+# 2026-04-25: 특정 LoRA (예: AI Asian Influencer · blue_hair_q2512) 가 표준 sampling
+# 파라미터와 다른 권장값 (sampler/steps/cfg) 을 요구할 때, 토글 ON 시 자동으로
+# 적용. Lightning 과 비호환 (sampling 값이 충돌) — 호출부가 강제 OFF 처리.
+@dataclass(frozen=True)
+class StylePreset:
+    """스타일 LoRA 프리셋.
+
+    토글 ON 시:
+      - LoRA 체인에 self.lora 가 추가됨 (strength 적용)
+      - sampling 파라미터가 self.sampling_override 로 교체됨
+      - self.trigger_prompt 가 비어있지 않으면 prompt 보강 시 트리거 강제
+      - incompatible_with_lightning=True 면 호출부가 Lightning 토글 OFF 처리
+    """
+
+    id: str  # 식별자 — request 의 styleId 와 매칭 ("asian_influencer")
+    display_name: str  # UI 라벨
+    description: str  # UI 서브라벨 (예: "Euler A · 25step · cfg 6.0")
+    lora: LoraEntry
+    sampling_override: SamplingDefaults
+    trigger_prompt: str  # 트리거 키워드 (빈 문자열 가능 — 차후 실측 후 추가)
+    incompatible_with_lightning: bool = True
+
+
 # ── 생성 모델 ──
 @dataclass(frozen=True)
 class GenerateModelPreset:
@@ -117,8 +141,10 @@ GENERATE_MODEL = GenerateModelPreset(
             strength=1.0,
             role="lightning",
         ),
+        # 2026-04-25: FemNude_qwen-image-2512_epoch30 → female-body-beauty_qwen
+        # 사용자 평가에서 후자가 더 자연스러움. 트리거/sampling override 불필요한 LoRA.
         LoraEntry(
-            name="FemNude_qwen-image-2512_epoch30.safetensors",
+            name="female-body-beauty_qwen.safetensors",
             strength=1.0,
             role="extra",
         ),
@@ -144,6 +170,24 @@ GENERATE_MODEL = GenerateModelPreset(
     ),
     default_aspect="1:1",
 )
+
+
+# ── Generate 스타일 LoRA 목록 ──
+# 토글로 활성화하는 추가 LoRA. 활성 시 sampling 파라미터도 같이 override + 트리거 prepend.
+# 차후 다른 스타일 LoRA 추가 시 이 배열에 StylePreset 객체만 추가하면 됨.
+# 2026-04-25 (1차 시도 후 보류): blue_hair_q2512 (AI Asian Influencer) 평가 결과 효과 미약 →
+# 제거. 시스템 (StylePreset / get_generate_style / builder 의 trigger prepend) 은 유지.
+GENERATE_STYLES: list[StylePreset] = []
+
+
+def get_generate_style(style_id: str | None) -> StylePreset | None:
+    """style_id 로 GENERATE_STYLES 에서 매칭되는 프리셋 반환 (없으면 None)."""
+    if not style_id:
+        return None
+    for s in GENERATE_STYLES:
+        if s.id == style_id:
+            return s
+    return None
 
 
 # ── 수정 모델 ──

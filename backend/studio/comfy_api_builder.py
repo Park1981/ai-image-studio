@@ -41,6 +41,7 @@ from .presets import (
     active_video_loras,
     compute_video_resize,
     get_aspect,
+    get_generate_style,
     resolve_video_unet_name,
 )
 
@@ -297,11 +298,17 @@ def build_generate_from_request(
     lightning: bool,
     width: int | None = None,
     height: int | None = None,
+    style_id: str | None = None,
 ) -> ApiPrompt:
     """프리셋 + 요청값으로 한 방에 빌드.
 
     width/height 가 둘 다 주어지면 aspect_label 프리셋 대신 사용자 지정 사이즈 사용.
     내부에서 8의 배수 + 256~2048 clamp 로 정규화.
+
+    style_id (2026-04-25): GENERATE_STYLES 의 id 와 매칭되면 자동으로:
+        - LoRA 체인에 style.lora 추가 (extras 끝에)
+        - sampling 파라미터 (steps/cfg/sampler/scheduler/shift) 를 style.sampling_override 로 교체
+        - incompatible_with_lightning=True 면 lightning 강제 OFF
     """
     if width is not None and height is not None:
         resolved_w = _snap_dimension(width)
@@ -317,6 +324,29 @@ def build_generate_from_request(
     )
     extras = [l for l in GENERATE_MODEL.loras if l.role == "extra"]
 
+    # ── 스타일 프리셋 적용 (있으면 sampling 파라미터 + LoRA 체인 override + 트리거 prepend) ──
+    style = get_generate_style(style_id)
+    sampler_name = d.sampler
+    scheduler_name = d.scheduler
+    shift_value = d.shift
+    if style is not None:
+        # Lightning 비호환 → 강제 OFF (호출부에서도 처리하지만 안전망)
+        if style.incompatible_with_lightning:
+            lightning = False
+        # sampling override (steps/cfg 는 이미 router 에서 override 후 들어왔다고 가정)
+        sampler_name = style.sampling_override.sampler
+        scheduler_name = style.sampling_override.scheduler
+        shift_value = style.sampling_override.shift
+        steps = style.sampling_override.steps
+        cfg = style.sampling_override.cfg
+        # LoRA 체인 — extras 끝에 style.lora 추가
+        extras = [*extras, style.lora]
+        # 트리거 prepend — gemma4 가 단어를 변환/번역해도 보장됨.
+        # 이미 substring 으로 포함되어 있으면 skip (중복 방지). case-insensitive.
+        trigger = style.trigger_prompt.strip()
+        if trigger and trigger.lower() not in prompt.lower():
+            prompt = f"{trigger}, {prompt}"
+
     inp = GenerateApiInput(
         prompt=prompt,
         negative_prompt=GENERATE_MODEL.negative_prompt,
@@ -325,9 +355,9 @@ def build_generate_from_request(
         seed=seed,
         steps=steps,
         cfg=cfg,
-        sampler=d.sampler,
-        scheduler=d.scheduler,
-        shift=d.shift,
+        sampler=sampler_name,
+        scheduler=scheduler_name,
+        shift=shift_value,
         lightning=lightning,
         unet_name=GENERATE_MODEL.files.unet,
         clip_name=GENERATE_MODEL.files.clip,

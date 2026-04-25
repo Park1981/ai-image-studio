@@ -260,6 +260,9 @@ export interface GenerateRequest {
   /** upgrade-only 단계에서 이미 얻은 Claude 힌트 — 빈 배열 [] 도 "조사 완료" 로 간주됨.
    *  undefined 이면 백엔드가 research 플래그대로 조사 실행. */
   preResearchHints?: string[];
+  /** 활성 스타일 LoRA id (GENERATE_STYLES.id 와 매칭). null/undefined 면 미사용.
+   *  백엔드가 sampling 파라미터 자동 override + LoRA 체인에 추가 + Lightning 강제 OFF. */
+  styleId?: string | null;
 }
 
 export interface UpgradeOnlyResult {

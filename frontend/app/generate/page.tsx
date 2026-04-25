@@ -39,7 +39,6 @@ import {
 import UpgradeConfirmModal from "@/components/studio/UpgradeConfirmModal";
 import Icon from "@/components/ui/Icon";
 import {
-  Pill,
   Field,
   Range,
   Spinner,
@@ -287,13 +286,6 @@ export default function GeneratePage() {
                   setPrompt(e.target.value);
                   autoGrow(e.target);
                 }}
-                onKeyDown={(e) => {
-                  // Shift+Enter — 즉시 생성 (툴팁 ⇧↵ 배지와 일치)
-                  if (e.key === "Enter" && e.shiftKey) {
-                    e.preventDefault();
-                    if (!generating && prompt.trim()) handleGenerate();
-                  }
-                }}
                 placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."
                 rows={3}
                 style={{
@@ -328,9 +320,7 @@ export default function GeneratePage() {
                   color: "var(--ink-4)",
                 }}
               >
-                <div style={{ display: "flex", gap: 6 }}>
-                  <Pill mini>Shift+Enter 생성</Pill>
-                </div>
+                <div />
                 <div style={{ display: "flex", gap: 10 }}>
                   <button
                     type="button"
@@ -406,19 +396,29 @@ export default function GeneratePage() {
             error={researchPreview.error}
           />
 
-          {/* 고급 accordion — 사이즈·Lightning 만 (Step/CFG/Seed 는 UI 제거 · 2026-04-24) */}
-          <AdvancedAccordion
+          {/* Lightning toggle — /edit 페이지와 동일 패턴 (카드 없이 Toggle 직접) */}
+          <Toggle
+            checked={lightning}
+            onChange={applyLightning}
+            label={lightning ? "⚡ Lightning 4-step" : "표준 (고퀄)"}
+            desc={
+              lightning
+                ? "Lightning LoRA ON · 약 4배 빠름"
+                : "Lightning LoRA OFF · 풀 퀄리티"
+            }
+          />
+
+          {/* 사이즈 — 단독 카드 */}
+          <SizeCard
             aspect={aspect}
             sizeLabel={sizeLabel}
             width={width}
             height={height}
             aspectLocked={aspectLocked}
-            lightning={lightning}
             onAspect={(v) => setAspect(v)}
             onWidth={setWidth}
             onHeight={setHeight}
             onAspectLocked={setAspectLocked}
-            onLightning={applyLightning}
           />
 
           {/* Primary CTA — sticky 하단 (페이지 스크롤 시 viewport 하단에 고정) */}
@@ -646,35 +646,30 @@ export default function GeneratePage() {
 }
 
 /* ─────────────────────────────────
-   고급 accordion (지역 컴포넌트)
-   2026-04-24: Step/CFG/Seed 제거 — 사이즈(W/H 숫자+슬라이더) + Lightning 만.
+   사이즈 카드 (지역 컴포넌트) — W/H 입력 + 슬라이더 + 비율잠금 + 비율칩
+   2026-04-25: AdvancedAccordion → SizeCard 분리 (Lightning 은 호출부에서 직접 노출)
    ───────────────────────────────── */
-function AdvancedAccordion({
+function SizeCard({
   aspect,
   sizeLabel,
   width,
   height,
   aspectLocked,
-  lightning,
   onAspect,
   onWidth,
   onHeight,
   onAspectLocked,
-  onLightning,
 }: {
   aspect: AspectValue;
   sizeLabel: string;
   width: number;
   height: number;
   aspectLocked: boolean;
-  lightning: boolean;
   onAspect: (v: AspectRatioLabel) => void;
   onWidth: (v: number) => void;
   onHeight: (v: number) => void;
   onAspectLocked: (v: boolean) => void;
-  onLightning: (v: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
   // 입력 중 raw string — blur/Enter 시에만 store 커밋 (중간값 clamp 방지)
   const [rawW, setRawW] = useState(String(width));
   const [rawH, setRawH] = useState(String(height));
@@ -703,62 +698,12 @@ function AdvancedAccordion({
         borderRadius: "var(--radius)",
         overflow: "hidden",
         transition: "all .2s",
+        padding: "14px 16px 16px",
       }}
     >
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        style={{
-          all: "unset",
-          cursor: "pointer",
-          width: "100%",
-          padding: "14px 16px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          fontSize: 13,
-          color: "var(--ink-2)",
-          fontWeight: 500,
-        }}
+      <Field
+        label={`사이즈 · ${sizeLabel}${aspect === "custom" ? "" : ` · ${aspect}`}`}
       >
-        <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          고급
-          <span
-            className="mono"
-            style={{
-              fontSize: 10.5,
-              color: "var(--ink-4)",
-              letterSpacing: ".04em",
-            }}
-          >
-            {aspect} · {sizeLabel}
-            {lightning && " · ⚡"}
-          </span>
-        </span>
-        <div
-          style={{
-            transform: open ? "rotate(180deg)" : "rotate(0)",
-            transition: "transform .2s",
-            color: "var(--ink-3)",
-          }}
-        >
-          <Icon name="chevron-down" size={15} />
-        </div>
-      </button>
-      {open && (
-        <div
-          style={{
-            padding: "6px 16px 18px",
-            borderTop: "1px solid var(--line)",
-            display: "grid",
-            gridTemplateColumns: "1fr 1fr",
-            gap: "16px 20px",
-          }}
-        >
-          <div style={{ gridColumn: "1 / -1" }}>
-          <Field
-            label={`사이즈 · ${sizeLabel}${aspect === "custom" ? "" : ` · ${aspect}`}`}
-          >
             {/* W/H 세트 — 각 입력박스 바로 아래에 동일 너비 슬라이더 (컴팩트) */}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               {/* W 세트 (input + slider 세로) */}
@@ -860,24 +805,7 @@ function AdvancedAccordion({
                 );
               })}
             </div>
-          </Field>
-          </div>
-          <div style={{ gridColumn: "1 / -1" }}>
-          <Field label="Lightning 모드">
-            <Toggle
-              checked={lightning}
-              onChange={onLightning}
-              label={lightning ? "⚡ 4-step (빠름)" : "표준 (고퀄)"}
-              desc={
-                lightning
-                  ? "Lightning LoRA ON · 약 4배 빠름"
-                  : "Lightning LoRA OFF · 풀 퀄리티"
-              }
-            />
-          </Field>
-          </div>
-        </div>
-      )}
+      </Field>
     </div>
   );
 }

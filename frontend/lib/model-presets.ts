@@ -64,7 +64,9 @@ export const GENERATE_MODEL = {
       role: "lightning",
     },
     {
-      name: "FemNude_qwen-image-2512_epoch30.safetensors",
+      // 2026-04-25: FemNude_qwen-image-2512_epoch30 → female-body-beauty_qwen
+      // 백엔드 backend/studio/presets.py 의 GENERATE_MODEL.loras 와 동기화 유지.
+      name: "female-body-beauty_qwen.safetensors",
       strength: 1,
       role: "extra",
     },
@@ -185,6 +187,26 @@ export function countExtraLoras(
 ): number {
   return model.loras.filter((l) => l.role === "extra").length;
 }
+
+/* ──────────────────────────────────────────────────────
+   Generate 스타일 LoRA — 토글로 활성화하는 추가 LoRA + sampling override
+   2026-04-25: 단일 entry (asian_influencer) 시작. 차후 추가 시 배열에 객체만 push.
+   백엔드 backend/studio/presets.py::GENERATE_STYLES 와 1:1 동기화 유지.
+   ────────────────────────────────────────────────────── */
+export interface GenerateStyle {
+  /** 식별자 — POST /generate body 의 styleId 값 */
+  id: string;
+  /** UI 라벨 */
+  displayName: string;
+  /** UI 서브라벨 (예: "Euler A · 25step · cfg 6.0") */
+  description: string;
+  /** Lightning 토글과 호환 여부 — true 면 활성 시 Lightning 자동 OFF */
+  incompatibleWithLightning: boolean;
+}
+
+// 2026-04-25 (1차 시도 후 보류): asian_influencer (blue_hair_q2512) 효과 미약 → 제거.
+// 시스템 (GenerateStyle 타입, useGenerateStore.styleId) 은 유지 — 차후 추가 시 객체만 push.
+export const GENERATE_STYLES: GenerateStyle[] = [];
 
 /** Lightning 토글 상태에 따라 현재 적용 중인 LoRA 목록 */
 export function activeLoras(

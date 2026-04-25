@@ -392,6 +392,9 @@ class GenerateBody(BaseModel):
     pre_research_hints: list[str] | None = Field(
         default=None, alias="preResearchHints"
     )
+    # 스타일 LoRA 토글 (2026-04-25) — None / "asian_influencer" 등 GENERATE_STYLES.id
+    # 활성 시 sampling 파라미터 자동 override + Lightning 강제 OFF + LoRA 체인 추가
+    style_id: str | None = Field(default=None, alias="styleId")
 
     # Pydantic V2: class-based Config 대신 model_config = ConfigDict(...)
     model_config = ConfigDict(populate_by_name=True)
@@ -742,6 +745,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
                 lightning=body.lightning,
                 width=resolved_w,
                 height=resolved_h,
+                style_id=body.style_id,
             )
 
         dispatch = await _dispatch_to_comfy(
@@ -781,6 +785,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             "steps": body.steps,
             "cfg": body.cfg,
             "lightning": body.lightning,
+            "styleId": body.style_id,
             "model": GENERATE_MODEL.display_name,
             "createdAt": int(time.time() * 1000),
             "imageRef": image_ref,

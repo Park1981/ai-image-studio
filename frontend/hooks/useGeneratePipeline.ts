@@ -60,6 +60,7 @@ export function useGeneratePipeline(): UseGeneratePipeline {
   const height = useGenerateStore((s) => s.height);
   const lightning = useGenerateStore((s) => s.lightning);
   const research = useGenerateStore((s) => s.research);
+  const styleId = useGenerateStore((s) => s.styleId);
   // 실행 상태
   const generating = useGenerateStore((s) => s.generating);
   const setRunning = useGenerateStore((s) => s.setRunning);
@@ -120,6 +121,7 @@ export function useGeneratePipeline(): UseGeneratePipeline {
         visionModel: visionModelSel,
         preUpgradedPrompt: preUpgraded,
         preResearchHints,
+        styleId,
       })) {
         if (evt.type === "done") {
           addItem(evt.item);

@@ -49,6 +49,8 @@ export interface GenerateState {
   aspectLocked: boolean;
   research: boolean;
   lightning: boolean;
+  /** 활성 스타일 LoRA id (GENERATE_STYLES.id 와 매칭) — null 이면 미사용 */
+  styleId: string | null;
 
   // 실행 상태 (영속 X)
   generating: boolean;
@@ -82,6 +84,8 @@ export interface GenerateState {
 
   /** Lightning 토글 */
   applyLightning: (on: boolean) => void;
+  /** 스타일 LoRA 토글 — id 또는 null. 활성 시 호환성 처리는 호출부에서 (Lightning OFF 등) */
+  setStyleId: (id: string | null) => void;
 }
 
 export const useGenerateStore = create<GenerateState>()(
@@ -97,6 +101,7 @@ export const useGenerateStore = create<GenerateState>()(
         aspectLocked: true,
         research: true,
         lightning: false,
+        styleId: null,
 
         generating: false,
         progress: 0,
@@ -184,12 +189,14 @@ export const useGenerateStore = create<GenerateState>()(
           set({ samplingStep: step, samplingTotal: total }),
 
         applyLightning: (on) => set({ lightning: on }),
+        setStyleId: (id) => set({ styleId: id }),
       };
     },
     {
       name: "ais:generate",
       storage: createJSONStorage(() => localStorage),
-      version: 4,
+      version: 5,
+      // v4 → v5: styleId 신규 필드 (옛 사용자는 기본값 null 적용)
       // v3 → v4: prompt 영속 제거. 프롬프트는 히스토리/템플릿에서 복원.
       // v2 → v3: steps/cfg/seed 필드 제거 (UI 삭제에 맞춰 store 정리)
       // v1 → v2: width/height/aspectLocked 신규 필드 추가
@@ -220,6 +227,9 @@ export const useGenerateStore = create<GenerateState>()(
           void prompt;
           state = rest;
         }
+        if (version < 5) {
+          state = { ...state, styleId: null };
+        }
         return state;
       },
       // 진행 상태 제외 (영속 X)
@@ -230,6 +240,7 @@ export const useGenerateStore = create<GenerateState>()(
         aspectLocked: s.aspectLocked,
         research: s.research,
         lightning: s.lightning,
+        styleId: s.styleId,
       }),
     },
   ),
