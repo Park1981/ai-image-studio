@@ -67,17 +67,28 @@ ask to change.
 
 RULES:
 - Output ONLY the final English prompt — no preamble, no explanation, no quotes, no markdown.
+
 - If a STRICT MATRIX DIRECTIVES block is present, follow EVERY slot directive
-  exactly — preserve slots MUST contribute explicit preservation phrasing,
-  edit slots MUST be applied as written. Treat preserve directives with the
-  SAME priority as edit directives. Do NOT silently drop any slot.
+  exactly — preserve slots and edit slots have EQUAL priority. Do NOT silently
+  drop any slot.
+
+- For [edit] slots: apply the note VERBATIM as the change instruction.
+
+- For [preserve] slots: NEVER describe the specific state of that aspect.
+  Use ONLY generic preservation phrasing such as
+  "preserve the original X exactly as in the source", "no change to X",
+  "keep X unchanged". Specific descriptions of preserved aspects (e.g.
+  "the woman is standing with hands on hips") will mislead the diffusion
+  model into re-generating that aspect, causing unintended changes.
+  This is critical: preserve = "do not touch this", NOT a re-description.
+
 - Always include core identity-preservation clauses (even when not in matrix):
   "keep the exact same face, identical face, same person, same identity,
   same facial features, same eye shape, same nose, same lips,
   realistic skin texture, no skin smoothing, photorealistic, natural lighting."
-- Describe the change clearly and specifically using the matrix as the source
-  of truth (when present) — apply edit notes verbatim, preserve notes verbatim.
+
 - If user wrote Korean, translate intent to English.
+
 - Never repeat words or phrases."""
 
 SYSTEM_VIDEO_BASE = """You are a cinematic prompt engineer for LTX-2.3 video generation.
@@ -395,7 +406,15 @@ def _build_matrix_directive_block(analysis: Any) -> str:
     """EditVisionAnalysis 객체 → SYSTEM_EDIT 에 주입할 STRICT MATRIX directive.
 
     analysis 가 None / fallback=True / slots 비어있으면 빈 문자열 반환 (블록 미주입).
-    각 슬롯별로 [preserve] / [edit] tag + note + 강제 instruction 행.
+    각 슬롯별로 [preserve] / [edit] tag + 강제 instruction 행.
+
+    spec 17 (2026-04-25 후속): [preserve] 슬롯의 note 는 SYSTEM 에 보내지 않음.
+    이유: 보존 슬롯 note (예: "손 허리에 올린 자세") 를 프롬프트에 명시하면
+    diffusion 모델이 그걸 "지시" 로 오해해서 변경 요청 안 한 부위까지 다시
+    그릴 위험이 있음. 보존은 묘사가 아니라 "변경 안 함" 이므로 generic
+    preservation phrasing 만 강제.
+
+    [edit] 슬롯은 그대로 — note 가 변경 지시 자체이므로 명시 필수.
     """
     if analysis is None:
         return ""
@@ -406,15 +425,14 @@ def _build_matrix_directive_block(analysis: Any) -> str:
 
     domain = getattr(analysis, "domain", "object_scene")
     intent_text = getattr(analysis, "intent", "") or ""
-    summary_text = getattr(analysis, "summary", "") or ""
+    # spec 17: source_summary 도 SYSTEM 에 안 보냄 (LLM 이 묘사를 지시로
+    # 오해할 위험 차단). intent 만 변경 의도 컨텍스트로 전달.
 
     lines: list[str] = []
     lines.append("=== STRICT MATRIX DIRECTIVES ===")
     lines.append(f"Domain: {domain}")
     if intent_text:
         lines.append(f"Refined intent: {intent_text}")
-    if summary_text:
-        lines.append(f"Source summary: {summary_text}")
     lines.append("")
     lines.append("For each slot, follow the directive EXACTLY:")
     lines.append("")
@@ -424,15 +442,21 @@ def _build_matrix_directive_block(analysis: Any) -> str:
         note = (getattr(entry, "note", "") or "").strip()
         label = _slot_label(key)
         if action == "edit":
+            # 변경 의도 — note 가 변경 지시 자체이므로 그대로 명시
             lines.append(f"[edit] {label}")
             lines.append(
                 f"  -> APPLY EXACTLY: {note or '(follow user instruction)'}"
             )
         else:
-            lines.append(f"[preserve] {label}")
+            # 보존 의도 — note 절대 명시 X. generic preservation 만 강제.
+            lines.append(f"[preserve] {label} — KEEP IDENTICAL TO SOURCE")
             lines.append(
-                "  -> INCLUDE preservation phrasing for this slot. "
-                f"Current state: {note or '(unchanged from source)'}"
+                "  -> DO NOT describe this slot's specific state in the output."
+            )
+            lines.append(
+                f"  -> Use ONLY generic preservation phrasing: "
+                f"\"preserve the original {label} exactly as in the source, "
+                f"no change to {label}\"."
             )
 
     lines.append("=================================")

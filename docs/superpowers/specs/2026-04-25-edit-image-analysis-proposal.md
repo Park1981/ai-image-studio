@@ -896,3 +896,130 @@ interface ComparisonAnalysis {
 - 사전 ↔ 사후 시각적 쌍둥이 일관성
 
 → "이미지 수정 모드 완벽" 달성.
+
+---
+
+## 17. 보존 슬롯 묘사 누출 픽스 (2026-04-25 · 후속 v3.1)
+
+**작성자**: Claude (Opus 4.7)
+**계기**: spec 16 한 사이클 완성 후 사용자 실측 → "포즈 변경 요청 안 했는데
+결과 포즈가 약간 바뀌었음" 발견. 최종 EN 프롬프트 추적해서 원인 진단.
+
+### 17.1 사용자 통찰 (정확함)
+
+> "내가 의도는 의상만인데 포즈가 약간 바뀌었어. 프롬프트에 포즈를 변경하는
+> 게 추가되었다는게 걸리는거야. 난 수정지시 안했는데."
+
+### 17.2 진단
+
+`run_vision_pipeline` 결과 EN 프롬프트:
+
+```
+"...the woman is smiling, the woman has long black hair,
+ the woman is standing with her hands on her hips,           ← 누출!
+ and the background shows curtains and a window with natural light,
+ keeping everything else unchanged."
+```
+
+**경로**:
+1. qwen2.5vl 이 원본 보고 `slots.body_pose.note = "The woman is standing
+   with her hands on her hips."` 작성 (보존 의도, 단순 묘사)
+2. `_build_matrix_directive_block` 가 SYSTEM 에 `[preserve] body_pose →
+   Current state: <note>` 형태로 그대로 흘림
+3. gemma4-un 이 directive 받아 최종 EN 프롬프트에 그 묘사를 그대로 반영
+4. ComfyUI Qwen Image Edit 가 "standing with hands on hips" 를 **변경 지시**
+   로 오해 → 손/어깨 위치를 명시적으로 다시 그림 → 결과 포즈 변형
+
+### 17.3 디자인 결함
+
+spec 16 의 매트릭스 directive 시스템은 "사전·사후 정합성" 을 위해 슬롯
+note 를 SYSTEM 에 모두 흘렸음. 그런데 **보존 의도 슬롯의 묘사는 흘리면
+안 됨** — 그건 "지시" 가 아니라 "변경 안 함" 이기 때문.
+
+원칙:
+- **변경 의도 슬롯 (`[edit]`)**: note 가 변경 지시 자체이므로 그대로 명시
+- **보존 의도 슬롯 (`[preserve]`)**: note 는 **묘사**이지 지시 아님 → SYSTEM 에 흘리지 X
+  → generic preservation 만 강제 (예: "preserve the original body_pose
+  exactly as in the source, no change to body_pose")
+
+### 17.4 적용 변경
+
+**`backend/studio/prompt_pipeline.py` `_build_matrix_directive_block`**:
+
+Before (spec 16):
+```python
+if action == "edit":
+    lines.append(f"[edit] {label}")
+    lines.append(f"  -> APPLY EXACTLY: {note}")
+else:
+    lines.append(f"[preserve] {label}")
+    lines.append(
+        f"  -> INCLUDE preservation phrasing for this slot. "
+        f"Current state: {note}"   # ← note 누출
+    )
+```
+
+After (spec 17):
+```python
+if action == "edit":
+    # 변경 의도 — note 그대로 명시 (변경 지시 자체)
+    lines.append(f"[edit] {label}")
+    lines.append(f"  -> APPLY EXACTLY: {note}")
+else:
+    # 보존 의도 — note 절대 명시 X. generic preservation 만.
+    lines.append(f"[preserve] {label} — KEEP IDENTICAL TO SOURCE")
+    lines.append("  -> DO NOT describe this slot's specific state in the output.")
+    lines.append(
+        f'  -> Use ONLY generic preservation phrasing: '
+        f'"preserve the original {label} exactly as in the source, '
+        f'no change to {label}".'
+    )
+```
+
+추가로 **`Source summary` 도 SYSTEM 에 안 보냄** (spec 16 에선 보냈음). summary 도
+원본 묘사라서 LLM 이 지시로 오해할 수 있음. `Refined intent` 만 변경 의도
+컨텍스트로 전달.
+
+**`SYSTEM_EDIT` 가드 강화**:
+
+```text
+- For [preserve] slots: NEVER describe the specific state of that aspect.
+  Use ONLY generic preservation phrasing such as
+  "preserve the original X exactly as in the source", "no change to X",
+  "keep X unchanged". Specific descriptions of preserved aspects (e.g.
+  "the woman is standing with hands on hips") will mislead the diffusion
+  model into re-generating that aspect, causing unintended changes.
+  This is critical: preserve = "do not touch this", NOT a re-description.
+```
+
+### 17.5 UI 영향 X
+
+이 변경은 **백엔드가 SYSTEM_EDIT 에 보내는 directive 블록만 수정**. UI 표시용
+slot.note (사용자가 보는 "인물 모드 분석" 카드의 슬롯별 한 줄 설명) 는 그대로
+유지. 사용자에게는 풍부한 정보, ComfyUI 에는 안전한 generic preservation.
+
+### 17.6 효과
+
+다음 실측에서:
+- 변경 요청 슬롯 (의상 등): 의도대로 변경 ✅
+- **보존 요청 슬롯 (포즈, 얼굴, 헤어, 배경 등): 진짜 그대로 유지** ✅
+  (구체 묘사가 SYSTEM 에 안 흘러가니 ComfyUI 가 새 지시로 오해할 일 없음)
+
+### 17.7 호환성
+
+- 모든 pytest 회귀 통과 (151 + 신규 8 = 159)
+- `analyze_pair_generic` (Vision Compare) 무영향
+- `comparison_pipeline.analyze_pair` 무영향 (이건 사후 분석으로 별도 흐름)
+- DB 스키마 무변경
+- 프론트 UI 무변경
+
+### 17.8 작업 분량
+
+| 작업 | 분량 |
+|---|---|
+| spec 17장 추가 | 10분 |
+| `_build_matrix_directive_block` preserve 처리 변경 | 10분 |
+| `SYSTEM_EDIT` 가드 강화 | 5분 |
+| 신규 테스트 `test_matrix_directive_block.py` (8 케이스) | 10분 |
+| 회귀 + 검증 | 5분 |
+| **총** | **~40분** |
