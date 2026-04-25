@@ -125,6 +125,9 @@ export function Toggle({
   return (
     <label
       style={{
+        // 숨김 checkbox 의 absolute 기준을 토글 내부로 고정해
+        // 드로어 scrollHeight 계산에 보이지 않는 overflow 가 섞이지 않게 한다.
+        position: "relative",
         display: "flex",
         alignItems: "center",
         gap: 10,
@@ -162,8 +165,12 @@ export function Toggle({
         />
       </span>
       {/*
-        visually-hidden 패턴 — 화면상 보이지 않지만 Tab 포커스 + 스크린리더 인식 가능.
-        display:none 이나 pointerEvents:none 로 완전히 제거하면 키보드/접근성 도구에서 제외됨.
+        visually-transparent 패턴 (2026-04-25 layout shift fix · Codex 진단).
+        기존 1x1 + clip:rect() 의 visually-hidden 이 overflow:auto 드로어 안에서
+        Chromium 의 focus/scroll-into-view 계산을 흔들어 토글 클릭 시 scroll
+        wrapper 의 scrollHeight 가 비정상 증가하는 layout shift 의 유력 원인.
+        label 전체를 덮는 투명 input 으로 전환 — 접근성 (Tab 포커스 + 스크린리더)
+        은 동일하게 유지되며 1x1 박스가 만드는 측정 잡음 제거.
       */}
       <input
         type="checkbox"
@@ -172,13 +179,12 @@ export function Toggle({
         aria-label={label}
         style={{
           position: "absolute",
-          width: 1,
-          height: 1,
-          padding: 0,
-          margin: -1,
-          overflow: "hidden",
-          clip: "rect(0,0,0,0)",
-          whiteSpace: "nowrap",
+          inset: 0,
+          width: "100%",
+          height: "100%",
+          margin: 0,
+          opacity: 0,
+          cursor: "pointer",
           border: 0,
         }}
       />
