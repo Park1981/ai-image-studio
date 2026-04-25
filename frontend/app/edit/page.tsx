@@ -46,7 +46,7 @@ import {
 import { useProcessStore } from "@/stores/useProcessStore";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
-import { EDIT_MODEL } from "@/lib/model-presets";
+import { EDIT_MODEL, countExtraLoras } from "@/lib/model-presets";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
 import { useEditPipeline } from "@/hooks/useEditPipeline";
 import { useEditStore } from "@/stores/useEditStore";
@@ -455,7 +455,8 @@ export default function EditPage() {
             stepDone={stepDone}
             currentStep={currentStep}
             running={running}
-            lightning={lightning}
+            footerLabel={`ComfyUI · LoRA +${countExtraLoras(EDIT_MODEL)}`}
+            footerEta={lightning ? "~12s 예상" : "~38s 예상"}
           />
 
           <div style={{ flex: 1 }} />

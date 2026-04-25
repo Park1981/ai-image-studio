@@ -363,7 +363,8 @@ export default function VideoPage() {
             stepDone={stepDone}
             currentStep={currentStep}
             running={running}
-            lightning={false}
+            footerLabel="ComfyUI · LTX-2.3 22B"
+            footerEta={lightning ? "약 5~10분 예상" : "약 25~40분 예상"}
           />
 
           {/* VRAM 주의 배너 */}

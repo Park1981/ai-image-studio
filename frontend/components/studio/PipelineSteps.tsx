@@ -3,6 +3,9 @@
  * 2026-04-23 Opus F5: edit/page.tsx 에서 분리.
  * 2026-04-24 audit P1b: 실행 중에는 compact 1줄 요약으로 자동 축소
  *   (정보 중복 해소 — 상세 진행은 ProgressModal 이 primary).
+ * 2026-04-25 Codex 리뷰 fix: footer 정보를 외부 주입으로 분리
+ *   (Edit 전용 하드코딩 → 호출부에서 footerLabel/footerEta 전달).
+ *   Video 페이지에 EDIT_MODEL LoRA 개수와 38s ETA 가 잘못 표시되던 문제 해결.
  *
  * 모드별 표시:
  *   - 실행 전 (running=false, stepDone=0): 전체 상세 (예정 단계 안내 가치)
@@ -15,7 +18,6 @@
 
 import Icon from "@/components/ui/Icon";
 import { StepMark } from "@/components/ui/primitives";
-import { EDIT_MODEL, countExtraLoras } from "@/lib/model-presets";
 
 export interface PipelineStepMeta {
   n: number;
@@ -31,8 +33,12 @@ interface PipelineStepsProps {
   currentStep: number | null;
   /** 전체 파이프라인 실행 중 여부 (false 면 running 아이콘 안 그림) */
   running: boolean;
-  /** Lightning 모드 여부 — 예상 소요 시간 분기용 */
-  lightning: boolean;
+  /** Footer 좌측 — 예: "ComfyUI · LoRA +1" / "ComfyUI · LTX-2.3 22B".
+   *  호출부가 자기 모델에 맞는 라벨을 구성해 주입 (모델-agnostic). */
+  footerLabel: string;
+  /** Footer 우측 ETA — 호출부에서 lightning 분기 후 완성된 문자열 전달.
+   *  예: "~12s 예상" / "~38s 예상" / "~5분 예상" / "~20분+ 예상". */
+  footerEta: string;
 }
 
 export default function PipelineSteps({
@@ -40,7 +46,8 @@ export default function PipelineSteps({
   stepDone,
   currentStep,
   running,
-  lightning,
+  footerLabel,
+  footerEta,
 }: PipelineStepsProps) {
   // audit P1b: 실행 중 compact 뷰 — 상세 진행은 ProgressModal 에서만 표시.
   if (running) {
@@ -206,9 +213,7 @@ export default function PipelineSteps({
         }}
       >
         <Icon name="arrow-right" size={12} />
-        <span style={{ fontWeight: 500 }}>
-          ComfyUI · LoRA +{countExtraLoras(EDIT_MODEL)}
-        </span>
+        <span style={{ fontWeight: 500 }}>{footerLabel}</span>
         <span
           className="mono"
           style={{
@@ -217,7 +222,7 @@ export default function PipelineSteps({
             letterSpacing: ".04em",
           }}
         >
-          ~{lightning ? "12" : "38"}s 예상
+          {footerEta}
         </span>
       </div>
     </div>
