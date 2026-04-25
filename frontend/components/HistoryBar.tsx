@@ -28,7 +28,8 @@ export default function HistoryBar() {
 
   // 초기 로드
   useEffect(() => {
-    fetchHistory()
+    const timer = setTimeout(fetchHistory, 0)
+    return () => clearTimeout(timer)
   }, [fetchHistory])
 
   // 생성 완료 시 자동 갱신

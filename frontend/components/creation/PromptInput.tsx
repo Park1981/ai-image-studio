@@ -61,9 +61,13 @@ export default function PromptInput() {
 
   // 드롭다운 열릴 때 목록 새로고침
   useEffect(() => {
-    if (showTemplates) {
+    if (!showTemplates) return
+
+    const timer = setTimeout(() => {
       fetchTemplates()
-    }
+    }, 0)
+
+    return () => clearTimeout(timer)
   }, [showTemplates, fetchTemplates])
 
   // 저장 인풋 열릴 때 포커스

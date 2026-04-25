@@ -26,9 +26,6 @@ export default function EditModePanel() {
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // 수정 모드가 아니면 렌더링 안 함
-  if (!editMode) return null
-
   /**
    * 업로드된 이미지의 원본 치수를 sanitize 하여 스토어에 주입
    * - Qwen Edit 권장 step_size=16의 배수로 반올림 (ComfyUI latent 호환)
@@ -88,6 +85,9 @@ export default function EditModePanel() {
     const file = e.dataTransfer.files[0]
     if (file) handleFileUpload(file)
   }
+
+  // 수정 모드가 아니면 렌더링 안 함
+  if (!editMode) return null
 
   return (
     <div className="px-3 pt-3 pb-1">

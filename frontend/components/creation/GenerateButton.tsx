@@ -56,7 +56,11 @@ export default function GenerateButton() {
       if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
         e.preventDefault()
         if (enhancePending) {
-          editMode ? handleEditGenerate() : confirmEnhance()
+          if (editMode) {
+            handleEditGenerate()
+          } else {
+            confirmEnhance()
+          }
         } else if (editMode && !isGenerating && prompt.trim()) {
           handleEditGenerate()
         } else if (!isGenerating && prompt.trim()) {

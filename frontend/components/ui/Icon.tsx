@@ -17,6 +17,7 @@ export type IconName =
   | "chevron-right"
   | "sparkle"
   | "search"
+  | "scan-eye"
   | "upload"
   | "check"
   | "clock"
@@ -32,6 +33,7 @@ export type IconName =
   | "lock"
   | "unlock"
   | "play"
+  | "compare"
   | "upscale";
 
 interface IconProps {
@@ -95,6 +97,15 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
           <path d="M10 8.5v7l6-3.5z" />
         </svg>
       );
+    case "compare":
+      return (
+        <svg {...common}>
+          <rect x="3" y="5" width="7" height="14" rx="1.5" />
+          <rect x="14" y="5" width="7" height="14" rx="1.5" />
+          <path d="M10 12h4" />
+          <path d="m12 9 3 3-3 3" />
+        </svg>
+      );
     case "upscale":
       // 업스케일 — 좌하단 픽셀 그리드(저해상도) + 우상단 대각선 화살표(고해상도)
       // 그리드 일부는 opacity 0.4 로 입체감
@@ -145,6 +156,14 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
         <svg {...common}>
           <circle cx="11" cy="11" r="7" />
           <path d="m21 21-4.3-4.3" />
+        </svg>
+      );
+    case "scan-eye":
+      return (
+        <svg {...common}>
+          <path d="M7 3H5a2 2 0 0 0-2 2v2M17 3h2a2 2 0 0 1 2 2v2M7 21H5a2 2 0 0 1-2-2v-2M17 21h2a2 2 0 0 0 2-2v-2" />
+          <path d="M4.5 12s2.6-4 7.5-4 7.5 4 7.5 4-2.6 4-7.5 4-7.5-4-7.5-4Z" />
+          <circle cx="12" cy="12" r="2" />
         </svg>
       );
     case "upload":

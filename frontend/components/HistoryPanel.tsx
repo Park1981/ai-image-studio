@@ -66,10 +66,14 @@ export default function HistoryPanel() {
 
   // 패널 열릴 때 목록 로드
   useEffect(() => {
-    if (historyPanelOpen) {
+    if (!historyPanelOpen) return
+
+    const timer = setTimeout(() => {
       setSearchQuery('')
       fetchHistory(1, '')
-    }
+    }, 0)
+
+    return () => clearTimeout(timer)
   }, [historyPanelOpen, fetchHistory])
 
   // 검색어 디바운스 처리

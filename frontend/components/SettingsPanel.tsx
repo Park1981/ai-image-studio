@@ -43,10 +43,14 @@ export default function SettingsPanel() {
 
   // 설정 패널 열릴 때 모델 목록 + 커스텀 프리셋 로드
   useEffect(() => {
-    if (settingsOpen) {
+    if (!settingsOpen) return
+
+    const timer = setTimeout(() => {
       fetchOllamaModels()
       setCustomPresets(loadCustomPresets())
-    }
+    }, 0)
+
+    return () => clearTimeout(timer)
   }, [settingsOpen, fetchOllamaModels])
 
   /** 상태 즉시 갱신 (10초 폴링 대기 안 함) */

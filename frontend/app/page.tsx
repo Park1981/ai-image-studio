@@ -151,7 +151,7 @@ export default function MainMenuPage() {
               onClick={() => router.push("/generate")}
             />
             <MenuCard
-              icon="edit"
+              icon="wand"
               title="Image Edit"
               desc="참조 이미지와 자연어 지시를 비전 모델로 분석해 수정본을 생성합니다."
               bgImage="/menu/edit.png"
@@ -162,14 +162,14 @@ export default function MainMenuPage() {
           {/* ── 비전 카테고리 ── */}
           <CategorySection label="Vision">
             <MenuCard
-              icon="search"
+              icon="scan-eye"
               title="Vision Analyze"
               desc="이미지 한 장을 비전 모델로 분석해 상세 영/한 설명을 추출합니다."
               bgImage="/menu/vision.png"
               onClick={() => router.push("/vision")}
             />
             <MenuCard
-              icon="grid"
+              icon="compare"
               title="Vision Compare"
               desc="두 이미지를 비전 모델로 비교해 구성·색·피사체·분위기·품질 5축 차이를 분석합니다."
               bgImage="/menu/compare.png"
