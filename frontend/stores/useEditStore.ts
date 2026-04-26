@@ -7,6 +7,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import type { EditVisionAnalysis } from "@/lib/api/types";
 
 export interface EditStepDetail {
@@ -184,3 +185,33 @@ export const useEditStore = create<EditState>((set) => ({
   setSampling: (step, total) =>
     set({ samplingStep: step, samplingTotal: total }),
 }));
+
+/* ──────────── 그룹 selectors (task #8 · 2026-04-26) ────────────
+ * generate 와 동일 패턴 — 좌측 입력 / 우측 결과 / 진행상태를 useShallow 로 묶음.
+ */
+
+/** 입력 + 액션 (좌측 패널) */
+export const useEditInputs = () =>
+  useEditStore(
+    useShallow((s) => ({
+      sourceImage: s.sourceImage,
+      sourceLabel: s.sourceLabel,
+      sourceWidth: s.sourceWidth,
+      sourceHeight: s.sourceHeight,
+      setSource: s.setSource,
+      prompt: s.prompt,
+      setPrompt: s.setPrompt,
+      lightning: s.lightning,
+      setLightning: s.setLightning,
+    })),
+  );
+
+/** 진행 상태 (모달 + CTA) */
+export const useEditRunning = () =>
+  useEditStore(
+    useShallow((s) => ({
+      running: s.running,
+      pipelineProgress: s.pipelineProgress,
+      pipelineLabel: s.pipelineLabel,
+    })),
+  );

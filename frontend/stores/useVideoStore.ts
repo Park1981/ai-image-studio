@@ -9,6 +9,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 
 // ── 영상 해상도 슬라이더 범위 (backend presets.py 와 동기화) ──
 export const VIDEO_LONGER_EDGE_MIN = 512;
@@ -229,3 +230,35 @@ export const useVideoStore = create<VideoState>((set) => ({
       pipelineLabel: "",
     }),
 }));
+
+/* ──────────── 그룹 selectors (task #8 · 2026-04-26) ──────────── */
+
+/** 입력 + 액션 (좌측 패널) */
+export const useVideoInputs = () =>
+  useVideoStore(
+    useShallow((s) => ({
+      sourceImage: s.sourceImage,
+      sourceLabel: s.sourceLabel,
+      sourceWidth: s.sourceWidth,
+      sourceHeight: s.sourceHeight,
+      setSource: s.setSource,
+      prompt: s.prompt,
+      setPrompt: s.setPrompt,
+      adult: s.adult,
+      setAdult: s.setAdult,
+      longerEdge: s.longerEdge,
+      setLongerEdge: s.setLongerEdge,
+      lightning: s.lightning,
+      setLightning: s.setLightning,
+    })),
+  );
+
+/** 진행 상태 */
+export const useVideoRunning = () =>
+  useVideoStore(
+    useShallow((s) => ({
+      running: s.running,
+      pipelineProgress: s.pipelineProgress,
+      pipelineLabel: s.pipelineLabel,
+    })),
+  );

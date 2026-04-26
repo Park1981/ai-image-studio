@@ -39,29 +39,23 @@ import { toast } from "@/stores/useToastStore";
 import {
   computeVideoResize,
   useVideoStore,
+  useVideoInputs,
+  useVideoRunning,
   VIDEO_LONGER_EDGE_MAX,
   VIDEO_LONGER_EDGE_MIN,
   VIDEO_LONGER_EDGE_STEP,
 } from "@/stores/useVideoStore";
 
 export default function VideoPage() {
-  /* ── store ── */
-  const sourceImage = useVideoStore((s) => s.sourceImage);
-  const sourceLabel = useVideoStore((s) => s.sourceLabel);
-  const sourceWidth = useVideoStore((s) => s.sourceWidth);
-  const sourceHeight = useVideoStore((s) => s.sourceHeight);
-  const setSource = useVideoStore((s) => s.setSource);
-  const prompt = useVideoStore((s) => s.prompt);
-  const setPrompt = useVideoStore((s) => s.setPrompt);
-  const adult = useVideoStore((s) => s.adult);
-  const setAdult = useVideoStore((s) => s.setAdult);
-  const longerEdge = useVideoStore((s) => s.longerEdge);
-  const setLongerEdge = useVideoStore((s) => s.setLongerEdge);
-  const lightning = useVideoStore((s) => s.lightning);
-  const setLightning = useVideoStore((s) => s.setLightning);
-  const running = useVideoStore((s) => s.running);
-  // pipelineProgress 는 audit P1b 에서 CTA/VideoPlayerCard 모두 제거. ProgressModal 에서 직접 구독.
-  const pipelineLabel = useVideoStore((s) => s.pipelineLabel);
+  /* ── store (그룹 selectors · task #8 · 13줄 → 2줄) ── */
+  const {
+    sourceImage, sourceLabel, sourceWidth, sourceHeight, setSource,
+    prompt, setPrompt,
+    adult, setAdult,
+    longerEdge, setLongerEdge,
+    lightning, setLightning,
+  } = useVideoInputs();
+  const { running, pipelineLabel } = useVideoRunning();
   const lastVideoRef = useVideoStore((s) => s.lastVideoRef);
 
   const items = useHistoryStore((s) => s.items);

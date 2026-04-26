@@ -40,23 +40,23 @@ import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
 import { useEditPipeline } from "@/hooks/useEditPipeline";
-import { useEditStore } from "@/stores/useEditStore";
+import {
+  useEditStore,
+  useEditInputs,
+  useEditRunning,
+} from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 
 export default function EditPage() {
-  /* ── store ── */
-  const sourceImage = useEditStore((s) => s.sourceImage);
-  const sourceLabel = useEditStore((s) => s.sourceLabel);
-  const sourceWidth = useEditStore((s) => s.sourceWidth);
-  const sourceHeight = useEditStore((s) => s.sourceHeight);
-  const setSource = useEditStore((s) => s.setSource);
-  const prompt = useEditStore((s) => s.prompt);
-  const setPrompt = useEditStore((s) => s.setPrompt);
-  const lightning = useEditStore((s) => s.lightning);
-  const setLightning = useEditStore((s) => s.setLightning);
-  const running = useEditStore((s) => s.running);
+  /* ── store (그룹 selectors · task #8 · 11줄 → 2줄) ── */
+  const {
+    sourceImage, sourceLabel, sourceWidth, sourceHeight, setSource,
+    prompt, setPrompt,
+    lightning, setLightning,
+  } = useEditInputs();
+  const { running } = useEditRunning();
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
 

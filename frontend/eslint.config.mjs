@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // task #9 (2026-04-26): legacy 코드는 reference only · 컴파일/lint 그래프 분리
+    "legacy/**",
   ]),
 ]);
 
