@@ -11,13 +11,14 @@ from __future__ import annotations
 
 import asyncio
 import io
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from PIL import Image
 
 from studio.vision_pipeline import (
     SYSTEM_VISION_DETAILED,
+    SYSTEM_VISION_RECIPE_V2,
     VisionAnalysisResult,
     analyze_image_detailed,
 )
@@ -44,6 +45,23 @@ def test_system_vision_detailed_has_required_cues() -> None:
     assert "no markdown" in SYSTEM_VISION_DETAILED.lower()
 
 
+def test_system_vision_recipe_v2_has_single_image_guard() -> None:
+    """단일 Vision Analyzer 가 비교/2장 레이아웃으로 새지 않도록 가드."""
+    prompt = SYSTEM_VISION_RECIPE_V2
+    compact_prompt = " ".join(prompt.split())
+    assert "exactly ONE uploaded" in prompt
+    assert "additional image" in prompt
+    assert "DEFAULT SINGLE-IMAGE ANCHOR" in prompt
+    assert "Never use ordinal image labels" in prompt
+    assert "Never split one visible person" in prompt
+    assert "choose single-frame" in prompt
+    assert "clear panel boundaries" in prompt
+    assert "Use multi-subject or multi-panel wording ONLY" in prompt
+    assert "clearly separated layout panels" in compact_prompt
+    # 이전 side-by-side 예시가 모델 출력 템플릿처럼 복사되는 회귀 방지.
+    assert "Two side-by-side portraits of the same young woman" not in prompt
+
+
 # ───────── analyze_image_detailed 경로 ─────────
 
 
@@ -54,6 +72,10 @@ def test_vision_fallback_when_describe_fails() -> None:
     """
     translate_mock = AsyncMock(return_value="(should not be called)")
     with (
+        patch(
+            "studio.vision_pipeline._call_vision_recipe_v2",
+            new=AsyncMock(return_value=""),
+        ),
         patch(
             "studio.vision_pipeline._describe_image",
             new=AsyncMock(return_value=""),
@@ -79,6 +101,10 @@ def test_vision_success_with_translation() -> None:
     translate_mock = AsyncMock(return_value="황혼 무렵의 따뜻한 에디토리얼 사진.")
     with (
         patch(
+            "studio.vision_pipeline._call_vision_recipe_v2",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
             "studio.vision_pipeline._describe_image",
             new=describe_mock,
         ),
@@ -100,6 +126,10 @@ def test_vision_success_translation_only_fails() -> None:
     translate_mock = AsyncMock(return_value=None)  # translate 실패 시 None 반환
     with (
         patch(
+            "studio.vision_pipeline._call_vision_recipe_v2",
+            new=AsyncMock(return_value=""),
+        ),
+        patch(
             "studio.vision_pipeline._describe_image",
             new=describe_mock,
         ),
@@ -117,9 +147,14 @@ def test_vision_success_translation_only_fails() -> None:
 
 def test_vision_model_override_propagates() -> None:
     """vision_model / text_model override 가 실제 호출에 전달되는지."""
+    recipe_mock = AsyncMock(return_value="")
     describe_mock = AsyncMock(return_value="x")
     translate_mock = AsyncMock(return_value=None)
     with (
+        patch(
+            "studio.vision_pipeline._call_vision_recipe_v2",
+            new=recipe_mock,
+        ),
         patch(
             "studio.vision_pipeline._describe_image",
             new=describe_mock,
@@ -140,6 +175,8 @@ def test_vision_model_override_propagates() -> None:
     _, kwargs = describe_mock.call_args
     assert kwargs["vision_model"] == "custom-vision:latest"
     assert kwargs["system_prompt"] == SYSTEM_VISION_DETAILED
+    _, rkwargs = recipe_mock.call_args
+    assert rkwargs["vision_model"] == "custom-vision:latest"
 
     # translate_mock 에 text_model 이 model 인자로 전달
     _, tkwargs = translate_mock.call_args
@@ -159,6 +196,10 @@ async def test_vision_analyze_route_happy_path() -> None:
     describe_mock = AsyncMock(return_value="A moody studio portrait.")
     translate_mock = AsyncMock(return_value="분위기 있는 스튜디오 초상.")
     with (
+        patch(
+            "studio.vision_pipeline._call_vision_recipe_v2",
+            new=AsyncMock(return_value=""),
+        ),
         patch(
             "studio.vision_pipeline._describe_image",
             new=describe_mock,
@@ -202,6 +243,56 @@ def test_aspect_label_common_ratios() -> None:
     assert _aspect_label(1000, 333).endswith("custom")
     # 0/음수 방어
     assert _aspect_label(0, 0) == "unknown aspect"
+
+
+@pytest.mark.asyncio
+async def test_call_vision_recipe_v2_payload_declares_single_source() -> None:
+    """Ollama user message 에도 단일 이미지 조건을 명시."""
+    from studio.vision_pipeline import _call_vision_recipe_v2
+
+    captured: dict = {}
+
+    class _FakeResponse:
+        def raise_for_status(self) -> None: ...
+
+        def json(self) -> dict:
+            return {"message": {"content": "{}"}}
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url: str, json=None):
+            captured["url"] = url
+            captured["payload"] = json
+            return _FakeResponse()
+
+    with patch(
+        "studio.vision_pipeline.httpx.AsyncClient",
+        new=MagicMock(return_value=_FakeClient()),
+    ):
+        await _call_vision_recipe_v2(
+            _tiny_png_bytes(),
+            width=491,
+            height=628,
+            vision_model="qwen2.5vl:7b",
+            timeout=10.0,
+            ollama_url="http://x",
+        )
+
+    payload = captured["payload"]
+    assert payload.get("format") == "json"
+    assert payload.get("keep_alive") == "0"
+    sys_msg = payload["messages"][0]["content"]
+    user_msg = payload["messages"][1]["content"]
+    assert "exactly ONE uploaded" in sys_msg
+    assert "Exactly one SOURCE image is attached" in user_msg
+    assert "Analyze this single image only" in user_msg
+    assert "Do not mention a second image" in user_msg
+    assert "491×628" in user_msg
 
 
 def test_vision_v2_json_path_populates_slots() -> None:
