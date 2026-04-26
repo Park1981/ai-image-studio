@@ -91,6 +91,31 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **types/store 확장**: `VisionRecipeV2` interface + `VisionAnalysisResponse extends VisionRecipeV2`. `useVisionStore` 의 `VisionEntry` + `VisionResult` 9 슬롯 옵셔널 필드. `useVisionPipeline` 응답 매핑. `useProcessStore` 에 cpu/ram/gpu 필드 + `applyStatus({ollama, comfyui, vram, ram, gpuPercent, cpuPercent})` 시그니처 변경.
 - **테스트**: pytest 159→162 (`_aspect_label` / vision recipe v2 happy path / JSON parse 실패 폴백 3 케이스 추가).
 
+**2026-04-26 (후속) Compare v2.2 + Ollama keep_alive=0** — pytest 162 · vitest 23 · lint+tsc clean.
+- **Vision Compare v2.2** (Codex+Claude 공동 spec):
+  - **점수 calibration rubric** 5단계 (95-100 nearly identical / 90-94 very close / 80-89 clear differences / 60-79 major changes / <60 substantial mismatch). "Default to LOW end when unsure. Under-score before over-score." 명시.
+  - **Subject 하드 캡** (recreation fidelity 보호): GAZE 변화 → ≤90 / HEAD ANGLE → ≤88 / FACIAL EXPRESSION → ≤88 / POSE → ≤88 / 2개 이상 동시 → ≤82. "DO NOT give subject > 90 if pose/gaze/angle/expression differ — even when identity, clothing, background look the same."
+  - **Quality 의미 명확화**: "technical similarity, NOT 'which is better'". 둘 다 high 면 high stay, but 코멘트는 parity 묘사.
+  - **풍부 묘사**: 각 축 1-2 → 3-5 sentences. 구체적 디테일 (gaze direction, head angle, expression specifics) 명시.
+  - **transform_prompt 슬롯 신설**: A → B 변형 t2i 지시 (e.g. "shift gaze upward 30°, soften smile..."). 95+ 동일 시 "no significant changes — visually equivalent".
+  - **uncertain 슬롯 신설**: 비교 못한 영역 명시 (없으면 "").
+  - **format: "json"** 추가 (Vision Recipe v2 와 일관).
+  - **SYSTEM 단축 v2.1→v2.2**: 200+ 줄 → 80 줄 (lost-in-middle 회피). ABSOLUTE REQUIREMENTS 섹션 추가 — 모든 점수 필드 0-100 정수 강제 + null/missing 금지. v2.1 첫 시도 시 모델이 점수 누락 (종합 0%) 한 사례 fix.
+  - **Vision Recipe v2 example 교체**: 단일 centered portrait 예시 → 4 도메인 예시 (off-center 인물 / top-down 음식 / 항공 풍경 / 매크로 제품). "Match shape to actual domain — DO NOT default to centered portrait phrasing for non-portrait images." 강조.
+- **VisionCompareAnalysis 확장**: `transform_prompt_en/ko` + `uncertain_en/ko` 옵셔널 필드. 번역 묶음에 `extra_sections` 인자 추가 (transform/uncertain 도 동일 호출에서 한국어 번역).
+- **Frontend `/vision/compare` UI**: TransformPromptBox 신설 (보라색 left-bar · 영문 우선 복사 + 한국어 메인 + 영문 옅게 표시) · UncertainBox 신설 (회색 톤). Summary 카드 다음에 배치.
+- **Ollama keep_alive=0** (CRITICAL — VRAM 안정성):
+  - 16GB VRAM 환경에서 Ollama 가 비전 분석 후 14GB 5분 점유 (default keep_alive=5m) → ComfyUI 와 swap 충돌 → 무한 로딩 사례 발견.
+  - **모든 Ollama `/api/chat` payload 에 `"keep_alive": 0` 추가** (7 호출):
+    `vision_pipeline._describe_image` / `_call_vision_edit_source` / `_call_vision_recipe_v2` /
+    `comparison_pipeline._call_vision_pair` / `_call_vision_pair_generic` / `_translate_comments_to_ko` /
+    `prompt_pipeline._chat_text_only`
+  - Vision (qwen2.5vl 14GB) + Text (gemma4-un 16GB) 모두 적용 — 응답 직후 unload, VRAM 즉시 반납.
+  - Trade-off: 다음 호출 시 모델 재로드 ~5초 (ComfyUI 30초+ 컨텍스트라 영향 미미). 안정성 압도적 우선.
+  - 검증: 강제 unload (`POST /api/generate keep_alive:0`) → VRAM 15.4GB → 1.3GB 즉시 반납 확인.
+  - CLAUDE.md "Ollama: 온디맨드 호출 + VRAM 즉시 반납" 의도와 일치.
+- **테스트**: pytest 162 (회귀 0) · vitest 23 · lint+tsc clean.
+
 ## Architecture (신규 · 재설계 후)
 - frontend/: Next.js 16, App Router, React 19, TypeScript strict, Tailwind v4, Zustand 5
 - backend/: FastAPI, Python 3.13, httpx + websockets + aiosqlite + pydantic-settings

@@ -181,7 +181,12 @@ export type VisionCompareComments = {
   [K in keyof VisionCompareScores]: string;
 };
 
-/** Vision Compare 분석 단일 결과 (휘발 · DB 저장 X). */
+/** Vision Compare 분석 단일 결과 (휘발 · DB 저장 X).
+ *
+ * 2026-04-26 v2.1 (Codex+Claude 안):
+ *   - transform_prompt: B 를 만드려면 A 에 적용할 t2i 변형 지시
+ *   - uncertain: 비전이 비교 못한 영역 명시 (없으면 빈 문자열)
+ */
 export interface VisionCompareAnalysis {
   scores: VisionCompareScores;
   overall: number;
@@ -189,6 +194,14 @@ export interface VisionCompareAnalysis {
   comments_ko: VisionCompareComments;
   summary_en: string;
   summary_ko: string;
+  /** v2.1: A → B 변형 t2i 프롬프트 (영문) */
+  transform_prompt_en?: string;
+  /** v2.1: 변형 프롬프트 한국어 번역 */
+  transform_prompt_ko?: string;
+  /** v2.1: 비교 못한 영역 (영문) */
+  uncertain_en?: string;
+  /** v2.1: 비교 못한 영역 한국어 번역 */
+  uncertain_ko?: string;
   provider: "ollama" | "fallback";
   fallback: boolean;
   analyzedAt: number;
@@ -451,7 +464,7 @@ export type VideoStage =
 export interface VisionRecipeV2 {
   /** 사람 읽는 2-3 문장 영문 요약 (한국어 번역은 ko 필드에 들어감). */
   summary: string;
-  /** t2i 재생성용 80-200 단어 영문 프롬프트 (subject FIRST ordering). */
+  /** t2i 재생성용 150-300 단어 영문 프롬프트 (subject FIRST ordering · comprehensive · 2026-04-26 동기화). */
   positivePrompt: string;
   /** 콤마 분리 회피 리스트 — image-specific + 표준 t2i guards. */
   negativePrompt: string;

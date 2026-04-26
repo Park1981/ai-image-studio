@@ -134,38 +134,86 @@ Rules:
 - Always provide an integer score 0-100 (no nulls).
 - Comments are concise (max 2 sentences each)."""
 
-# 비전 응답 강제 — STRICT JSON only (Vision Compare context · 신규 · edit 무영향)
-# 사용자가 직접 고른 두 이미지를 5축 (composition/color/subject/mood/quality)으로 비교
-# 힌트가 있으면 프롬프트 끝에 강한 지시문이 추가됨 (_call_vision_pair_generic 에서 처리)
-SYSTEM_COMPARE_GENERIC = """You are a vision evaluator comparing TWO arbitrary images:
-  IMAGE_A = first image
-  IMAGE_B = second image
+# 비전 응답 강제 — STRICT JSON only (Vision Compare context · 2026-04-26 v2.2)
+# v2.1 의 SYSTEM 이 200+ 줄로 길어 모델이 lost-in-middle → scores 누락 응답 발생.
+# v2.2: 핵심 룰만 80줄로 단축 + JSON 스키마 마지막에 명확 강조 + 룰 위반 금지 표현.
+SYSTEM_COMPARE_GENERIC = """You are a vision evaluator comparing TWO images:
+  IMAGE_A = first
+  IMAGE_B = second
 
-Evaluate the two images side-by-side on FIVE axes.
-Score each axis 0-100 (integer) where the score reflects HOW SIMILAR the
-two images are on that axis. 100 = identical, 0 = completely different.
-  - composition: framing, layout, subject placement, perspective.
-  - color: dominant palette, saturation, white balance, lighting tone.
-  - subject: main subject(s) — identity, count, pose, action, expression.
-  - mood: overall atmosphere, emotional tone, time-of-day feel.
-  - quality: technical sharpness, resolution feel, noise/artifacts, focus.
+Score each of 5 axes (composition, color, subject, mood, quality)
+0-100 (integer) for recreation fidelity (HOW SIMILAR they are).
 
-Write a 1-2 sentence comment per axis (English) describing the
-key DIFFERENCE between A and B on that axis.
-Then write a 3-5 sentence overall summary (English) of how A and B compare.
+═══ SCORE RUBRIC ═══
+  95-100: nearly identical (only tiny imperceptible differences)
+  90-94 : very close (no major changes)
+  80-89 : same concept but CLEAR visible differences
+  60-79 : same broad scene but MAJOR pose/composition/expression changes
+  below 60: substantial mismatch
 
-Return STRICT JSON only (no markdown, no preamble, no trailing text):
+Default to LOW end when unsure. Under-score before over-score.
+
+═══ SUBJECT HARD CAPS (MUST APPLY) ═══
+For "subject" axis only, enforce these upper bounds:
+  - GAZE direction changed significantly         → subject MUST be ≤ 90
+  - HEAD ANGLE changed significantly             → subject MUST be ≤ 88
+  - FACIAL EXPRESSION changed significantly      → subject MUST be ≤ 88
+  - POSE/BODY ORIENTATION changed significantly  → subject MUST be ≤ 88
+  - 2 OR MORE of the above changed               → subject MUST be ≤ 82
+
+DO NOT give subject > 90 if pose, gaze, head angle, or expression
+differ between A and B — even when identity, clothing, and background
+look the same.
+
+═══ AXIS DEFINITIONS ═══
+  composition: framing, layout, placement, perspective, aspect
+  color      : palette, saturation, white balance, lighting tone
+  subject    : identity, pose, head/gaze/expression (HARD CAPS APPLY)
+  mood       : atmosphere, emotional tone, time-of-day feel
+  quality    : technical sharpness/noise/focus parity (NOT "better")
+
+═══ COMMENT TONE ═══
+3-5 sentences per axis (English). Be SPECIFIC, cite actual differences.
+Avoid filler ("two images are similar").
+
+═══ TRANSFORM PROMPT ═══
+A t2i instruction set that, applied to A's generation prompt, would
+produce B. If A and B are 95+ identical, use exactly:
+  "no significant changes — visually equivalent"
+
+═══ UNCERTAIN ═══
+Aspects not reliably comparable. Use "" if all confidently compared.
+
+═══════════════════════════════════════════════════════════════════
+RETURN STRICT JSON ONLY (no markdown fences, no preamble, no trailer)
+═══════════════════════════════════════════════════════════════════
 {
   "scores": {
-    "composition": <int>, "color": <int>, "subject": <int>,
-    "mood": <int>, "quality": <int>
+    "composition": <integer 0-100>,
+    "color":       <integer 0-100>,
+    "subject":     <integer 0-100>,
+    "mood":        <integer 0-100>,
+    "quality":     <integer 0-100>
   },
   "comments": {
-    "composition": "<en>", "color": "<en>", "subject": "<en>",
-    "mood": "<en>", "quality": "<en>"
+    "composition": "<English, 3-5 sentences>",
+    "color":       "<English, 3-5 sentences>",
+    "subject":     "<English, 3-5 sentences>",
+    "mood":        "<English, 3-5 sentences>",
+    "quality":     "<English, 3-5 sentences>"
   },
-  "summary": "<en, 3-5 sentences>"
-}"""
+  "summary":          "<English, 3-5 sentences>",
+  "transform_prompt": "<English t2i instructions to turn A into B>",
+  "uncertain":        "<English, or empty string>"
+}
+
+ABSOLUTE REQUIREMENTS:
+  1. ALL 5 score fields MUST be integers 0-100. NEVER null, NEVER missing.
+  2. ALL 5 comment fields MUST be non-empty English strings.
+  3. summary MUST be non-empty.
+  4. transform_prompt MUST be non-empty.
+  5. uncertain MAY be "" but must be present.
+  6. Output ONLY this JSON object. NOTHING else."""
 
 # 힌트가 있을 때 시스템 프롬프트 끝에 추가되는 강한 지시 블록
 # (없으면 추가하지 않음 — AI 가 빈 힌트로 혼란 안 겪게)
@@ -233,6 +281,13 @@ class ComparisonAnalysisResult:
     overall: int = 0
     summary_en: str = ""
     summary_ko: str = ""
+
+    # 2026-04-26 v2.1 (Vision Compare 전용 신규 필드 — analyze_pair 는 미사용)
+    transform_prompt_en: str = ""
+    transform_prompt_ko: str = ""
+    uncertain_en: str = ""
+    uncertain_ko: str = ""
+
     provider: str = "fallback"  # "ollama" | "fallback"
     fallback: bool = True
     analyzed_at: int = 0
@@ -260,6 +315,15 @@ class ComparisonAnalysisResult:
             out["comments_en"] = self.comments_en
         if self.comments_ko:
             out["comments_ko"] = self.comments_ko
+        # 2026-04-26 v2.1 — Vision Compare 전용 신규 필드 (값 있을 때만 포함)
+        if self.transform_prompt_en:
+            out["transform_prompt_en"] = self.transform_prompt_en
+        if self.transform_prompt_ko:
+            out["transform_prompt_ko"] = self.transform_prompt_ko
+        if self.uncertain_en:
+            out["uncertain_en"] = self.uncertain_en
+        if self.uncertain_ko:
+            out["uncertain_ko"] = self.uncertain_ko
         return out
 
 
@@ -311,6 +375,8 @@ async def _call_vision_pair(
             },
         ],
         "stream": False,
+        # 2026-04-26: VRAM 즉시 반납
+        "keep_alive": 0,
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
@@ -421,12 +487,19 @@ async def _translate_comments_to_ko(
     timeout: float,
     ollama_url: str,
     axes: tuple[str, ...] = AXES,
+    extra_sections: dict[str, str] | None = None,
 ) -> dict[str, Any] | None:
-    """5축 코멘트 + summary 를 한 호출로 번역 (gemma4-un, think:False). 실패 시 None.
-    axes 기본값=AXES (edit 호출자 무영향).
+    """5축 코멘트 + summary + extra (transform_prompt / uncertain) 한 호출로 번역.
+
+    gemma4-un, think:False. 실패 시 None.
+
+    Args:
+        extra_sections: 추가 번역 묶음 — {"transform_prompt": "...", "uncertain": "..."} 등.
+            빈 문자열은 자동 스킵. 결과는 returned dict 의 "extra" 키에 같은 키로 들어감.
 
     Returns:
-        {"comments_ko": {axis: ko_text, ...}, "summary_ko": str} or None
+        {"comments_ko": {axis: ko_text, ...}, "summary_ko": str,
+         "extra": {key: ko_text, ...}} or None.
     """
     # 번역할 섹션 묶음 구성
     sections: list[str] = []
@@ -436,6 +509,13 @@ async def _translate_comments_to_ko(
             sections.append(f"[{axis}]\n{text}")
     if summary_en.strip():
         sections.append(f"[summary]\n{summary_en.strip()}")
+    # 2026-04-26 v2.1 — extra_sections (transform_prompt / uncertain 등)
+    extra_keys: list[str] = []
+    if extra_sections:
+        for key, text in extra_sections.items():
+            if text and text.strip():
+                sections.append(f"[{key}]\n{text.strip()}")
+                extra_keys.append(key)
     if not sections:
         return None
 
@@ -449,6 +529,8 @@ async def _translate_comments_to_ko(
         "stream": False,
         # CLAUDE.md 규칙: gemma4-un 은 reasoning 모델 → think:False 필수
         "think": False,
+        # 2026-04-26: VRAM 즉시 반납
+        "keep_alive": 0,
         "options": {"temperature": 0.4, "num_ctx": 4096, "num_predict": 800},
     }
     try:
@@ -468,16 +550,25 @@ async def _translate_comments_to_ko(
     sections_ko = re.split(r"\[([a-zA-Z_]+)\]\s*", raw)
     comments_ko: dict[str, str] = {}
     summary_ko = ""
+    extra_ko: dict[str, str] = {}
+    extra_keys_lower = {k.lower(): k for k in extra_keys}
     # 짝수 인덱스(1,3,5,...) = 키, 홀수 인덱스(2,4,6,...) = 값
     for i in range(1, len(sections_ko) - 1, 2):
         # 모델이 대문자/혼합 케이스로 응답해도 lower() 로 정규화
-        key = sections_ko[i].strip().lower()
+        key_lower = sections_ko[i].strip().lower()
         val = sections_ko[i + 1].strip()
-        if key == "summary":
+        if key_lower == "summary":
             summary_ko = val
-        elif key in axes:
-            comments_ko[key] = val
-    return {"comments_ko": comments_ko, "summary_ko": summary_ko}
+        elif key_lower in axes:
+            comments_ko[key_lower] = val
+        elif key_lower in extra_keys_lower:
+            # 원본 키 케이스로 저장 (extra_sections 호출자와 동일 키)
+            extra_ko[extra_keys_lower[key_lower]] = val
+    return {
+        "comments_ko": comments_ko,
+        "summary_ko": summary_ko,
+        "extra": extra_ko,
+    }
 
 
 def _coerce_intent(raw: Any) -> str:
@@ -702,6 +793,10 @@ async def _call_vision_pair_generic(
             },
         ],
         "stream": False,
+        # 2026-04-26 v2.1: Vision Recipe v2 와 동일하게 format=json 강제 (Codex 안)
+        "format": "json",
+        # 2026-04-26: VRAM 즉시 반납
+        "keep_alive": 0,
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
@@ -788,7 +883,18 @@ async def analyze_pair_generic(
     summary_en = summary_raw.strip() if isinstance(summary_raw, str) else ""
     overall = _compute_overall(scores)
 
+    # 2026-04-26 v2.1 — transform_prompt + uncertain 파싱 (Codex+Claude 안)
+    transform_raw = parsed.get("transform_prompt")
+    transform_en = (
+        transform_raw.strip() if isinstance(transform_raw, str) else ""
+    )
+    uncertain_raw = parsed.get("uncertain")
+    uncertain_en = (
+        uncertain_raw.strip() if isinstance(uncertain_raw, str) else ""
+    )
+
     # ── 4단계: 한글 번역 (실패해도 en 으로 폴백) ──
+    # transform/uncertain 도 같은 번역 묶음에 포함 (extra_sections 인자 도입)
     translation = await _translate_comments_to_ko(
         comments_en,
         summary_en,
@@ -796,16 +902,25 @@ async def analyze_pair_generic(
         timeout=60.0,
         ollama_url=resolved_url,
         axes=COMPARE_AXES,
+        extra_sections={"transform_prompt": transform_en, "uncertain": uncertain_en},
     )
     if translation is None:
         comments_ko = dict(comments_en)
         summary_ko = "한글 번역 실패"
+        transform_ko = transform_en
+        uncertain_ko = uncertain_en
     else:
         comments_ko = {
             axis: translation["comments_ko"].get(axis) or comments_en.get(axis, "")
             for axis in COMPARE_AXES
         }
         summary_ko = translation["summary_ko"] or summary_en
+        transform_ko = (
+            translation.get("extra", {}).get("transform_prompt") or transform_en
+        )
+        uncertain_ko = (
+            translation.get("extra", {}).get("uncertain") or uncertain_en
+        )
 
     return ComparisonAnalysisResult(
         scores=scores,
@@ -814,6 +929,10 @@ async def analyze_pair_generic(
         comments_ko=comments_ko,
         summary_en=summary_en,
         summary_ko=summary_ko,
+        transform_prompt_en=transform_en,
+        transform_prompt_ko=transform_ko,
+        uncertain_en=uncertain_en,
+        uncertain_ko=uncertain_ko,
         provider="ollama",
         fallback=False,
         analyzed_at=int(time.time() * 1000),

@@ -221,6 +221,64 @@ Each visible detail (skin texture, fabric weave, hair flow direction,
 catchlight position, shadow softness, color saturation) deserves at
 least one descriptor.
 
+═══════════════════════════════════════════════════════════════════
+EXAMPLES — diverse domains, NOT centered passport-style only
+═══════════════════════════════════════════════════════════════════
+Adapt your prompt to the actual scene. Do not bias toward centered
+portraits. Below are example positive_prompts across diverse domains:
+
+[example A — environmental wide portrait, off-center]
+"East Asian young woman leaning against a moss-covered tree, three-
+quarter pose with weight on left hip, content half-smile, gaze drifting
+upward to the canopy, long damp dark hair clinging to shoulders, gray
+ribbed cotton tank top with subtle wet patches, olive utility shorts,
+positioned right-third of frame following rule of thirds, dense
+rainforest backdrop with cascading waterfall middle-ground and ferns
+foreground, overcast diffused daylight with soft rim light from rear,
+gentle rain visible as faint streaks, muted earth tones with cool teal
+shadows in foliage, 35mm f/1.8 environmental portrait lens, shallow
+DOF on subject with soft bokeh on rocks behind, naturalistic film
+grain, cinematic editorial photography, ultra detailed."
+
+[example B — food still life, top-down]
+"Rustic ceramic bowl of ramen on weathered oak table, top-down 90°
+overhead composition, bowl placed slightly upper-left of frame,
+swirling steam captured mid-motion, glossy soy-tonkotsu broth surface
+with floating chashu slices, soft-boiled egg halved revealing molten
+yolk, crisp nori sheet at 2 o'clock, scallions scattered, chopsticks
+laid diagonally lower-right, warm tungsten kitchen light from camera-
+right at golden-hour color temperature, deep amber-brown palette with
+emerald scallion accents, 50mm f/2.8 macro lens with razor-sharp focus
+on egg yolk and gentle fall-off on table edges, film stock rendering,
+moody food photography, restaurant editorial style, ultra detailed."
+
+[example C — landscape, wide aspect]
+"Aerial view of winding mountain road carving through autumn maple
+forest, captured from drone perspective at 30° downward angle, road
+diagonal from lower-left to upper-right, vehicle absent, dense crimson
+and amber canopy filling 80% of frame, narrow blue river snaking
+parallel in middle-ground, distant misty peaks at top edge, golden
+hour low-angle sunlight from camera-right casting long warm shadows,
+saturated reds and oranges with cool blue-violet shadow accents,
+24mm wide-angle lens, deep DOF with everything sharp, atmospheric
+haze, dramatic landscape photography, National Geographic style,
+ultra detailed."
+
+[example D — single product, studio]
+"Vintage brass camera lens placed on textured charcoal felt surface,
+extreme close-up macro shot, lens aperture ring slightly tilted at
+15° toward camera-left, brass body with patina showing natural wear
+and oily fingerprints, glass element catching ring-light reflection,
+small "f/2.8" engraving readable, single softbox key from upper-
+right at 45°, no fill light creating dramatic chiaroscuro shadows,
+warm vintage tones with deep blacks and amber metal highlights, 100mm
+f/8 macro lens, deep DOF with everything pin-sharp, product
+photography studio style, ultra detailed."
+
+CRITICAL: Match the example shape to the actual image domain (person /
+food / landscape / product / etc). Do NOT default to centered portrait
+phrasing for non-portrait images.
+
 Example positive_prompt (good):
 "young woman, long dark hair, white tank top, neutral expression,
 centered composition, subject fills frame, soft diffused 85mm portrait
@@ -454,6 +512,8 @@ async def _describe_image(
             },
         ],
         "stream": False,
+        # 2026-04-26: VRAM 즉시 반납 — 비전 모델 14GB 가 ComfyUI 와 충돌 방지
+        "keep_alive": 0,
         "options": {"temperature": temperature},
     }
     try:
@@ -664,6 +724,8 @@ async def _call_vision_edit_source(
         ],
         "stream": False,
         "format": "json",
+        # 2026-04-26: VRAM 즉시 반납
+        "keep_alive": 0,
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
@@ -877,6 +939,8 @@ async def _call_vision_recipe_v2(
         ],
         "stream": False,
         "format": "json",
+        # 2026-04-26: VRAM 즉시 반납
+        "keep_alive": 0,
         "options": {"temperature": 0.4, "num_ctx": 8192},
     }
     try:
