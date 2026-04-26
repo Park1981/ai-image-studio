@@ -1,0 +1,354 @@
+/**
+ * VideoLeftPanel — Video 페이지 좌측 입력 패널.
+ *
+ * 포함:
+ *  - StudioModeHeader (Video Generate)
+ *  - 원본 이미지 카드 (SourceImageCard)
+ *  - 영상 지시 textarea (PromptHistoryPeek + 비우기)
+ *  - VideoResolutionSlider (긴 변 픽셀 + 원본 비율 유지)
+ *  - Lightning / Adult 토글
+ *  - 16GB VRAM 주의 배너
+ *  - Primary CTA (sticky · 처리 중 spinner + ETA)
+ *
+ * 2026-04-26: video/page.tsx 591줄 → 분해 step 1.
+ *  - VideoResolutionSlider + simplifyRatio 도 같이 이동
+ *  - Store 직접 구독 (useVideoInputs/useVideoRunning) → page 의 prop drilling 차단
+ */
+
+"use client";
+
+import type { RefObject } from "react";
+import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import SourceImageCard from "@/components/studio/SourceImageCard";
+import {
+  StudioLeftPanel,
+  StudioModeHeader,
+} from "@/components/studio/StudioLayout";
+import Icon from "@/components/ui/Icon";
+import { Spinner, Toggle } from "@/components/ui/primitives";
+import {
+  computeVideoResize,
+  useVideoInputs,
+  useVideoRunning,
+  VIDEO_LONGER_EDGE_MAX,
+  VIDEO_LONGER_EDGE_MIN,
+  VIDEO_LONGER_EDGE_STEP,
+} from "@/stores/useVideoStore";
+import { toast } from "@/stores/useToastStore";
+
+interface Props {
+  /** prompt textarea ref — useAutoGrowTextarea 훅이 부모에서 관리 */
+  promptTextareaRef: RefObject<HTMLTextAreaElement | null>;
+  /** 영상 생성 트리거 (useVideoPipeline.generate) */
+  onGenerate: () => void;
+}
+
+export default function VideoLeftPanel({
+  promptTextareaRef,
+  onGenerate,
+}: Props) {
+  const {
+    sourceImage, sourceLabel, sourceWidth, sourceHeight, setSource,
+    prompt, setPrompt,
+    adult, setAdult,
+    longerEdge, setLongerEdge,
+    lightning, setLightning,
+  } = useVideoInputs();
+  const { running } = useVideoRunning();
+
+  const handleSourceChange = (
+    image: string,
+    label: string,
+    w: number,
+    h: number,
+  ) => {
+    setSource(image, label, w, h);
+    toast.success("이미지 업로드 완료", label.split(" · ")[0]);
+  };
+  const handleClearSource = () => {
+    setSource(null);
+    toast.info("이미지 해제됨");
+  };
+
+  const ctaDisabled = running || !sourceImage || !prompt.trim();
+
+  return (
+    <StudioLeftPanel>
+      <StudioModeHeader
+        title="Video Generate"
+        description="원본 이미지와 영상 지시로 5초 MP4를 생성합니다."
+      />
+
+      {/* ── 원본 이미지 ── */}
+      <div>
+        <div className="ais-field-header">
+          <label className="ais-field-label">원본 이미지</label>
+          <span className="mono ais-field-meta">
+            {sourceWidth && sourceHeight
+              ? `${sourceWidth}×${sourceHeight}`
+              : "—"}
+          </span>
+        </div>
+        <SourceImageCard
+          sourceImage={sourceImage}
+          sourceLabel={sourceLabel}
+          sourceWidth={sourceWidth}
+          sourceHeight={sourceHeight}
+          onChange={handleSourceChange}
+          onClear={handleClearSource}
+          onError={(msg) => toast.error(msg)}
+        />
+      </div>
+
+      {/* ── 영상 지시 prompt ── */}
+      <div>
+        <div className="ais-field-header">
+          <label className="ais-field-label">영상 지시</label>
+          <span className="mono ais-field-meta">{prompt.length} chars</span>
+        </div>
+        <div className="ais-prompt-shell">
+          <PromptHistoryPeek mode="video" onSelect={(p) => setPrompt(p)} />
+          <textarea
+            ref={promptTextareaRef}
+            value={prompt}
+            onChange={(e) => setPrompt(e.target.value)}
+            placeholder="어떤 움직임/카메라/분위기의 영상? 예: 느린 달리 인, 창가 빛 변화..."
+            rows={3}
+            className="ais-prompt-textarea"
+          />
+          {prompt.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPrompt("")}
+              title="프롬프트 비우기"
+              className="ais-prompt-clear"
+              style={{ position: "absolute", bottom: 6, right: 10 }}
+            >
+              <Icon name="x" size={10} /> 비우기
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── 영상 해상도 슬라이더 ── */}
+      <VideoResolutionSlider
+        longerEdge={longerEdge}
+        setLongerEdge={setLongerEdge}
+        sourceWidth={sourceWidth}
+        sourceHeight={sourceHeight}
+      />
+
+      {/* ── Lightning / Adult 토글 ── */}
+      <Toggle
+        checked={lightning}
+        onChange={setLightning}
+        label={lightning ? "Lightning 4-step" : "고품질 30-step"}
+        desc={
+          lightning
+            ? "빠른 생성 · 약 5분 · 얼굴 변할 수 있음"
+            : "Full step · 약 20분+ · 얼굴 보존 우선"
+        }
+      />
+
+      <Toggle
+        checked={adult}
+        onChange={setAdult}
+        label={adult ? "성인 모드 켜짐" : "성인 모드 꺼짐"}
+        desc={
+          adult
+            ? "에로틱 모션 + NSFW LoRA 적용"
+            : "SFW 프롬프트 · 얼굴 보존 안정"
+        }
+      />
+
+      {/* ── VRAM 주의 배너 ── */}
+      <div
+        style={{
+          padding: "10px 12px",
+          background: "var(--amber-soft)",
+          border: "1px solid rgba(250,173,20,.35)",
+          borderRadius: "var(--radius)",
+          fontSize: 11.5,
+          color: "var(--amber-ink)",
+          lineHeight: 1.55,
+        }}
+      >
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            fontWeight: 600,
+            marginBottom: 3,
+          }}
+        >
+          <Icon name="search" size={12} />
+          16GB VRAM 주의
+        </div>
+        공식 fp8 체크포인트(29GB)는 VRAM 초과. NVIDIA Control Panel →
+        “CUDA Sysmem Fallback: Prefer” 활성화 또는 <code>.env</code>에{" "}
+        <code>LTX_UNET_NAME</code> 지정으로 경량 variant 교체.
+      </div>
+
+      <div style={{ flex: 1 }} />
+
+      {/* ── Primary CTA (sticky 하단 + ETA) ── */}
+      <div className="ais-cta-sticky">
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={ctaDisabled}
+          className="ais-cta-primary"
+        >
+          {running ? (
+            <>
+              <Spinner /> 처리 중…
+            </>
+          ) : (
+            <>
+              <Icon name="sparkle" size={15} />
+              영상 생성
+            </>
+          )}
+        </button>
+        <div className="ais-cta-eta">
+          평균 소요{" "}
+          <span className="mono">{lightning ? "5~10분" : "25~40분"}</span> ·
+          5초 영상 · 로컬 처리
+        </div>
+      </div>
+    </StudioLeftPanel>
+  );
+}
+
+/* ────────────────────────────────────────────────
+   영상 해상도 슬라이더 (Video 전용 — 외부 노출 불필요)
+   - 긴 변을 512~1536 (step 128) 범위로 선택
+   - 원본 비율 유지: 예상 출력 해상도 실시간 계산
+   - 이미지 없으면 disabled (비율 계산 불가)
+   ──────────────────────────────────────────────── */
+function VideoResolutionSlider({
+  longerEdge,
+  setLongerEdge,
+  sourceWidth,
+  sourceHeight,
+}: {
+  longerEdge: number;
+  setLongerEdge: (v: number) => void;
+  sourceWidth: number | null;
+  sourceHeight: number | null;
+}) {
+  const hasSource = !!(sourceWidth && sourceHeight);
+  const expected = hasSource
+    ? computeVideoResize(sourceWidth!, sourceHeight!, longerEdge)
+    : { width: 0, height: 0 };
+  // 시간 가중치 — 1536 기준 대비 (픽셀수 제곱 근사)
+  const timeFactor = Math.pow(longerEdge / VIDEO_LONGER_EDGE_MAX, 2);
+  const speedLabel =
+    timeFactor > 0.8
+      ? "고품질"
+      : timeFactor > 0.4
+        ? "표준"
+        : timeFactor > 0.18
+          ? "빠름"
+          : "매우 빠름";
+  const ratio = hasSource ? simplifyRatio(sourceWidth!, sourceHeight!) : "—";
+
+  return (
+    <div
+      style={{
+        padding: "12px 14px",
+        borderRadius: "var(--radius)",
+        border: "1px solid var(--line)",
+        background: "var(--surface)",
+        opacity: hasSource ? 1 : 0.55,
+        transition: "opacity .2s",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          marginBottom: 8,
+        }}
+      >
+        <label
+          style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}
+        >
+          영상 해상도
+        </label>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10.5,
+            color: "var(--ink-4)",
+            letterSpacing: ".04em",
+          }}
+        >
+          긴 변 {longerEdge}px · {speedLabel}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={VIDEO_LONGER_EDGE_MIN}
+        max={VIDEO_LONGER_EDGE_MAX}
+        step={VIDEO_LONGER_EDGE_STEP}
+        value={longerEdge}
+        disabled={!hasSource}
+        onChange={(e) => setLongerEdge(Number(e.target.value))}
+        style={{
+          width: "100%",
+          accentColor: "var(--accent)",
+          cursor: hasSource ? "pointer" : "not-allowed",
+        }}
+      />
+      {/* 눈금 */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          fontSize: 10,
+          color: "var(--ink-4)",
+          marginTop: 2,
+        }}
+        className="mono"
+      >
+        <span>{VIDEO_LONGER_EDGE_MIN}</span>
+        <span>{VIDEO_LONGER_EDGE_MAX}</span>
+      </div>
+      <div
+        style={{
+          marginTop: 6,
+          fontSize: 11,
+          color: "var(--ink-3)",
+          lineHeight: 1.5,
+        }}
+      >
+        {hasSource ? (
+          <>
+            원본 <span className="mono">{sourceWidth}×{sourceHeight}</span>
+            {" → "}
+            출력{" "}
+            <span
+              className="mono"
+              style={{ color: "var(--accent-ink)", fontWeight: 600 }}
+            >
+              {expected.width}×{expected.height}
+            </span>{" "}
+            <span style={{ color: "var(--ink-4)" }}>({ratio})</span>
+          </>
+        ) : (
+          "원본 이미지를 업로드하면 예상 출력 해상도가 표시됩니다."
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 정수 비율 근사 — "16:9" / "3:4" 등 */
+function simplifyRatio(w: number, h: number): string {
+  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
+  const g = gcd(w, h);
+  return `${w / g}:${h / g}`;
+}
