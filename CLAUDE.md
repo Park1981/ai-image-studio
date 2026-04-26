@@ -136,6 +136,15 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **VramBadge amber 임계 통일**: 0.75 → 0.80 (SystemMetrics 와 일치 · breakdown 오버레이 트리거와 동일).
 - **검증**: pytest 166/166 · tsc clean · lint clean · 실측 backend 응답 확인 (ComfyUI 15.2G + Ollama 0G 정상 표시, 폴백 작동).
 
+**2026-04-26 router.py 풀 분해 + legacy quarantine** — pytest 201/201 · ruff F clean · main.py import OK.
+3 커밋 (`ba7e6e2 → df872e3 → 0c4b999`) 으로 `backend/studio/router.py` 1,769 → **118줄 (facade only · -93%)** 달성. 옛 라우터 + services + tests 15 파일 `backend/legacy/` 격리.
+- **Step 1 (`ba7e6e2`) — pipelines/ 추출**: `studio/pipelines/{_dispatch,generate,edit,video,__init__}.py` 신규 5 파일 (1,045줄). `_run_*_pipeline` + `_dispatch_to_comfy` + `ComfyDispatchResult` + `_save_comfy_output/_video` + `_cleanup_comfy_temp` + `_mark_generation_complete` + `COMFY_*` 상수 분리. **🔴 잠재 NameError fix 1건**: 옛 router.py 1213줄의 `getattr(settings, "ltx_unet_name", None)` 가 `settings` import 없이 참조됐었음 → pipelines/video.py 에 명시 import 추가 (Video 호출 시 NameError 터질 뻔).
+- **Step 2 (`df872e3`) — routes/ 분리**: `studio/routes/{_common,streams,prompt,vision,compare,system,__init__}.py` 신규 7 파일 (960줄). endpoint 도메인별 그룹화 (streams=generate/edit/video task+SSE / prompt=upgrade-only+research+interrupt / vision=vision-analyze / compare=compare-analyze mutex+2 context / system=process+ollama+history). `_common.py` 가 `_stream_task` `_sse_format` `_spawn` `_proc_mgr` `log` 공유. router.py 는 `from .routes import studio_router as router` + 외부 호환 re-export 만.
+- **Step 3 (`0c4b999`) — legacy quarantine** (frontend/legacy 정책 일관): `backend/legacy/{routers,services,tests}/` 신규 트리. 옛 5 라우터 + 5 services (process_manager 제외) + 4 tests + conftest = 15 파일 git mv. import 경로 갱신 19건 (`from services.X` → `from legacy.services.X` · `services.process_manager` 만 그대로). main.py 의 `from routers import ...` + `app.include_router(*)` 5개 제거. **app routes 20개 전부 `/api/studio/*` 직속**. pytest `testpaths = tests` 가 legacy 자동 exclude.
+- **🔑 새 정책 — mock.patch 위치 = lookup 모듈 기준**: re-export 받는 모듈에 patch 해도 호출 site 가 다른 모듈이면 안 가로챔. 분해 시 patch 사이트 명시 갱신 필수. 이번 5건 갱신 (`studio.router.X` → `studio.routes.{prompt,compare}.X` / `studio.pipelines.edit.X`).
+- **🔑 외부 호환 정책 (확장)**: router.py 가 storage/schemas/tasks/pipelines/routes._common + 외부 모듈 alias (`analyze_pair`, `clarify_edit_intent`, `upgrade_generate_prompt`, `analyze_image_detailed`, `run_vision_pipeline`) 모두 re-export. 옛 테스트 호환 전용 — 신규 코드는 본래 위치 직접 import 권장.
+- **legacy 코드는 수정 금지 원칙** — 옛 라우터 살리려면 main.py 에 `from legacy.routers import X` + `app.include_router(X.router)` 추가만. 코드 자체 손대면 의존성 그래프 깨질 수 있음. `legacy/tests/test_generate.py` 9개는 endpoint 등록 끊김으로 fail (의도된 dead).
+
 **2026-04-26 spec 19 — 비전 + gemma4 + Claude CLI 시스템 프롬프트 통합 점검** — pytest 166→197 · tsc+lint clean.
 사용자 요청 (Codex + Claude 점검 합산) → 4 라운드 누적 작업. 비전 시스템 프롬프트 점검 → gemma4/Claude CLI 점검 → Ollama race fix → upgrade-only aspect.
 - **신규 모듈 3개**: `backend/studio/_json_utils.py` (parse_strict_json 통합 · quoted-string aware scanner), `backend/studio/ollama_unload.py` (force_unload_all_before_comfy + 단계별 unload_model), `frontend/components/studio/CompareExtraBoxes.tsx` (TransformPromptBox + UncertainBox 공용)
@@ -167,7 +176,7 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - Frontend dev (Mock): `cd frontend && npm run dev`
 - Backend dev: `cd backend && D:\AI-Image-Studio\.venv\Scripts\python.exe -m uvicorn main:app --host 127.0.0.1 --port 8001 --no-access-log`
 - Frontend lint: `cd frontend && npm run lint`
-- Backend test: `cd backend && D:\AI-Image-Studio\.venv\Scripts\python.exe -m pytest tests/studio/` (159 tests · Edit 한 사이클 v3 + spec 17)
+- Backend test: `cd backend && D:\AI-Image-Studio\.venv\Scripts\python.exe -m pytest tests/` (201 tests · 모든 studio + legacy 자동 exclude)
 
 ## Code Style
 - Korean comments in ALL files (한글 주석 필수)
@@ -179,9 +188,12 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 
 ## Key Files (재설계 이후)
 ### 신규 (권위)
-- **backend/studio/router.py**: `/api/studio/*` FastAPI 라우터 (generate/edit/**video** SSE · upgrade-only · research · interrupt · vision-analyze · **compare-analyze** · history · models · process · ollama/models)
+- **backend/studio/router.py** (118줄 · 2026-04-26 분해 후): facade only — `from .routes import studio_router as router` + 외부 호환 re-export 묶음 (storage/schemas/tasks/pipelines/routes._common + 외부 모듈 alias). 신규 코드는 본래 위치 직접 import 권장.
+- **backend/studio/routes/** (7 파일 · 960줄): endpoint 도메인별 그룹 (`__init__.py` 통합 router · `_common.py` SSE/태스크 유틸 · `streams.py` generate/edit/video task+SSE · `prompt.py` upgrade-only/research/interrupt · `vision.py` vision-analyze · `compare.py` compare-analyze mutex+2 context · `system.py` process+ollama+history)
+- **backend/studio/pipelines/** (5 파일 · 1,045줄): 백그라운드 파이프라인 (`__init__.py` re-export · `_dispatch.py` ComfyUI 디스패치 공용 헬퍼 · `generate.py` `_run_generate_pipeline` · `edit.py` `_run_edit_pipeline` · `video.py` `_run_video_pipeline_task`)
+- **backend/legacy/** (2026-04-26 quarantine): 옛 5 라우터 + 5 services (process_manager 제외) + 4 tests + conftest. 코드 본체 무수정 · import 경로만 갱신. main.py 등록 끊김 — frontend/legacy 만 호출하던 dead path. 살리려면 `from legacy.routers import X` + `app.include_router(X.router)` 추가.
 - **backend/studio/comfy_api_builder.py**: ComfyUI flat API format 빌더 (`build_generate_from_request`, `build_edit_from_request`, **`build_video_from_request`**)
-- **backend/studio/comfy_transport.py**: WebSocket + HTTP 전송 (idle 600s / hard 1800s timeout · Video 는 idle 900s / hard 3600s)
+- **backend/studio/comfy_transport.py**: WebSocket + HTTP 전송 (idle 1200s / hard 7200s timeout · 2026-04-26 16GB VRAM swap 케이스 안전망 / Video 는 idle 900s / hard 3600s)
 - **backend/studio/{prompt,vision,video,comparison}_pipeline.py**: Ollama gemma4 업그레이드 + qwen2.5vl 비전 · Video 는 5-step 체이닝 · **vision_pipeline.analyze_edit_source v2 (인물/물체·풍경 5 슬롯 매트릭스 · 2026-04-25 spec 15)** · **prompt_pipeline.clarify_edit_intent + SYSTEM_EDIT STRICT MATRIX DIRECTIVES (2026-04-25 spec 16)** · **comparison_pipeline 은 2 context 분리 (analyze_pair v3 = Edit 도메인 분기 + 의도 컨텍스트 점수 / analyze_pair_generic = Vision Compare · SYSTEM 프롬프트와 5축 모두 별도 · Edit 무영향 보장)**
 - **backend/studio/presets.py**: Qwen Image 2512 / Edit 2511 / **LTX Video 2.3** 프리셋 (프론트와 동기화 필수) · `compute_video_resize`, `build_quality_sigmas`, `active_video_loras` 헬퍼 포함
 - **backend/studio/history_db.py**: SQLite studio_history 테이블 (mode: generate/edit/**video**) · **source_ref + comparison_analysis + v5: adult/duration_sec/fps/frame_count 컬럼** (video 메타 · idempotent ALTER 마이그레이션)
@@ -198,9 +210,13 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **frontend/app/globals.css**: 디자인 토큰 (warm neutral + cool blue) + `@keyframes fade-in`
 
 ### 레거시 (참조용 · 수정 금지)
-- backend/services/*, backend/routers/*, frontend/components/{Creation,History,Settings}*.tsx, frontend/hooks/*, frontend/stores/slices/*, frontend/lib/api.ts
+- **backend/legacy/{routers,services,tests}/** (2026-04-26 quarantine 후 위치 · 옛 backend/{routers,services,tests}/* 에서 이동)
+- **backend/services/process_manager.py** 만 backend/services/ 에 그대로 유지 (신규 코드 사용 중 — 이동 금지)
+- frontend/legacy/* (39 파일 · tsconfig/eslint exclude · 옛 fetchApi 기반 api.ts 등)
+- frontend/components/{Creation,History,Settings}*.tsx, frontend/hooks/*, frontend/stores/slices/* (재설계로 대체된 옛 구조)
 
 ## Rules
+- **mock.patch 위치 = lookup 모듈 기준**: re-export 받는 모듈에 patch 해도 호출 site 가 다른 모듈이면 안 가로챔. 함수 분해/이동 시 patch 사이트 명시 갱신 필수 (이전 router.py 분해에서 9건 갱신). 신규 테스트는 `studio.routes.X` / `studio.pipelines.X` 직접 import 권장.
 - workflow JSON 템플릿은 코드로 직접 수정하지 말 것 (사용자에게 확인)
 - ComfyUI/Ollama URL은 .env에서 config.py로 로드 (하드코딩 금지)
 - 외부 API 호출(ComfyUI, Ollama)은 반드시 try/except + 타임아웃
