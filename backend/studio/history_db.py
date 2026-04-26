@@ -181,11 +181,29 @@ async def init_studio_history_db() -> None:
                 # 이미 존재하면 정상 (idempotent)
                 pass
         await db.commit()
+    # v6 (2026-04-26 spec 19 후속): refined_intent 컬럼 추가
+    # Edit 한 사이클 안의 clarify_edit_intent 결과 (영문 1-2문장) 캐시.
+    # 비교 분석 (compare-analyze) 이 historyItemId 받으면 이 캐시 재사용 →
+    # gemma4 cold start ~5초 절약.
+    async with aiosqlite.connect(_DB_PATH) as db:
+        try:
+            await db.execute(
+                "ALTER TABLE studio_history ADD COLUMN refined_intent TEXT"
+            )
+            log.info("Migrated studio_history: added refined_intent column")
+        except Exception:
+            # 이미 존재하면 정상 (idempotent)
+            pass
+        await db.commit()
     log.info("studio_history DB ready at %s", _DB_PATH)
 
 
 async def insert_item(item: dict[str, Any]) -> None:
-    """생성/수정 완료 아이템 저장."""
+    """생성/수정 완료 아이템 저장.
+
+    spec 19 후속 (v6): item.get("refinedIntent") 도 함께 저장 (Edit 한 사이클의
+    gemma4 정제 결과 캐시 — 비교 분석에서 재사용). generate/video 는 None.
+    """
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute(
             """INSERT OR REPLACE INTO studio_history
@@ -193,8 +211,8 @@ async def insert_item(item: dict[str, Any]) -> None:
              model, created_at, image_ref, upgraded_prompt, upgraded_prompt_ko,
              prompt_provider, research_hints, vision_description, comfy_error,
              source_ref, comparison_analysis,
-             adult, duration_sec, fps, frame_count)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             adult, duration_sec, fps, frame_count, refined_intent)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 item["id"],
                 item["mode"],
@@ -223,6 +241,8 @@ async def insert_item(item: dict[str, Any]) -> None:
                 item.get("durationSec"),
                 item.get("fps"),
                 item.get("frameCount"),
+                # v6 (spec 19 후속): refined_intent — Edit 만 채움, 나머지 None
+                item.get("refinedIntent"),
             ),
         )
         await db.commit()
@@ -428,6 +448,8 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
     duration_sec = _safe("duration_sec")
     fps = _safe("fps")
     frame_count = _safe("frame_count")
+    # v6 (spec 19 후속) — refined_intent (Edit 모드만 채워짐 · 옛 row 는 None)
+    refined_intent = _safe("refined_intent")
 
     item: dict[str, Any] = {
         "id": row["id"],
@@ -461,4 +483,7 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
         item["fps"] = fps
     if frame_count is not None:
         item["frameCount"] = frame_count
+    # v6 refined_intent — Edit 모드만 채움 (옛 row + generate/video 는 노출 안함)
+    if refined_intent:
+        item["refinedIntent"] = refined_intent
     return item

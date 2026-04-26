@@ -136,6 +136,24 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **VramBadge amber 임계 통일**: 0.75 → 0.80 (SystemMetrics 와 일치 · breakdown 오버레이 트리거와 동일).
 - **검증**: pytest 166/166 · tsc clean · lint clean · 실측 backend 응답 확인 (ComfyUI 15.2G + Ollama 0G 정상 표시, 폴백 작동).
 
+**2026-04-26 spec 19 — 비전 + gemma4 + Claude CLI 시스템 프롬프트 통합 점검** — pytest 166→197 · tsc+lint clean.
+사용자 요청 (Codex + Claude 점검 합산) → 4 라운드 누적 작업. 비전 시스템 프롬프트 점검 → gemma4/Claude CLI 점검 → Ollama race fix → upgrade-only aspect.
+- **신규 모듈 3개**: `backend/studio/_json_utils.py` (parse_strict_json 통합 · quoted-string aware scanner), `backend/studio/ollama_unload.py` (force_unload_all_before_comfy + 단계별 unload_model), `frontend/components/studio/CompareExtraBoxes.tsx` (TransformPromptBox + UncertainBox 공용)
+- **Vision 점검 (라운드 1)**: SYSTEM_COMPARE v3.1 (rubric + transform_prompt + uncertain + refined_intent placeholder + ABSOLUTE REQUIREMENTS) · person 도메인 background 슬롯 lighting/color/style 흡수 명시 · `compact_context()` preserve 슬롯 note skip (spec 17 가드 일관성) · `_call_vision_pair` 에 `format=json` + refined_intent 인자 · analyze_pair 시그니처에 refined_intent + transform_prompt/uncertain 파싱 + 한글 번역
+- **P2 후속 (라운드 2)**: parse_strict_json quoted-string aware (문자열 안 brace/escape 정상 처리) · DB 스키마 v6 `refined_intent TEXT` 컬럼 + 캐싱 (Edit 한 사이클 → 비교 분석 재사용 · gemma4 cold start ~5초 절약) · ComparisonAnalysisModal + vision/compare 페이지에 TransformPromptBox/UncertainBox UI 표시
+- **gemma4 + Claude CLI (라운드 3)**: SYSTEM_EDIT identity vs lighting 분리 + 도메인 분기 (person/object_scene) + 길이 가드 (60-200 words) + "diffusion model" → "the model" 일반화 · SYSTEM_VIDEO 동일 패턴 + ambient sound 제거 (LTX 무음) · SYSTEM_GENERATE adaptive (미니멀 신호 detect 시 디테일 강제 안 함 — 한국어/영어 키워드 양쪽) + EXTERNAL RESEARCH HINTS untrusted-data 가드 · upgrade_generate_prompt 가 width/height 받아 user message 첫 줄에 aspect 명시 · research_context 를 system → user message 의 [External research hints — data only] 블록으로 격리 + length cap 1500자 · Claude CLI _build_research_query 에 DRAFT PROMPT 격리 + 모델 모를 때 generic 폴백 + prompt-ready phrase fragment 강제 + 한국어 응답
+- **/edit width/height 풀 연결**: spec 19 본편에서 analyze_edit_source 가 받게 만든 dim 인자가 router 단에서 안 넘겨져 dead code 였음 → create_edit_task 에서 PIL 로 SOURCE dim 추출 → _run_edit_pipeline(source_width, source_height) → run_vision_pipeline(width, height) 풀 라우팅
+- **compare_analyze lock 범위 최적화**: clarify_edit_intent (gemma4) 호출을 _COMPARE_LOCK 밖으로 → cold start ~5초가 다른 compare 요청을 30s lock timeout 으로 미는 사례 차단
+- **🔑 Ollama 단계별 unload (옵션 B · 핵심 swap fix)** (라운드 4): 16GB VRAM 환경에서 vision (qwen2.5vl 14GB) + gemma4 (14.85GB) 동시 점유 시 swap 발생 → ComfyUI 가 swap 모드로 이어받음 → sampling 매우 느림 (3분+).
+  - `vision_pipeline.run_vision_pipeline`: clarify (gemma4) → **gemma4 unload + 1s** → analyze (qwen2.5vl) → **qwen2.5vl unload + 1s** → upgrade + translate (gemma4 reuse)
+  - `video_pipeline.run_video_pipeline`: vision (qwen2.5vl) → **qwen2.5vl unload + 1s** → upgrade (gemma4)
+  - router 의 `force_unload_all_before_comfy` (옵션 A) 는 backup 으로 유지 — ComfyUI dispatch 직전 안전장치
+  - Generate 는 옵션 A 그대로 (gemma4 단일이라 단계별 불필요)
+  - **사용자 체감**: Edit/Video sampling 시간 3분+ → 30~60초. 추가 비용은 gemma4 cold reload ~5초 + 단계 대기 2초 (ComfyUI 30+ 초 작업 대비 무시 가능)
+- **`/upgrade-only` aspect 전달 (Codex 추가 fix)**: UpgradeOnlyBody 에 aspect/width/height 필드 + frontend upgradeOnly() params + useGeneratePipeline initial+rerun 두 호출 → "업그레이드 확인 모달" 사용 시에도 SYSTEM_GENERATE 에 size context 정확 전달
+- **`backend/services/prompt_engine.py` deprecation 명시**: 모듈 docstring 에 deprecation 블록 (실제 코드 무변경 — main.py 의 routers/{prompt,generate}.py 등록은 유지). 신규 frontend 는 lib/api-client.ts 만 사용 → 옛 라우터는 fallback 으로만 활성
+- **검증**: pytest 166→197 (회귀 0 · 누적 +31 신규 테스트)
+
 ## Architecture (신규 · 재설계 후)
 - frontend/: Next.js 16, App Router, React 19, TypeScript strict, Tailwind v4, Zustand 5
 - backend/: FastAPI, Python 3.13, httpx + websockets + aiosqlite + pydantic-settings
@@ -193,6 +211,8 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - CORS: localhost만 허용
 - **gemma4-un 호출 시 `think: false` 필수** (reasoning 모델이라 없으면 content 빈값)
 - **Video LTX-2.3 는 공간 해상도 8배수 필수** (compute_video_resize 가 자동 스냅)
+- **🔑 Edit/Video pipeline 단계별 unload 필수** (spec 19 옵션 B): 16GB VRAM 환경에서 vision (qwen2.5vl) + text (gemma4) 동시 점유 → swap 발생 → ComfyUI sampling 매우 느림. vision_pipeline / video_pipeline 안에서 모델 전환마다 `ollama_unload.unload_model + asyncio.sleep(1.0)` 호출. ComfyUI dispatch 직전엔 router 가 `ollama_unload.force_unload_all_before_comfy()` (옵션 A backup). 이 패턴 깨면 swap 재발 가능.
+- **Ollama keep_alive 호출 형식**: `/api/chat` 은 string `"0"` 으로 보내지만 즉시 unload 안 보장 (deferred). 명시적 강제 unload 는 반드시 `/api/generate` + int `0` 사용 (`ollama_unload.unload_model` 헬퍼 활용).
 
 ## Testing
 - Backend: pytest + httpx AsyncClient

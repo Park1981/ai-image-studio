@@ -465,6 +465,49 @@ def test_compact_context_lists_all_slots_in_order() -> None:
     assert "[preserve]" in ctx
 
 
+def test_compact_context_skips_preserve_slot_notes_spec19() -> None:
+    """spec 19 (Codex #2): preserve 슬롯의 specific note 는 절대 출력 X.
+
+    이전엔 preserve 슬롯 note (예: "soft smile, brown hair") 가 그대로
+    [Image description] 블록에 흘러서 gemma4 가 변경 지시로 오해할 위험
+    있었음. 이제 preserve 는 generic 마커 ("(preserved — keep as-is)") 로
+    대체. edit 슬롯 note 는 변경 지시 자체이므로 그대로 명시.
+    """
+    with (
+        patch(
+            "studio.vision_pipeline._call_vision_edit_source",
+            new=AsyncMock(return_value=_person_json()),
+        ),
+        patch(
+            "studio.prompt_pipeline.clarify_edit_intent",
+            new=AsyncMock(return_value="Test intent."),
+        ),
+    ):
+        result = asyncio.run(
+            analyze_edit_source(_tiny_png_bytes(), "x")
+        )
+    ctx = result.compact_context()
+
+    # _person_json() 의 preserve 슬롯 specific notes 가 ctx 에 있으면 안 됨
+    preserve_specific_notes = [
+        "keep identity, soft smile, brown hair",  # face_expression note
+        "same long brown hair",                    # hair note
+        "same park scene and lighting",            # background note
+    ]
+    for note in preserve_specific_notes:
+        assert note not in ctx, (
+            f"preserve 슬롯 note '{note}' 가 compact_context 에 누출됨 "
+            f"(spec 19 가드 위반)"
+        )
+
+    # edit 슬롯 note 는 그대로 명시되어야 함 (변경 지시 자체)
+    assert "remove top and bottom (full nude)" in ctx
+    assert "increase bust to natural sagging E-cup" in ctx
+
+    # preserve 마커 존재 확인 (slot label 만 보존)
+    assert "(preserved" in ctx
+
+
 def test_human_summary_returns_summary_or_intent() -> None:
     """human_summary() 는 summary 우선, 없으면 intent."""
     with (
@@ -545,6 +588,65 @@ def test_run_vision_pipeline_passes_compact_context_when_matrix_ok() -> None:
     assert result.edit_vision_analysis.fallback is False
     assert result.edit_vision_analysis.intent == "Refined English intent."
     describe_spy.assert_not_called()
+
+
+def test_run_vision_pipeline_unloads_models_between_stages_spec19() -> None:
+    """spec 19 옵션 B — 단계별 unload 호출 순서 검증.
+
+    기대 흐름:
+      clarify (gemma4) → unload(gemma4) → analyze (qwen2.5vl)
+      → unload(qwen2.5vl) → upgrade (gemma4)
+
+    이전엔 두 모델 동시 점유로 16GB VRAM swap 발생 → ComfyUI 가 swap 모드로
+    이어받음 → sampling 매우 느림. 이제 단계 전환마다 명시적 unload + 1초 대기로
+    swap 차단.
+    """
+    captured: dict[str, str] = {}
+    unload_calls: list[str] = []
+
+    async def _spy_unload(model: str, **_kwargs):
+        unload_calls.append(model)
+        return True
+
+    # asyncio.sleep 도 mock — 테스트 시간 단축 (1초 대기 X 2 = 2초 절약)
+    async def _no_sleep(_sec):
+        return None
+
+    with (
+        patch(
+            "studio.prompt_pipeline.clarify_edit_intent",
+            new=AsyncMock(return_value="intent"),
+        ),
+        patch(
+            "studio.vision_pipeline._call_vision_edit_source",
+            new=AsyncMock(return_value=_person_json()),
+        ),
+        patch(
+            "studio.vision_pipeline.upgrade_edit_prompt",
+            new=_fake_upgrade(captured),
+        ),
+        patch(
+            "studio.ollama_unload.unload_model",
+            new=_spy_unload,
+        ),
+        patch(
+            "studio.vision_pipeline.asyncio.sleep",
+            new=_no_sleep,
+        ),
+    ):
+        asyncio.run(
+            run_vision_pipeline(
+                _tiny_png_bytes(),
+                "옷 바꿔",
+                vision_model="qwen2.5vl:7b",
+                text_model="gemma4-un:latest",
+            )
+        )
+
+    # 호출 순서: gemma4 (clarify 후) → qwen2.5vl (analyze 후)
+    assert unload_calls == ["gemma4-un:latest", "qwen2.5vl:7b"], (
+        f"단계별 unload 순서 불일치 (예상: gemma4 → qwen / 실제: {unload_calls})"
+    )
 
 
 def test_run_vision_pipeline_falls_back_to_caption_when_matrix_fails() -> None:

@@ -20,11 +20,19 @@ import type {
   UpgradeOnlyResult,
 } from "./types";
 
-/** gemma4 업그레이드 + 선택적 Claude 조사만 수행 (ComfyUI 호출 없음) */
+/** gemma4 업그레이드 + 선택적 Claude 조사만 수행 (ComfyUI 호출 없음).
+ *
+ * spec 19 후속 (Codex 추가 fix): aspect/width/height 도 전달 → backend 가
+ * SYSTEM_GENERATE 에 [Output dimensions] 컨텍스트 주입. 이전엔 upgrade-only
+ * 경로만 빠져 있어 "업그레이드 확인" 모달 사용 시 size context 누락됐음.
+ */
 export async function upgradeOnly(params: {
   prompt: string;
   research: boolean;
   ollamaModel?: string;
+  aspect?: string;
+  width?: number;
+  height?: number;
 }): Promise<UpgradeOnlyResult> {
   if (USE_MOCK) {
     await sleep(800 + Math.random() * 600);

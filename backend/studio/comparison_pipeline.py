@@ -20,7 +20,6 @@ spec 16 (2026-04-25 v3 패러다임 전환):
 from __future__ import annotations
 
 import base64
-import json
 import logging
 import re
 import time
@@ -29,6 +28,7 @@ from typing import Any
 
 import httpx
 
+from ._json_utils import parse_strict_json as _parse_strict_json
 from .presets import DEFAULT_OLLAMA_ROLES
 from .prompt_pipeline import _DEFAULT_OLLAMA_URL, DEFAULT_TIMEOUT
 
@@ -71,13 +71,24 @@ COMPARE_AXES: tuple[str, str, str, str, str] = (
     "quality",
 )
 
-# 비전 응답 강제 — STRICT JSON only (Edit context v3 · spec 16).
-# 도메인 분류 + 슬롯별 의도 판정 + 의도-컨텍스트 점수.
+# 비전 응답 강제 — STRICT JSON only (Edit context v3.1 · spec 19 · 2026-04-26).
+# 도메인 분류 + 슬롯별 의도 판정 + 의도-컨텍스트 점수 + score rubric + transform/uncertain.
+#
+# v3.1 변경 (Codex 진단 #3 + #4 + #6 반영):
+#   - Score rubric (95-100/90-94/...) 추가 — preserve 슬롯 점수 후함 방지
+#   - "Default to LOW end when unsure. Under-score before over-score." 편향 가드
+#   - {refined_intent} placeholder — 정제된 영문 intent 도 함께 주입
+#   - transform_prompt 슬롯 — 사용자 의도와 실제 결과 사이의 잔여 작업 묘사
+#   - uncertain 슬롯 — 비교 못한 영역 명시
+#
+# hard cap (Vision Compare v2.2) 은 edit context 와 의미가 안 맞아 의도적으로 제외.
+# (edit 슬롯의 점수는 "변경 정도" 가 아니라 "의도 부합도" 라 cap 부적절.)
 SYSTEM_COMPARE = """You are a vision evaluator comparing TWO images:
   SOURCE = original image (before edit)
   RESULT = edited image (after the user's edit)
 
-The user's edit instruction was: "{edit_prompt}"
+The user's raw edit instruction was: "{edit_prompt}"
+Refined English intent (cleaned): "{refined_intent}"
 
 Step 1 — Classify domain:
   - "person" if a human or anthropomorphic character is the main subject.
@@ -98,10 +109,40 @@ Step 2 — For each of the 5 domain-specific slots, decide intent and score.
     - If intent == "edit":     score = how well the edit FOLLOWS the user's
       instruction on this slot. 100 = fully followed, 0 = ignored.
 
-Step 3 — Write a 1-2 sentence comment per slot (English) explaining the score.
+  Score rubric (apply to BOTH preserve and edit semantics):
+    95-100: nearly perfect (only tiny imperceptible differences / fully followed)
+    90-94 : very close / largely followed (no major issue)
+    80-89 : same concept but CLEAR visible differences / partially followed
+    60-79 : major changes vs source / partially missed key aspects
+    below 60: substantial mismatch / instruction largely ignored
+
+  Default to the LOW end when unsure. Under-score before over-score.
+  Especially for preserve slots — if pose, gaze, expression, hair flow, or
+  background detail differ even subtly, do NOT give 95+. Recreation fidelity
+  matters; subjective "looks similar" should land in the 80s, not the 90s.
+
+Step 3 — Write a 3-5 sentence comment per slot (English). Cite ACTUAL
+differences (gaze direction, pose specifics, fabric texture, lighting tone,
+etc.). Avoid filler like "the two images look similar".
+
 Step 4 — Write a 3-5 sentence overall summary (English).
 
-Return STRICT JSON only (no markdown, no preamble, no trailing text).
+Step 5 — transform_prompt (English t2i instructions):
+  Describe the residual work needed to fully realize the user's intent on the
+  RESULT — what additional or corrective changes (pose, expression, lighting,
+  composition, texture, color) would make RESULT match the intent perfectly.
+  If RESULT already fully matches the intent (all edit slots ≥ 95 and all
+  preserve slots ≥ 95), output EXACTLY:
+    "no significant gap — edit fully realizes the intent"
+  Otherwise describe specific concrete next steps. Do NOT use that literal
+  string when ANY slot is below 95.
+
+Step 6 — uncertain (English):
+  Aspects that could not be reliably evaluated visually (e.g. micro-detail
+  hidden by JPEG compression, text not legible, occluded body parts).
+  Use "" if all slots were confidently scored.
+
+Return STRICT JSON only (no markdown fences, no preamble, no trailing text).
 
 If domain == "person":
 {
@@ -113,7 +154,9 @@ If domain == "person":
     "body_pose":       {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
     "background":      {"intent": "edit|preserve", "score": <int>, "comment": "<en>"}
   },
-  "summary": "<en, 3-5 sentences>"
+  "summary":          "<en, 3-5 sentences>",
+  "transform_prompt": "<en t2i residual instructions>",
+  "uncertain":        "<en or empty string>"
 }
 
 If domain == "object_scene":
@@ -126,13 +169,23 @@ If domain == "object_scene":
     "background_setting":  {"intent": "edit|preserve", "score": <int>, "comment": "<en>"},
     "mood_style":          {"intent": "edit|preserve", "score": <int>, "comment": "<en>"}
   },
-  "summary": "<en, 3-5 sentences>"
+  "summary":          "<en, 3-5 sentences>",
+  "transform_prompt": "<en t2i residual instructions>",
+  "uncertain":        "<en or empty string>"
 }
 
-Rules:
+For the "person" domain, the "background" slot is broad — it covers
+environment / setting, lighting (key/fill/rim, color temperature, hour),
+overall color palette and grading, atmosphere / mood, weather, and
+photographic style anchors. Score it accordingly.
+
+ABSOLUTE REQUIREMENTS:
 - Always fill ALL 5 slots for the chosen domain. Never omit a slot.
-- Always provide an integer score 0-100 (no nulls).
-- Comments are concise (max 2 sentences each)."""
+- Always provide an integer score 0-100 (no nulls, no missing).
+- summary MUST be non-empty.
+- transform_prompt MUST be non-empty.
+- uncertain MAY be "" but must be present.
+- Output ONLY this JSON object. NOTHING else."""
 
 # 비전 응답 강제 — STRICT JSON only (Vision Compare context · 2026-04-26 v2.2)
 # v2.1 의 SYSTEM 이 200+ 줄로 길어 모델이 lost-in-middle → scores 누락 응답 발생.
@@ -293,7 +346,12 @@ class ComparisonAnalysisResult:
     summary_en: str = ""
     summary_ko: str = ""
 
-    # 2026-04-26 v2.1 (Vision Compare 전용 신규 필드 — analyze_pair 는 미사용)
+    # 2026-04-26 v2.1 / spec 19 (2026-04-26 후속) — edit/generic 공용 extra 필드.
+    # 의미는 context 별로 다름:
+    #   - analyze_pair_generic (Vision Compare): A 를 B 로 바꾸는 t2i 변형 지시
+    #   - analyze_pair (Edit context · spec 19): 사용자 의도 부합도 잔여 작업
+    #     (RESULT 가 의도를 완전히 실현하려면 추가로 필요한 변경)
+    # uncertain 도 공용 — 비전이 신뢰성 있게 평가 못한 영역.
     transform_prompt_en: str = ""
     transform_prompt_ko: str = ""
     uncertain_en: str = ""
@@ -326,7 +384,8 @@ class ComparisonAnalysisResult:
             out["comments_en"] = self.comments_en
         if self.comments_ko:
             out["comments_ko"] = self.comments_ko
-        # 2026-04-26 v2.1 — Vision Compare 전용 신규 필드 (값 있을 때만 포함)
+        # 2026-04-26 v2.1 / spec 19 — 공용 extra 필드 (값 있을 때만 포함)
+        # edit context 와 generic context 가 의미만 다르고 키 이름은 동일.
         if self.transform_prompt_en:
             out["transform_prompt_en"] = self.transform_prompt_en
         if self.transform_prompt_ko:
@@ -361,18 +420,33 @@ async def _call_vision_pair(
     vision_model: str,
     timeout: float,
     ollama_url: str,
+    refined_intent: str = "",
 ) -> str:
     """qwen2.5vl 에 두 이미지 동시 전달 → raw 응답 문자열.
+
+    spec 19 (2026-04-26 · Codex #4 + #5):
+      - format=json 추가 (generic 과 일관성)
+      - refined_intent 옵셔널 — SYSTEM 의 {refined_intent} placeholder 채움.
+        분석 단계에서 이미 정제된 intent 가 있으면 비교 단계에서도 재사용해
+        모델이 한국어 / 구어체 raw prompt 를 다시 해석할 필요 없음.
 
     Ollama /api/chat messages.images 배열에 SOURCE, RESULT 순서로 담음.
     실패 시 빈 문자열 반환 (예외는 위로 안 올림 — analyze_pair 가 fallback 처리).
     """
+    raw_prompt = (edit_prompt or "")[:400]
+    refined_clean = (refined_intent or "").strip()[:400] or "(not provided — use the raw instruction above)"
+    system_content = (
+        SYSTEM_COMPARE
+        .replace("{edit_prompt}", raw_prompt)
+        .replace("{refined_intent}", refined_clean)
+    )
+
     payload = {
         "model": vision_model,
         "messages": [
             {
                 "role": "system",
-                "content": SYSTEM_COMPARE.replace("{edit_prompt}", edit_prompt[:400]),
+                "content": system_content,
             },
             {
                 "role": "user",
@@ -386,6 +460,8 @@ async def _call_vision_pair(
             },
         ],
         "stream": False,
+        # spec 19 (Codex #5): generic 과 동일하게 format=json 강제 — JSON 안정화
+        "format": "json",
         # 2026-04-26: VRAM 즉시 반납
         "keep_alive": "0",
         "options": {"temperature": 0.3, "num_ctx": 8192},
@@ -401,37 +477,7 @@ async def _call_vision_pair(
         return ""
 
 
-def _parse_strict_json(raw: str) -> dict[str, Any] | None:
-    """비전 응답에서 첫 번째 JSON object 추출 → dict, 실패 시 None.
-
-    qwen2.5vl 이 가끔 ```json ... ``` 펜스를 두르거나 JSON 뒤에 자연어 코멘트
-    (예: "{...} Confidence: high") 를 붙임. 따라서:
-      1) ``` 펜스 제거
-      2) 첫 '{' 부터 brace depth 가 0 이 되는 첫 '}' 까지 균형 매칭
-      3) json.loads — 실패 시 None
-    """
-    if not raw:
-        return None
-    # ``` 펜스 제거
-    cleaned = re.sub(r"```(?:json)?\s*", "", raw, flags=re.IGNORECASE).rstrip("`").strip()
-    # 첫 '{' 위치 탐색
-    start = cleaned.find("{")
-    if start == -1:
-        return None
-    # balanced-brace 탐색 — depth 가 0 이 되는 첫 '}' 까지만 추출
-    depth = 0
-    for i in range(start, len(cleaned)):
-        ch = cleaned[i]
-        if ch == "{":
-            depth += 1
-        elif ch == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(cleaned[start : i + 1])
-                except json.JSONDecodeError:
-                    return None
-    return None  # 균형 안 맞으면 (열린 채 끝남) None
+# parse_strict_json 은 ._json_utils 에서 import (모듈 통합 · spec 19).
 
 
 def _coerce_scores(
@@ -651,14 +697,17 @@ async def analyze_pair(
     text_model: str | None = None,
     ollama_url: str | None = None,
     timeout: float = DEFAULT_TIMEOUT,
+    refined_intent: str = "",
 ) -> ComparisonAnalysisResult:
-    """SOURCE + RESULT 비교 분석 v3 (spec 16 · 도메인 분기 + 의도 컨텍스트 점수).
+    """SOURCE + RESULT 비교 분석 v3.1 (spec 19 · rubric + transform/uncertain + refined_intent).
 
     HTTP 200 원칙 — 모든 fallback 경로도 ComparisonAnalysisResult shape 유지.
 
     Args:
         source_bytes / result_bytes: PIL 호환 이미지 바이트
-        edit_prompt: 사용자 수정 지시 (시스템 프롬프트에 주입)
+        edit_prompt: 사용자 수정 지시 raw (한/영, 시스템 프롬프트에 주입)
+        refined_intent: clarify_edit_intent 로 정제된 영문 intent (spec 19 · Codex #4)
+            비어있으면 SYSTEM 이 raw prompt 만 보고 판단 (옛 동작과 동일).
         vision_model: 기본 settings.visionModel (qwen2.5vl:7b)
         text_model: 번역용 (기본 gemma4-un:latest)
     """
@@ -674,6 +723,7 @@ async def analyze_pair(
         vision_model=resolved_vision,
         timeout=timeout,
         ollama_url=resolved_url,
+        refined_intent=refined_intent,
     )
     if not raw:
         return ComparisonAnalysisResult(
@@ -712,7 +762,7 @@ async def analyze_pair(
             vision_model=resolved_vision,
         )
 
-    # ── 3단계: domain + slots 정규화 ──
+    # ── 3단계: domain + slots + transform/uncertain 정규화 ──
     raw_domain = parsed.get("domain")
     domain = (
         raw_domain.strip().lower()
@@ -725,7 +775,17 @@ async def analyze_pair(
     summary_en = summary_raw.strip() if isinstance(summary_raw, str) else ""
     overall = _v3_overall(slots)
 
-    # ── 4단계: 한글 번역 (코멘트 + summary 한 호출) ──
+    # spec 19 (2026-04-26 · Codex #3): transform_prompt + uncertain 파싱 (옵셔널)
+    transform_raw = parsed.get("transform_prompt")
+    transform_en = (
+        transform_raw.strip() if isinstance(transform_raw, str) else ""
+    )
+    uncertain_raw = parsed.get("uncertain")
+    uncertain_en = (
+        uncertain_raw.strip() if isinstance(uncertain_raw, str) else ""
+    )
+
+    # ── 4단계: 한글 번역 (코멘트 + summary + transform/uncertain 한 호출) ──
     comments_en_for_translate = {k: s.comment_en for k, s in slots.items()}
     translation = await _translate_comments_to_ko(
         comments_en_for_translate,
@@ -734,18 +794,27 @@ async def analyze_pair(
         timeout=60.0,
         ollama_url=resolved_url,
         axes=axes,
+        extra_sections={"transform_prompt": transform_en, "uncertain": uncertain_en},
     )
     if translation is None:
         # 번역 실패 — 코멘트는 en 그대로, summary 에 마커
         for k, s in slots.items():
             s.comment_ko = s.comment_en
         summary_ko = "한글 번역 실패"
+        transform_ko = transform_en
+        uncertain_ko = uncertain_en
     else:
         for k, s in slots.items():
             s.comment_ko = (
                 translation["comments_ko"].get(k) or s.comment_en
             )
         summary_ko = translation["summary_ko"] or summary_en
+        transform_ko = (
+            translation.get("extra", {}).get("transform_prompt") or transform_en
+        )
+        uncertain_ko = (
+            translation.get("extra", {}).get("uncertain") or uncertain_en
+        )
 
     return ComparisonAnalysisResult(
         domain=domain,
@@ -753,6 +822,10 @@ async def analyze_pair(
         overall=overall,
         summary_en=summary_en,
         summary_ko=summary_ko,
+        transform_prompt_en=transform_en,
+        transform_prompt_ko=transform_ko,
+        uncertain_en=uncertain_en,
+        uncertain_ko=uncertain_ko,
         provider="ollama",
         fallback=False,
         analyzed_at=int(time.time() * 1000),

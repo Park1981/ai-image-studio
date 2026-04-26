@@ -201,6 +201,10 @@ export function useGeneratePipeline(): UseGeneratePipeline {
           prompt,
           research,
           ollamaModel: ollamaModelSel,
+          // spec 19 후속 (Codex 추가 fix): aspect 컨텍스트 전달
+          aspect,
+          width,
+          height,
         });
         setUpgradeResult(result);
       } catch (err) {
@@ -233,6 +237,10 @@ export function useGeneratePipeline(): UseGeneratePipeline {
         prompt,
         research,
         ollamaModel: ollamaModelSel,
+        // spec 19 후속 (Codex 추가 fix): aspect 컨텍스트 전달 (재업그레이드)
+        aspect,
+        width,
+        height,
       });
       setUpgradeResult(result);
     } catch (err) {

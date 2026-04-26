@@ -56,13 +56,13 @@ from .presets import (
     compute_video_resize,
     get_aspect,
 )
-from .prompt_pipeline import upgrade_generate_prompt
+from .prompt_pipeline import clarify_edit_intent, upgrade_generate_prompt
 from .claude_cli import research_prompt
 from .vision_pipeline import analyze_image_detailed, run_vision_pipeline
 from .video_pipeline import run_video_pipeline
 from .comparison_pipeline import analyze_pair, analyze_pair_generic
 from .system_metrics import get_system_metrics, get_vram_breakdown
-from . import dispatch_state
+from . import dispatch_state, ollama_unload
 from .comfy_api_builder import (
     build_generate_from_request,
     build_edit_from_request,
@@ -403,11 +403,20 @@ class GenerateBody(BaseModel):
 
 
 class UpgradeOnlyBody(BaseModel):
-    """gemma4 업그레이드 + 선택적 조사만 수행 · ComfyUI 디스패치 없음."""
+    """gemma4 업그레이드 + 선택적 조사만 수행 · ComfyUI 디스패치 없음.
+
+    spec 19 후속 (Codex 추가 fix): aspect/width/height 도 받아서 SYSTEM_GENERATE
+    의 [Output dimensions] 컨텍스트에 정확한 dim 주입.
+    GenerateBody 와 동일 필드 (옵셔널 · 미전달 시 aspect preset 폴백).
+    """
 
     prompt: str = Field(..., min_length=1)
     research: bool = False
     ollama_model: str | None = Field(default=None, alias="ollamaModel")
+    # spec 19 후속 — aspect 컨텍스트 (옵셔널)
+    aspect: str = "1:1"
+    width: int | None = Field(default=None, ge=256, le=2048)
+    height: int | None = Field(default=None, ge=256, le=2048)
 
     model_config = ConfigDict(populate_by_name=True)
 
@@ -673,6 +682,20 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
                 if research.ok:
                     research_hints = research.hints
 
+        # spec 19 후속 (Codex 리뷰 fix): resolved_w/h 를 upgrade 호출 전에
+        # 미리 결정. 이전엔 upgrade 호출 뒤에 계산돼서 body.width/height 가
+        # None (aspect preset 만 쓴 일반 케이스) 이면 upgrade 에 0/0 전달 →
+        # SYSTEM_GENERATE 가 aspect context 못 받았음. 이제 preset 이든 직접
+        # 지정이든 항상 정확한 dim 을 SYSTEM 에 전달.
+        aspect = get_aspect(body.aspect)
+        actual_seed = body.seed if body.seed > 0 else int(time.time() * 1000)
+        if body.width is not None and body.height is not None:
+            resolved_w = _snap_dimension(body.width)
+            resolved_h = _snap_dimension(body.height)
+        else:
+            resolved_w = aspect.width
+            resolved_h = aspect.height
+
         # 3. gemma4 업그레이드 (또는 사전 확정된 프롬프트 사용)
         if body.pre_upgraded_prompt:
             # 사용자가 모달에서 이미 확인/수정한 프롬프트 — 재호출 스킵
@@ -705,6 +728,10 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
                 prompt=body.prompt,
                 model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
                 research_context="\n".join(research_hints) if research_hints else None,
+                # spec 19 후속 (F + Codex 리뷰 fix): resolved_w/h 가 항상 정확
+                # (preset 이든 직접 지정이든) → SYSTEM_GENERATE composition 정확도 ↑
+                width=resolved_w,
+                height=resolved_h,
             )
 
         # 4. API 포맷 조립
@@ -717,18 +744,6 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             },
         )
 
-        aspect = get_aspect(body.aspect)
-        actual_seed = body.seed if body.seed > 0 else int(time.time() * 1000)
-
-        # 사용자가 width/height 직접 지정했으면 그걸, 아니면 aspect 프리셋 사용.
-        # snap/clamp 를 미리 하고 히스토리에도 같은 값으로 저장.
-        if body.width is not None and body.height is not None:
-            resolved_w = _snap_dimension(body.width)
-            resolved_h = _snap_dimension(body.height)
-        else:
-            resolved_w = aspect.width
-            resolved_h = aspect.height
-
         # 5. ComfyUI 디스패치 (Generate: 업로드 없음, prompt 즉시 조립)
         await task.emit(
             "stage",
@@ -738,6 +753,11 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
                 "stageLabel": "ComfyUI 샘플링",
             },
         )
+
+        # spec 19 후속 (옵션 A): ComfyUI 디스패치 직전 Ollama 강제 unload
+        # → gemma4 (~14.85GB) 가 unload 되지 않고 남아 ComfyUI 가 swap 모드로
+        #   진입하던 race condition 차단. 1.5초 대기로 GPU 메모리 실제 반납 보장.
+        await ollama_unload.force_unload_all_before_comfy()
 
         def _make_generate_prompt(_uploaded: str | None) -> dict[str, Any]:
             return build_generate_from_request(
@@ -1098,6 +1118,19 @@ async def create_edit_task(
     if not image_bytes:
         raise HTTPException(400, "empty image")
 
+    # spec 19 후속 (Codex P1 #1): SOURCE 이미지 dim 추출 → vision 분석에 전달.
+    # 이전엔 analyze_edit_source 가 width/height 받게 만들었지만 router 가
+    # 안 넘겨서 dead code 였음 (aspect 항상 unknown). 여기서 PIL 한 번 열어
+    # 정수 dim 만 추출. 실패해도 0/0 으로 폴백 (옛 동작과 동일).
+    source_w, source_h = 0, 0
+    try:
+        with Image.open(io.BytesIO(image_bytes)) as src_im:
+            source_w, source_h = src_im.size
+    except Exception as dim_err:
+        log.info(
+            "edit source dim extraction failed (non-fatal): %s", dim_err
+        )
+
     task = await _new_task()
     # 헤더 VRAM breakdown 오버레이용 — ComfyUI 마지막 dispatch 모델 기록
     dispatch_state.record("edit", EDIT_MODEL.display_name)
@@ -1110,6 +1143,8 @@ async def create_edit_task(
             image.filename or "input.png",
             ollama_model_override,
             vision_model_override,
+            source_width=source_w,
+            source_height=source_h,
         )
     )
     return TaskCreated(
@@ -1141,6 +1176,9 @@ async def _run_edit_pipeline(
     filename: str,
     ollama_model_override: str | None = None,
     vision_model_override: str | None = None,
+    *,
+    source_width: int = 0,
+    source_height: int = 0,
 ) -> None:
     try:
         # Step 1: vision analysis — pipelineProgress 10 → 30
@@ -1151,6 +1189,11 @@ async def _run_edit_pipeline(
             prompt,
             vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
             text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
+            # spec 19 후속 (Codex P1 #1): SOURCE 이미지 aspect 정보 전달.
+            # 이전엔 analyze_edit_source 가 받게 만들었는데 여기서 안 넘겨
+            # dead code 였음. 이제 layout/composition 정확도 ↑.
+            width=source_width,
+            height=source_height,
         )
         # step 1 done payload — Phase 1 (2026-04-25):
         #   기존 description (사용자 표시용 요약) 은 그대로 유지.
@@ -1195,6 +1238,11 @@ async def _run_edit_pipeline(
         await task.emit("step", {"step": 4, "done": False})
 
         actual_seed = int(time.time() * 1000)
+
+        # spec 19 후속 (옵션 A): Edit 한 사이클은 qwen2.5vl (~14GB) + gemma4
+        # (~14.85GB) 둘 다 호출 → 누적 메모리 점유 위험. ComfyUI 디스패치 전
+        # 전부 unload + 1.5초 대기.
+        await ollama_unload.force_unload_all_before_comfy()
 
         def _make_edit_prompt(uploaded_name: str | None) -> dict[str, Any]:
             # Edit 는 업로드 이후에만 호출됨 → uploaded_name 반드시 있음
@@ -1268,6 +1316,12 @@ async def _run_edit_pipeline(
         # insert_item 이 알려진 컬럼만 INSERT 하므로 DB persist X (휘발 패턴 유지).
         if _analysis is not None:
             item["editVisionAnalysis"] = _analysis.to_dict()
+            # spec 19 후속 (v6): refined_intent 캐싱 — 비교 분석 (compare-analyze)
+            # 이 historyItemId 받으면 이 값을 재사용해 gemma4 cold start ~5초 절약.
+            # _analysis.intent 가 정제 영문 1-2문장 (clarify_edit_intent 결과).
+            cached_intent = getattr(_analysis, "intent", "") or ""
+            if cached_intent:
+                item["refinedIntent"] = cached_intent
         saved_to_history = await _persist_history(item)
         await task.emit(
             "done", {"item": item, "savedToHistory": saved_to_history}
@@ -1293,16 +1347,32 @@ async def upgrade_only(body: UpgradeOnlyBody):
 
     showUpgradeStep 프리퍼런스 ON 일 때 프론트가 호출 → 모달에서 사용자 확인 →
     /generate 로 preUpgradedPrompt 와 함께 재요청.
+
+    spec 19 후속 (Codex 추가 fix): aspect/width/height 도 SYSTEM_GENERATE 에
+    전달 → /generate 본 호출과 동일한 size context 보장.
     """
     research_hints: list[str] = []
     if body.research:
         research = await research_prompt(body.prompt, GENERATE_MODEL.display_name)
         if research.ok:
             research_hints = research.hints
+
+    # spec 19 후속 — generate pipeline 과 동일한 resolved_w/h 계산.
+    # 사용자가 width/height 직접 지정했으면 snap, 아니면 aspect preset 사용.
+    aspect = get_aspect(body.aspect)
+    if body.width is not None and body.height is not None:
+        resolved_w = _snap_dimension(body.width)
+        resolved_h = _snap_dimension(body.height)
+    else:
+        resolved_w = aspect.width
+        resolved_h = aspect.height
+
     upgrade = await upgrade_generate_prompt(
         prompt=body.prompt,
         model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
         research_context="\n".join(research_hints) if research_hints else None,
+        width=resolved_w,
+        height=resolved_h,
     )
     return {
         "upgradedPrompt": upgrade.upgraded,
@@ -1543,6 +1613,10 @@ async def _run_video_pipeline_task(
         )
         await task.emit("step", {"step": 4, "done": False})
 
+        # spec 19 후속 (옵션 A): Video 도 vision + upgrade 후 ComfyUI 디스패치 →
+        # gemma4 + qwen2.5vl 누적 점유 가능. unload + 1.5초 대기.
+        await ollama_unload.force_unload_all_before_comfy()
+
         dispatch = await _dispatch_to_comfy(
             task,
             _make_video_prompt,
@@ -1751,7 +1825,43 @@ async def compare_analyze(
     ):
         raise HTTPException(413, "image too large")
 
+    # spec 19 후속 (Codex P1 #2): refined_intent 준비를 lock 밖에서 수행.
+    # 이전엔 _COMPARE_LOCK 안에서 clarify_edit_intent (gemma4) 호출 가능했음 →
+    # cold start ~5초가 다른 compare 요청을 30s lock timeout 까지 밀어붙임.
+    # lock 의 본 목적은 qwen2.5vl 비전 호출과 ComfyUI VRAM 충돌 회피이므로
+    # gemma4 text 호출은 lock 밖이 안전 (다른 모델 + 작은 메모리).
+    refined_intent = ""
+    if context != "compare":
+        # edit context 만 refined_intent 사용 (Vision Compare 는 compare_hint 만)
+        if (
+            isinstance(history_item_id_raw, str)
+            and _TASK_ID_RE.match(history_item_id_raw)
+        ):
+            try:
+                cached_item = await history_db.get_item(history_item_id_raw)
+                if cached_item and cached_item.get("refinedIntent"):
+                    refined_intent = cached_item["refinedIntent"]
+            except Exception as cache_err:
+                log.info(
+                    "compare-analyze refined_intent cache lookup failed (non-fatal): %s",
+                    cache_err,
+                )
+        # 캐시 미스 + edit_prompt 있으면 fresh 호출 (lock 밖)
+        if not refined_intent and edit_prompt:
+            try:
+                refined_intent = await clarify_edit_intent(
+                    edit_prompt,
+                    model=text_override or "gemma4-un:latest",
+                    timeout=60.0,
+                )
+            except Exception as exc:
+                log.info(
+                    "compare-analyze refine failed (non-fatal): %s", exc
+                )
+
     # mutex — ComfyUI 샘플링과 충돌 회피용 직렬화. 30s 대기 후에도 락이면 503.
+    # 이제 lock 안엔 qwen2.5vl 비전 호출 (analyze_pair / analyze_pair_generic)
+    # 만 들어감 → 동시성 개선.
     try:
         await asyncio.wait_for(
             _COMPARE_LOCK.acquire(), timeout=_COMPARE_LOCK_TIMEOUT_SEC
@@ -1771,13 +1881,14 @@ async def compare_analyze(
                 text_model=text_override,
             )
         else:
-            # 기본 "edit" 코드 경로 — 기존 동작 100% 보존
+            # edit context — refined_intent 는 위에서 lock 밖에 준비됨
             result_obj = await analyze_pair(
                 source_bytes=source_bytes,
                 result_bytes=result_bytes,
                 edit_prompt=edit_prompt,
                 vision_model=vision_override,
                 text_model=text_override,
+                refined_intent=refined_intent,
             )
     finally:
         _COMPARE_LOCK.release()
@@ -1793,6 +1904,18 @@ async def compare_analyze(
         except Exception as db_err:
             log.warning("compare-analyze DB persist failed: %s", db_err)
             saved = False
+
+    # spec 19 후속 (옵션 1 · 사용자 진단): 자동 비교 분석 후 모델 (qwen2.5vl
+    # + gemma4 합 28GB) 이 keep_alive 처리 deferred 로 메모리에 남아있을
+    # 수 있음. ComfyUI 가 곧바로 안 호출되니 wait_sec=0 으로 unload 명령만
+    # 즉시 발송 → 헤더 VRAM Breakdown 깨끗 + 다음 작업 안전. graceful (실패해도
+    # 응답 영향 X — 헬퍼가 내부에서 모든 예외 흡수).
+    try:
+        await ollama_unload.force_unload_all_before_comfy(wait_sec=0.0)
+    except Exception as unload_err:
+        log.info(
+            "compare-analyze post-unload failed (non-fatal): %s", unload_err
+        )
 
     return {"analysis": result_obj.to_dict(), "saved": saved}
 

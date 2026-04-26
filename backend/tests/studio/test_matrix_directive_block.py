@@ -148,6 +148,26 @@ def test_system_edit_has_preserve_no_describe_guard() -> None:
     assert "NEVER describe" in txt
     assert "generic preservation phrasing" in txt
     # mislead 경고 (이게 왜 위험한지)
-    assert "mislead the diffusion model" in txt
+    # spec 19 후속: "diffusion model" 메타 단어 → "the model" 로 일반화
+    # (사용자 결과 프롬프트에 "diffusion model" 같은 메타 토큰 누출 방지)
+    assert "mislead the model" in txt
     # core identity preservation 은 유지
     assert "exact same face" in txt
+
+
+def test_system_edit_v2_domain_aware_identity_clauses() -> None:
+    """spec 19 후속 — SYSTEM_EDIT 가 도메인별 identity clause 분리 + lighting 조건부."""
+    txt = SYSTEM_EDIT
+    # 도메인별 분기 명시
+    assert 'Domain == "person"' in txt
+    assert 'Domain == "object_scene"' in txt
+    # person clause 핵심 키워드
+    assert "exact same face" in txt
+    # object_scene clause 핵심 키워드 (사람 단어 없이)
+    assert "exact same subject" in txt
+    assert "no subject swap" in txt
+    # lighting/style 은 conditional 명시
+    assert "DO NOT force" in txt
+    assert "neon lighting" in txt or "anime style" in txt
+    # 길이 가드
+    assert "60-200 words" in txt or "Never exceed 250 words" in txt

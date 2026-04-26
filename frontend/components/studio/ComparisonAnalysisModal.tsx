@@ -20,6 +20,10 @@
 import { useState } from "react";
 import Icon from "@/components/ui/Icon";
 import {
+  TransformPromptBox,
+  UncertainBox,
+} from "@/components/studio/CompareExtraBoxes";
+import {
   COMPARISON_LEGACY_AXES,
   COMPARISON_LEGACY_LABELS_KO,
   COMPARISON_OBJECT_SCENE_SLOTS,
@@ -294,6 +298,33 @@ export default function ComparisonAnalysisModal({
             {summary || "—"}
           </div>
         </div>
+
+        {/* spec 19 후속 — Transform Prompt (Edit 의미: 추가 수정 가이드) */}
+        {(analysis.transform_prompt_ko || analysis.transform_prompt_en) && (
+          <div
+            style={{
+              padding: "0 18px 14px",
+              borderTop: "1px solid var(--line)",
+              paddingTop: 14,
+            }}
+          >
+            <TransformPromptBox
+              textKo={analysis.transform_prompt_ko}
+              textEn={analysis.transform_prompt_en}
+              contextLabel="추가 수정 가이드"
+            />
+          </div>
+        )}
+
+        {/* spec 19 후속 — Uncertain (비교 못한 영역) */}
+        {(analysis.uncertain_ko || analysis.uncertain_en) && (
+          <div style={{ padding: "0 18px 18px" }}>
+            <UncertainBox
+              textKo={analysis.uncertain_ko}
+              textEn={analysis.uncertain_en}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

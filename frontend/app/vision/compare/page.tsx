@@ -47,6 +47,10 @@ import { usePromptHistoryStore } from "@/stores/usePromptHistoryStore";
 import { compareAnalyze } from "@/lib/api-client";
 import { toast } from "@/stores/useToastStore";
 import type { VisionCompareAnalysis } from "@/lib/api/types";
+import {
+  TransformPromptBox,
+  UncertainBox,
+} from "@/components/studio/CompareExtraBoxes";
 
 /* ──────────────────────────────────────────────────────────────────────
  * 파일 → VisionCompareImage 로더 (paste fallback 용)
@@ -827,183 +831,8 @@ function AnalysisFilled({ analysis }: { analysis: VisionCompareAnalysis }) {
   );
 }
 
-/* 2026-04-26 v2.1 — Transform Prompt 박스 (B 같이 만들기 t2i 변형) */
-function TransformPromptBox({
-  textKo,
-  textEn,
-}: {
-  textKo?: string;
-  textEn?: string;
-}) {
-  const text = (textKo && textKo.trim()) || (textEn && textEn.trim()) || "";
-  const showEn = !!(textEn && textEn !== textKo);
-  const onCopy = async () => {
-    if (!text) {
-      toast.warn("복사할 내용이 없습니다.");
-      return;
-    }
-    try {
-      // 복붙은 영문 우선 (t2i 입력용) — 영문 없으면 한국어
-      const copyText = (textEn && textEn.trim()) || text;
-      await navigator.clipboard.writeText(copyText);
-      toast.success("변형 프롬프트 복사됨", `${copyText.length} chars`);
-    } catch (err) {
-      toast.error("복사 실패", err instanceof Error ? err.message : "");
-    }
-  };
-
-  return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderLeft: "3px solid #A855F7",
-        borderRadius: "var(--radius)",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "8px 12px",
-          borderBottom: "1px solid var(--line)",
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            color: "#A855F7",
-          }}
-        >
-          <Icon name="sparkle" size={11} />
-          <span
-            className="mono"
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "#A855F7",
-              letterSpacing: ".1em",
-            }}
-          >
-            TRANSFORM PROMPT
-          </span>
-          <span
-            className="mono"
-            style={{
-              fontSize: 9.5,
-              color: "var(--ink-4)",
-              letterSpacing: ".04em",
-              fontWeight: 500,
-            }}
-          >
-            · A → B 변형 가이드
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={onCopy}
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            fontSize: 10,
-            color: "var(--ink-3)",
-            padding: "2px 6px",
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid var(--line)",
-            background: "var(--bg-2)",
-            display: "flex",
-            alignItems: "center",
-            gap: 3,
-          }}
-        >
-          <Icon name="copy" size={10} /> 복사
-        </button>
-      </div>
-      <div
-        style={{
-          padding: "10px 12px",
-          fontSize: 12,
-          lineHeight: 1.55,
-          color: "var(--ink-2)",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-        }}
-      >
-        {text}
-        {showEn && textEn && (
-          <div
-            className="mono"
-            style={{
-              marginTop: 6,
-              paddingTop: 6,
-              borderTop: "1px dashed var(--line)",
-              fontSize: 10.5,
-              color: "var(--ink-4)",
-              lineHeight: 1.5,
-            }}
-          >
-            {textEn}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* 2026-04-26 v2.1 — Uncertain 박스 (비교 못한 영역) */
-function UncertainBox({
-  textKo,
-  textEn,
-}: {
-  textKo?: string;
-  textEn?: string;
-}) {
-  const text = (textKo && textKo.trim()) || (textEn && textEn.trim()) || "";
-  if (!text) return null;
-  return (
-    <div
-      style={{
-        background: "var(--bg-2)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius)",
-        padding: "8px 12px",
-        fontSize: 11.5,
-        color: "var(--ink-3)",
-        lineHeight: 1.5,
-        opacity: 0.9,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          marginBottom: 3,
-          color: "var(--ink-4)",
-        }}
-      >
-        <Icon name="search" size={10} />
-        <span
-          className="mono"
-          style={{
-            fontSize: 9.5,
-            fontWeight: 600,
-            letterSpacing: ".1em",
-            textTransform: "uppercase",
-          }}
-        >
-          Uncertain · 비교 못한 영역
-        </span>
-      </div>
-      {text}
-    </div>
-  );
-}
+/* spec 19 후속 — TransformPromptBox / UncertainBox 는
+ * @/components/studio/CompareExtraBoxes 로 이전 (Edit 모달 공용). */
 
 function AxisRow({
   label,

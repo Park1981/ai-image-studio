@@ -5,6 +5,25 @@ Ollama 기반 구조화 프롬프트 보강 엔진
 - 생성/수정 모드 분리
 - 창의성/디테일 레벨 지원
 - Ollama 장애 시 Claude CLI 폴백 → 태그 폴백 3단계 처리
+
+═══════════════════════════════════════════════════════════════════════
+⚠️  DEPRECATED — 레거시 모듈 (2026-04-22 재설계 이후 신규 studio 경로로 대체)
+═══════════════════════════════════════════════════════════════════════
+이 모듈은 main.py 의 routers/{prompt,generate}.py 를 통해 등록된 옛
+`/api/prompt/*`, `/api/generate/*` 엔드포인트가 호출함. 신규 4페이지
+(/generate /edit /video /vision) 는 모두 `backend/studio/*` 의
+prompt_pipeline / vision_pipeline / comparison_pipeline 을 사용하며
+이 모듈을 호출하지 않음.
+
+호환성/롤백 안전 차원에서 모듈 자체는 보존하지만:
+  - **신규 기능 추가 금지** — 모든 개선은 backend/studio/* 에 적용
+  - **버그 수정도 신규 경로 우선** — 여기 고쳐도 사용자 영향 0
+  - preserve-slot specific note 누출 같은 문제 (신규에서 spec 17/19 로 해결)
+    가 이 모듈에는 남아있을 수 있음 — 수정하지 말고 신규 경로 사용 유도
+  - 차후 레거시 컴포넌트 (frontend/components/CreationPanel.tsx 등) 와 함께
+    완전 제거 검토 (현재는 보류 — CLAUDE.md 의 "레거시 코드: 직접 수정 금지" 규칙)
+
+신규 프롬프트 작업은 모두 `backend/studio/prompt_pipeline.py` 에서 진행.
 """
 
 import asyncio

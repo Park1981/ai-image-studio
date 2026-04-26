@@ -50,6 +50,15 @@ export interface ComparisonAnalysis {
   overall: number;
   summary_en: string;
   summary_ko: string;
+
+  /** spec 19 (2026-04-26 · Codex 진단 #3 반영) — 옵셔널.
+   * Edit context 의도 부합도 잔여 작업 + 비교 못한 영역 명시.
+   * 옛 row 는 없음 → undefined. UI 는 값 있을 때만 표시. */
+  transform_prompt_en?: string;
+  transform_prompt_ko?: string;
+  uncertain_en?: string;
+  uncertain_ko?: string;
+
   provider: "ollama" | "fallback";
   fallback: boolean;
   analyzedAt: number;
@@ -252,6 +261,10 @@ export interface HistoryItem {
   /** Edit 비전 구조 분석 (Phase 1 · 휘발). 이 세션에서 실행된 edit 에만 포함.
    *  옛 히스토리 로드 시 undefined → AiEnhanceCard 는 visionDescription 단락으로 폴백. */
   editVisionAnalysis?: EditVisionAnalysis;
+  /** spec 19 후속 (v6 캐싱) — Edit 한 사이클의 clarify_edit_intent 결과 캐시.
+   *  비교 분석 (compare-analyze) 이 historyItemId 받으면 이 값을 재사용해
+   *  gemma4 cold start 비용 ~5초 절약. mode === "edit" 만 채워짐. */
+  refinedIntent?: string;
 }
 
 export interface GenerateRequest {

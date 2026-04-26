@@ -407,6 +407,245 @@ async def test_analyze_pair_translation_fail_keeps_en() -> None:
     assert "번역 실패" in result.summary_ko
 
 
+# ───────── spec 19 (2026-04-26 후속) — Codex 시스템 프롬프트 점검 반영 ─────────
+
+
+def test_system_compare_v3_1_has_rubric_and_extra_slots() -> None:
+    """SYSTEM_COMPARE 가 score rubric + transform_prompt + uncertain + refined_intent 포함."""
+    from studio.comparison_pipeline import SYSTEM_COMPARE
+
+    # 핵심 placeholder 존재
+    assert "{edit_prompt}" in SYSTEM_COMPARE
+    assert "{refined_intent}" in SYSTEM_COMPARE  # spec 19 신규
+    # rubric 가드 (preserve 점수 후함 방지)
+    assert "95-100" in SYSTEM_COMPARE
+    assert "Default to" in SYSTEM_COMPARE and "LOW end" in SYSTEM_COMPARE
+    # 신규 슬롯
+    assert "transform_prompt" in SYSTEM_COMPARE
+    assert "uncertain" in SYSTEM_COMPARE
+    # ABSOLUTE REQUIREMENTS 가 JSON 안정성 보장
+    assert "ABSOLUTE REQUIREMENTS" in SYSTEM_COMPARE
+
+
+@pytest.mark.asyncio
+async def test_call_vision_pair_injects_format_json_and_refined_intent() -> None:
+    """_call_vision_pair 가 Ollama payload 에 format=json + refined_intent 주입."""
+    from unittest.mock import AsyncMock, MagicMock, patch
+
+    from studio.comparison_pipeline import _call_vision_pair
+
+    captured: dict = {}
+
+    class _FakeResponse:
+        def raise_for_status(self) -> None: ...
+
+        def json(self) -> dict:
+            return {"message": {"content": "{}"}}
+
+    class _FakeClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url: str, json=None):
+            captured["url"] = url
+            captured["payload"] = json
+            return _FakeResponse()
+
+    with patch(
+        "studio.comparison_pipeline.httpx.AsyncClient",
+        new=MagicMock(return_value=_FakeClient()),
+    ):
+        await _call_vision_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="옷 색깔 바꿔줘",
+            vision_model="qwen2.5vl:7b",
+            timeout=10.0,
+            ollama_url="http://x",
+            refined_intent="Change the top color to deep blue.",
+        )
+
+    payload = captured["payload"]
+    # spec 19 (Codex #5): format=json 강제
+    assert payload.get("format") == "json"
+    # spec 19 (Codex #4): refined_intent 가 SYSTEM 프롬프트에 주입됨
+    sys_msg = payload["messages"][0]["content"]
+    assert "Change the top color to deep blue." in sys_msg
+    # raw editPrompt 도 같이 들어가 있어야 함 (한국어 원문)
+    assert "옷 색깔 바꿔줘" in sys_msg
+    # keep_alive 가드 유지
+    assert payload.get("keep_alive") == "0"
+
+
+@pytest.mark.asyncio
+async def test_analyze_pair_parses_transform_prompt_and_uncertain() -> None:
+    """spec 19: 비전 응답의 transform_prompt + uncertain 이 결과에 채워지고 한글 번역도 흡수."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import analyze_pair
+
+    raw_json = json.dumps({
+        "domain": "person",
+        "slots": {
+            "face_expression": {"intent": "preserve", "score": 92, "comment": "ok"},
+            "hair":            {"intent": "preserve", "score": 90, "comment": "ok"},
+            "attire":          {"intent": "edit",     "score": 95, "comment": "ok"},
+            "body_pose":       {"intent": "preserve", "score": 88, "comment": "ok"},
+            "background":      {"intent": "preserve", "score": 90, "comment": "ok"},
+        },
+        "summary": "Edit largely realized.",
+        "transform_prompt": "soften facial expression slightly, restore left hand position",
+        "uncertain": "right earring partially hidden",
+    })
+
+    with (
+        patch(
+            "studio.comparison_pipeline._call_vision_pair",
+            new=AsyncMock(return_value=raw_json),
+        ),
+        patch(
+            "studio.comparison_pipeline._translate_comments_to_ko",
+            new=AsyncMock(return_value={
+                "comments_ko": {
+                    "face_expression": "표정 보존됨.",
+                    "hair": "헤어 보존됨.",
+                    "attire": "의상 변경 적용됨.",
+                    "body_pose": "포즈 보존됨.",
+                    "background": "배경 보존됨.",
+                },
+                "summary_ko": "수정 대체로 반영됨.",
+                "extra": {
+                    "transform_prompt": "표정을 약간 부드럽게, 왼손 위치 복원.",
+                    "uncertain": "오른쪽 귀걸이가 일부 가림.",
+                },
+            }),
+        ),
+    ):
+        result = await analyze_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="x",
+            refined_intent="Change top color to blue.",
+        )
+
+    # 영문 그대로 흡수
+    assert "soften facial expression" in result.transform_prompt_en
+    assert "right earring" in result.uncertain_en
+    # 한글 번역 흡수
+    assert "표정을 약간 부드럽게" in result.transform_prompt_ko
+    assert "오른쪽 귀걸이" in result.uncertain_ko
+    # to_dict 직렬화에도 포함
+    serialized = result.to_dict()
+    assert "transform_prompt_en" in serialized
+    assert "transform_prompt_ko" in serialized
+    assert "uncertain_en" in serialized
+    assert "uncertain_ko" in serialized
+
+
+@pytest.mark.asyncio
+async def test_analyze_pair_passes_refined_intent_to_vision_call() -> None:
+    """spec 19: analyze_pair 호출 시 refined_intent 가 _call_vision_pair 로 전달되는지 검증."""
+    from unittest.mock import AsyncMock, patch
+
+    from studio.comparison_pipeline import analyze_pair
+
+    captured: dict = {}
+
+    async def _fake_call(*args, **kwargs):
+        captured.update(kwargs)
+        # 빈 응답 → fallback 경로 (테스트 목적은 인자 전달만 검증)
+        return ""
+
+    with patch(
+        "studio.comparison_pipeline._call_vision_pair",
+        new=_fake_call,
+    ):
+        await analyze_pair(
+            source_bytes=_tiny_png_bytes(),
+            result_bytes=_tiny_png_bytes(),
+            edit_prompt="옷 변경",
+            refined_intent="Change the outfit to a red dress.",
+        )
+
+    # _call_vision_pair 가 refined_intent 인자를 그대로 받았는지 확인
+    assert captured.get("refined_intent") == "Change the outfit to a red dress."
+
+
+# ───────── refined_intent 캐싱 (spec 19 후속 v6) ─────────
+
+
+@pytest.mark.asyncio
+async def test_history_db_persists_and_returns_refined_intent(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """v6 마이그레이션 + insert_item / get_item 가 refined_intent 왕복 처리."""
+    from studio import history_db
+
+    _set_temp_db(monkeypatch, tmp_path)
+    await history_db.init_studio_history_db()
+
+    item = {
+        "id": "tsk-cafef00d1234",
+        "mode": "edit",
+        "prompt": "옷 색깔 바꿔줘",
+        "label": "옷 색깔 바꿔줘",
+        "width": 1024,
+        "height": 1024,
+        "seed": 1,
+        "steps": 4,
+        "cfg": 1.0,
+        "lightning": True,
+        "model": "Qwen Image Edit 2511",
+        "createdAt": 1234567890000,
+        "imageRef": "/images/studio/result/tsk-cafef00d1234.png",
+        "refinedIntent": "Change the top color to deep blue. Keep everything else unchanged.",
+    }
+    await history_db.insert_item(item)
+
+    out = await history_db.get_item("tsk-cafef00d1234")
+    assert out is not None
+    assert out["refinedIntent"] == (
+        "Change the top color to deep blue. Keep everything else unchanged."
+    )
+
+
+@pytest.mark.asyncio
+async def test_get_item_returns_no_refined_intent_when_unset(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """refinedIntent 안 넣고 insert 한 row 는 get_item 결과에 키 자체가 없음.
+
+    옛 row + generate/video row 와 동일한 패턴 (값 없으면 노출 안함).
+    """
+    from studio import history_db
+
+    _set_temp_db(monkeypatch, tmp_path)
+    await history_db.init_studio_history_db()
+
+    await history_db.insert_item({
+        "id": "tsk-deadbeef5678",
+        "mode": "generate",
+        "prompt": "x",
+        "label": "x",
+        "width": 1024,
+        "height": 1024,
+        "seed": 1,
+        "steps": 8,
+        "cfg": 1.5,
+        "lightning": True,
+        "model": "Qwen Image 2512",
+        "createdAt": 1234567890000,
+        "imageRef": "/images/studio/result/tsk-deadbeef5678.png",
+    })
+
+    out = await history_db.get_item("tsk-deadbeef5678")
+    assert out is not None
+    assert "refinedIntent" not in out
+
+
 # ───────── 회귀 테스트: trailing 텍스트 + 대문자 헤더 ─────────
 
 
@@ -516,6 +755,253 @@ def test_parse_strict_json_unbalanced_returns_none() -> None:
 
     raw = '{"x": {"y": 1'
     assert _parse_strict_json(raw) is None
+
+
+# ───── spec 19 후속 (재합산) — D: lock 범위 최적화 + A: edit width/height 전달 ─────
+
+
+@pytest.mark.asyncio
+async def test_compare_analyze_skips_clarify_when_refined_intent_cached(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """spec 19 후속 (Codex 리뷰): historyItemId 의 row 에 refinedIntent 캐시가
+    있으면 clarify_edit_intent 호출 안 함 → gemma4 cold start ~5초 절약.
+
+    캐시 히트 → analyze_pair 의 refined_intent 인자에 캐시 값 그대로 전달.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+    from studio import history_db
+    from studio.comparison_pipeline import (
+        ComparisonAnalysisResult,
+        ComparisonSlotEntry,
+    )
+
+    _set_temp_db(monkeypatch, tmp_path)
+    await history_db.init_studio_history_db()
+
+    # 사전 row insert + refinedIntent 캐시
+    cached_intent = "Change the top color to deep blue. Keep everything else unchanged."
+    await history_db.insert_item({
+        "id": "tsk-cacef00d1234",
+        "mode": "edit",
+        "prompt": "옷 색깔 바꿔줘",
+        "label": "옷 색깔 바꿔줘",
+        "width": 1024, "height": 1024, "seed": 1,
+        "steps": 4, "cfg": 1.0, "lightning": True,
+        "model": "Qwen Image Edit 2511",
+        "createdAt": 1700000000000,
+        "imageRef": "/images/studio/result/tsk-cacef00d1234.png",
+        "refinedIntent": cached_intent,
+    })
+
+    clarify_calls: list[str] = []
+
+    async def _fake_clarify(*args, **_kwargs):
+        clarify_calls.append(args[0] if args else "")
+        return "FRESH (should not be called when cache hit)"
+
+    captured_intent: list[str] = []
+
+    async def _fake_analyze(*_args, **kwargs):
+        captured_intent.append(kwargs.get("refined_intent", ""))
+        return ComparisonAnalysisResult(
+            domain="person",
+            slots={
+                k: ComparisonSlotEntry(
+                    intent="preserve", score=90, comment_en="ok", comment_ko="ok"
+                )
+                for k in ("face_expression", "hair", "attire", "body_pose", "background")
+            },
+            overall=90,
+            summary_en="ok", summary_ko="ok",
+            provider="ollama", fallback=False,
+            analyzed_at=1700000000000, vision_model="qwen2.5vl:7b",
+        )
+
+    with (
+        patch("studio.router.clarify_edit_intent", new=_fake_clarify),
+        patch("studio.router.analyze_pair", new=_fake_analyze),
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+            res = await cli.post(
+                "/api/studio/compare-analyze",
+                files={
+                    "source": ("s.png", _tiny_png_bytes(), "image/png"),
+                    "result": ("r.png", _tiny_png_bytes(), "image/png"),
+                },
+                data={"meta": json.dumps({
+                    "editPrompt": "옷 색깔 바꿔줘",
+                    "historyItemId": "tsk-cacef00d1234",
+                })},
+            )
+    assert res.status_code == 200
+    # 캐시 히트 → clarify 호출 0회 (gemma4 cold start ~5초 절약 검증)
+    assert clarify_calls == [], (
+        f"clarify_edit_intent 가 캐시 히트 시 호출됨 (예상: 0회 / 실제: {len(clarify_calls)}회)"
+    )
+    # analyze_pair 가 캐시된 refined_intent 그대로 받았는지
+    assert captured_intent == [cached_intent]
+
+
+@pytest.mark.asyncio
+async def test_compare_analyze_runs_clarify_intent_outside_lock(
+    monkeypatch, tmp_path: Path
+) -> None:
+    """D — clarify_edit_intent 가 _COMPARE_LOCK 잡히기 전에 호출돼야 함.
+
+    이전엔 lock 안에서 gemma4 cold start ~5초 잡혀서 다른 compare 요청이
+    30s lock timeout 으로 503 받을 수 있었음. lock 밖으로 옮긴 후엔 vision
+    호출 직전까지 기다리지 않고 미리 정제 수행.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+    from studio.comparison_pipeline import (
+        ComparisonAnalysisResult,
+        ComparisonSlotEntry,
+    )
+
+    call_order: list[str] = []
+
+    async def _fake_clarify(*_args, **_kwargs):
+        call_order.append("clarify")
+        return "Refined English intent."
+
+    async def _fake_analyze(*_args, **kwargs):
+        call_order.append("analyze")
+        # refined_intent 가 lock 밖 정제 결과로 들어왔는지 확인
+        assert kwargs.get("refined_intent") == "Refined English intent."
+        return ComparisonAnalysisResult(
+            domain="person",
+            slots={
+                k: ComparisonSlotEntry(
+                    intent="preserve", score=90, comment_en="ok", comment_ko="ok"
+                )
+                for k in ("face_expression", "hair", "attire", "body_pose", "background")
+            },
+            overall=90,
+            summary_en="ok",
+            summary_ko="ok",
+            provider="ollama",
+            fallback=False,
+            analyzed_at=1700000000000,
+            vision_model="qwen2.5vl:7b",
+        )
+
+    with (
+        patch("studio.router.clarify_edit_intent", new=_fake_clarify),
+        patch("studio.router.analyze_pair", new=_fake_analyze),
+    ):
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+            res = await cli.post(
+                "/api/studio/compare-analyze",
+                files={
+                    "source": ("s.png", _tiny_png_bytes(), "image/png"),
+                    "result": ("r.png", _tiny_png_bytes(), "image/png"),
+                },
+                data={"meta": json.dumps({"editPrompt": "옷 색깔 바꿔줘"})},
+            )
+    assert res.status_code == 200
+    # 호출 순서: clarify (lock 밖) → analyze (lock 안)
+    assert call_order == ["clarify", "analyze"]
+
+
+@pytest.mark.asyncio
+async def test_edit_run_pipeline_forwards_width_height_to_vision() -> None:
+    """A — _run_edit_pipeline 가 source_width/source_height kwargs 를
+    run_vision_pipeline 에 width/height kwargs 로 전달하는지 단위 검증.
+
+    full SSE + ComfyUI dispatch 통합은 다른 통합 테스트가 커버.
+    여기선 spec 19 후속 변경 (kwargs 라우팅) 만 좁게 검증.
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from studio.router import _run_edit_pipeline
+
+    captured: dict = {}
+
+    async def _fake_vision(*_args, **kwargs):
+        captured.update(kwargs)
+        # _run_edit_pipeline 이 vision 결과 attribute 접근하는데, 빠른 종료를
+        # 위해 RuntimeError 로 short-circuit (try/except 가 잡음 → 에러 emit 후 종료)
+        raise RuntimeError("short-circuit after capture")
+
+    # task.emit / task.close 는 호출되지만 결과 검증 대상 아님 — AsyncMock 으로 noop
+    fake_task = AsyncMock()
+    fake_task.task_id = "tsk-cafef00d1234"
+    fake_task.emit = AsyncMock(return_value=None)
+    fake_task.close = AsyncMock(return_value=None)
+
+    with patch("studio.router.run_vision_pipeline", new=_fake_vision):
+        await _run_edit_pipeline(
+            fake_task,
+            image_bytes=_tiny_png_bytes(),
+            prompt="test",
+            lightning=True,
+            filename="x.png",
+            source_width=1664,
+            source_height=928,
+        )
+
+    assert captured.get("width") == 1664
+    assert captured.get("height") == 928
+
+
+# ───── spec 19 후속 — quoted-string aware scanner (Codex P2 권고) ─────
+
+
+def test_parse_strict_json_handles_brace_inside_string() -> None:
+    """문자열 값 안의 { 또는 } 가 brace depth 에 영향 안 줌.
+
+    예전 brace-only scanner 는 transform_prompt 안에 "{...}" 가 들어오면
+    균형이 어긋나서 파싱 실패했음. quoted-string aware 로 해결.
+    """
+    from studio._json_utils import parse_strict_json
+
+    raw = (
+        '{"transform_prompt": "shift gaze {upward} 30 degrees", '
+        '"summary": "ok"}'
+    )
+    result = parse_strict_json(raw)
+    assert result is not None
+    assert result["transform_prompt"] == "shift gaze {upward} 30 degrees"
+    assert result["summary"] == "ok"
+
+
+def test_parse_strict_json_handles_escaped_quote_in_string() -> None:
+    """문자열 안의 escape 된 따옴표 \\" 도 정상 처리."""
+    from studio._json_utils import parse_strict_json
+
+    # JSON 문자열로 'She said "hi" to me' 표현 — \" 로 escape
+    raw = '{"comment": "She said \\"hi\\" to me", "score": 95}'
+    result = parse_strict_json(raw)
+    assert result is not None
+    assert result["comment"] == 'She said "hi" to me'
+    assert result["score"] == 95
+
+
+def test_parse_strict_json_handles_escaped_backslash_then_quote() -> None:
+    """\\\\\" 패턴 (escape 된 backslash + 진짜 종료 따옴표) 도 정상 처리.
+
+    edge case: \\\\\" 는 "백슬래시 한 글자 + 종료 따옴표" 의미.
+    quoted-string aware scanner 가 escape_next 를 한 글자만 skip 하므로 정상.
+    """
+    from studio._json_utils import parse_strict_json
+
+    # JSON 문자열 값이 'path\\' (백슬래시로 끝남) 인 케이스
+    raw = '{"path": "C:\\\\folder\\\\", "ok": true}'
+    result = parse_strict_json(raw)
+    assert result is not None
+    assert result["path"] == "C:\\folder\\"
+    assert result["ok"] is True
 
 
 @pytest.mark.asyncio

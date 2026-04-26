@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import asyncio
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import aiosqlite
 import pytest
@@ -27,6 +27,66 @@ from studio.prompt_pipeline import (
     upgrade_video_prompt,
 )
 from studio.video_pipeline import VideoPipelineResult, run_video_pipeline
+
+
+# ═════════════════════════════════════════════
+# spec 19 옵션 B — 단계별 unload (Video)
+# ═════════════════════════════════════════════
+
+
+def test_run_video_pipeline_unloads_vision_before_text_spec19() -> None:
+    """spec 19 옵션 B — vision (qwen2.5vl) 호출 후 / text (gemma4) 호출 전 unload.
+
+    16GB VRAM 한계 → 두 모델 동시 점유 시 swap. 단계별 unload 로 차단.
+    """
+    unload_calls: list[str] = []
+
+    async def _spy_unload(model: str, **_kwargs):
+        unload_calls.append(model)
+        return True
+
+    async def _no_sleep(_sec):
+        return None
+
+    fake_upgrade_result = UpgradeResult(
+        upgraded="final video prompt",
+        fallback=False,
+        provider="ollama",
+        original="user direction",
+        translation=None,
+    )
+
+    with (
+        patch(
+            "studio.video_pipeline._describe_image",
+            new=AsyncMock(return_value="vision caption"),
+        ),
+        patch(
+            "studio.video_pipeline.upgrade_video_prompt",
+            new=AsyncMock(return_value=fake_upgrade_result),
+        ),
+        patch(
+            "studio.ollama_unload.unload_model",
+            new=_spy_unload,
+        ),
+        patch(
+            "studio.video_pipeline.asyncio.sleep",
+            new=_no_sleep,
+        ),
+    ):
+        asyncio.run(
+            run_video_pipeline(
+                _tiny_png_bytes(),
+                "panning shot",
+                vision_model="qwen2.5vl:7b",
+                text_model="gemma4-un:latest",
+            )
+        )
+
+    # vision (qwen) 호출 후 unload 한 번 (text 호출 전)
+    assert unload_calls == ["qwen2.5vl:7b"], (
+        f"video pipeline 단계별 unload 누락 (예상: [qwen2.5vl:7b] / 실제: {unload_calls})"
+    )
 
 
 def _tiny_png_bytes() -> bytes:
