@@ -212,6 +212,164 @@ button {
 }
 
 /* ─────────────────────────────────────────
+   Generate / Edit / Video 페이지 공용 인라인 → 토큰 class (task #5 · 2026-04-26)
+   page.tsx 분해 시 인라인 style 30+ → 한 곳에서 관리.
+   :hover 는 CSS 가 React 인라인 mutation 보다 안정적 (re-render 0).
+   ───────────────────────────────────────── */
+
+/* 라벨 / 메타 컬럼 헤더 (label + meta 양 끝) */
+.ais-field-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+.ais-field-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  letter-spacing: 0;
+}
+.ais-field-meta {
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
+
+/* 프롬프트 입력 카드 shell (textarea + footer) */
+.ais-prompt-shell {
+  position: relative;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  transition: border .15s;
+  box-shadow: var(--shadow-sm);
+}
+.ais-prompt-textarea {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  resize: none;
+  background: transparent;
+  padding: 14px 44px 38px 16px;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  border-radius: var(--radius);
+  /* auto-grow: 내용만큼만 + 상한 60vh 에서 내부 스크롤 */
+  min-height: 96px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.ais-prompt-footer {
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--ink-4);
+}
+.ais-prompt-link {
+  all: unset;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.ais-prompt-clear {
+  all: unset;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ink-4);
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: background .12s;
+}
+.ais-prompt-clear:hover {
+  background: var(--bg-2);
+}
+
+/* Primary CTA 버튼 — sticky 하단 + progress bar overlay */
+.ais-cta-sticky {
+  position: sticky;
+  bottom: 12px;
+  margin-top: auto;
+  padding-top: 10px;
+  z-index: 4;
+  background: linear-gradient(to bottom, transparent, var(--bg) 45%);
+}
+.ais-cta-primary {
+  all: unset;
+  cursor: pointer;
+  text-align: center;
+  background: var(--accent);
+  color: #fff;
+  padding: 14px 20px;
+  border-radius: var(--radius-full);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow:
+    0 4px 18px rgba(74, 158, 255, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  transition: all .18s;
+  position: relative;
+  overflow: hidden;
+}
+.ais-cta-primary:hover:not(:disabled) {
+  background: var(--accent-ink);
+}
+.ais-cta-primary:disabled {
+  cursor: not-allowed;
+  background: var(--accent-disabled);
+  box-shadow: none;
+}
+.ais-cta-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.18);
+  transition: width .2s;
+}
+.ais-cta-content {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ais-cta-shortcut {
+  font-size: 10.5px;
+  opacity: 0.8;
+  font-weight: 500;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.18);
+}
+.ais-cta-eta {
+  font-size: 11px;
+  color: var(--ink-4);
+  text-align: center;
+  margin-top: 6px;
+}
+
+/* ─────────────────────────────────────────
    메인 메뉴 그리드 — 반응형 baseline (P0-1 · 2026-04-26)
    ≥1280px: 3열 / 1024-1280px: 2열 / <1024px: 미지원 (StudioLayout floor 동일).
    사용자 정책: 1024px = 최소 (모바일 미지원, 노트북부터).
