@@ -563,13 +563,6 @@ class ProcessManager:
             return 0.0
         return (time.time() - self._comfyui_started_at) / 60.0
 
-    @property
-    def comfyui_pid(self) -> int | None:
-        """ComfyUI 프로세스 PID (미실행 시 None)"""
-        if self._comfyui_process is None:
-            return None
-        return self._comfyui_process.pid
-
 
 # 싱글톤 인스턴스
 process_manager = ProcessManager()

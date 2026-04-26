@@ -44,7 +44,7 @@ from typing import Any, Awaitable, Callable
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field
 
 from .presets import (
@@ -81,6 +81,20 @@ try:
     from services.process_manager import process_manager as _proc_mgr  # type: ignore
 except Exception:  # pragma: no cover - 테스트 환경
     _proc_mgr = None
+
+
+def _mark_generation_complete() -> None:
+    """Studio 파이프라인 완료 시 idle shutdown 타이머 시작.
+
+    레거시 /api/generate 만 호출하던 mark_generation_complete 를 신규 Studio 파이프라인에도 통합.
+    _proc_mgr 가 None (테스트 환경) 이면 무시. 호출 자체 실패해도 파이프라인은 정상 완료 처리.
+    """
+    if _proc_mgr is None:
+        return
+    try:
+        _proc_mgr.mark_generation_complete()
+    except Exception as exc:  # pragma: no cover - 방어적
+        log.warning("mark_generation_complete 호출 실패: %s", exc)
 
 # ComfyUI 가 실제로 안 돌고 있어서 /prompt 가 실패해도 UI 는 Mock 이미지로 완주되게 할지.
 # False 면 에러를 프론트로 올리고 토스트. True 면 폴백해서 mock-seed:// 리턴.
@@ -457,14 +471,23 @@ class Task:
         self.cancelled = False
         # monotonic: NTP 보정과 무관한 TTL 계산
         self.created_at = time.monotonic()
+        # P0-1 (2026-04-26): 활성 task 가 idle 상태인지 판정하기 위한 마지막 이벤트 시각.
+        # emit() 호출마다 갱신. 좀비 worker (ComfyUI hang 등) 회수에 사용.
+        self.last_event_at = self.created_at
+        # close() 호출 시점 — closed 이후 메모리 회수 TTL 계산용.
+        self.closed_at: float | None = None
         self.worker: asyncio.Task[Any] | None = None
 
     async def emit(self, event_type: str, payload: dict[str, Any]) -> None:
+        # last_event_at 갱신 — 활성 task 의 idle 판정 기준.
+        # 주의: single-threaded asyncio 라 _TASKS_LOCK 없이 안전 (Codex 검증).
+        self.last_event_at = time.monotonic()
         await self.queue.put({"event": event_type, "data": payload})
 
     async def close(self) -> None:
         if not self.closed:
             self.closed = True
+            self.closed_at = time.monotonic()
             await self.queue.put({"event": "__close__", "data": {}})
 
     def cancel(self) -> None:
@@ -482,8 +505,23 @@ class Task:
 
 TASKS: dict[str, Task] = {}
 _TASKS_LOCK = asyncio.Lock()
-TASK_TTL_SEC = 600  # 10분
+
+# P0-1 (2026-04-26): TTL 정책을 4-state 별로 분리.
+# 이전: TASK_TTL_SEC=600 단일 정책 — created_at 기준 → 비디오 7200s · 16GB swap 51분+ 케이스 강제 cancel 발생.
+# 신규: closed / orphan(worker None) / worker-done / active 4-state 분리.
+#   - CLOSED_TTL: 정상 종료된 task 메모리 회수 시점 (의미상 기존 TASK_TTL_SEC 와 동일)
+#   - ORPHAN_GRACE: stream 연결 안 받은 task 회수 (보통 worker spawn 직후 실패 시나리오)
+#   - ACTIVE_IDLE_TTL: 활성 worker 가 일정 시간 emit 없으면 좀비 추정 → cancel.
+#       Codex 검증: emit() 은 ComfyUI progress WS 이벤트에서만 호출되므로 swap 케이스 emit gap 이
+#       기존안 1500s 를 넘을 수 있음 → ComfyUI hard_timeout(7200s) + 5분 buffer = 7500s 로 보수화.
+#       사실상 좀비 회수용 hard cap.
+_CLOSED_TTL_SEC = 600  # 10분 — closed 후 메모리 회수
+_ORPHAN_GRACE_SEC = 120  # 2분 — worker 미할당 task 회수
+_ACTIVE_IDLE_TTL_SEC = 7500  # 2시간 5분 — emit 없이 idle 시 좀비 회수 (ComfyUI hard_timeout + buffer)
 _CLEANUP_INTERVAL_SEC = 120  # 2분마다 stale sweep
+
+# 하위호환 — 외부에서 import 하는 케이스 보호 (현재 import 검색 0건이지만 safety)
+TASK_TTL_SEC = _CLOSED_TTL_SEC
 
 
 async def _new_task() -> Task:
@@ -496,21 +534,39 @@ async def _new_task() -> Task:
 
 
 async def _cleanup_stale_tasks() -> int:
-    """closed 여부와 무관하게 TTL 초과한 task 모두 정리.
+    """4-state 별 TTL 정책으로 stale task 정리 (P0-1 재설계 · 2026-04-26).
+
+    분류 순서 (Codex 검증 — closed 를 worker.done() 보다 먼저 봐야 정상 완료 task 즉시 삭제 안 됨):
+      1. closed: closed_at 기준 _CLOSED_TTL_SEC 초과 → 회수
+      2. orphan (worker None): created_at 기준 _ORPHAN_GRACE_SEC 초과 → 회수
+      3. worker.done() (close() 못 부른 비정상 종료): 즉시 회수
+      4. active: last_event_at 기준 _ACTIVE_IDLE_TTL_SEC 초과 → 좀비 추정 cancel
 
     Returns:
         정리된 task 개수.
     """
     async with _TASKS_LOCK:
         now = time.monotonic()
-        stale = [
-            tid
-            for tid, t in TASKS.items()
-            if now - t.created_at > TASK_TTL_SEC
-        ]
+        stale: list[str] = []
+        for tid, t in TASKS.items():
+            if t.closed:
+                # 정상 종료 task — closed_at 기준 메모리 회수
+                if t.closed_at is not None and (now - t.closed_at) > _CLOSED_TTL_SEC:
+                    stale.append(tid)
+            elif t.worker is None:
+                # orphan — _new_task 후 worker 할당 전 race (현재 코드엔 발생 가능 path 없지만 방어)
+                if (now - t.created_at) > _ORPHAN_GRACE_SEC:
+                    stale.append(tid)
+            elif t.worker.done():
+                # worker 종료됐는데 close() 못 부른 비정상 case — 안전 회수
+                stale.append(tid)
+            else:
+                # 활성 task — emit gap 으로 좀비 판정 (ComfyUI hard_timeout 초과 케이스)
+                if (now - t.last_event_at) > _ACTIVE_IDLE_TTL_SEC:
+                    stale.append(tid)
         for tid in stale:
             t = TASKS.pop(tid, None)
-            # 살아있는 worker 가 있으면 강제 종료 (좀비 회수)
+            # 살아있는 worker 있으면 강제 종료 (좀비 회수)
             if t is not None and not t.closed:
                 t.cancel()
         return len(stale)
@@ -823,6 +879,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
         await task.emit(
             "done", {"item": item, "savedToHistory": saved_to_history}
         )
+        _mark_generation_complete()
     except asyncio.CancelledError:
         log.info("Generate pipeline cancelled: %s", task.task_id)
         raise
@@ -1095,6 +1152,9 @@ async def _save_comfy_output(
 # ─────────────────────────────────────────────
 
 
+_EDIT_MAX_IMAGE_BYTES = 20 * 1024 * 1024  # P1-5 (2026-04-26): Vision/Video 와 동일 정책
+
+
 @router.post("/edit", response_model=TaskCreated)
 async def create_edit_task(
     image: UploadFile = File(...),
@@ -1118,15 +1178,28 @@ async def create_edit_task(
     if not image_bytes:
         raise HTTPException(400, "empty image")
 
+    # P1-5 (2026-04-26): size + image 형식 검증 — Vision/Video 와 동일 정책.
+    # 이전엔 빈 bytes 만 체크하고 손상/비-이미지 도 통과 → ComfyUI 단계 모호한 실패.
+    if len(image_bytes) > _EDIT_MAX_IMAGE_BYTES:
+        raise HTTPException(
+            413,
+            f"image too large: {len(image_bytes)} bytes "
+            f"(max {_EDIT_MAX_IMAGE_BYTES})",
+        )
+
     # spec 19 후속 (Codex P1 #1): SOURCE 이미지 dim 추출 → vision 분석에 전달.
     # 이전엔 analyze_edit_source 가 width/height 받게 만들었지만 router 가
     # 안 넘겨서 dead code 였음 (aspect 항상 unknown). 여기서 PIL 한 번 열어
-    # 정수 dim 만 추출. 실패해도 0/0 으로 폴백 (옛 동작과 동일).
+    # 정수 dim 만 추출. P1-5 보강: open 자체 실패 시 400 (손상 이미지 거부).
     source_w, source_h = 0, 0
     try:
         with Image.open(io.BytesIO(image_bytes)) as src_im:
             source_w, source_h = src_im.size
+    except UnidentifiedImageError as e:
+        # PIL 이 인식 못하는 형식 — 명백히 비-이미지. 즉시 reject.
+        raise HTTPException(400, f"invalid image format: {e}") from e
     except Exception as dim_err:
+        # 그 외 오류 (예외적 메모리/IO 등) — 0/0 폴백 후 ComfyUI 가 처리.
         log.info(
             "edit source dim extraction failed (non-fatal): %s", dim_err
         )
@@ -1326,6 +1399,7 @@ async def _run_edit_pipeline(
         await task.emit(
             "done", {"item": item, "savedToHistory": saved_to_history}
         )
+        _mark_generation_complete()
     except asyncio.CancelledError:
         log.info("Edit pipeline cancelled: %s", task.task_id)
         raise
@@ -1680,6 +1754,7 @@ async def _run_video_pipeline_task(
         await task.emit(
             "done", {"item": item, "savedToHistory": saved_to_history}
         )
+        _mark_generation_complete()
 
     except asyncio.CancelledError:
         log.info("Video pipeline cancelled: %s", task.task_id)
@@ -2011,7 +2086,7 @@ async def process_status():
     try:
         metrics = await get_system_metrics()  # type: ignore[assignment]
     except Exception as exc:
-        logger.warning("system metrics 측정 실패: %s", exc)
+        log.warning("system metrics 측정 실패: %s", exc)
         metrics = {}
 
     # VRAM breakdown — process_manager 노출 PID 활용 (외부 기동이면 None → 휴리스틱)
@@ -2025,7 +2100,7 @@ async def process_status():
             total_used_gb=total_used_gb,
         )
     except Exception as exc:
-        logger.warning("vram breakdown 측정 실패: %s", exc)
+        log.warning("vram breakdown 측정 실패: %s", exc)
         breakdown = {}
 
     # comfyui 묶음 — VRAM + GPU% (GPU 메트릭 nvidia-smi 의존)
