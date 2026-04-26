@@ -119,8 +119,22 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 **2026-04-26 (후속 2) Codex 3가지 미세 fix** — pytest 162→166 · vitest 23.
 - **`_coerce_score` 문자열 방어** (CRITICAL): 모델이 `"95"` / `"95%"` / `"95/100"` / `"85 (high)"` 같은 문자열로 응답해도 정상 파싱 (이전엔 None → 종합 0% 버그). string strip + `%` / `/100` / `(...)` 제거 + float 변환. `_coerce_scores` 도 `_coerce_score` 헬퍼 위임 → 일관 적용.
 - **keep_alive 타입 통일**: int `0` → str `"0"` (7 호출 모두). Ollama spec duration 형식 일관성 (옛 코드 패턴 일치 + Ollama 명시적 표준).
-- **transform_prompt 트리거 조건 명확화**: "A and B are 95+ identical" 모호 → "ALL 5 axes >= 95 (composition / color / subject (no caps) / mood / quality)" 명시. 임의 axis < 95 면 구체 변경 묘사 강제. "no significant changes" 남발 차단.
+- **transform_prompt 트리거 조건 명확화**: "A and B are 95+ identical" 모호 → "ALL 5 axes >= 95 (composition / color / subject (no caps) / mono / quality)" 명시. 임의 axis < 95 면 구체 변경 묘사 강제. "no significant changes" 남발 차단.
 - **pytest 보강**: `_coerce_score` 단위 테스트 4 케이스 추가 (int/float / string variants / invalid → None / dict 통합).
+
+**2026-04-26 (후속 3) VRAM Breakdown 오버레이 + 막대 100% 길게 + 위험 그라데이션** — pytest 166 · tsc+lint clean.
+사용자 제안: "VRAM 임계 넘을 때 ComfyUI/Ollama 어떤 모델 점유 중인지 헤더에 자세히 보고 싶다." → 80% 임계 진입 시 막대 하단 오버레이 fade-in.
+- **Backend 신규 모듈 `backend/studio/dispatch_state.py`**: ComfyUI 마지막 dispatch 모델 캐시 (단순 모듈 변수 + record/get/clear). router.py 의 generate/edit/video 진입 시점에 `dispatch_state.record(mode, model.display_name)` 호출 (3 endpoint).
+- **Backend `system_metrics.py::get_vram_breakdown()`**: nvidia-smi `--query-compute-apps=pid,process_name,used_memory` + Ollama `/api/ps` 병렬 호출. 프로세스별 VRAM 분류 (ComfyUI / Ollama / 기타). PID 매칭 정확 + process_name 휴리스틱 폴백.
+- **🔑 Windows 권한 정책 폴백** (CRITICAL): Windows 11 보안 정책으로 일반 사용자 권한 nvidia-smi 의 `used_gpu_memory` 컬럼이 모두 `[N/A]` 반환 (관리자 권한만 GB 값 노출). 우리 코드는 ValueError 로 skip → 모든 분류 0G. **폴백**: `total_used_gb - (ollama_total_gb + other_gb)` 차이를 ComfyUI 로 추정. `ollama_total_gb = max(nvidia-smi 매칭, /api/ps size_vram 합)` — 두 측정원 max 로 swap 케이스 (Ollama 동시 점유) 도 정확 분리. 합산이 물리 VRAM 한계 안으로 수렴.
+- **`process_manager.comfyui_pid` property**: subprocess.Popen 의 PID 노출 (외부 기동이면 None). breakdown 의 정확 PID 매칭에 활용.
+- **`/process/status` 응답 확장**: `vram_breakdown: {comfyui:{vram_gb,models,last_mode?}, ollama:{vram_gb,models[{name,size_vram_gb,expires_in_sec}]}, other_gb}` 항상 포함 (실패 graceful · 빈 객체).
+- **Frontend `VramBreakdown` 타입** + `useProcessStore.vramBreakdown` 필드 + `AppShell` 폴러 5초 주기 동기화.
+- **SystemMetrics VRAM 임계 오버레이** (`>= 80%` + breakdown 있을 때만): 막대 하단 fade-in. ComfyUI 줄 (모델명 + 모드 한글) / Ollama 줄 (모델별 · expires 한글 — "4분 후 unload") / 기타 줄. **0.0G row 자체 숨김** (사용자 요청 — 모두 0 이면 오버레이 자체 안 그림).
+- **막대 시각 개편**: width 22→44px (collapsed) / 56→112px (hover). 색상 정책 3단계 — `0-80%` solid 고유색 / `80-90%` 끝쪽 amber linear-gradient / `90-100%` 끝쪽 빨강 그라데이션 (Tailwind red-600 #DC2626). 1차 시도 oklab mix 결함 회피 — 메트릭 색을 출발점으로 유지해 정체성 보존 + 끝쪽만 위험 색 강조.
+- **CPU 색상 빨강 → 시안** (#06B6D4 Tailwind cyan-500): 90%+ 위험 빨강 그라데이션과 시각 충돌 회피 ("CPU 임계인 줄 알았는데 평상시" 차단). 빨/주/노 영역은 임계 신호 전용으로 비움. RAM 파랑(sky-blue)과 청록계로 충분히 구분.
+- **VramBadge amber 임계 통일**: 0.75 → 0.80 (SystemMetrics 와 일치 · breakdown 오버레이 트리거와 동일).
+- **검증**: pytest 166/166 · tsc clean · lint clean · 실측 backend 응답 확인 (ComfyUI 15.2G + Ollama 0G 정상 표시, 폴백 작동).
 
 ## Architecture (신규 · 재설계 후)
 - frontend/: Next.js 16, App Router, React 19, TypeScript strict, Tailwind v4, Zustand 5

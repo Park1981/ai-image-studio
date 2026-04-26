@@ -12,6 +12,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { VramBreakdown } from "@/lib/api/types";
 
 export type ProcStatus = "running" | "stopped";
 
@@ -35,6 +36,8 @@ export interface ProcessState {
   gpuPercent: number | null;
   /** 0~100 CPU 사용률 — null 이면 psutil 실패 */
   cpuPercent: number | null;
+  /** VRAM 임계 (80%) 오버레이용 프로세스 분류 — Mock/실패 시 null */
+  vramBreakdown: VramBreakdown | null;
 
   setOllama: (s: ProcStatus) => void;
   setComfyui: (s: ProcStatus) => void;
@@ -46,6 +49,7 @@ export interface ProcessState {
     ram: MemorySnapshot | null;
     gpuPercent: number | null;
     cpuPercent: number | null;
+    vramBreakdown: VramBreakdown | null;
   }) => void;
   toggleOllama: () => void;
   toggleComfyui: () => void;
@@ -60,6 +64,7 @@ export const useProcessStore = create<ProcessState>()(
       ram: null,
       gpuPercent: null,
       cpuPercent: null,
+      vramBreakdown: null,
       setOllama: (s) => set({ ollama: s }),
       setComfyui: (s) => set({ comfyui: s }),
       applyStatus: (input) =>
@@ -70,6 +75,7 @@ export const useProcessStore = create<ProcessState>()(
           ram: input.ram,
           gpuPercent: input.gpuPercent,
           cpuPercent: input.cpuPercent,
+          vramBreakdown: input.vramBreakdown,
         }),
       toggleOllama: () =>
         set((st) => ({ ollama: st.ollama === "running" ? "stopped" : "running" })),

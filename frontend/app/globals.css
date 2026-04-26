@@ -292,9 +292,9 @@ button {
   transition-delay: .18s;
 }
 
-/* bar — collapsed 22px, expanded 56px */
+/* bar — collapsed 44px, expanded 112px (2026-04-26 후속: 100% 길게 + 위험 그라데이션 가시성 확보) */
 .ais-metric-cell .ais-bar {
-  width: 22px;
+  width: 44px;
   height: 6px;
   background: var(--bg-2);
   border-radius: 3px;
@@ -303,10 +303,12 @@ button {
   transition: width .4s var(--ais-ease-out-back);
 }
 .ais-metrics:hover .ais-metric-cell .ais-bar {
-  width: 56px;
+  width: 112px;
 }
 .ais-metric-cell .ais-bar-fill {
   height: 100%;
   border-radius: 3px;
-  transition: width .35s ease, background-color .25s;
+  /* 0-80% solid 고유색 / 80-90% amber 톤 / 90-100% 빨강 그라데이션
+     background 변경도 부드럽게 — fill 의 width transition 과 동시 효과 */
+  transition: width .35s ease, background .35s ease;
 }

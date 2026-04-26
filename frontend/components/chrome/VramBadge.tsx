@@ -14,8 +14,9 @@ import { useProcessStore } from "@/stores/useProcessStore";
 const BAR_W = 38;
 const BAR_H = 5;
 
-/** 사용률 75% 미만 = accent / 75%+ = amber (16GB 환경에서 ~12GB 부터 경고) */
-const HIGH_THRESHOLD = 0.75;
+/** 사용률 80% 미만 = accent / 80%+ = amber (16GB 환경에서 ~12.8GB 부터 경고).
+ *  2026-04-26 (후속): SystemMetrics 의 임계 (80%) + VRAM breakdown 오버레이 트리거와 통일. */
+const HIGH_THRESHOLD = 0.8;
 
 export default function VramBadge() {
   const vram = useProcessStore((s) => s.vram);

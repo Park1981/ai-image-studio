@@ -61,7 +61,8 @@ from .claude_cli import research_prompt
 from .vision_pipeline import analyze_image_detailed, run_vision_pipeline
 from .video_pipeline import run_video_pipeline
 from .comparison_pipeline import analyze_pair, analyze_pair_generic
-from .system_metrics import get_system_metrics
+from .system_metrics import get_system_metrics, get_vram_breakdown
+from . import dispatch_state
 from .comfy_api_builder import (
     build_generate_from_request,
     build_edit_from_request,
@@ -604,6 +605,8 @@ async def _stream_task(task: Task, request: Request | None = None):
 async def create_generate_task(body: GenerateBody):
     """생성 요청 받으면 백그라운드 파이프라인 spawn, task_id 반환."""
     task = await _new_task()
+    # 헤더 VRAM breakdown 오버레이용 — ComfyUI 마지막 dispatch 모델 기록
+    dispatch_state.record("generate", GENERATE_MODEL.display_name)
     task.worker = _spawn(_run_generate_pipeline(task, body))
     return TaskCreated(
         task_id=task.task_id,
@@ -1096,6 +1099,8 @@ async def create_edit_task(
         raise HTTPException(400, "empty image")
 
     task = await _new_task()
+    # 헤더 VRAM breakdown 오버레이용 — ComfyUI 마지막 dispatch 모델 기록
+    dispatch_state.record("edit", EDIT_MODEL.display_name)
     task.worker = _spawn(
         _run_edit_pipeline(
             task,
@@ -1385,6 +1390,8 @@ async def create_video_task(
     source_w, source_h = _extract_image_dims(image_bytes)
 
     task = await _new_task()
+    # 헤더 VRAM breakdown 오버레이용 — ComfyUI 마지막 dispatch 모델 기록
+    dispatch_state.record("video", VIDEO_MODEL.display_name)
     task.worker = _spawn(
         _run_video_pipeline_task(
             task,
@@ -1858,8 +1865,14 @@ async def process_status():
         "comfyui": {"running": bool, "vram_used_gb": float?, "vram_total_gb": float?,
                     "gpu_percent": float?},
         "system":  {"cpu_percent": float?, "ram_used_gb": float?, "ram_total_gb": float?},
+        "vram_breakdown": {
+          "comfyui": {"vram_gb": float, "models": [str], "last_mode": str?},
+          "ollama":  {"vram_gb": float, "models": [{"name", "size_vram_gb", "expires_in_sec"}]},
+          "other_gb": float
+        }
       }
     각 메트릭 필드는 측정 실패 시 누락 가능 (프론트에서 누락 = 미표시 처리).
+    vram_breakdown 은 항상 포함 (실패 시 0/빈 리스트) — 프론트에서 80% 임계 넘을 때만 표시.
     """
     if _proc_mgr is None:
         return {
@@ -1878,6 +1891,20 @@ async def process_status():
         logger.warning("system metrics 측정 실패: %s", exc)
         metrics = {}
 
+    # VRAM breakdown — process_manager 노출 PID 활용 (외부 기동이면 None → 휴리스틱)
+    # nvidia-smi compute-apps 가 ComfyUI 못 잡는 케이스 폴백을 위해 total_used_gb 도 전달.
+    comfyui_pid = getattr(_proc_mgr, "comfyui_pid", None)
+    total_used_gb = metrics.get("vram_used_gb")
+    breakdown: dict[str, Any] = {}
+    try:
+        breakdown = await get_vram_breakdown(
+            comfyui_pid=comfyui_pid,
+            total_used_gb=total_used_gb,
+        )
+    except Exception as exc:
+        logger.warning("vram breakdown 측정 실패: %s", exc)
+        breakdown = {}
+
     # comfyui 묶음 — VRAM + GPU% (GPU 메트릭 nvidia-smi 의존)
     comfyui_payload: dict[str, Any] = {"running": comfyui_ok}
     for key in ("vram_used_gb", "vram_total_gb", "gpu_percent"):
@@ -1894,6 +1921,7 @@ async def process_status():
         "ollama": {"running": ollama_ok},
         "comfyui": comfyui_payload,
         "system": system_payload,
+        "vram_breakdown": breakdown,
     }
 
 

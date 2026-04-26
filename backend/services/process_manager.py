@@ -44,6 +44,17 @@ class ProcessManager:
         # Ollama 서브프로세스 핸들 (수동 시작 시만 보관)
         self._ollama_process: subprocess.Popen | None = None
 
+    @property
+    def comfyui_pid(self) -> int | None:
+        """우리가 띄운 ComfyUI subprocess PID — 외부 기동 시 None.
+
+        헤더 VRAM breakdown UI 가 nvidia-smi compute-apps 와 매칭하는 데 사용.
+        """
+        proc = self._comfyui_process
+        if proc is None or proc.poll() is not None:
+            return None
+        return proc.pid
+
     def _close_comfyui_log_handles(self) -> None:
         """ComfyUI subprocess 가 사용한 stdout/stderr 파일 핸들 close."""
         if self._comfyui_log_handles is None:

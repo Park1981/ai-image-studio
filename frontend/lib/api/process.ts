@@ -4,7 +4,7 @@
  */
 
 import { STUDIO_BASE, USE_MOCK } from "./client";
-import type { OllamaModel, ProcessStatusSnapshot } from "./types";
+import type { OllamaModel, ProcessStatusSnapshot, VramBreakdown } from "./types";
 
 /**
  * 백엔드 /process/status 폴링 — 프로세스 상태 + CPU/RAM/GPU%/VRAM 원샷 조회.
@@ -33,6 +33,18 @@ export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null
         ram_used_gb?: number;
         ram_total_gb?: number;
       };
+      vram_breakdown?: {
+        comfyui?: { vram_gb?: number; models?: string[]; last_mode?: string };
+        ollama?: {
+          vram_gb?: number;
+          models?: Array<{
+            name?: string;
+            size_vram_gb?: number;
+            expires_in_sec?: number | null;
+          }>;
+        };
+        other_gb?: number;
+      };
     };
 
     // VRAM — total>0 일 때만 유효 (nvidia-smi 미설치 환경 처리)
@@ -51,6 +63,28 @@ export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null
         ? { usedGb: rUsed, totalGb: rTotal }
         : null;
 
+    // VRAM breakdown — snake → camel 변환. 누락 필드는 안전한 기본값.
+    let vramBreakdown: VramBreakdown | null = null;
+    const bd = data.vram_breakdown;
+    if (bd) {
+      vramBreakdown = {
+        comfyui: {
+          vramGb: bd.comfyui?.vram_gb ?? 0,
+          models: Array.isArray(bd.comfyui?.models) ? bd.comfyui.models : [],
+          lastMode: bd.comfyui?.last_mode,
+        },
+        ollama: {
+          vramGb: bd.ollama?.vram_gb ?? 0,
+          models: (bd.ollama?.models ?? []).map((m) => ({
+            name: m.name ?? "(unknown)",
+            sizeVramGb: m.size_vram_gb ?? 0,
+            expiresInSec: m.expires_in_sec ?? null,
+          })),
+        },
+        otherGb: bd.other_gb ?? 0,
+      };
+    }
+
     return {
       ollamaRunning: !!data.ollama?.running,
       comfyuiRunning: !!data.comfyui?.running,
@@ -58,6 +92,7 @@ export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null
       ram,
       gpuPercent: data.comfyui?.gpu_percent ?? null,
       cpuPercent: data.system?.cpu_percent ?? null,
+      vramBreakdown,
     };
   } catch {
     return null;

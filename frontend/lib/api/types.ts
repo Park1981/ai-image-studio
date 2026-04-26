@@ -374,6 +374,7 @@ export interface RamSnapshot {
  *
  * 2026-04-26: SystemMetrics (CPU/GPU/VRAM/RAM 4-bar UI) 도입 — vram 단독에서
  * cpu/gpu/ram 까지 확장.
+ * 2026-04-26 (후속): vramBreakdown 추가 — 헤더 80% 임계 오버레이 (프로세스별 VRAM + 로드 모델).
  */
 export interface ProcessStatusSnapshot {
   ollamaRunning: boolean;
@@ -386,6 +387,36 @@ export interface ProcessStatusSnapshot {
   gpuPercent: number | null;
   /** psutil CPU utilization % — 실패 시 null. */
   cpuPercent: number | null;
+  /** 프로세스별 VRAM 분류 + 로드 모델 정보. 측정 실패 시 null. */
+  vramBreakdown: VramBreakdown | null;
+}
+
+/**
+ * 헤더 VRAM 임계 오버레이용 — ComfyUI / Ollama / 기타 분류.
+ * 백엔드 /process/status 응답의 vram_breakdown 필드 그대로 매핑 (snake → camel).
+ */
+export interface VramBreakdown {
+  comfyui: {
+    /** ComfyUI 프로세스가 점유 중인 VRAM (GB) */
+    vramGb: number;
+    /** 마지막 dispatch 모델 (display_name) — 추적값. 비어있을 수 있음. */
+    models: string[];
+    /** 마지막 dispatch 모드: "generate" | "edit" | "video" */
+    lastMode?: string;
+  };
+  ollama: {
+    /** Ollama 프로세스가 점유 중인 VRAM (GB) */
+    vramGb: number;
+    /** 현재 로드된 모델 목록 (keep_alive=0 정책에선 보통 빈 배열) */
+    models: Array<{
+      name: string;
+      sizeVramGb: number;
+      /** keep_alive 남은 초 — null 이면 파싱 실패 또는 만료 */
+      expiresInSec: number | null;
+    }>;
+  };
+  /** 기타 GPU 사용 프로세스 합산 (브라우저 GPU 가속 등) */
+  otherGb: number;
 }
 
 /**
