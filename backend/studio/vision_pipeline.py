@@ -513,7 +513,7 @@ async def _describe_image(
         ],
         "stream": False,
         # 2026-04-26: VRAM 즉시 반납 — 비전 모델 14GB 가 ComfyUI 와 충돌 방지
-        "keep_alive": 0,
+        "keep_alive": "0",
         "options": {"temperature": temperature},
     }
     try:
@@ -725,7 +725,7 @@ async def _call_vision_edit_source(
         "stream": False,
         "format": "json",
         # 2026-04-26: VRAM 즉시 반납
-        "keep_alive": 0,
+        "keep_alive": "0",
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
@@ -940,7 +940,7 @@ async def _call_vision_recipe_v2(
         "stream": False,
         "format": "json",
         # 2026-04-26: VRAM 즉시 반납
-        "keep_alive": 0,
+        "keep_alive": "0",
         "options": {"temperature": 0.4, "num_ctx": 8192},
     }
     try:

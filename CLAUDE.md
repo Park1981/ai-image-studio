@@ -116,6 +116,12 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
   - CLAUDE.md "Ollama: 온디맨드 호출 + VRAM 즉시 반납" 의도와 일치.
 - **테스트**: pytest 162 (회귀 0) · vitest 23 · lint+tsc clean.
 
+**2026-04-26 (후속 2) Codex 3가지 미세 fix** — pytest 162→166 · vitest 23.
+- **`_coerce_score` 문자열 방어** (CRITICAL): 모델이 `"95"` / `"95%"` / `"95/100"` / `"85 (high)"` 같은 문자열로 응답해도 정상 파싱 (이전엔 None → 종합 0% 버그). string strip + `%` / `/100` / `(...)` 제거 + float 변환. `_coerce_scores` 도 `_coerce_score` 헬퍼 위임 → 일관 적용.
+- **keep_alive 타입 통일**: int `0` → str `"0"` (7 호출 모두). Ollama spec duration 형식 일관성 (옛 코드 패턴 일치 + Ollama 명시적 표준).
+- **transform_prompt 트리거 조건 명확화**: "A and B are 95+ identical" 모호 → "ALL 5 axes >= 95 (composition / color / subject (no caps) / mood / quality)" 명시. 임의 axis < 95 면 구체 변경 묘사 강제. "no significant changes" 남발 차단.
+- **pytest 보강**: `_coerce_score` 단위 테스트 4 케이스 추가 (int/float / string variants / invalid → None / dict 통합).
+
 ## Architecture (신규 · 재설계 후)
 - frontend/: Next.js 16, App Router, React 19, TypeScript strict, Tailwind v4, Zustand 5
 - backend/: FastAPI, Python 3.13, httpx + websockets + aiosqlite + pydantic-settings

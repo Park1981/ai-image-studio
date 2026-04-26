@@ -410,6 +410,75 @@ async def test_analyze_pair_translation_fail_keeps_en() -> None:
 # ───────── 회귀 테스트: trailing 텍스트 + 대문자 헤더 ─────────
 
 
+# ───────── _coerce_score 문자열 방어 (2026-04-26 Codex 진단) ─────────
+
+
+def test_coerce_score_int_and_float() -> None:
+    """기본: int / float 정상 처리, 0-100 클램프."""
+    from studio.comparison_pipeline import _coerce_score
+
+    assert _coerce_score(50) == 50
+    assert _coerce_score(95.7) == 95
+    assert _coerce_score(0) == 0
+    assert _coerce_score(100) == 100
+    assert _coerce_score(150) == 100  # 상한 클램프
+    assert _coerce_score(-10) == 0  # 하한 클램프
+
+
+def test_coerce_score_string_variants() -> None:
+    """문자열 응답 (모델이 실수로 string 으로 보낸 경우) 도 정상 파싱.
+
+    이전 버전 (int/float 만) → None 반환 → 종합 0% 버그 발생.
+    Codex 진단으로 string 방어 추가.
+    """
+    from studio.comparison_pipeline import _coerce_score
+
+    # 단순 숫자 string
+    assert _coerce_score("95") == 95
+    assert _coerce_score(" 88 ") == 88  # 양옆 공백
+    # 퍼센트 표기
+    assert _coerce_score("95%") == 95
+    assert _coerce_score("88%") == 88
+    # x/100 표기
+    assert _coerce_score("95/100") == 95
+    assert _coerce_score("70/100") == 70
+    # 부가 텍스트 (괄호 안 코멘트)
+    assert _coerce_score("85 (high)") == 85
+    # 소수점 string
+    assert _coerce_score("92.5") == 92
+
+
+def test_coerce_score_invalid_returns_none() -> None:
+    """파싱 불가능한 값은 None — 폴백 트리거."""
+    from studio.comparison_pipeline import _coerce_score
+
+    assert _coerce_score(None) is None
+    assert _coerce_score("") is None
+    assert _coerce_score("high") is None
+    assert _coerce_score("N/A") is None
+    assert _coerce_score(True) is None  # bool 은 명시적 제외
+    assert _coerce_score([95]) is None  # 리스트 등 비지원 타입
+
+
+def test_coerce_scores_handles_string_dict() -> None:
+    """_coerce_scores (복수형) 도 string 처리 일관 적용."""
+    from studio.comparison_pipeline import COMPARE_AXES, _coerce_scores
+
+    raw = {
+        "composition": "92",
+        "color": "88%",
+        "subject": "78/100",
+        "mood": 90,
+        "quality": "95.5",
+    }
+    out = _coerce_scores(raw, COMPARE_AXES)
+    assert out["composition"] == 92
+    assert out["color"] == 88
+    assert out["subject"] == 78
+    assert out["mood"] == 90
+    assert out["quality"] == 95
+
+
 def test_parse_strict_json_handles_trailing_text() -> None:
     """qwen2.5vl 이 JSON 뒤에 자연어 코멘트 붙여도 첫 균형 JSON 만 추출."""
     from studio.comparison_pipeline import _parse_strict_json

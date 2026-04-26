@@ -635,7 +635,7 @@ async def _call_ollama_chat(
         "think": False,
         # 2026-04-26: VRAM 즉시 반납 (CLAUDE.md "Ollama: 온디맨드 호출 + 즉시 반납" 의도)
         # 기본 5분 keep_alive 가 16GB VRAM 환경 ComfyUI 와 충돌 → 응답 직후 unload.
-        "keep_alive": 0,
+        "keep_alive": "0",
         "options": options,
     }
     async with httpx.AsyncClient(timeout=timeout) as client:

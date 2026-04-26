@@ -178,8 +178,19 @@ Avoid filler ("two images are similar").
 
 ═══ TRANSFORM PROMPT ═══
 A t2i instruction set that, applied to A's generation prompt, would
-produce B. If A and B are 95+ identical, use exactly:
-  "no significant changes — visually equivalent"
+produce B. Describe specific concrete changes (gaze, expression, pose,
+lighting, color tone, etc.) needed to transform A into B.
+
+ONLY use the literal output "no significant changes — visually equivalent"
+when ALL of these are simultaneously true:
+  - composition >= 95
+  - color       >= 95
+  - subject     >= 95 (no hard caps triggered above)
+  - mood        >= 95
+  - quality     >= 95
+
+If ANY axis is below 95, you MUST describe the actual changes — do
+NOT use "no significant changes". Recreation fidelity requires this.
 
 ═══ UNCERTAIN ═══
 Aspects not reliably comparable. Use "" if all confidently compared.
@@ -376,7 +387,7 @@ async def _call_vision_pair(
         ],
         "stream": False,
         # 2026-04-26: VRAM 즉시 반납
-        "keep_alive": 0,
+        "keep_alive": "0",
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
@@ -427,16 +438,16 @@ def _coerce_scores(
     raw_scores: Any, axes: tuple[str, ...] = AXES
 ) -> dict[str, int | None]:
     """5축 점수 dict 정규화 — 누락 / 비정수 → None, 범위는 0-100 클램프.
-    axes 기본값=AXES (edit 호출자 무영향)."""
+
+    2026-04-26 (Codex 진단): _coerce_score 헬퍼 위임 → string 방어 일관 적용.
+    """
     out: dict[str, int | None] = _empty_scores(axes)
     if not isinstance(raw_scores, dict):
         return out
     for axis in axes:
-        val = raw_scores.get(axis)
-        if isinstance(val, bool):  # bool 은 int 의 subclass — 명시 제외
-            continue
-        if isinstance(val, (int, float)):
-            out[axis] = max(0, min(100, int(val)))
+        coerced = _coerce_score(raw_scores.get(axis))
+        if coerced is not None:
+            out[axis] = coerced
     return out
 
 
@@ -530,7 +541,7 @@ async def _translate_comments_to_ko(
         # CLAUDE.md 규칙: gemma4-un 은 reasoning 모델 → think:False 필수
         "think": False,
         # 2026-04-26: VRAM 즉시 반납
-        "keep_alive": 0,
+        "keep_alive": "0",
         "options": {"temperature": 0.4, "num_ctx": 4096, "num_predict": 800},
     }
     try:
@@ -578,11 +589,22 @@ def _coerce_intent(raw: Any) -> str:
 
 
 def _coerce_score(raw: Any) -> int | None:
-    """0-100 정수로 정규화. None / 비정수 → None."""
+    """0-100 정수로 정규화. None / 비정수 → None.
+
+    2026-04-26 (Codex 진단): 모델이 "95" / "95%" / "95/100" 같은 문자열로
+    응답해도 None 으로 돌리지 않도록 string 방어 추가. 종합 0% 버그 근본 차단.
+    """
     if isinstance(raw, bool):
         return None
     if isinstance(raw, (int, float)):
         return max(0, min(100, int(raw)))
+    if isinstance(raw, str):
+        # "95" / "95%" / "95/100" / " 95 " / "95 (high)" 등 처리
+        s = raw.strip().rstrip("%").split("/")[0].split("(")[0].strip()
+        try:
+            return max(0, min(100, int(float(s))))
+        except (ValueError, TypeError):
+            return None
     return None
 
 
@@ -796,7 +818,7 @@ async def _call_vision_pair_generic(
         # 2026-04-26 v2.1: Vision Recipe v2 와 동일하게 format=json 강제 (Codex 안)
         "format": "json",
         # 2026-04-26: VRAM 즉시 반납
-        "keep_alive": 0,
+        "keep_alive": "0",
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
