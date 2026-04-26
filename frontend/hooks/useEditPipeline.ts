@@ -14,6 +14,7 @@
 
 import { editImageStream } from "@/lib/api-client";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
+import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { useEditStore } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -67,107 +68,96 @@ export function useEditPipeline({
     }
 
     setRunning(true);
-    let completed = false;
-    try {
-      for await (const evt of editImageStream({
+    await consumePipelineStream(
+      editImageStream({
         sourceImage,
         prompt,
         lightning,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
-      })) {
-        if (evt.type === "sampling") {
-          setSampling(evt.samplingStep ?? null, evt.samplingTotal ?? null);
-          continue;
-        }
-        if (evt.type === "step") {
-          setStep(evt.step, evt.done);
-          if (!evt.done) {
-            recordStepDetail({
-              n: evt.step,
-              startedAt: Date.now(),
-              doneAt: null,
-            });
-          } else {
-            // done 시 startedAt 안 넘김 → store merge 가 기존 startedAt 보존.
-            // (이전엔 startedAt: Date.now() 가 머지에서 덮어써져 elapsed=0 이었음)
-            recordStepDetail({
-              n: evt.step,
-              doneAt: Date.now(),
-              description: evt.description,
-              finalPrompt: evt.finalPrompt,
-              finalPromptKo: evt.finalPromptKo,
-              provider: evt.provider,
-            });
-            // Phase 1 (2026-04-25): step 1 done 에 구조 분석 payload 포함 가능.
-            // 휘발 저장 — useEditStore 에만 두고 DB persist X.
-            if (evt.step === 1 && evt.editVisionAnalysis) {
-              setEditVisionAnalysis(evt.editVisionAnalysis);
+      }),
+      {
+        on: {
+          sampling: (e) =>
+            setSampling(e.samplingStep ?? null, e.samplingTotal ?? null),
+          step: (e) => {
+            setStep(e.step, e.done);
+            if (!e.done) {
+              recordStepDetail({
+                n: e.step,
+                startedAt: Date.now(),
+                doneAt: null,
+              });
+            } else {
+              // done 시 startedAt 안 넘김 → store merge 가 기존 startedAt 보존.
+              recordStepDetail({
+                n: e.step,
+                doneAt: Date.now(),
+                description: e.description,
+                finalPrompt: e.finalPrompt,
+                finalPromptKo: e.finalPromptKo,
+                provider: e.provider,
+              });
+              // Phase 1 (2026-04-25): step 1 done 에 구조 분석 payload 포함 가능.
+              if (e.step === 1 && e.editVisionAnalysis) {
+                setEditVisionAnalysis(e.editVisionAnalysis);
+              }
             }
-          }
-        } else if (evt.type === "stage") {
-          setPipelineProgress(evt.progress, evt.stageLabel);
-        } else if (evt.type === "done") {
-          resetPipeline();
-          addItem(evt.item);
-          // sourceImage 를 backend 영구 sourceRef 로 교체 (dataURL → 절대 URL)
-          // → 이후 BeforeAfter 슬라이더의 매칭 조건 (afterItem.sourceRef === sourceImage)
-          //   이 정확하게 동작. 옛 row 와도 동일 비교 가능.
-          if (evt.item.sourceRef) {
-            setSource(
-              evt.item.sourceRef,
-              sourceLabel || evt.item.label,
-              evt.item.width,
-              evt.item.height,
-            );
-          }
-          onComplete(evt.item.id);
-          toast.success("수정 완료", evt.item.label);
-          if (evt.item.comfyError) {
-            toast.error(
-              "ComfyUI 오류 (Mock 폴백 적용)",
-              evt.item.comfyError.slice(0, 160),
-            );
-          } else if (evt.item.promptProvider === "fallback") {
-            toast.warn("gemma4 업그레이드 실패", "Ollama 상태 확인 필요");
-          }
-          if (!evt.savedToHistory) {
-            toast.warn(
-              "히스토리 DB 저장 실패",
-              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있습니다.",
-            );
-          }
-          // 자동 비교 분석 — 토글 ON + edit 모드 + sourceRef 있음 + busy 아님 조건 모두 만족 시
-          // void 호출로 본 흐름(resetPipeline/onComplete) 차단 X, 백그라운드 비동기 실행
-          // silent=true → VRAM > 13GB 시 useComparisonAnalysis 가 자동 skip + 짧은 토스트
-          if (
-            autoCompareAnalysis &&
-            evt.item.mode === "edit" &&
-            evt.item.sourceRef &&
-            !isComparisonBusy(evt.item.id)
-          ) {
-            void analyzeComparison(evt.item, { silent: true });
-          }
-          completed = true;
-          return;
-        }
-      }
-      // generator 가 done 없이 끝남 — 비정상 종료
-      if (!completed) {
-        toast.warn(
-          "수정 스트림이 도중에 끊겼습니다.",
-          "백엔드 로그를 확인해 주세요. 결과는 저장되지 않았습니다.",
-        );
-      }
-    } catch (err) {
-      toast.error(
-        "수정 실패",
-        err instanceof Error ? err.message : "알 수 없는 오류",
-      );
-    } finally {
-      // 어떤 종료 경로든 running 해제 보장 (UI 영구 잠금 방지)
-      resetPipeline();
-    }
+          },
+          stage: (e) => setPipelineProgress(e.progress, e.stageLabel),
+          done: (e) => {
+            resetPipeline();
+            addItem(e.item);
+            // sourceImage → backend 영구 sourceRef 로 교체 (dataURL → 절대 URL)
+            if (e.item.sourceRef) {
+              setSource(
+                e.item.sourceRef,
+                sourceLabel || e.item.label,
+                e.item.width,
+                e.item.height,
+              );
+            }
+            onComplete(e.item.id);
+            toast.success("수정 완료", e.item.label);
+            if (e.item.comfyError) {
+              toast.error(
+                "ComfyUI 오류 (Mock 폴백 적용)",
+                e.item.comfyError.slice(0, 160),
+              );
+            } else if (e.item.promptProvider === "fallback") {
+              toast.warn("gemma4 업그레이드 실패", "Ollama 상태 확인 필요");
+            }
+            if (!e.savedToHistory) {
+              toast.warn(
+                "히스토리 DB 저장 실패",
+                "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있습니다.",
+              );
+            }
+            // 자동 비교 분석 — silent=true → VRAM > 13GB 면 자동 skip
+            if (
+              autoCompareAnalysis &&
+              e.item.mode === "edit" &&
+              e.item.sourceRef &&
+              !isComparisonBusy(e.item.id)
+            ) {
+              void analyzeComparison(e.item, { silent: true });
+            }
+          },
+        },
+        onIncomplete: () =>
+          toast.warn(
+            "수정 스트림이 도중에 끊겼습니다.",
+            "백엔드 로그를 확인해 주세요. 결과는 저장되지 않았습니다.",
+          ),
+        onError: (err) =>
+          toast.error(
+            "수정 실패",
+            err instanceof Error ? err.message : "알 수 없는 오류",
+          ),
+        // 어떤 종료 경로든 running 해제 보장 (UI 영구 잠금 방지)
+        onFinally: resetPipeline,
+      },
+    );
   };
 
   return { generate };

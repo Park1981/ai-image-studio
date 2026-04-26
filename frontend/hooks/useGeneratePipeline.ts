@@ -22,6 +22,7 @@ import {
   upgradeOnly,
   type UpgradeOnlyResult,
 } from "@/lib/api-client";
+import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { GENERATE_MODEL } from "@/lib/model-presets";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -105,9 +106,8 @@ export function useGeneratePipeline(): UseGeneratePipeline {
       ? GENERATE_MODEL.lightning
       : GENERATE_MODEL.defaults;
     const randomSeed = Math.floor(Math.random() * 1e15);
-    let completed = false;
-    try {
-      for await (const evt of generateImageStream({
+    await consumePipelineStream(
+      generateImageStream({
         prompt,
         aspect,
         width,
@@ -122,60 +122,60 @@ export function useGeneratePipeline(): UseGeneratePipeline {
         preUpgradedPrompt: preUpgraded,
         preResearchHints,
         styleId,
-      })) {
-        if (evt.type === "done") {
-          addItem(evt.item);
-          resetRunning();
-          toast.success(
-            "생성 완료",
-            `${evt.item.width}×${evt.item.height}`,
-          );
-          if (evt.item.comfyError) {
-            toast.error(
-              "ComfyUI 오류 (Mock 폴백 적용)",
-              evt.item.comfyError.slice(0, 160),
-            );
-          } else if (evt.item.promptProvider === "fallback") {
-            toast.warn(
-              "gemma4 업그레이드 실패",
-              "원본 프롬프트로 생성됐습니다. Ollama 상태 확인 또는 설정에서 재시작해 주세요.",
-            );
+      }),
+      {
+        on: {
+          done: (e) => {
+            addItem(e.item);
+            resetRunning();
+            toast.success("생성 완료", `${e.item.width}×${e.item.height}`);
+            if (e.item.comfyError) {
+              toast.error(
+                "ComfyUI 오류 (Mock 폴백 적용)",
+                e.item.comfyError.slice(0, 160),
+              );
+            } else if (e.item.promptProvider === "fallback") {
+              toast.warn(
+                "gemma4 업그레이드 실패",
+                "원본 프롬프트로 생성됐습니다. Ollama 상태 확인 또는 설정에서 재시작해 주세요.",
+              );
+            }
+            if (!e.savedToHistory) {
+              toast.warn(
+                "히스토리 DB 저장 실패",
+                "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있습니다.",
+              );
+            }
+          },
+        },
+        // done 외 모든 event 공통 — running progress + stage 타임라인 + comfyui-sampling 분기.
+        // (GenStage 의 comfyui-sampling 이 자체 variant 가 아니라 첫 variant 의 type union 멤버라
+        //  Extract<...,{type:"comfyui-sampling"}> 가 narrow 안 됨 → onProgress 안에서 type 분기.)
+        onProgress: (e) => {
+          setRunning(true, e.progress, e.stageLabel);
+          pushStage({
+            type: e.type,
+            label: e.stageLabel,
+            progress: e.progress,
+          });
+          if (e.type === "comfyui-sampling") {
+            setSampling(e.samplingStep ?? null, e.samplingTotal ?? null);
           }
-          if (!evt.savedToHistory) {
-            toast.warn(
-              "히스토리 DB 저장 실패",
-              "결과는 화면에서 유지되지만 서버 재기동 후 사라질 수 있습니다.",
-            );
-          }
-          completed = true;
-          return;
-        }
-        setRunning(true, evt.progress, evt.stageLabel);
-        pushStage({
-          type: evt.type,
-          label: evt.stageLabel,
-          progress: evt.progress,
-        });
-        if (evt.type === "comfyui-sampling") {
-          setSampling(evt.samplingStep ?? null, evt.samplingTotal ?? null);
-        }
-      }
-      // generator 가 done 없이 끝남 — 비정상 종료
-      if (!completed) {
-        toast.warn(
-          "생성 스트림이 도중에 끊겼습니다.",
-          "백엔드 로그를 확인해 주세요. 결과는 저장되지 않았습니다.",
-        );
-      }
-    } catch (err) {
-      toast.error(
-        "생성 실패",
-        err instanceof Error ? err.message : "알 수 없는 오류",
-      );
-    } finally {
-      // 어떤 종료 경로든 running 해제 보장 (UI 영구 잠금 방지)
-      resetRunning();
-    }
+        },
+        onIncomplete: () =>
+          toast.warn(
+            "생성 스트림이 도중에 끊겼습니다.",
+            "백엔드 로그를 확인해 주세요. 결과는 저장되지 않았습니다.",
+          ),
+        onError: (err) =>
+          toast.error(
+            "생성 실패",
+            err instanceof Error ? err.message : "알 수 없는 오류",
+          ),
+        // 어떤 종료 경로든 running 해제 보장
+        onFinally: resetRunning,
+      },
+    );
   };
 
   /* ── [생성] 진입점 ── */
