@@ -199,8 +199,10 @@ async def test_upgrade_only_route_passes_aspect_to_upgrade() -> None:
             translation=None,
         )
 
+    # task #17 (2026-04-26): upgrade-only endpoint 가 studio.routes.prompt 로 이동.
+    # mock.patch 는 lookup 모듈 기준 → 새 위치 패치.
     with patch(
-        "studio.router.upgrade_generate_prompt", new=_fake_upgrade
+        "studio.routes.prompt.upgrade_generate_prompt", new=_fake_upgrade
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as cli:

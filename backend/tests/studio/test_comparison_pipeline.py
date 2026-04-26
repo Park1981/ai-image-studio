@@ -823,8 +823,8 @@ async def test_compare_analyze_skips_clarify_when_refined_intent_cached(
         )
 
     with (
-        patch("studio.router.clarify_edit_intent", new=_fake_clarify),
-        patch("studio.router.analyze_pair", new=_fake_analyze),
+        patch("studio.routes.compare.clarify_edit_intent", new=_fake_clarify),
+        patch("studio.routes.compare.analyze_pair", new=_fake_analyze),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as cli:
@@ -896,8 +896,8 @@ async def test_compare_analyze_runs_clarify_intent_outside_lock(
         )
 
     with (
-        patch("studio.router.clarify_edit_intent", new=_fake_clarify),
-        patch("studio.router.analyze_pair", new=_fake_analyze),
+        patch("studio.routes.compare.clarify_edit_intent", new=_fake_clarify),
+        patch("studio.routes.compare.analyze_pair", new=_fake_analyze),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as cli:
@@ -1160,7 +1160,7 @@ async def test_compare_analyze_route_happy_path(monkeypatch, tmp_path: Path) -> 
     )
 
     with patch(
-        "studio.router.analyze_pair",
+        "studio.routes.compare.analyze_pair",
         new=AsyncMock(return_value=fake),
     ):
         transport = ASGITransport(app=app)
@@ -1215,7 +1215,7 @@ async def test_compare_analyze_persists_when_history_id_given(
     )
 
     with patch(
-        "studio.router.analyze_pair", new=AsyncMock(return_value=fake),
+        "studio.routes.compare.analyze_pair", new=AsyncMock(return_value=fake),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as cli:
@@ -1262,7 +1262,7 @@ async def test_compare_analyze_unknown_history_id_saved_false(
         analyzed_at=0, vision_model="qwen2.5vl:7b",
     )
 
-    with patch("studio.router.analyze_pair", new=AsyncMock(return_value=fake)):
+    with patch("studio.routes.compare.analyze_pair", new=AsyncMock(return_value=fake)):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test") as cli:
             res = await cli.post(
