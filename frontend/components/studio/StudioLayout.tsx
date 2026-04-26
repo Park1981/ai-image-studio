@@ -2,6 +2,16 @@
 
 import type { CSSProperties, ReactNode } from "react";
 
+/**
+ * 반응형 정책 (P0-1 · 2026-04-26):
+ *   - 최소 지원 viewport: 1024px (노트북부터, 모바일 미지원)
+ *   - 1024px = floor (좌패널 400 + 우패널 624 정확 fit)
+ *   - >1024px = 우패널 자동 확장 (minmax 1fr)
+ *   - <1024px = 미지원 (가로 스크롤 또는 깨짐 — 의도된 제약)
+ *
+ * 메인 메뉴 (app/page.tsx) 는 별도 breakpoint:
+ *   ≥1280: 3열 / 1024-1280: 2열 (globals.css `.ais-menu-grid`)
+ */
 export const STUDIO_MIN_WIDTH = 1024;
 export const STUDIO_GRID_COLUMNS = "400px minmax(624px, 1fr)";
 export const STUDIO_LEFT_PANEL_PADDING = "24px 20px";

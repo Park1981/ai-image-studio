@@ -8,7 +8,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import AppHeader from "@/components/chrome/AppHeader";
 import AnalysisProgressModal from "@/components/studio/AnalysisProgressModal";
 import SourceImageCard from "@/components/studio/SourceImageCard";
@@ -25,6 +25,7 @@ import VisionResultCard from "@/components/studio/VisionResultCard";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
 import { useVisionPipeline } from "@/hooks/useVisionPipeline";
+import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
 import { toast } from "@/stores/useToastStore";
 import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
 
@@ -51,20 +52,8 @@ export default function VisionPage() {
   /* ── 파이프라인 훅 ── */
   const { analyze, analyzing } = useVisionPipeline();
 
-  /* ── 진행 모달 open 상태 ── */
-  const [progressOpen, setProgressOpen] = useState(false);
-  const [prevAnalyzing, setPrevAnalyzing] = useState(analyzing);
-  if (prevAnalyzing !== analyzing) {
-    setPrevAnalyzing(analyzing);
-    if (analyzing) setProgressOpen(true);
-  }
-
-  useEffect(() => {
-    if (analyzing) return;
-    if (!progressOpen) return;
-    const t = setTimeout(() => setProgressOpen(false), 1000);
-    return () => clearTimeout(t);
-  }, [analyzing, progressOpen]);
+  /* ── 진행 모달 open 상태 — useAutoCloseModal hook (1000ms · 분석은 짧음) ── */
+  const [progressOpen, setProgressOpen] = useAutoCloseModal(analyzing, 1000);
 
   /* ── 소스 이미지 핸들러 ── */
   const handleSourceChange = (

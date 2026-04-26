@@ -209,10 +209,20 @@ export default function StudioUploadSlot({
     );
   }
 
-  // empty
+  // empty — UI P0-4: keyboard 접근성 (role+tabIndex+Enter/Space+focus-visible)
   return (
     <div
       onClick={pick}
+      onKeyDown={(e) => {
+        // Enter/Space 시 file input 열기 — button 표준 키 동작.
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          pick();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      aria-label="이미지 업로드 (클릭, 드래그, Ctrl+V 붙여넣기)"
       onDragOver={(e) => e.preventDefault()}
       onDragEnter={() => setDrag(true)}
       onDragLeave={() => setDrag(false)}
@@ -222,6 +232,10 @@ export default function StudioUploadSlot({
         onFiles?.(e.dataTransfer.files);
       }}
       {...hoverHandlers}
+      // focus-visible: keyboard tab 으로 들어왔을 때만 outline 표시 (마우스 클릭 시 노이즈 방지).
+      // CSS 의사 클래스라 globals.css 의 .ais-upload-slot:focus-visible 정의가 있으면 우선.
+      // 인라인 outline 은 :focus 에선 안 그려지고 :focus-visible 에서만 그려지도록 className 활용.
+      className="ais-upload-slot"
       style={{
         ...common,
         background: drag ? "#F1EEE8" : "var(--bg-2)",

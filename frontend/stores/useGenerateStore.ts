@@ -11,6 +11,7 @@
 "use client";
 
 import { create } from "zustand";
+import { useShallow } from "zustand/react/shallow";
 import { persist, createJSONStorage } from "zustand/middleware";
 import {
   ASPECT_RATIOS,
@@ -251,3 +252,49 @@ function matchAspect(w: number, h: number): AspectValue {
   const match = ASPECT_RATIOS.find((r) => r.width === w && r.height === h);
   return match?.label ?? "custom";
 }
+
+/* ──────────── 그룹 selectors (task #5 · 2026-04-26) ────────────
+ * 페이지 루트의 18줄 보일러 (`const x = useGenerateStore((s) => s.x)` × 18)
+ * 를 한 줄로 줄임. useShallow 로 매 렌더 새 객체 비교 → 무한 루프 차단.
+ *
+ * 사용 예:
+ *   const inputs = useGenerateInputs();
+ *   inputs.prompt; inputs.setPrompt(...); ...
+ *
+ * 진행 상태 (generating/progress/stage) 는 별도 hook —
+ * 우측 결과 패널만 구독해 좌측 입력 변경 시 결과 영역 리렌더 차단 가능.
+ */
+
+/** 입력 필드 + 액션 묶음 (좌측 패널 전용). */
+export const useGenerateInputs = () =>
+  useGenerateStore(
+    useShallow((s) => ({
+      prompt: s.prompt,
+      setPrompt: s.setPrompt,
+      aspect: s.aspect,
+      setAspect: s.setAspect,
+      width: s.width,
+      height: s.height,
+      setWidth: s.setWidth,
+      setHeight: s.setHeight,
+      setDimensions: s.setDimensions,
+      aspectLocked: s.aspectLocked,
+      setAspectLocked: s.setAspectLocked,
+      research: s.research,
+      setResearch: s.setResearch,
+      lightning: s.lightning,
+      applyLightning: s.applyLightning,
+      styleId: s.styleId,
+      setStyleId: s.setStyleId,
+    })),
+  );
+
+/** 진행 상태 묶음 (우측 결과 패널 + 진행 모달용). */
+export const useGenerateRunning = () =>
+  useGenerateStore(
+    useShallow((s) => ({
+      generating: s.generating,
+      progress: s.progress,
+      stage: s.stage,
+    })),
+  );

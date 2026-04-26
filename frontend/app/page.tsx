@@ -105,11 +105,15 @@ export default function MainMenuPage() {
           </p>
         </div>
 
-        {/* 3카테고리 그리드 — 열당 카드 2장 세로 스택 */}
+        {/* 3카테고리 그리드 — 열당 카드 2장 세로 스택.
+            반응형 baseline (2026-04-26 P0-1):
+              ≥1280px: 3열 (기본 데스크톱 인상 유지)
+              1024-1280px: 2열 (13인치 노트북 등 좁은 데스크톱)
+              <1024px: 미지원 (StudioLayout 과 동일 floor) */}
         <div
+          className="ais-menu-grid"
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(3, 1fr)",
             gap: 28,
           }}
         >

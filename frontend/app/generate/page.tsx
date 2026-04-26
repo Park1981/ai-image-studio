@@ -47,8 +47,14 @@ import {
   urlToDataUrl,
 } from "@/lib/image-actions";
 import { useGeneratePipeline } from "@/hooks/useGeneratePipeline";
+import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
+import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { useEditStore } from "@/stores/useEditStore";
-import { useGenerateStore, type AspectValue } from "@/stores/useGenerateStore";
+import {
+  useGenerateInputs,
+  useGenerateRunning,
+  type AspectValue,
+} from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
@@ -56,25 +62,16 @@ import { toast } from "@/stores/useToastStore";
 export default function GeneratePage() {
   const router = useRouter();
 
-  /* ── store subscribe ── */
-  const prompt = useGenerateStore((s) => s.prompt);
-  const setPrompt = useGenerateStore((s) => s.setPrompt);
-  const aspect = useGenerateStore((s) => s.aspect);
-  const setAspect = useGenerateStore((s) => s.setAspect);
-  const width = useGenerateStore((s) => s.width);
-  const height = useGenerateStore((s) => s.height);
-  const setWidth = useGenerateStore((s) => s.setWidth);
-  const setHeight = useGenerateStore((s) => s.setHeight);
-  const setDimensions = useGenerateStore((s) => s.setDimensions);
-  const aspectLocked = useGenerateStore((s) => s.aspectLocked);
-  const setAspectLocked = useGenerateStore((s) => s.setAspectLocked);
-  const research = useGenerateStore((s) => s.research);
-  const setResearch = useGenerateStore((s) => s.setResearch);
-  const lightning = useGenerateStore((s) => s.lightning);
-  const applyLightning = useGenerateStore((s) => s.applyLightning);
-  const generating = useGenerateStore((s) => s.generating);
-  const progress = useGenerateStore((s) => s.progress);
-  const stage = useGenerateStore((s) => s.stage);
+  /* ── store subscribe (그룹 selectors · task #5 · 18줄 → 2줄) ── */
+  const {
+    prompt, setPrompt,
+    aspect, setAspect,
+    width, height, setWidth, setHeight, setDimensions,
+    aspectLocked, setAspectLocked,
+    research, setResearch,
+    lightning, applyLightning,
+  } = useGenerateInputs();
+  const { generating, progress, stage } = useGenerateRunning();
 
   const items = useHistoryStore((s) => s.items);
   const selectedId = useHistoryStore((s) => s.selectedId);
@@ -106,24 +103,8 @@ export default function GeneratePage() {
   /* ── 결과 뷰어 호버 ── */
   const [viewerHovered, setViewerHovered] = useState(false);
 
-  /* ── 진행 모달 open 상태 ──
-   * generating false→true 전이 시 자동 오픈. React 공식 권장 패턴:
-   * https://react.dev/reference/react/useState#storing-information-from-previous-renders
-   */
-  const [progressOpen, setProgressOpen] = useState(false);
-  const [prevGenerating, setPrevGenerating] = useState(generating);
-  if (prevGenerating !== generating) {
-    setPrevGenerating(generating);
-    if (generating) setProgressOpen(true);
-  }
-
-  // 생성 끝나고 1.2초 후 자동 close (단, 사용자가 이미 닫았다면 무시)
-  useEffect(() => {
-    if (generating) return;
-    if (!progressOpen) return;
-    const t = setTimeout(() => setProgressOpen(false), 1200);
-    return () => clearTimeout(t);
-  }, [generating, progressOpen]);
+  /* ── 진행 모달 open 상태 — useAutoCloseModal hook (task #5/#7) ── */
+  const [progressOpen, setProgressOpen] = useAutoCloseModal(generating);
 
   /* ── 진입 시 Lightning 기본값 적용 (1회) ──
    * applyLightning 은 store action (setState 트리거) 이지만 mount 1회만이라 effect 가 적합.
@@ -143,17 +124,8 @@ export default function GeneratePage() {
     setPrompt("");
   }, [setPrompt]);
 
-  /* ── 프롬프트 textarea auto-grow (내용 높이에 맞춰 자동 확장) ── */
-  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const autoGrow = (el: HTMLTextAreaElement) => {
-    // scrollHeight 는 정확한 content 높이 — 'auto' 로 먼저 리셋해야 줄어들기도 가능.
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  };
-  // 마운트 직후 + prompt 외부 변경(템플릿 선택/재생성 복원 등) 시 재측정
-  useEffect(() => {
-    if (promptTextareaRef.current) autoGrow(promptTextareaRef.current);
-  }, [prompt]);
+  /* ── 프롬프트 textarea auto-grow — useAutoGrowTextarea hook (task #5/#7) ── */
+  const promptTextareaRef = useAutoGrowTextarea(prompt);
 
   const sizeLabel = `${width}×${height}`;
 
@@ -249,10 +221,7 @@ export default function GeneratePage() {
               <textarea
                 ref={promptTextareaRef}
                 value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value);
-                  autoGrow(e.target);
-                }}
+                onChange={(e) => setPrompt(e.target.value)}
                 placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."
                 rows={3}
                 style={{

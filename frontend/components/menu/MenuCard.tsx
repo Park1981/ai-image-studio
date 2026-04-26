@@ -46,6 +46,9 @@ export default function MenuCard({
   if (bgImage) {
     return (
       <button
+        type="button"
+        disabled={disabled}
+        aria-disabled={disabled}
         onMouseEnter={() => !disabled && setHover(true)}
         onMouseLeave={() => setHover(false)}
         onClick={disabled ? undefined : onClick}

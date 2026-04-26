@@ -14,13 +14,15 @@ import HistoryBootstrap from "./HistoryBootstrap";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { toast } from "@/stores/useToastStore";
-import { fetchProcessStatus } from "@/lib/api-client";
+import { fetchProcessStatus, setProcessStatus } from "@/lib/api-client";
 
-/* 진입 시 autoStartComfy 프리퍼런스 반영 — 한 세션에서 1회만 */
+/* 진입 시 autoStartComfy 프리퍼런스 반영 — 한 세션에서 1회만.
+   이전: setComfyui("running") 만 호출 → UI 만 거짓 running 표시 (실제 backend 미시작).
+   현재: 실제 /api/studio/process/comfyui/start 호출 → 성공 시 ProcessStatusPoller (5초 주기) 가
+   실 상태를 반영. 실패 시 bootedRef 리셋해 다음 평가에서 재시도 가능. */
 function AutoStartBoot() {
   const autoStartComfy = useSettingsStore((s) => s.autoStartComfy);
   const comfyui = useProcessStore((s) => s.comfyui);
-  const setComfyui = useProcessStore((s) => s.setComfyui);
   const bootedRef = useRef(false);
 
   useEffect(() => {
@@ -28,9 +30,24 @@ function AutoStartBoot() {
     if (!autoStartComfy) return;
     if (comfyui === "running") return;
     bootedRef.current = true;
-    setComfyui("running");
-    toast.info("ComfyUI 자동 시작", "설정의 '앱 시작 시 ComfyUI 자동 실행' ON");
-  }, [autoStartComfy, comfyui, setComfyui]);
+
+    (async () => {
+      const res = await setProcessStatus("comfyui", "start");
+      if (res.ok) {
+        toast.info(
+          "ComfyUI 자동 시작",
+          "백엔드에 시작 요청 전송 — 곧 상태 반영",
+        );
+        // 실제 running 전환은 ProcessStatusPoller (5초 주기) 가 자연 동기화
+      } else {
+        bootedRef.current = false;
+        toast.error(
+          "ComfyUI 자동 시작 실패",
+          res.message ?? "백엔드 응답 오류",
+        );
+      }
+    })();
+  }, [autoStartComfy, comfyui]);
 
   return null;
 }

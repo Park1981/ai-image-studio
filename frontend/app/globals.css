@@ -212,6 +212,33 @@ button {
 }
 
 /* ─────────────────────────────────────────
+   메인 메뉴 그리드 — 반응형 baseline (P0-1 · 2026-04-26)
+   ≥1280px: 3열 / 1024-1280px: 2열 / <1024px: 미지원 (StudioLayout floor 동일).
+   사용자 정책: 1024px = 최소 (모바일 미지원, 노트북부터).
+   ───────────────────────────────────────── */
+.ais-menu-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+@media (max-width: 1279.98px) {
+  .ais-menu-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ─────────────────────────────────────────
+   StudioUploadSlot — empty 상태 keyboard 접근성 (UI P0-4 · 2026-04-26)
+   role=button + tabIndex=0 + onKeyDown 에 focus-visible 링 시각화.
+   :focus 가 아닌 :focus-visible 만 사용 — 마우스 클릭 시 outline 노이즈 방지.
+   ───────────────────────────────────────── */
+.ais-upload-slot:focus {
+  outline: none;
+}
+.ais-upload-slot:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ─────────────────────────────────────────
    SystemMetrics — 헤더 통합 자원 사용률 4-bar UI
    class 토글 패턴 (inline style transition 불안정 회피).
    collapsed: 막대만 / hover: dot · 라벨 · 사용량 · % 슬라이드 인.
@@ -232,7 +259,8 @@ button {
     border-color .25s var(--ais-ease-quick),
     background-color .25s var(--ais-ease-quick);
 }
-.ais-metrics:hover {
+.ais-metrics:hover,
+.ais-metrics:focus-within {
   gap: 12px;
   padding: 5px 10px;
   border-color: var(--line);
@@ -245,7 +273,8 @@ button {
   gap: 0;
   transition: gap .35s var(--ais-ease-out-back);
 }
-.ais-metrics:hover .ais-metric-cell {
+.ais-metrics:hover,
+.ais-metrics:focus-within .ais-metric-cell {
   gap: 6px;
 }
 
@@ -260,7 +289,8 @@ button {
     width .35s var(--ais-ease-out-back) .04s,
     opacity .3s var(--ais-ease-quick) .04s;
 }
-.ais-metrics:hover .ais-metric-cell .ais-dot {
+.ais-metrics:hover,
+.ais-metrics:focus-within .ais-metric-cell .ais-dot {
   width: 6px;
   opacity: 1;
 }
@@ -276,17 +306,20 @@ button {
     opacity .35s var(--ais-ease-quick),
     max-width .4s var(--ais-ease-out-back);
 }
-.ais-metrics:hover .ais-metric-cell .ais-label {
+.ais-metrics:hover,
+.ais-metrics:focus-within .ais-metric-cell .ais-label {
   opacity: 1;
   max-width: 60px;
   transition-delay: .08s;
 }
-.ais-metrics:hover .ais-metric-cell .ais-usage {
+.ais-metrics:hover,
+.ais-metrics:focus-within .ais-metric-cell .ais-usage {
   opacity: 1;
   max-width: 72px;
   transition-delay: .12s;
 }
-.ais-metrics:hover .ais-metric-cell .ais-percent {
+.ais-metrics:hover,
+.ais-metrics:focus-within .ais-metric-cell .ais-percent {
   opacity: 1;
   max-width: 36px;
   transition-delay: .18s;
@@ -302,7 +335,8 @@ button {
   flex-shrink: 0;
   transition: width .4s var(--ais-ease-out-back);
 }
-.ais-metrics:hover .ais-metric-cell .ais-bar {
+.ais-metrics:hover,
+.ais-metrics:focus-within .ais-metric-cell .ais-bar {
   width: 112px;
 }
 .ais-metric-cell .ais-bar-fill {

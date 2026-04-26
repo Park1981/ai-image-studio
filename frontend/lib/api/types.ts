@@ -5,6 +5,21 @@
  * 스토어/컴포넌트는 여기에서 import. lib/api-client 는 barrel 재export 만 담당.
  */
 
+/* ──────────── Studio 모드 union (단일 정의 · task #6 · 2026-04-26) ──────────── */
+
+/**
+ * Studio 4 모드 단일 union.
+ * 이전엔 컴포넌트별 인라인 union ("generate" | "edit" | "video") 으로 흩어짐 —
+ * 모드 추가/변경 시 컴파일러가 못 잡음. 이 alias 한 곳만 보면 됨.
+ *
+ * Backend 의 Mode = Literal["generate", "edit", "video", "vision"] 와 한쌍.
+ * vision 은 history 에는 안 들어가지만 ProgressModal 등 UI 분기에서 사용.
+ */
+export type StudioMode = "generate" | "edit" | "video" | "vision";
+
+/** History 에 저장 가능한 모드 (vision 제외). */
+export type HistoryMode = "generate" | "edit" | "video";
+
 /* ──────────── Comparison Analysis (Edit 결과 vs 원본) ──────────── */
 
 /** v1 (옛 형식 · 호환만 유지) — 5축 유사도 점수 */
@@ -219,7 +234,7 @@ export interface VisionCompareAnalysis {
 
 export interface HistoryItem {
   id: string;
-  mode: "generate" | "edit" | "video";
+  mode: HistoryMode;
   prompt: string;
   label: string;
   width: number;

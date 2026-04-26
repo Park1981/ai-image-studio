@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
 import { interruptCurrent } from "@/lib/api-client";
+import type { HistoryMode } from "@/lib/api/types";
 import { toast } from "@/stores/useToastStore";
 import {
   useGenerateStore,
@@ -102,7 +103,7 @@ export default function ProgressModal({
   mode,
   onClose,
 }: {
-  mode: "generate" | "edit" | "video";
+  mode: HistoryMode;
   onClose: () => void;
 }) {
   const headerTitle =
@@ -182,7 +183,7 @@ export default function ProgressModal({
  *
  * 500ms 간격으로 tick — 경과 시간 즉시성 유지.
  */
-function StatusBar({ mode }: { mode: "generate" | "edit" | "video" }) {
+function StatusBar({ mode }: { mode: HistoryMode }) {
   // mode 별 store 에서 startedAt / sampling 정보 pull
   const genStartedAt = useGenerateStore((s) => s.startedAt);
   const genSamplingStep = useGenerateStore((s) => s.samplingStep);
@@ -374,9 +375,14 @@ function Header({
             background: "#FCEDEC",
             color: "#C0392B",
           }}
-          title="ComfyUI 인터럽트 (샘플링 중단)"
+          // UI P0-6 라벨 정밀화 (2026-04-26): 단순 "취소" 는 전체 파이프라인 중단으로 오해 가능.
+          // 실제 /interrupt 는 ComfyUI 샘플링만 중단 — 비전·업그레이드·다운로드 단계엔 효과 없음.
+          // 라벨을 명시적으로 바꿔 사용자 혼동 차단. 단계별 hidden/disabled 매트릭스는
+          // task #5 (generate page 분해) 와 함께 처리.
+          title="ComfyUI 샘플링 중단 (다른 단계엔 효과 없음)"
+          aria-label="ComfyUI 샘플링 중단"
         >
-          취소
+          ComfyUI 중단
         </button>
         <button
           type="button"

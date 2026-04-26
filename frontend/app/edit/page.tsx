@@ -15,6 +15,8 @@ import BeforeAfterSlider from "@/components/studio/BeforeAfterSlider";
 import ComparisonAnalysisCard from "@/components/studio/ComparisonAnalysisCard";
 import ComparisonAnalysisModal from "@/components/studio/ComparisonAnalysisModal";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
+import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
+import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistoryPicker from "@/components/studio/HistoryPicker";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
@@ -101,22 +103,8 @@ export default function EditPage() {
   /* ── 결과 뷰어 호버 상태 (호버 시 액션바 페이드 인) ── */
   const [viewerHovered, setViewerHovered] = useState(false);
 
-  /* ── 진행 모달 open 상태 ──
-   * running false→true 전이 시 자동 오픈. React 공식 권장: prev state 비교.
-   */
-  const [progressOpen, setProgressOpen] = useState(false);
-  const [prevRunning, setPrevRunning] = useState(running);
-  if (prevRunning !== running) {
-    setPrevRunning(running);
-    if (running) setProgressOpen(true);
-  }
-
-  useEffect(() => {
-    if (running) return;
-    if (!progressOpen) return;
-    const t = setTimeout(() => setProgressOpen(false), 1200);
-    return () => clearTimeout(t);
-  }, [running, progressOpen]);
+  /* ── 진행 모달 open 상태 — useAutoCloseModal hook (task #5/#7) ── */
+  const [progressOpen, setProgressOpen] = useAutoCloseModal(running);
 
   /* ── 매칭 안 되는 afterId 정리 (시각 selection 일관성) ──
      슬라이더 자체는 afterItem.sourceRef === sourceImage 조건으로 자동 빈 상태 처리되지만,
@@ -154,16 +142,8 @@ export default function EditPage() {
     setPrompt("");
   }, [setPrompt]);
 
-  /* ── 프롬프트 textarea auto-grow (내용 높이에 맞춰 자동 확장) ── */
-  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const autoGrow = (el: HTMLTextAreaElement) => {
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  };
-  // 마운트/외부 prompt 변경(다시 버튼 등 복원) 시 재측정
-  useEffect(() => {
-    if (promptTextareaRef.current) autoGrow(promptTextareaRef.current);
-  }, [prompt]);
+  /* ── 프롬프트 textarea auto-grow — useAutoGrowTextarea hook (task #5/#7) ── */
+  const promptTextareaRef = useAutoGrowTextarea(prompt);
 
   /* ── 파일 업로드 결과 수신 (SourceImageCard 에서 호출) ── */
   const handleSourceChange = (
@@ -332,10 +312,7 @@ export default function EditPage() {
               <textarea
                 ref={promptTextareaRef}
                 value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value);
-                  autoGrow(e.target);
-                }}
+                onChange={(e) => setPrompt(e.target.value)}
                 placeholder="어떻게 수정할까요? 예: 배경을 바다로 바꿔주세요"
                 rows={3}
                 style={{

@@ -109,6 +109,8 @@ export default function SystemMetrics() {
       className="ais-metrics"
       role="group"
       aria-label="시스템 자원 사용률"
+      // UI P0-5: keyboard focus 시에도 펼쳐지게. globals.css 의 :focus-within 분기와 한쌍.
+      tabIndex={0}
     >
       {metrics.map((m) => (
         <MetricCell
@@ -282,7 +284,7 @@ function VramBreakdownOverlay({ data }: { data: VramBreakdown }) {
         padding: "10px 12px",
         background: "var(--surface)",
         border: "1px solid var(--line)",
-        borderRadius: "var(--radius-md)",
+        borderRadius: "var(--radius)",
         boxShadow:
           "0 8px 28px rgba(0, 0, 0, 0.18), 0 2px 6px rgba(0, 0, 0, 0.10)",
         display: "flex",

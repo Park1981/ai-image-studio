@@ -30,6 +30,8 @@ import VideoPlayerCard from "@/components/studio/VideoPlayerCard";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import { useVideoPipeline } from "@/hooks/useVideoPipeline";
+import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
+import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { filenameFromRef } from "@/lib/image-actions";
 import type { HistoryItem } from "@/lib/api-client";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -82,35 +84,14 @@ export default function VideoPage() {
    *  generate/edit/vision 과 동일 패턴 — 히스토리 클릭 시에만 결과 영역에 표시. */
   const playingRef = lastVideoRef ?? null;
 
-  /* ── 진행 모달 open 상태 ──
-   * running false→true 전이 시 자동 오픈. React 공식 권장: prev state 비교.
-   */
-  const [progressOpen, setProgressOpen] = useState(false);
-  const [prevRunning, setPrevRunning] = useState(running);
-  if (prevRunning !== running) {
-    setPrevRunning(running);
-    if (running) setProgressOpen(true);
-  }
+  /* ── 진행 모달 open 상태 — useAutoCloseModal hook (1400ms · video 비디오 결과 강조 위해 generate 보다 길게) ── */
+  const [progressOpen, setProgressOpen] = useAutoCloseModal(running, 1400);
 
   /* ── Lightbox (자세히 누르면 오픈) ── */
   const [lightboxItem, setLightboxItem] = useState<HistoryItem | null>(null);
 
-  useEffect(() => {
-    if (running) return;
-    if (!progressOpen) return;
-    const t = setTimeout(() => setProgressOpen(false), 1400);
-    return () => clearTimeout(t);
-  }, [running, progressOpen]);
-
-  /* ── 프롬프트 textarea auto-grow (Gen/Edit 일관) ── */
-  const promptTextareaRef = useRef<HTMLTextAreaElement>(null);
-  const autoGrow = (el: HTMLTextAreaElement) => {
-    el.style.height = "auto";
-    el.style.height = `${el.scrollHeight}px`;
-  };
-  useEffect(() => {
-    if (promptTextareaRef.current) autoGrow(promptTextareaRef.current);
-  }, [prompt]);
+  /* ── 프롬프트 textarea auto-grow — useAutoGrowTextarea hook ── */
+  const promptTextareaRef = useAutoGrowTextarea(prompt);
 
   /* ── 진입 시 영상 지시는 빈 입력으로 시작 ── */
   const promptClearedRef = useRef(false);
@@ -232,10 +213,7 @@ export default function VideoPage() {
               <textarea
                 ref={promptTextareaRef}
                 value={prompt}
-                onChange={(e) => {
-                  setPrompt(e.target.value);
-                  autoGrow(e.target);
-                }}
+                onChange={(e) => setPrompt(e.target.value)}
                 placeholder="어떤 움직임/카메라/분위기의 영상? 예: 느린 달리 인, 창가 빛 변화..."
                 rows={3}
                 style={{

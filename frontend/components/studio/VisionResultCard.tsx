@@ -98,11 +98,13 @@ function RecipeV2View({ result }: { result: VisionCardResult }) {
       {/* ── PROMPT 토글 카드 (통합/분리 전환) ── */}
       <PromptToggleCard positive={positive} negative={negative} />
 
-      {/* ── 디테일 슬롯 그리드 (6개) ── */}
+      {/* ── 디테일 슬롯 그리드 (6개) ──
+          P0-1 반응형 (2026-04-26): auto-fit + minmax(280px) 로 폭에 따라 2~3열 자연 조정.
+          1024px 우측 패널(~600px) → 2열 / 1440px(~1000px) → 3열 / 1920px(~1480px) → 4-5열. */}
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
+          gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
           gap: 10,
         }}
       >
