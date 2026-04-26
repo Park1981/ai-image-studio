@@ -106,6 +106,7 @@ export default function ProgressModal({
   mode: HistoryMode;
   onClose: () => void;
 }) {
+  const canInterruptComfy = useComfyInterruptAvailability(mode);
   const headerTitle =
     mode === "generate"
       ? "이미지 생성 중"
@@ -113,6 +114,7 @@ export default function ProgressModal({
         ? "이미지 수정 중"
         : "영상 생성 중";
   const handleCancel = async () => {
+    if (!canInterruptComfy) return;
     const ok = await interruptCurrent();
     if (ok) {
       toast.warn("ComfyUI 인터럽트 전송", "현재 샘플링 중단 시도됨");
@@ -155,6 +157,7 @@ export default function ProgressModal({
           title={headerTitle}
           onClose={onClose}
           onCancel={handleCancel}
+          canInterruptComfy={canInterruptComfy}
         />
         <StatusBar mode={mode} />
         <div
@@ -175,6 +178,30 @@ export default function ProgressModal({
       </section>
     </div>
   );
+}
+
+function useComfyInterruptAvailability(mode: HistoryMode): boolean {
+  const genRunning = useGenerateStore((s) => s.generating);
+  const genStageHistory = useGenerateStore((s) => s.stageHistory);
+
+  const editRunning = useEditStore((s) => s.running);
+  const editCurrentStep = useEditStore((s) => s.currentStep);
+
+  const videoRunning = useVideoStore((s) => s.running);
+  const videoCurrentStep = useVideoStore((s) => s.currentStep);
+
+  const lastGenStage = genStageHistory[genStageHistory.length - 1]?.type;
+
+  if (mode === "generate") {
+    return genRunning && lastGenStage === "comfyui-sampling";
+  }
+  if (mode === "edit") {
+    return editRunning && editCurrentStep === 4;
+  }
+  if (mode === "video") {
+    return videoRunning && videoCurrentStep === 4;
+  }
+  return false;
 }
 
 /**
@@ -332,10 +359,12 @@ function Header({
   title,
   onClose,
   onCancel,
+  canInterruptComfy,
 }: {
   title: string;
   onClose: () => void;
   onCancel: () => void;
+  canInterruptComfy: boolean;
 }) {
   return (
     <header
@@ -361,29 +390,28 @@ function Header({
         </h2>
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-        <button
-          type="button"
-          onClick={onCancel}
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            fontSize: 11.5,
-            fontWeight: 500,
-            padding: "5px 10px",
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid rgba(192,57,43,.32)",
-            background: "#FCEDEC",
-            color: "#C0392B",
-          }}
-          // UI P0-6 라벨 정밀화 (2026-04-26): 단순 "취소" 는 전체 파이프라인 중단으로 오해 가능.
-          // 실제 /interrupt 는 ComfyUI 샘플링만 중단 — 비전·업그레이드·다운로드 단계엔 효과 없음.
-          // 라벨을 명시적으로 바꿔 사용자 혼동 차단. 단계별 hidden/disabled 매트릭스는
-          // task #5 (generate page 분해) 와 함께 처리.
-          title="ComfyUI 샘플링 중단 (다른 단계엔 효과 없음)"
-          aria-label="ComfyUI 샘플링 중단"
-        >
-          ComfyUI 중단
-        </button>
+        {canInterruptComfy && (
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              all: "unset",
+              cursor: "pointer",
+              fontSize: 11.5,
+              fontWeight: 500,
+              padding: "5px 10px",
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid rgba(192,57,43,.32)",
+              background: "#FCEDEC",
+              color: "#C0392B",
+            }}
+            // UI P0-6: 실제 /interrupt 가 먹히는 ComfyUI 단계에서만 노출.
+            title="ComfyUI 샘플링 중단"
+            aria-label="ComfyUI 샘플링 중단"
+          >
+            ComfyUI 중단
+          </button>
+        )}
         <button
           type="button"
           onClick={onClose}

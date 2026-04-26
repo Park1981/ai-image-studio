@@ -431,7 +431,7 @@ button {
   gap: 0;
   transition: gap .35s var(--ais-ease-out-back);
 }
-.ais-metrics:hover,
+.ais-metrics:hover .ais-metric-cell,
 .ais-metrics:focus-within .ais-metric-cell {
   gap: 6px;
 }
@@ -447,7 +447,7 @@ button {
     width .35s var(--ais-ease-out-back) .04s,
     opacity .3s var(--ais-ease-quick) .04s;
 }
-.ais-metrics:hover,
+.ais-metrics:hover .ais-metric-cell .ais-dot,
 .ais-metrics:focus-within .ais-metric-cell .ais-dot {
   width: 6px;
   opacity: 1;
@@ -464,19 +464,19 @@ button {
     opacity .35s var(--ais-ease-quick),
     max-width .4s var(--ais-ease-out-back);
 }
-.ais-metrics:hover,
+.ais-metrics:hover .ais-metric-cell .ais-label,
 .ais-metrics:focus-within .ais-metric-cell .ais-label {
   opacity: 1;
   max-width: 60px;
   transition-delay: .08s;
 }
-.ais-metrics:hover,
+.ais-metrics:hover .ais-metric-cell .ais-usage,
 .ais-metrics:focus-within .ais-metric-cell .ais-usage {
   opacity: 1;
   max-width: 72px;
   transition-delay: .12s;
 }
-.ais-metrics:hover,
+.ais-metrics:hover .ais-metric-cell .ais-percent,
 .ais-metrics:focus-within .ais-metric-cell .ais-percent {
   opacity: 1;
   max-width: 36px;
@@ -493,7 +493,7 @@ button {
   flex-shrink: 0;
   transition: width .4s var(--ais-ease-out-back);
 }
-.ais-metrics:hover,
+.ais-metrics:hover .ais-metric-cell .ais-bar,
 .ais-metrics:focus-within .ais-metric-cell .ais-bar {
   width: 112px;
 }

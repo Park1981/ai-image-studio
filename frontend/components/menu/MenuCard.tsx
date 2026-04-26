@@ -193,6 +193,9 @@ export default function MenuCard({
   /* ─────────────── 기존 텍스트 카드 (backward-compat) ─────────────── */
   return (
     <button
+      type="button"
+      disabled={disabled}
+      aria-disabled={disabled}
       onMouseEnter={() => !disabled && setHover(true)}
       onMouseLeave={() => setHover(false)}
       onClick={disabled ? undefined : onClick}
