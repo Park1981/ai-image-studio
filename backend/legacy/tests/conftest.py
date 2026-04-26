@@ -12,7 +12,8 @@ from pathlib import Path
 import pytest
 
 # backend 디렉토리를 Python 경로에 추가 (from config import settings 등 지원)
-_backend_root = str(Path(__file__).resolve().parent.parent)
+# task #18 (2026-04-26): legacy/tests/ 위치라 parent 한 단계 더 (legacy → backend).
+_backend_root = str(Path(__file__).resolve().parent.parent.parent)
 if _backend_root not in sys.path:
     sys.path.insert(0, _backend_root)
 

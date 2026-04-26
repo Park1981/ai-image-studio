@@ -9,7 +9,7 @@ import time
 
 import pytest
 
-from services.task_manager import TaskManager
+from legacy.services.task_manager import TaskManager
 from models.schemas import GenerateRequest, EditRequest
 
 

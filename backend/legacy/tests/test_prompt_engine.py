@@ -9,7 +9,7 @@ PromptEngine 단위 테스트
 import pytest
 from unittest.mock import AsyncMock, patch
 
-from services.prompt_engine import PromptEngine, _FALLBACK_NEGATIVE, CATEGORY_META
+from legacy.services.prompt_engine import PromptEngine, _FALLBACK_NEGATIVE, CATEGORY_META
 from models.schemas import EnhanceCategoryConfig
 
 

@@ -22,7 +22,7 @@ class TestGenerateEndpoint:
     async def test_생성_요청_task_id_반환(self, async_client):
         """POST /api/generate → task_id 즉시 반환"""
         # 백그라운드 태스크 실행 방지 (실제 ComfyUI 없음)
-        with patch("routers.generate._run_generation", new_callable=AsyncMock):
+        with patch("legacy.routers.generate._run_generation", new_callable=AsyncMock):
             resp = await async_client.post("/api/generate", json={
                 "prompt": "a beautiful mountain",
                 "steps": 20,
@@ -55,7 +55,7 @@ class TestStatusEndpoint:
     async def test_상태_조회(self, async_client):
         """존재하는 태스크 상태 조회"""
         # 먼저 태스크 생성
-        with patch("routers.generate._run_generation", new_callable=AsyncMock):
+        with patch("legacy.routers.generate._run_generation", new_callable=AsyncMock):
             create_resp = await async_client.post("/api/generate", json={
                 "prompt": "test prompt",
             })
@@ -90,14 +90,14 @@ class TestCancelEndpoint:
     async def test_취소_요청(self, async_client):
         """queued 상태 태스크 취소"""
         # 태스크 생성
-        with patch("routers.generate._run_generation", new_callable=AsyncMock):
+        with patch("legacy.routers.generate._run_generation", new_callable=AsyncMock):
             create_resp = await async_client.post("/api/generate", json={
                 "prompt": "cancel me",
             })
         task_id = create_resp.json()["data"]["task_id"]
 
         # 취소 요청 (ComfyUI interrupt mock)
-        with patch("routers.generate.comfyui_client.interrupt", new_callable=AsyncMock, return_value=True):
+        with patch("legacy.routers.generate.comfyui_client.interrupt", new_callable=AsyncMock, return_value=True):
             resp = await async_client.post(f"/api/generate/cancel/{task_id}")
 
         assert resp.status_code == 200
@@ -124,7 +124,7 @@ class TestUploadEndpoint:
     async def test_이미지_업로드(self, async_client, tmp_path):
         """정상 파일 업로드 → 파일명+사이즈 반환"""
         # upload_path를 임시 디렉토리로 패치
-        with patch("routers.generate.settings") as mock_settings:
+        with patch("legacy.routers.generate.settings") as mock_settings:
             mock_settings.upload_path = str(tmp_path / "uploads")
 
             # multipart 파일 전송
@@ -151,7 +151,7 @@ class TestEditEndpoint:
     @pytest.mark.asyncio
     async def test_수정_요청_task_id_반환(self, async_client):
         """POST /api/generate/edit → task_id 즉시 반환"""
-        with patch("routers.generate._run_edit_generation", new_callable=AsyncMock):
+        with patch("legacy.routers.generate._run_edit_generation", new_callable=AsyncMock):
             resp = await async_client.post("/api/generate/edit", json={
                 "source_image": "test.png",
                 "edit_prompt": "change background to blue",

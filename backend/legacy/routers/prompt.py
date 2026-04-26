@@ -15,8 +15,8 @@ from models.schemas import (
     PromptTemplate,
     PromptTemplateCreate,
 )
-from services.image_path import resolve_image_path
-from services.prompt_engine import prompt_engine
+from legacy.services.image_path import resolve_image_path
+from legacy.services.prompt_engine import prompt_engine
 
 router = APIRouter(prefix="/api/prompt", tags=["프롬프트"])
 

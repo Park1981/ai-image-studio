@@ -11,7 +11,7 @@ import copy
 
 import pytest
 
-from services.workflow_manager import WorkflowManager
+from legacy.services.workflow_manager import WorkflowManager
 from models.schemas import GenerateRequest, EditRequest, LoraConfig
 
 

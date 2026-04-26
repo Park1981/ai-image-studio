@@ -16,7 +16,6 @@ from fastapi.staticfiles import StaticFiles
 
 from config import settings
 from database import init_db
-from routers import generate, history, models, process, prompt
 from services.process_manager import process_manager
 from studio.router import (
     router as studio_router,
@@ -161,13 +160,10 @@ images_dir.mkdir(parents=True, exist_ok=True)
 app.mount("/images", StaticFiles(directory=str(images_dir)), name="images")
 
 # ── 라우터 등록 ──
-app.include_router(generate.router)
-app.include_router(history.router)
-app.include_router(process.router)
-app.include_router(models.router)
-app.include_router(prompt.router)
-
-# 재설계 (/api/studio/*) — Phase 2 신규 라우터. 기존 라우터와 병행.
+# task #18 (2026-04-26): 옛 routers/* 5개 (/api/{generate,history,models,process,prompt})
+# 는 backend/legacy/routers/ 로 quarantine — frontend/legacy 만 호출하던 dead path.
+# 신규 frontend 는 모두 /api/studio/* 사용. 옛 라우터를 살리려면 backend/legacy/
+# 에서 import 후 include_router 추가하면 됨 (코드 본체는 보존됨).
 app.include_router(studio_router)
 
 

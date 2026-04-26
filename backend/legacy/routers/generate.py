@@ -21,12 +21,12 @@ from models.schemas import (
     GenerateRequest,
     GenerateResponse,
 )
-from services.comfyui_client import comfyui_client
-from services.image_path import resolve_image_path
-from services.process_manager import process_manager
-from services.prompt_engine import prompt_engine
-from services.task_manager import Task, task_manager
-from services.workflow_manager import workflow_manager
+from legacy.services.comfyui_client import comfyui_client
+from legacy.services.image_path import resolve_image_path
+from services.process_manager import process_manager  # 신규 위치 유지
+from legacy.services.prompt_engine import prompt_engine
+from legacy.services.task_manager import Task, task_manager
+from legacy.services.workflow_manager import workflow_manager
 
 logger = logging.getLogger(__name__)
 

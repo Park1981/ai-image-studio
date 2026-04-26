@@ -484,7 +484,7 @@ class PromptEngine:
         - Path.relative_to() 기반 검증 (접두사 비교 아님) → `uploads_evil` 우회 방지
         - 이미지가 너무 크면 리사이즈 (max 1024px)
         """
-        from services.image_path import resolve_image_path
+        from legacy.services.image_path import resolve_image_path
 
         # 절대경로든 상대 식별자든 resolve_image_path가 허용 루트 내에서 탐색
         file_path = resolve_image_path(image_path)

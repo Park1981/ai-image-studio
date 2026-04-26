@@ -11,11 +11,11 @@ from pathlib import Path
 from fastapi import APIRouter
 
 from models.schemas import ApiResponse
-from services.comfyui_client import comfyui_client
-from services.process_manager import process_manager
+from legacy.services.comfyui_client import comfyui_client
+from services.process_manager import process_manager  # 신규 위치 유지
 
 # 모델 프리셋 JSON 로드
-_PRESETS_PATH = Path(__file__).parent.parent / "models" / "model_presets.json"
+_PRESETS_PATH = Path(__file__).parent.parent.parent / "models" / "model_presets.json"
 _model_presets: dict = {}
 if _PRESETS_PATH.exists():
     _model_presets = json.loads(_PRESETS_PATH.read_text(encoding="utf-8"))
