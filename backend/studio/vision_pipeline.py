@@ -141,15 +141,147 @@ Rules:
 - Do not invent details that are not visible in the image."""
 
 # Vision Analyzer (독립 페이지) 용 — 40~120 단어 프롬프트 엔지니어 어조
+# 2026-04-26 spec 18 v2 도입 후엔 폴백 경로(JSON 파싱 실패) 에서만 사용.
 SYSTEM_VISION_DETAILED = (
     "You are a prompt engineer analyzing an image for reuse in a "
     "text-to-image generation prompt.\n\n"
     "Output a single English paragraph of 40-120 words that captures: "
     "subject, composition, lighting, mood, color palette, materials/textures, "
-    "camera/lens feel, film/style anchors, environment. "
+    "camera/lens feel, environment. "
     "Omit safety preambles. No bullets, no markdown. "
     "Return ONLY the paragraph."
 )
+
+
+# ═══════════════════════════════════════════════════════════════════════
+#  Vision Recipe v2 (2026-04-26 · spec 18 통합)
+#
+#  목적: 단일 비전 분석을 "캡션" 에서 "재생성 레시피" 로 패러다임 전환.
+#  Codex + Claude 공동 spec — 9 슬롯 JSON 으로 재생성 가능한 풀 프롬프트 추출.
+#
+#  주요 변경 (Codex 진단 반영):
+#    - "single paragraph 40-120" 강제 → "structured 9-slot JSON, positive_prompt 80-200 단어"
+#    - user message "Describe this image." → width/height 주입한 명시적 recipe 요청
+#    - "film-style anchors" 메타 표현 제거 → t2i 어휘로 대체 (lens, lighting setup, etc.)
+#    - "uncertain" 슬롯 추가 — 추정 금지 영역 명시 (잘못된 identity 추정 차단)
+# ═══════════════════════════════════════════════════════════════════════
+
+SYSTEM_VISION_RECIPE_V2 = """You are a vision-to-prompt specialist. Given a SOURCE image and its
+aspect ratio, produce a structured recreation recipe that lets a
+text-to-image model (Qwen Image 2512 family) reproduce a visually
+similar result.
+
+Return STRICT JSON only (no markdown fences, no preamble, no trailing text):
+{
+  "summary": "<2-3 sentence concise English summary of what is visible>",
+  "positive_prompt": "<150-300 word English t2i prompt, COMPREHENSIVE, SELF-CONTAINED, subject-FIRST ordering — prioritize completeness over brevity>",
+  "negative_prompt": "<comma-separated list of things to avoid (image-specific + standard)>",
+  "composition": "<framing, shot size, subject placement, layout (single/side-by-side/grid/collage)>",
+  "subject": "<person/object identity: visible face features, body, expression, pose. If multiple, list each as numbered item>",
+  "clothing_or_materials": "<attire, textures, condition, materials, surface details>",
+  "environment": "<setting, foreground/middle/background structure, time, weather>",
+  "lighting_camera_style": "<lighting setup (key/fill/rim, hour, color temp), lens feel (35mm f/1.4 / 85mm portrait / 24mm wide), DOF, color grading>",
+  "uncertain": "<aspects that cannot be determined visually — explicitly list, do not guess>"
+}
+
+═══════════════════════════════════════════════════════════════════
+CRITICAL RULE — positive_prompt SELF-CONTAINMENT
+═══════════════════════════════════════════════════════════════════
+positive_prompt is the PRIMARY copy-paste target. The user expects to
+paste it into a t2i UI and get a similar image WITHOUT consulting the
+other slots. Therefore:
+
+- positive_prompt MUST INCORPORATE every key visual detail you list in
+  composition / subject / clothing_or_materials / environment /
+  lighting_camera_style slots.
+- If you mention "85mm portrait lens" in lighting_camera_style, that
+  exact lens detail MUST also appear in positive_prompt.
+- If you mention "muted earth tones" in lighting_camera_style, that
+  palette MUST appear in positive_prompt.
+- If you list "side-by-side comparison" in composition, the layout
+  MUST appear in positive_prompt.
+- The other slots are AUGMENTATION/UI ANNOTATION — never substitutes
+  for completeness in positive_prompt.
+
+Ordering inside positive_prompt:
+  subject -> composition/layout -> clothing/materials -> environment ->
+  lighting/camera/lens -> color palette -> style anchors
+
+═══════════════════════════════════════════════════════════════════
+TONE — t2i-friendly mixed style + RICH detail
+═══════════════════════════════════════════════════════════════════
+Combine natural language sentences with comma-separated tag phrases.
+Avoid pure descriptive paragraph tone ("She is facing...", "The
+composition is..."). Prefer concrete tag-style phrases interleaved
+with brief sentences.
+
+LENGTH PRIORITY: Aim for 150-300 words in positive_prompt. Err on the
+side of MORE detail. Better to over-describe than to lose visual cues.
+Each visible detail (skin texture, fabric weave, hair flow direction,
+catchlight position, shadow softness, color saturation) deserves at
+least one descriptor.
+
+Example positive_prompt (good):
+"young woman, long dark hair, white tank top, neutral expression,
+centered composition, subject fills frame, soft diffused 85mm portrait
+lighting, even illumination, muted earth tones, minimalistic plain
+light backdrop, soft shadows, clean modern editorial photography style,
+ultra detailed, high resolution"
+
+Bad (too descriptive):
+"A young woman with long dark hair is wearing a tank top. She is
+facing the camera. The composition is centered..."
+
+═══════════════════════════════════════════════════════════════════
+MULTI-SUBJECT HANDLING
+═══════════════════════════════════════════════════════════════════
+If the image contains MULTIPLE distinct subjects (group photo, side-
+by-side comparison, collage, multi-pose, before/after, two views of
+same person):
+
+1) summary: explicitly mention multi-subject layout
+   (e.g. "Two side-by-side portraits of the same young woman, left
+   in white tank top and right in black tank top.")
+
+2) composition: describe the LAYOUT as a first-class detail
+   (e.g. "side-by-side dual portrait, two equal frames separated by
+   thin gap, both subjects centered in their own frame")
+
+3) subject: describe each subject as a numbered list
+   (e.g. "1) left: same woman, white tank top, slight side glance.
+   2) right: same woman, black tank top, direct gaze.")
+
+4) positive_prompt: build it as a layout-aware prompt
+   (e.g. "two side-by-side portraits of the same young woman, left
+   frame in white tank, right frame in black tank...")
+
+═══════════════════════════════════════════════════════════════════
+GENERAL RULES
+═══════════════════════════════════════════════════════════════════
+Identity inference policy (2026-04-26 — broad race allowed):
+- BROAD race / appearance category: ALLOWED when visually evident.
+  Use these labels: "East Asian", "South Asian", "Southeast Asian",
+  "Caucasian", "African / Black", "Hispanic / Latin", "Middle Eastern",
+  "Mixed / ambiguous". Include in subject and positive_prompt.
+- SPECIFIC nationality (Korean, Japanese, Chinese, etc.): list in
+  "uncertain" UNLESS strong visual evidence (e.g. hanbok, kimono,
+  cultural-specific signage). Visual cues from face alone are NOT
+  sufficient — East/South/Southeast Asian appearances overlap heavily.
+- AGE: rough range only ("young adult", "middle-aged"). Specific age
+  (e.g. "23 years old") goes to "uncertain".
+- NAME / PERSONAL identity: never infer. Always "uncertain".
+
+Other rules:
+- negative_prompt must include image-specific avoids
+  (e.g. "smiling" if original is neutral, "color shift" if mono palette)
+  PLUS standard t2i guards (extra fingers, blurry, lowres, watermark,
+  text artifacts, oversaturated, plastic skin).
+- Use concrete t2i vocabulary: specific lens (35mm, 50mm, 85mm),
+  lighting type (golden hour rim, softbox key, north window diffused,
+  overcast soft, harsh midday sun), color grading (teal-orange,
+  muted earth tones, pastel film stock, high contrast b&w).
+- All field values are strings (never null). If truly empty, use "".
+"""
 
 
 @dataclass
@@ -654,14 +786,108 @@ async def analyze_edit_source(
 class VisionAnalysisResult:
     """analyze_image_detailed 결과.
 
-    - fallback=True: 비전 호출 자체 실패 (en 이 빈 문자열)
-    - ko=None: 번역만 실패 (en 은 유효, 프론트가 "번역 실패" 표시)
+    레거시 필드 (옛 row 호환):
+      - en: 메인 영문 단락 (v2 에선 summary + positive_prompt 합본 또는 폴백 단락)
+      - ko: 한국어 번역 (실패 시 None)
+      - fallback=True: 비전 호출 자체 실패
+      - ko=None: 번역만 실패
+
+    Vision Recipe v2 슬롯 (2026-04-26 spec 18):
+      모두 빈 문자열 가능 — 폴백 경로(JSON 파싱 실패)에선 모두 "" 로 채움.
+      프론트는 positive_prompt 가 비면 옛 row 로 판정해 자동 폴백 UI.
     """
 
     en: str
     ko: str | None
     provider: str  # "ollama" | "fallback"
     fallback: bool
+
+    # ── v2 9 슬롯 (옛 row 는 모두 "" — 프론트 자동 폴백) ──
+    summary: str = ""
+    positive_prompt: str = ""
+    negative_prompt: str = ""
+    composition: str = ""
+    subject: str = ""
+    clothing_or_materials: str = ""
+    environment: str = ""
+    lighting_camera_style: str = ""
+    uncertain: str = ""
+
+
+def _aspect_label(width: int, height: int) -> str:
+    """W×H → 사람 친화 비율 라벨 (예: '1:1 square', '16:9 widescreen').
+
+    근사 매핑 — Qwen 권장 비율(1664×928 등)이 정확한 16:9 가 아니라도 근사로 잡힘.
+    매칭 없으면 GCD 단순화 결과 + 'custom' 라벨.
+    """
+    if width <= 0 or height <= 0:
+        return "unknown aspect"
+    # 약수로 단순화 (custom 라벨 표기용)
+    from math import gcd
+
+    g = gcd(width, height)
+    w_r, h_r = width // g, height // g
+
+    # 근사 매핑 — 약 2% 오차 허용 (Qwen 권장 1664×928 = 1.793 ≈ 16:9 = 1.778)
+    ratio = width / height
+    common: list[tuple[float, str]] = [
+        (1.0, "1:1 square"),
+        (16 / 9, "16:9 widescreen"),
+        (9 / 16, "9:16 vertical"),
+        (4 / 3, "4:3 standard"),
+        (3 / 4, "3:4 portrait"),
+        (3 / 2, "3:2 landscape"),
+        (2 / 3, "2:3 tall portrait"),
+    ]
+    for target_ratio, label in common:
+        if abs(ratio - target_ratio) < target_ratio * 0.02:
+            return label
+    return f"{w_r}:{h_r} custom"
+
+
+async def _call_vision_recipe_v2(
+    image_bytes: bytes,
+    *,
+    width: int,
+    height: int,
+    vision_model: str,
+    timeout: float,
+    ollama_url: str,
+) -> str:
+    """qwen2.5vl 에 SOURCE 이미지 + width/height → raw JSON 응답 (spec 18).
+
+    user message 에 width/height + ratio_label 명시 — 모델이 composition 추정 안 해도 됨.
+    Ollama format=json 으로 JSON 안정화. 실패 시 빈 문자열.
+    """
+    ratio_label = _aspect_label(width, height)
+    user_content = (
+        f"Source image attached. Aspect: {width}×{height} ({ratio_label}).\n"
+        "Produce the recreation recipe in STRICT JSON as specified.\n"
+        "Return JSON only, no preamble, no markdown."
+    )
+    payload = {
+        "model": vision_model,
+        "messages": [
+            {"role": "system", "content": SYSTEM_VISION_RECIPE_V2},
+            {
+                "role": "user",
+                "content": user_content,
+                "images": [_to_base64(image_bytes)],
+            },
+        ],
+        "stream": False,
+        "format": "json",
+        "options": {"temperature": 0.4, "num_ctx": 8192},
+    }
+    try:
+        async with httpx.AsyncClient(timeout=timeout) as client:
+            res = await client.post(f"{ollama_url}/api/chat", json=payload)
+            res.raise_for_status()
+            data = res.json()
+            return ((data.get("message") or {}).get("content") or "").strip()
+    except Exception as e:
+        log.warning("vision recipe v2 call failed (%s): %s", vision_model, e)
+        return ""
 
 
 async def analyze_image_detailed(
@@ -671,20 +897,80 @@ async def analyze_image_detailed(
     text_model: str | None = None,
     ollama_url: str | None = None,
     timeout: float = DEFAULT_TIMEOUT,
+    width: int = 0,
+    height: int = 0,
 ) -> VisionAnalysisResult:
-    """단일 이미지 → 상세 영문 설명 + 한글 번역.
+    """단일 이미지 → Vision Recipe v2 (9 슬롯 JSON) + 한글 번역.
 
-    1) SYSTEM_VISION_DETAILED 로 비전 모델 호출 → en (40-120 단어 목표)
-    2) translate_to_korean(en) → ko (실패 시 None, en 은 유지)
-    3) 비전 호출 자체 실패 시 fallback=True, en=""
+    2026-04-26 spec 18 통합:
+      1) SYSTEM_VISION_RECIPE_V2 + width/height 주입 → JSON 9 슬롯
+      2) JSON 파싱 성공 시: summary 를 en 으로, ko 는 summary 번역
+      3) JSON 파싱 실패 시: 옛 SYSTEM_VISION_DETAILED 로 폴백 (단락 영문) → 9 슬롯 빈 문자열
+      4) 비전 호출 자체 실패: fallback=True, 모든 필드 빈 값
 
-    HTTP 레이어에선 절대 500 안 내는 원칙 — 프론트가 provider/fallback 으로 표시 분기.
+    HTTP 레이어 500 안 내는 원칙 — 프론트가 provider/fallback + positive_prompt 유무로 분기.
     """
     resolved_vision = vision_model or DEFAULT_OLLAMA_ROLES.vision
     resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
 
-    en = await _describe_image(
+    # ── 1단계: v2 JSON 호출 ──
+    raw = await _call_vision_recipe_v2(
+        image_bytes,
+        width=width,
+        height=height,
+        vision_model=resolved_vision,
+        timeout=timeout,
+        ollama_url=resolved_url,
+    )
+
+    parsed: dict[str, Any] | None = _parse_strict_json(raw) if raw else None
+
+    if parsed is not None:
+        # ── 2단계: 슬롯 정규화 (모두 string, None/non-str → "") ──
+        slots = {
+            "summary": _coerce_str(parsed.get("summary")),
+            "positive_prompt": _coerce_str(parsed.get("positive_prompt")),
+            "negative_prompt": _coerce_str(parsed.get("negative_prompt")),
+            "composition": _coerce_str(parsed.get("composition")),
+            "subject": _coerce_str(parsed.get("subject")),
+            "clothing_or_materials": _coerce_str(parsed.get("clothing_or_materials")),
+            "environment": _coerce_str(parsed.get("environment")),
+            "lighting_camera_style": _coerce_str(parsed.get("lighting_camera_style")),
+            "uncertain": _coerce_str(parsed.get("uncertain")),
+        }
+
+        # en 은 옛 호환 — summary + positive_prompt 합본 (사용자 화면용)
+        # 옛 row 는 단락 1개 였으니 비슷한 형태로 보존
+        en_combined = slots["summary"]
+        if slots["positive_prompt"]:
+            en_combined = (
+                f"{slots['summary']}\n\n{slots['positive_prompt']}"
+                if en_combined
+                else slots["positive_prompt"]
+            )
+
+        # ko 번역 — summary 만 번역 (positive_prompt 는 t2i 입력용이라 영문 유지)
+        ko: str | None = None
+        if slots["summary"]:
+            ko = await translate_to_korean(
+                slots["summary"],
+                model=resolved_text,
+                timeout=60.0,
+                ollama_url=resolved_url,
+            )
+
+        return VisionAnalysisResult(
+            en=en_combined,
+            ko=ko,
+            provider="ollama",
+            fallback=False,
+            **slots,
+        )
+
+    # ── 3단계: JSON 파싱 실패 → 옛 단락 SYSTEM 폴백 ──
+    log.info("vision recipe v2 JSON parse failed — falling back to legacy paragraph")
+    legacy_en = await _describe_image(
         image_bytes,
         vision_model=resolved_vision,
         timeout=timeout,
@@ -692,15 +978,22 @@ async def analyze_image_detailed(
         system_prompt=SYSTEM_VISION_DETAILED,
         temperature=0.5,
     )
-    if not en:
+    if not legacy_en:
+        # 비전 호출 자체 실패
         return VisionAnalysisResult(
             en="", ko=None, provider="fallback", fallback=True
         )
 
-    ko = await translate_to_korean(
-        en, model=resolved_text, timeout=60.0, ollama_url=resolved_url
+    legacy_ko = await translate_to_korean(
+        legacy_en, model=resolved_text, timeout=60.0, ollama_url=resolved_url
     )
-    return VisionAnalysisResult(en=en, ko=ko, provider="ollama", fallback=False)
+    # 9 슬롯 모두 빈 문자열로 — 프론트 자동 폴백 (positive_prompt 빈 = 옛 카드 표시)
+    return VisionAnalysisResult(
+        en=legacy_en,
+        ko=legacy_ko,
+        provider="ollama",
+        fallback=False,
+    )
 
 
 def _to_base64(image: Path | str | bytes) -> str:

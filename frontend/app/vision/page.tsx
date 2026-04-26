@@ -9,15 +9,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  BackBtn,
-  Logo,
-  ModelBadge,
-  TopBar,
-} from "@/components/chrome/Chrome";
-import VramBadge from "@/components/chrome/VramBadge";
-import SettingsButton from "@/components/settings/SettingsButton";
+import AppHeader from "@/components/chrome/AppHeader";
 import AnalysisProgressModal from "@/components/studio/AnalysisProgressModal";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
@@ -33,14 +25,10 @@ import VisionResultCard from "@/components/studio/VisionResultCard";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
 import { useVisionPipeline } from "@/hooks/useVisionPipeline";
-import { useProcessStore } from "@/stores/useProcessStore";
-import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
 
 export default function VisionPage() {
-  const router = useRouter();
-
   /* ── store ── */
   const currentImage = useVisionStore((s) => s.currentImage);
   const currentLabel = useVisionStore((s) => s.currentLabel);
@@ -54,8 +42,6 @@ export default function VisionPage() {
   const clearEntries = useVisionStore((s) => s.clearEntries);
   const loadEntry = useVisionStore((s) => s.loadEntry);
 
-  const visionModel = useSettingsStore((s) => s.visionModel);
-  const ollamaStatus = useProcessStore((s) => s.ollama);
 
   /* ── 갤러리 컬럼 토글 (2/3/4) — Generate/Edit 와 동일 ── */
   const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
@@ -106,27 +92,7 @@ export default function VisionPage() {
           onClose={() => setProgressOpen(false)}
         />
       )}
-      <TopBar
-        left={
-          <>
-            <BackBtn onClick={() => router.push("/")} />
-            <Logo />
-          </>
-        }
-        center={
-          <ModelBadge
-            name={visionModel || "vision"}
-            tag="Vision · Ollama"
-            status={ollamaStatus === "running" ? "ready" : "loading"}
-          />
-        }
-        right={
-          <>
-            <VramBadge />
-            <SettingsButton />
-          </>
-        }
-      />
+      <AppHeader />
 
       <StudioWorkspace>
         {/* ── LEFT: 업로드 + CTA ── */}

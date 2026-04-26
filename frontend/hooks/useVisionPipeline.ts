@@ -66,7 +66,19 @@ export function useVisionPipeline(): UseVisionPipeline {
         ollamaModel: ollamaModelSel,
       });
 
-      setResult(result.en, result.ko);
+      // v2 9 슬롯 — 옛 row (positivePrompt 비어있음) 도 그대로 흐름
+      const slots = {
+        summary: result.summary,
+        positivePrompt: result.positivePrompt,
+        negativePrompt: result.negativePrompt,
+        composition: result.composition,
+        subject: result.subject,
+        clothingOrMaterials: result.clothingOrMaterials,
+        environment: result.environment,
+        lightingCameraStyle: result.lightingCameraStyle,
+        uncertain: result.uncertain,
+      };
+      setResult(result.en, result.ko, slots);
 
       // 썸네일 리사이즈 — localStorage 용량 방어 (원본 dataURL 은 수 MB, 썸네일은 수십 KB)
       // 실패 시 원본 그대로 사용 (히스토리는 유지, 용량은 MAX 건수 상한으로 방어).
@@ -80,6 +92,7 @@ export function useVisionPipeline(): UseVisionPipeline {
         thumbLabel: currentLabel,
         en: result.en,
         ko: result.ko,
+        ...slots,
         createdAt: Date.now(),
         visionModel: visionModelSel,
         width: result.width || currentWidth || 0,

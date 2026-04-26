@@ -18,10 +18,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Logo, TopBar, BackBtn, ModelBadge } from "@/components/chrome/Chrome";
-import VramBadge from "@/components/chrome/VramBadge";
-import SettingsButton from "@/components/settings/SettingsButton";
+import AppHeader from "@/components/chrome/AppHeader";
 import Icon from "@/components/ui/Icon";
 import BeforeAfterSlider from "@/components/studio/BeforeAfterSlider";
 import AnalysisProgressModal from "@/components/studio/AnalysisProgressModal";
@@ -105,7 +102,6 @@ const AXIS_ORDER: Array<keyof VisionCompareAnalysis["scores"]> = [
  * 페이지
  * ──────────────────────────────────────────────────────────────────── */
 export default function VisionComparePage() {
-  const router = useRouter();
   const imageA = useVisionCompareStore((s) => s.imageA);
   const imageB = useVisionCompareStore((s) => s.imageB);
   const hint = useVisionCompareStore((s) => s.hint);
@@ -244,27 +240,7 @@ export default function VisionComparePage() {
           onClose={() => setProgressOpen(false)}
         />
       )}
-      <TopBar
-        left={
-          <>
-            <BackBtn onClick={() => router.push("/")} />
-            <Logo />
-          </>
-        }
-        center={
-          <ModelBadge
-            name={visionModel || "vision"}
-            tag="Compare · Ollama"
-            status={ollamaOn ? "ready" : "loading"}
-          />
-        }
-        right={
-          <>
-            <VramBadge />
-            <SettingsButton />
-          </>
-        }
-      />
+      <AppHeader />
 
       <StudioWorkspace>
         {/* ───────── 좌 패널 (입력) ───────── */}

@@ -10,16 +10,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  BackBtn,
-  IconBtn,
-  Logo,
-  ModelBadge,
-  TopBar,
-} from "@/components/chrome/Chrome";
-import VramBadge from "@/components/chrome/VramBadge";
-import SettingsButton from "@/components/settings/SettingsButton";
+import { IconBtn } from "@/components/chrome/Chrome";
+import AppHeader from "@/components/chrome/AppHeader";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageLightbox from "@/components/studio/ImageLightbox";
@@ -41,7 +33,6 @@ import { useVideoPipeline } from "@/hooks/useVideoPipeline";
 import { filenameFromRef } from "@/lib/image-actions";
 import type { HistoryItem } from "@/lib/api-client";
 import { useHistoryStore } from "@/stores/useHistoryStore";
-import { useProcessStore } from "@/stores/useProcessStore";
 import { toast } from "@/stores/useToastStore";
 import {
   computeVideoResize,
@@ -52,8 +43,6 @@ import {
 } from "@/stores/useVideoStore";
 
 export default function VideoPage() {
-  const router = useRouter();
-
   /* ── store ── */
   const sourceImage = useVideoStore((s) => s.sourceImage);
   const sourceLabel = useVideoStore((s) => s.sourceLabel);
@@ -76,7 +65,6 @@ export default function VideoPage() {
   const items = useHistoryStore((s) => s.items);
 
   // visionModel 은 useVideoPipeline 내부에서 store 직접 읽음 (여기 구독 불필요)
-  const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
   /* ── 파이프라인 훅 ── */
   const { generate: handleGenerate } = useVideoPipeline();
@@ -162,27 +150,7 @@ export default function VideoPage() {
           onClose={() => setLightboxItem(null)}
         />
       )}
-      <TopBar
-        left={
-          <>
-            <BackBtn onClick={() => router.push("/")} />
-            <Logo />
-          </>
-        }
-        center={
-          <ModelBadge
-            name="LTX Video 2.3"
-            tag="22B · A/V"
-            status={comfyuiStatus === "running" ? "ready" : "loading"}
-          />
-        }
-        right={
-          <>
-            <VramBadge />
-            <SettingsButton />
-          </>
-        }
-      />
+      <AppHeader />
 
       <StudioWorkspace>
         {/* ── LEFT: 업로드 + 프롬프트 + CTA ── */}
@@ -492,25 +460,22 @@ export default function VideoPage() {
             }
           />
 
-          <div style={{ maxHeight: "55vh", overflowY: "auto", paddingRight: 4 }}>
-            <HistoryGallery
-              items={videoResults}
-              gridCols={gridCols}
-              // selectedId 는 HistoryItem.id 기준 — video 는 playingRef(imageRef) 로 선택 표시.
-              // id 매칭으로 바꿔서 HistoryGallery 와 의미를 맞춤.
-              selectedId={
-                videoResults.find((v) => v.imageRef === playingRef)?.id ?? null
-              }
-              onTileClick={(it) => {
-                // 플레이어에 지정 — 세션 state (lastVideoRef) 로
-                useVideoStore.getState().setLastVideoRef(it.imageRef);
-              }}
-              onTileExpand={(it) => setLightboxItem(it)}
-              emptyMessage="아직 생성된 영상이 없습니다."
-            />
-          </div>
-
-          <div style={{ flex: 1 }} />
+          {/* 갤러리 — 자연 페이지 스크롤 (2026-04-26 maxHeight 박스 제거) */}
+          <HistoryGallery
+            items={videoResults}
+            gridCols={gridCols}
+            // selectedId 는 HistoryItem.id 기준 — video 는 playingRef(imageRef) 로 선택 표시.
+            // id 매칭으로 바꿔서 HistoryGallery 와 의미를 맞춤.
+            selectedId={
+              videoResults.find((v) => v.imageRef === playingRef)?.id ?? null
+            }
+            onTileClick={(it) => {
+              // 플레이어에 지정 — 세션 state (lastVideoRef) 로
+              useVideoStore.getState().setLastVideoRef(it.imageRef);
+            }}
+            onTileExpand={(it) => setLightboxItem(it)}
+            emptyMessage="아직 생성된 영상이 없습니다."
+          />
         </StudioRightPanel>
       </StudioWorkspace>
     </StudioPage>

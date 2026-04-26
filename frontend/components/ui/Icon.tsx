@@ -34,7 +34,8 @@ export type IconName =
   | "unlock"
   | "play"
   | "compare"
-  | "upscale";
+  | "upscale"
+  | "home";
 
 interface IconProps {
   name: IconName;
@@ -118,6 +119,13 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
           <rect x="11" y="17" width="4" height="4" fill="currentColor" stroke="none" opacity={0.4} />
           <path d="M12 12 L20 4" />
           <polyline points="15 4 20 4 20 9" />
+        </svg>
+      );
+    case "home":
+      // 홈 — 박공 지붕 + 박스 + 작은 문 (메뉴 페이지 ← 메인 BackBtn 신규 디자인)
+      return (
+        <svg {...common}>
+          <path d="M3 10.5 12 3l9 7.5V20a1 1 0 0 1-1 1h-5v-7h-6v7H4a1 1 0 0 1-1-1z" />
         </svg>
       );
     case "arrow-left":

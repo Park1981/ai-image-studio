@@ -61,6 +61,7 @@ from .claude_cli import research_prompt
 from .vision_pipeline import analyze_image_detailed, run_vision_pipeline
 from .video_pipeline import run_video_pipeline
 from .comparison_pipeline import analyze_pair, analyze_pair_generic
+from .system_metrics import get_system_metrics
 from .comfy_api_builder import (
     build_generate_from_request,
     build_edit_from_request,
@@ -846,8 +847,9 @@ async def _dispatch_to_comfy(
     upload_bytes: bytes | None = None,
     upload_filename: str | None = None,
     save_output: SaveOutputFn | None = None,
-    idle_timeout: float = 600.0,
-    hard_timeout: float = 1800.0,
+    # 2026-04-26 idle 600→1200s, hard 1800→7200s — 16GB VRAM 풀 퀄리티 swap 케이스 안전망.
+    idle_timeout: float = 1200.0,
+    hard_timeout: float = 7200.0,
 ) -> ComfyDispatchResult:
     """ComfyUI 에 API prompt 제출 + WS 진행 수신 + 결과 다운로드 (공용).
 
@@ -1662,8 +1664,11 @@ async def vision_analyze(
         image_bytes,
         vision_model=vision_model_override,
         text_model=ollama_model_override,
+        width=width,
+        height=height,
     )
 
+    # 응답: 옛 호환 필드 (en/ko) + Vision Recipe v2 9 슬롯 (2026-04-26 spec 18)
     return {
         "en": result.en,
         "ko": result.ko,
@@ -1672,6 +1677,16 @@ async def vision_analyze(
         "width": width,
         "height": height,
         "sizeBytes": len(image_bytes),
+        # ── v2 신규 9 슬롯 (옛 row 호환: 폴백 시 모두 "") ──
+        "summary": result.summary,
+        "positivePrompt": result.positive_prompt,
+        "negativePrompt": result.negative_prompt,
+        "composition": result.composition,
+        "subject": result.subject,
+        "clothingOrMaterials": result.clothing_or_materials,
+        "environment": result.environment,
+        "lightingCameraStyle": result.lighting_camera_style,
+        "uncertain": result.uncertain,
     }
 
 
@@ -1835,22 +1850,50 @@ async def list_ollama_models():
 
 @router.get("/process/status")
 async def process_status():
-    """실 process_manager 로부터 Ollama·ComfyUI 상태 + VRAM 조회."""
+    """실 process_manager + system_metrics 로부터 Ollama·ComfyUI 상태 + 통합 자원 메트릭 조회.
+
+    응답 구조 (2026-04-26 헤더 통합 SystemMetrics 도입):
+      {
+        "ollama":  {"running": bool},
+        "comfyui": {"running": bool, "vram_used_gb": float?, "vram_total_gb": float?,
+                    "gpu_percent": float?},
+        "system":  {"cpu_percent": float?, "ram_used_gb": float?, "ram_total_gb": float?},
+      }
+    각 메트릭 필드는 측정 실패 시 누락 가능 (프론트에서 누락 = 미표시 처리).
+    """
     if _proc_mgr is None:
         return {
             "ollama": {"running": False},
             "comfyui": {"running": False},
+            "system": {},
         }
     ollama_ok = await _proc_mgr.check_ollama()
     comfyui_ok = await _proc_mgr.check_comfyui()
-    vram: dict[str, Any] = {}
+
+    # 시스템 메트릭 일괄 측정 — psutil + nvidia-smi 병렬, 실패 시 부분값만 들어옴
+    metrics: dict[str, Any] = {}
     try:
-        vram = await _proc_mgr.get_vram_usage()
-    except Exception:
-        vram = {}
+        metrics = await get_system_metrics()  # type: ignore[assignment]
+    except Exception as exc:
+        logger.warning("system metrics 측정 실패: %s", exc)
+        metrics = {}
+
+    # comfyui 묶음 — VRAM + GPU% (GPU 메트릭 nvidia-smi 의존)
+    comfyui_payload: dict[str, Any] = {"running": comfyui_ok}
+    for key in ("vram_used_gb", "vram_total_gb", "gpu_percent"):
+        if key in metrics:
+            comfyui_payload[key] = metrics[key]
+
+    # system 묶음 — CPU + RAM (psutil 의존)
+    system_payload: dict[str, Any] = {}
+    for key in ("cpu_percent", "ram_used_gb", "ram_total_gb"):
+        if key in metrics:
+            system_payload[key] = metrics[key]
+
     return {
         "ollama": {"running": ollama_ok},
-        "comfyui": {"running": comfyui_ok, **(vram or {})},
+        "comfyui": comfyui_payload,
+        "system": system_payload,
     }
 
 

@@ -1,7 +1,11 @@
 /**
  * HistoryGallery — 히스토리 갤러리 (Masonry + 날짜 그룹).
- * 2026-04-24 UX v1 · 2026-04-24 date-sections 유틸 공유 리팩터:
- *  - CSS `columns` 기반 Masonry (새 의존성 없음) — 타일은 원본 이미지 비율대로 가변 높이
+ * 2026-04-24 UX v1 · 2026-04-24 date-sections 유틸 공유 리팩터.
+ * 2026-04-26 가로 흐름 전환: CSS `columns` (세로 우선) → JS column 분배 + flex column (가로 우선).
+ *  - height-aware 알고리즘: 각 item 을 "현재 누적 높이가 가장 짧은 컬럼" 에 추가
+ *    → 컬럼 간 height 균형 + 진짜 Masonry 효과. 의존성 0.
+ *  - 시각 결과: 첫 줄에 가장 최신 N개 (왼→오) 가 늘어섬 → 사용자 직관 매칭.
+ *  - 비율 유지 그대로 (각 타일 aspect-ratio 살림).
  *  - 날짜 섹션 그룹핑 + 접기·펼치기 (lib/date-sections 공용 유틸)
  *  - 가장 최신 섹션 1개만 기본 펼침 (오늘 없으면 어제가 자동 펼침)
  *  - /generate, /edit, /video 3 페이지 공용
@@ -100,6 +104,7 @@ export default function HistoryGallery({
         overflowX: "hidden",
       }}
     >
+      {/* 안내: 본 컴포넌트 하단의 MasonryRow 가 실제 grid 분배를 담당 */}
       {sections.map((s, i) => {
         const closed = isClosedSection(i, s.key, toggled);
         return (
@@ -111,52 +116,114 @@ export default function HistoryGallery({
               onToggle={() => toggle(s.key)}
             />
             {!closed && (
-              <div
-                style={{
-                  // CSS columns 기반 Masonry — 의존성 0 으로 구현.
-                  // 각 자식은 breakInside: avoid 로 컬럼 경계에서 쪼개지지 않게.
-                  columnCount: gridCols,
-                  columnGap: 12,
-                  marginTop: 10,
-                }}
-              >
-                {s.items.map((it) => {
-                  // aspect: 원본 이미지/영상 비율 → Masonry 에서 타일 높이 결정.
-                  // width/height 가 0 이거나 유효하지 않으면 1/1 폴백.
-                  const aspectVal =
-                    it.width > 0 && it.height > 0
-                      ? `${it.width}/${it.height}`
-                      : "1/1";
-                  return (
-                    <div
-                      key={it.id}
-                      style={{
-                        // CSS fragmentation — 모던 브라우저 (Chrome/Safari/FF) 모두 breakInside 지원.
-                        breakInside: "avoid",
-                        marginBottom: 12,
-                      }}
-                    >
-                      <HistoryTile
-                        item={it}
-                        aspect={aspectVal}
-                        selected={selectedId === it.id}
-                        onClick={() => onTileClick(it)}
-                        onExpand={() => onTileExpand(it)}
-                        onUseAsSource={
-                          onUseAsSource ? () => onUseAsSource(it) : undefined
-                        }
-                        onAfterDelete={
-                          onAfterDelete ? () => onAfterDelete(it) : undefined
-                        }
-                      />
-                    </div>
-                  );
-                })}
-              </div>
+              <MasonryRow
+                items={s.items}
+                gridCols={gridCols}
+                selectedId={selectedId}
+                onTileClick={onTileClick}
+                onTileExpand={onTileExpand}
+                onUseAsSource={onUseAsSource}
+                onAfterDelete={onAfterDelete}
+              />
             )}
           </section>
         );
       })}
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   MasonryRow — 한 날짜 섹션의 타일들을 가로 흐름 Masonry 로 배치.
+   2026-04-26 알고리즘:
+     1) 각 item 의 aspect 로 "예상 타일 높이 (단위 길이)" 계산
+        (width=1 가정 시 height = 1/aspect)
+     2) 각 item 을 "현재 누적 높이가 가장 짧은 컬럼" 에 추가
+     3) 결과: 컬럼 간 누적 높이 균형 + 진짜 Masonry wall 효과
+   시각 결과: 첫 줄에 가장 최신 N개가 가로로 늘어섬 (사용자 직관).
+   ───────────────────────────────────────── */
+function MasonryRow({
+  items,
+  gridCols,
+  selectedId,
+  onTileClick,
+  onTileExpand,
+  onUseAsSource,
+  onAfterDelete,
+}: {
+  items: HistoryItem[];
+  gridCols: 2 | 3 | 4;
+  selectedId: string | null;
+  onTileClick: (it: HistoryItem) => void;
+  onTileExpand: (it: HistoryItem) => void;
+  onUseAsSource?: (it: HistoryItem) => void;
+  onAfterDelete?: (it: HistoryItem) => void;
+}) {
+  // 컬럼 분배 — height-aware greedy: 가장 짧은 컬럼에 다음 item 추가
+  const columns = useMemo(() => {
+    const cols: HistoryItem[][] = Array.from({ length: gridCols }, () => []);
+    const heights = new Array<number>(gridCols).fill(0);
+    items.forEach((it) => {
+      // aspect = w/h. 타일은 컬럼 width(=1) 기준이라 실제 height 는 1/aspect.
+      const aspect =
+        it.width > 0 && it.height > 0 ? it.width / it.height : 1;
+      const tileUnit = 1 / aspect;
+      // 가장 짧은 컬럼 인덱스 찾기 — items 적을 때 O(N×cols) 무리 없음
+      let shortest = 0;
+      for (let i = 1; i < gridCols; i++) {
+        if (heights[i] < heights[shortest]) shortest = i;
+      }
+      cols[shortest].push(it);
+      heights[shortest] += tileUnit;
+    });
+    return cols;
+  }, [items, gridCols]);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        gap: 12,
+        marginTop: 10,
+        alignItems: "flex-start",
+      }}
+    >
+      {columns.map((col, c) => (
+        <div
+          key={c}
+          style={{
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            gap: 12,
+            // 좁은 컬럼에서 타일 내부 텍스트 ellipsis 보장
+            minWidth: 0,
+          }}
+        >
+          {col.map((it) => {
+            const aspectVal =
+              it.width > 0 && it.height > 0
+                ? `${it.width}/${it.height}`
+                : "1/1";
+            return (
+              <HistoryTile
+                key={it.id}
+                item={it}
+                aspect={aspectVal}
+                selected={selectedId === it.id}
+                onClick={() => onTileClick(it)}
+                onExpand={() => onTileExpand(it)}
+                onUseAsSource={
+                  onUseAsSource ? () => onUseAsSource(it) : undefined
+                }
+                onAfterDelete={
+                  onAfterDelete ? () => onAfterDelete(it) : undefined
+                }
+              />
+            );
+          })}
+        </div>
+      ))}
     </div>
   );
 }

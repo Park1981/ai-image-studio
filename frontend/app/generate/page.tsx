@@ -9,15 +9,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { HistoryItem } from "@/lib/api-client";
 import { useRouter } from "next/navigation";
-import {
-  Logo,
-  TopBar,
-  BackBtn,
-  IconBtn,
-  ModelBadge,
-} from "@/components/chrome/Chrome";
-import SettingsButton from "@/components/settings/SettingsButton";
-import VramBadge from "@/components/chrome/VramBadge";
+import { IconBtn } from "@/components/chrome/Chrome";
+import AppHeader from "@/components/chrome/AppHeader";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageLightbox from "@/components/studio/ImageLightbox";
@@ -46,11 +39,7 @@ import {
   inputStyle,
   iconBtnStyle,
 } from "@/components/ui/primitives";
-import {
-  ASPECT_RATIOS,
-  GENERATE_MODEL,
-  type AspectRatioLabel,
-} from "@/lib/model-presets";
+import { ASPECT_RATIOS, type AspectRatioLabel } from "@/lib/model-presets";
 import {
   downloadImage,
   copyImageToClipboard,
@@ -62,7 +51,6 @@ import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore, type AspectValue } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
-import { useProcessStore } from "@/stores/useProcessStore";
 import { toast } from "@/stores/useToastStore";
 
 export default function GeneratePage() {
@@ -94,7 +82,6 @@ export default function GeneratePage() {
 
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
   const addTemplate = useSettingsStore((s) => s.addTemplate);
-  const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
   /* ── 파이프라인 훅 (스트림 + 업그레이드 모달 + 조사) ── */
   const pipeline = useGeneratePipeline();
@@ -209,27 +196,7 @@ export default function GeneratePage() {
           }
         }}
       />
-      <TopBar
-        left={
-          <>
-            <BackBtn onClick={() => router.push("/")} />
-            <Logo />
-          </>
-        }
-        center={
-          <ModelBadge
-            name={GENERATE_MODEL.displayName}
-            tag={GENERATE_MODEL.tag}
-            status={comfyuiStatus === "running" ? "ready" : "loading"}
-          />
-        }
-        right={
-          <>
-            <VramBadge />
-            <SettingsButton />
-          </>
-        }
-      />
+      <AppHeader />
 
       <StudioWorkspace>
         {/* ── LEFT: 입력 영역 ── */}
@@ -620,25 +587,16 @@ export default function GeneratePage() {
             }
           />
 
-          {/* ── 갤러리 스크롤 박스 ── */}
-          <div
-            style={{
-              flex: 1,
-              minHeight: 0,
-              maxHeight: "55vh",
-              overflowY: "auto",
-              paddingRight: 4,
-            }}
-          >
-            <HistoryGallery
-              items={genItems}
-              gridCols={gridCols}
-              selectedId={selectedId ?? null}
-              onTileClick={(it) => selectItem(it.id)}
-              onTileExpand={(it) => setLightboxSrc(it.imageRef)}
-              emptyMessage={null}
-            />
-          </div>
+          {/* ── 갤러리 — 자연 페이지 스크롤 (2026-04-26 maxHeight 박스 제거) ──
+              날짜 섹션 접기 + height-aware Masonry 가 정보 밀도 관리. */}
+          <HistoryGallery
+            items={genItems}
+            gridCols={gridCols}
+            selectedId={selectedId ?? null}
+            onTileClick={(it) => selectItem(it.id)}
+            onTileExpand={(it) => setLightboxSrc(it.imageRef)}
+            emptyMessage={null}
+          />
         </StudioRightPanel>
       </StudioWorkspace>
     </StudioPage>

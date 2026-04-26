@@ -188,14 +188,19 @@ class ComfyUITransport:
         client_id: str,
         prompt_id: str,
         *,
-        idle_timeout: float = 600.0,
-        hard_timeout: float = 1800.0,
+        idle_timeout: float = 1200.0,
+        hard_timeout: float = 7200.0,
     ) -> AsyncIterator[ComfyProgress]:
         """prompt_id 의 완료까지 WebSocket 이벤트 스트림.
 
-        - idle_timeout: 아무 메시지도 안 오는 상태가 이만큼 지속되면 timeout (기본 10분)
-          → 모델 로드 중엔 메시지가 주기적으로 와서 리셋됨. 실제 "멈춤" 만 잡음.
-        - hard_timeout: 총 상한 (기본 30분). 안전망.
+        - idle_timeout: 아무 메시지도 안 오는 상태가 이만큼 지속되면 timeout (기본 20분).
+          모델 로드 중엔 메시지가 주기적으로 와서 리셋됨. 실제 "멈춤" 만 잡음.
+        - hard_timeout: 총 상한 (기본 2시간). 안전망.
+
+        2026-04-26: idle 600→1200s, hard 1800→7200s 로 확장.
+          16GB VRAM 환경에서 Lightning OFF 풀 퀄리티 (40 step) 시 swap 발동 →
+          step 당 시간 폭발 (6s → 77s+) → 30분 hard timeout 으로 끊겨 결과
+          못 받는 사례 방지. 풀 51분+ 작업도 안전 회수.
 
         종료 조건:
         - `execution_success` / `execution_error` 이벤트 수신

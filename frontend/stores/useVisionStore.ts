@@ -16,13 +16,31 @@ import { persist, createJSONStorage } from "zustand/middleware";
 // 용량 부담은 100건 × 약 50KB = 5MB (localStorage 10MB 한계 내 여유).
 export const MAX_VISION_HISTORY = 100;
 
-export interface VisionEntry {
+/**
+ * Vision Recipe v2 9 슬롯 (옵셔널 — 옛 entry 호환).
+ * 백엔드 spec 18 (2026-04-26) · 모두 빈 문자열 시 = 옛 v1 row 로 판정.
+ */
+export interface VisionRecipeSlots {
+  summary?: string;
+  positivePrompt?: string;
+  negativePrompt?: string;
+  composition?: string;
+  subject?: string;
+  clothingOrMaterials?: string;
+  environment?: string;
+  lightingCameraStyle?: string;
+  uncertain?: string;
+}
+
+export interface VisionEntry extends VisionRecipeSlots {
   id: string; // `vis-${Date.now().toString(36)}`
   /** dataURL (업로드 원본 그대로) 또는 서버 이미지 URL */
   imageRef: string;
   /** "파일명.png · 1024×768" */
   thumbLabel: string;
+  /** 옛 호환: v2 성공 시 summary+positive 합본, 폴백 시 단락. */
   en: string;
+  /** 한글 번역 (실패 시 null). v2 에선 summary 번역. */
   ko: string | null;
   /** ms since epoch */
   createdAt: number;
@@ -33,7 +51,8 @@ export interface VisionEntry {
   height: number;
 }
 
-interface VisionResult {
+/** lastResult — 현재 화면 결과 (entry 와 동일 9 슬롯 + en/ko). */
+interface VisionResult extends VisionRecipeSlots {
   en: string;
   ko: string | null;
 }
@@ -59,7 +78,8 @@ export interface VisionState {
   ) => void;
   clearSource: () => void;
   setRunning: (v: boolean) => void;
-  setResult: (en: string, ko: string | null) => void;
+  /** v2 통합 — en/ko + 9 슬롯 동시 set. 옛 호출 호환 위해 slots 옵셔널. */
+  setResult: (en: string, ko: string | null, slots?: VisionRecipeSlots) => void;
   addEntry: (entry: VisionEntry) => void;
   removeEntry: (id: string) => void;
   clearEntries: () => void;
@@ -100,7 +120,8 @@ export const useVisionStore = create<VisionState>()(
 
       setRunning: (v) => set({ running: v }),
 
-      setResult: (en, ko) => set({ lastResult: { en, ko } }),
+      setResult: (en, ko, slots) =>
+        set({ lastResult: { en, ko, ...(slots ?? {}) } }),
 
       addEntry: (entry) =>
         set((s) => {
@@ -121,12 +142,25 @@ export const useVisionStore = create<VisionState>()(
       loadEntry: (id) => {
         const entry = get().entries.find((x) => x.id === id);
         if (!entry) return;
+        // entry 의 v2 9 슬롯도 lastResult 로 복원 (옛 v1 entry 는 슬롯이 undefined)
         set({
           currentImage: entry.imageRef,
           currentLabel: entry.thumbLabel,
           currentWidth: entry.width || null,
           currentHeight: entry.height || null,
-          lastResult: { en: entry.en, ko: entry.ko },
+          lastResult: {
+            en: entry.en,
+            ko: entry.ko,
+            summary: entry.summary,
+            positivePrompt: entry.positivePrompt,
+            negativePrompt: entry.negativePrompt,
+            composition: entry.composition,
+            subject: entry.subject,
+            clothingOrMaterials: entry.clothingOrMaterials,
+            environment: entry.environment,
+            lightingCameraStyle: entry.lightingCameraStyle,
+            uncertain: entry.uncertain,
+          },
         });
       },
     }),

@@ -69,6 +69,28 @@ start.bat 실행 시 콘솔 1개만 보이고 나머지 모두 숨김. ComfyUI E
 **2026-04-25 Generate Lightning 8/1.5 튜닝** — HEAD `e6547be` + `91348bb`.
 Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 · 6/1.2 · 8/1.5) 결과 8/1.5 채택 (머리카락 결 / 얼굴 표정 / 니트 텍스처 / 손가락 / 배경 디테일 모두 뚜렷, color over-saturation 없음). 시간 ~2배 (예: 8s → 16s). **백엔드 + 프론트 둘 다 변경 필수**: `backend/studio/presets.py::GENERATE_MODEL.lightning` + `frontend/lib/model-presets.ts::GENERATE_MODEL.lightning` 동기화 (CLAUDE.md "프리셋 정의: 동기화 필수" 규칙 — 첫 시도 때 백엔드만 바꿔서 메타 반영 안 되는 문제 겪음). Edit Lightning 은 4/1.0 그대로 (Edit 결과 만족 상태).
 
+**2026-04-26 헤더 통합 + Vision Recipe v2.1 + 안정성 강화** — pytest 162 · vitest 23 · lint+tsc clean.
+- **AppHeader (통합 헤더)**: 6 페이지 TopBar 패턴 → `<AppHeader />` 한 줄. `usePathname()` 자동 분기 (메인 / 메뉴). BackBtn → home 아이콘 (icon-only · tooltip "메인으로"). `frontend/components/chrome/AppHeader.tsx` 신설.
+- **SystemMetrics (4-bar 자원 사용률)**: CPU/GPU/VRAM/RAM 헤더 우측 상시 표시. macOS Activity Monitor 색상 매핑 (CPU 빨 / GPU 초 / VRAM 보 / RAM 파). 평소 막대만 → hover 시 살짝 튕기듯 (CSS class 토글 패턴 · `globals.css` 의 `.ais-metrics:hover` selector + delay 시퀀스). `frontend/components/chrome/SystemMetrics.tsx` 신설. 사용량 표기: `78.1` 굵게 / `/96G` 옅게 (시각 위계).
+- **SystemStatusChip (ComfyUI 가동 표시)**: `useProcessStore.comfyui` 구독. stopped → 🔵 점멸 + "ComfyUI 준비 중…" 상시. running 전환 → 🟢 "준비 완료" 2초 후 fade out. `frontend/components/chrome/SystemStatusChip.tsx` 신설.
+- **VramBadge 그래픽화**: 텍스트 → 미니 bar (38×5px) + 사용량(`11.4G`) + 사용률 임계 amber 색.
+- **메인 풋터 (카피라이트)**: 하단 스트립 (VramBadge + 최근 생성 + 설정 안내) 제거 → 멋스러운 풋터 (제품명 대문자 letter-spacing + © 2026 · v1.2.4 · N generations + 빌드 스택).
+- **메인 다이어트**: padding/heading/footer 합산 ~80px 절약 (1154px viewport 풋터 fully 가시).
+- **HistoryGallery 가로 흐름 + height-aware Masonry**: CSS columns (세로 우선) → JS column 분배 (가로 우선). 누적 height 가장 짧은 컬럼에 다음 item greedy 추가 → 진짜 Masonry wall 효과. /generate /edit /video 의 갤러리 박스 `maxHeight: 55vh + overflowY:auto` 제거 → 자연 페이지 스크롤 (날짜 섹션 접기 + 가로 흐름이 정보 밀도 관리).
+- **Backend system_metrics 모듈 신설**: `backend/studio/system_metrics.py` (psutil + nvidia-smi 병렬 측정 · CPU/RAM/GPU%/VRAM 통합). `/process/status` 응답 확장: `comfyui.{vram_used_gb, vram_total_gb, gpu_percent}` + `system.{cpu_percent, ram_used_gb, ram_total_gb}`. 옛 `used_gb/total_gb` 필드명 → 신 `vram_used_gb/vram_total_gb` 명시. `psutil 7.2.2` 추가 의존성.
+- **ComfyUI timeout 대폭 확장**: idle 600→1200s, hard 1800→7200s. 16GB VRAM 풀 퀄리티 (40 step) + swap 케이스 (51분+) 안전 회수. Video 는 그대로 (idle 900 / hard 3600).
+- **Vision Recipe v2.1**: SYSTEM_VISION_DETAILED → SYSTEM_VISION_RECIPE_V2 (Codex+Claude 공동 spec). user message `"Describe this image."` → `"Source image attached. Aspect: WxH (label). Produce the recreation recipe..."`. 응답: 9 슬롯 STRICT JSON (`summary` / `positive_prompt` / `negative_prompt` / `composition` / `subject` / `clothing_or_materials` / `environment` / `lighting_camera_style` / `uncertain`). JSON 파싱 실패 시 옛 `SYSTEM_VISION_DETAILED` 폴백 (단락 형태). `_aspect_label()` 헬퍼 (1024×1024 → "1:1 square" 등 근사 매핑).
+  - **POSITIVE self-containment 강제**: 모든 슬롯 정보 (lens / palette / lighting setup / framing) 흡수 — 사용자가 POSITIVE 만 복붙해도 정보 손실 0
+  - **t2i 친화 톤**: comma-style + 자연어 짧은 문장 혼합 (descriptive paragraph 톤 회피)
+  - **Multi-subject 풀 핸들링**: side-by-side / collage / group 등 layout-aware 분석. summary 에 layout 명시 + composition 1급 디테일 + subject numbered list (1) left.. 2) right..) + positive_prompt 도 layout-aware
+  - **광역 race 허용**: East Asian / Caucasian / African·Black / South Asian / Hispanic / Middle Eastern 라벨 OK (사용자 결정). 정확 nationality (Korean/Japanese/Chinese) 는 strong cues 시만, 그 외 `uncertain` 처리. 정확 나이 / 이름은 항상 `uncertain`.
+  - **풍부한 결과**: positive_prompt 80-200 → 150-300 word (comprehensive · prioritize completeness)
+- **VisionResultCard 풀 9 슬롯 UI**: Summary 카드 (한/영 토글) / PromptToggleCard (통합·분리 토글, 한 카드 안 모드 분기 · 시각 위계 안정) / 디테일 6 슬롯 그리드 (구도·피사체·의상·환경·조명·불확실).
+  - **PROMPT 토글**: 통합 = A1111 표준 (`positive\n\nNegative prompt: negative` · 외부 SD WebUI/Forge/ComfyUI A1111 노드 호환) / 분리 = hairline 으로 구분된 두 섹션 (자체 헤더 + 복사 버튼)
+  - **옛 v1 row 자동 폴백**: `positivePrompt` 비면 옛 영/한 탭 단락 카드 표시 (사용자 인지 비용 0)
+- **types/store 확장**: `VisionRecipeV2` interface + `VisionAnalysisResponse extends VisionRecipeV2`. `useVisionStore` 의 `VisionEntry` + `VisionResult` 9 슬롯 옵셔널 필드. `useVisionPipeline` 응답 매핑. `useProcessStore` 에 cpu/ram/gpu 필드 + `applyStatus({ollama, comfyui, vram, ram, gpuPercent, cpuPercent})` 시그니처 변경.
+- **테스트**: pytest 159→162 (`_aspect_label` / vision recipe v2 happy path / JSON parse 실패 폴백 3 케이스 추가).
+
 ## Architecture (신규 · 재설계 후)
 - frontend/: Next.js 16, App Router, React 19, TypeScript strict, Tailwind v4, Zustand 5
 - backend/: FastAPI, Python 3.13, httpx + websockets + aiosqlite + pydantic-settings

@@ -9,16 +9,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import {
-  BackBtn,
-  IconBtn,
-  Logo,
-  ModelBadge,
-  TopBar,
-} from "@/components/chrome/Chrome";
-import SettingsButton from "@/components/settings/SettingsButton";
-import VramBadge from "@/components/chrome/VramBadge";
+import { IconBtn } from "@/components/chrome/Chrome";
+import AppHeader from "@/components/chrome/AppHeader";
 import BeforeAfterSlider from "@/components/studio/BeforeAfterSlider";
 import ComparisonAnalysisCard from "@/components/studio/ComparisonAnalysisCard";
 import ComparisonAnalysisModal from "@/components/studio/ComparisonAnalysisModal";
@@ -42,10 +34,8 @@ import {
   StudioRightPanel,
   StudioWorkspace,
 } from "@/components/studio/StudioLayout";
-import { useProcessStore } from "@/stores/useProcessStore";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
-import { EDIT_MODEL } from "@/lib/model-presets";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
 import { useEditPipeline } from "@/hooks/useEditPipeline";
 import { useEditStore } from "@/stores/useEditStore";
@@ -54,8 +44,6 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 
 export default function EditPage() {
-  const router = useRouter();
-
   /* ── store ── */
   const sourceImage = useEditStore((s) => s.sourceImage);
   const sourceLabel = useEditStore((s) => s.sourceLabel);
@@ -71,7 +59,6 @@ export default function EditPage() {
   const setCompareX = useEditStore((s) => s.setCompareX);
 
   const lightningByDefault = useSettingsStore((s) => s.lightningByDefault);
-  const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
   const items = useHistoryStore((s) => s.items);
   // history.add 는 useEditPipeline 내부에서 호출됨 (여기 직접 사용 안 함)
@@ -241,27 +228,7 @@ export default function EditPage() {
             : undefined
         }
       />
-      <TopBar
-        left={
-          <>
-            <BackBtn onClick={() => router.push("/")} />
-            <Logo />
-          </>
-        }
-        center={
-          <ModelBadge
-            name={EDIT_MODEL.displayName}
-            tag={EDIT_MODEL.tag}
-            status={comfyuiStatus === "running" ? "ready" : "loading"}
-          />
-        }
-        right={
-          <>
-            <VramBadge />
-            <SettingsButton />
-          </>
-        }
-      />
+      <AppHeader />
 
       <StudioWorkspace>
         {/* ── LEFT column ── */}
@@ -652,15 +619,8 @@ export default function EditPage() {
             }
           />
 
-          {/* 갤러리 스크롤 박스 — 자체 스크롤로 상단 비교뷰 고정 */}
-          <div
-            style={{
-              maxHeight: "55vh",
-              overflowY: "auto",
-              paddingRight: 4,
-            }}
-          >
-            <HistoryGallery
+          {/* 갤러리 — 자연 페이지 스크롤 (2026-04-26 maxHeight 박스 제거) */}
+          <HistoryGallery
               items={editResults}
               gridCols={gridCols}
               selectedId={afterId}
@@ -701,7 +661,6 @@ export default function EditPage() {
               }}
               emptyMessage="아직 수정 결과가 없습니다. 왼쪽에서 이미지를 업로드하고 [수정 생성]을 눌러주세요."
             />
-          </div>
         </StudioRightPanel>
       </StudioWorkspace>
     </StudioPage>

@@ -49,11 +49,14 @@ function ProcessStatusPoller() {
     const tick = async () => {
       const snapshot = await fetchProcessStatus();
       if (cancelled || !snapshot) return;
-      applyStatus(
-        snapshot.ollamaRunning ? "running" : "stopped",
-        snapshot.comfyuiRunning ? "running" : "stopped",
-        snapshot.vram,
-      );
+      applyStatus({
+        ollama: snapshot.ollamaRunning ? "running" : "stopped",
+        comfyui: snapshot.comfyuiRunning ? "running" : "stopped",
+        vram: snapshot.vram,
+        ram: snapshot.ram,
+        gpuPercent: snapshot.gpuPercent,
+        cpuPercent: snapshot.cpuPercent,
+      });
     };
 
     // 진입 즉시 1회 + 5초 주기

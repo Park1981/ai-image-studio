@@ -106,5 +106,19 @@ async function mockAnalyze(
     width: 1024,
     height: 1024,
     sizeBytes: 482_000,
+    // ── Vision Recipe v2 9 슬롯 (Mock 더미) ──
+    summary:
+      "An editorial portrait of a contemplative figure lit by soft north window light.",
+    positivePrompt:
+      "Editorial portrait of a young figure facing slightly away from camera, soft north window light pooling on left cheek, 35mm f/1.4 shallow depth of field with creamy bokeh, balanced rule-of-thirds framing, neutral warm palette of ochre and muted terracotta, fine retained skin texture with subtle 35mm film grain, matte film stock look, quiet contemplative studio setting, cinematic photography, ultra detailed.",
+    negativePrompt:
+      "extra fingers, deformed hands, blurry, lowres, watermark, text artifacts, oversaturated, plastic skin",
+    composition: "Medium close-up, rule of thirds, subject centered slightly left.",
+    subject: "Young figure, neutral expression, head turned slightly away.",
+    clothingOrMaterials: "Soft wool knit, matte finish, muted ochre tone.",
+    environment: "Clean indoor studio, neutral wall, soft window light from left.",
+    lightingCameraStyle:
+      "North window soft key from left, no fill, 35mm f/1.4, shallow DOF, matte film grading.",
+    uncertain: "Exact age, ethnicity, location.",
   };
 }

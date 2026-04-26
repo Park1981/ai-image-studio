@@ -186,6 +186,102 @@ async def test_vision_analyze_route_happy_path() -> None:
     assert data["sizeBytes"] > 0
 
 
+# ───────── Vision Recipe v2 (2026-04-26 spec 18) ─────────
+
+
+def test_aspect_label_common_ratios() -> None:
+    """_aspect_label — 권장 비율들이 사람 친화 라벨로 매핑."""
+    from studio.vision_pipeline import _aspect_label
+
+    assert _aspect_label(1024, 1024) == "1:1 square"
+    assert _aspect_label(1664, 928) == "16:9 widescreen"  # GCD=104
+    assert _aspect_label(928, 1664) == "9:16 vertical"
+    assert _aspect_label(1472, 1104) == "4:3 standard"
+    assert _aspect_label(1584, 1056) == "3:2 landscape"
+    # 비표준 비율은 custom 라벨
+    assert _aspect_label(1000, 333).endswith("custom")
+    # 0/음수 방어
+    assert _aspect_label(0, 0) == "unknown aspect"
+
+
+def test_vision_v2_json_path_populates_slots() -> None:
+    """v2 JSON 경로 — 정상 응답 시 9 슬롯 모두 채워지고 fallback=False."""
+    fake_json = (
+        '{"summary":"A studio portrait.","positive_prompt":"editorial portrait, '
+        'subject-first, soft key, 85mm","negative_prompt":"blurry, watermark",'
+        '"composition":"medium shot, centered","subject":"woman, neutral pose",'
+        '"clothing_or_materials":"wool coat, matte texture",'
+        '"environment":"plain studio backdrop","lighting_camera_style":'
+        '"softbox key from left, 85mm f/1.8","uncertain":"exact age"}'
+    )
+    recipe_mock = AsyncMock(return_value=fake_json)
+    translate_mock = AsyncMock(return_value="스튜디오 초상.")
+    with (
+        patch(
+            "studio.vision_pipeline._call_vision_recipe_v2",
+            new=recipe_mock,
+        ),
+        patch(
+            "studio.vision_pipeline.translate_to_korean",
+            new=translate_mock,
+        ),
+    ):
+        result = asyncio.run(
+            analyze_image_detailed(_tiny_png_bytes(), width=1024, height=1024)
+        )
+
+    assert result.fallback is False
+    assert result.provider == "ollama"
+    assert result.summary == "A studio portrait."
+    assert "85mm" in result.positive_prompt
+    assert "blurry" in result.negative_prompt
+    assert result.composition == "medium shot, centered"
+    assert result.subject == "woman, neutral pose"
+    assert result.environment.startswith("plain studio")
+    assert result.uncertain == "exact age"
+    # en 은 summary + positive_prompt 합본
+    assert "studio portrait" in result.en.lower()
+    assert "85mm" in result.en
+    # ko 는 summary 번역
+    assert "스튜디오" in (result.ko or "")
+
+
+def test_vision_v2_parse_failure_falls_back_to_paragraph() -> None:
+    """v2 JSON 파싱 실패 → 옛 SYSTEM_VISION_DETAILED 폴백 경로 진입.
+
+    9 슬롯 모두 빈 문자열 + en/ko 단락만 채워짐.
+    """
+    recipe_mock = AsyncMock(return_value="not a json {{{ broken")
+    describe_mock = AsyncMock(return_value="A warm photo at dusk.")
+    translate_mock = AsyncMock(return_value="황혼 사진.")
+    with (
+        patch(
+            "studio.vision_pipeline._call_vision_recipe_v2",
+            new=recipe_mock,
+        ),
+        patch(
+            "studio.vision_pipeline._describe_image",
+            new=describe_mock,
+        ),
+        patch(
+            "studio.vision_pipeline.translate_to_korean",
+            new=translate_mock,
+        ),
+    ):
+        result = asyncio.run(analyze_image_detailed(_tiny_png_bytes()))
+
+    assert result.fallback is False
+    assert result.provider == "ollama"
+    assert "warm photo" in result.en
+    assert "황혼" in (result.ko or "")
+    # 9 슬롯 모두 빈 문자열 (옛 row 와 동일 형태)
+    assert result.summary == ""
+    assert result.positive_prompt == ""
+    assert result.negative_prompt == ""
+    assert result.composition == ""
+    assert result.subject == ""
+
+
 @pytest.mark.asyncio
 async def test_vision_analyze_route_empty_image_400() -> None:
     """빈 파일 400."""

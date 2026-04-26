@@ -7,8 +7,11 @@ import { STUDIO_BASE, USE_MOCK } from "./client";
 import type { OllamaModel, ProcessStatusSnapshot } from "./types";
 
 /**
- * 백엔드 /process/status 폴링 — 프로세스 상태 + VRAM 사용량 원샷 조회.
+ * 백엔드 /process/status 폴링 — 프로세스 상태 + CPU/RAM/GPU%/VRAM 원샷 조회.
  * AppShell 의 ProcessStatusPoller 가 5s 주기로 호출.
+ *
+ * 2026-04-26: 응답 구조 확장 (system_metrics.py + router process_status).
+ * 각 메트릭 누락 시 null 매핑 → 프론트 UI 에서 자동 미표시.
  */
 export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null> {
   if (USE_MOCK) {
@@ -19,16 +22,42 @@ export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null
     if (!res.ok) return null;
     const data = (await res.json()) as {
       ollama?: { running?: boolean };
-      comfyui?: { running?: boolean; used_gb?: number; total_gb?: number };
+      comfyui?: {
+        running?: boolean;
+        vram_used_gb?: number;
+        vram_total_gb?: number;
+        gpu_percent?: number;
+      };
+      system?: {
+        cpu_percent?: number;
+        ram_used_gb?: number;
+        ram_total_gb?: number;
+      };
     };
-    const usedGb = data.comfyui?.used_gb ?? 0;
-    const totalGb = data.comfyui?.total_gb ?? 0;
-    // total_gb=0 은 nvidia-smi 쿼리 실패 → VRAM 숨김
-    const vram = totalGb > 0 ? { usedGb, totalGb } : null;
+
+    // VRAM — total>0 일 때만 유효 (nvidia-smi 미설치 환경 처리)
+    const vUsed = data.comfyui?.vram_used_gb;
+    const vTotal = data.comfyui?.vram_total_gb;
+    const vram =
+      vUsed !== undefined && vTotal !== undefined && vTotal > 0
+        ? { usedGb: vUsed, totalGb: vTotal }
+        : null;
+
+    // RAM — total>0 일 때만 유효 (psutil 실패 시 null)
+    const rUsed = data.system?.ram_used_gb;
+    const rTotal = data.system?.ram_total_gb;
+    const ram =
+      rUsed !== undefined && rTotal !== undefined && rTotal > 0
+        ? { usedGb: rUsed, totalGb: rTotal }
+        : null;
+
     return {
       ollamaRunning: !!data.ollama?.running,
       comfyuiRunning: !!data.comfyui?.running,
       vram,
+      ram,
+      gpuPercent: data.comfyui?.gpu_percent ?? null,
+      cpuPercent: data.system?.cpu_percent ?? null,
     };
   } catch {
     return null;

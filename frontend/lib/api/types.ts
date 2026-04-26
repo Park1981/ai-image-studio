@@ -349,15 +349,30 @@ export interface VramSnapshot {
   totalGb: number;
 }
 
+/** psutil 실패 시 null. RAM total 0 이면 null 처리. */
+export interface RamSnapshot {
+  usedGb: number;
+  totalGb: number;
+}
+
 /**
- * 백엔드 /process/status 폴링 결과 — Ollama/ComfyUI 실행 상태 + VRAM 사용량.
- * Mock 모드에선 현재 상태 유지 가정 (서버 쿼리 없음).
+ * 백엔드 /process/status 폴링 결과 — Ollama/ComfyUI + 통합 자원 메트릭.
+ * 각 메트릭 필드는 측정 실패 시 null (프론트에서 누락 = 미표시).
+ *
+ * 2026-04-26: SystemMetrics (CPU/GPU/VRAM/RAM 4-bar UI) 도입 — vram 단독에서
+ * cpu/gpu/ram 까지 확장.
  */
 export interface ProcessStatusSnapshot {
   ollamaRunning: boolean;
   comfyuiRunning: boolean;
-  /** nvidia-smi 실패 시 null. total_gb=0 이거나 쿼리 실패면 null 반환. */
+  /** nvidia-smi 실패 시 null. */
   vram: VramSnapshot | null;
+  /** psutil 실패 시 null. RAM total 0 이면 null 처리. */
+  ram: RamSnapshot | null;
+  /** nvidia-smi GPU utilization % — 실패 시 null. */
+  gpuPercent: number | null;
+  /** psutil CPU utilization % — 실패 시 null. */
+  cpuPercent: number | null;
 }
 
 /**
@@ -427,10 +442,32 @@ export type VideoStage =
 
 /* ──────────── Vision Analyzer ──────────── */
 
-export interface VisionAnalysisResponse {
-  /** 영문 상세 설명 (40-120 단어 목표). fallback=true 면 빈 문자열. */
+/**
+ * Vision Recipe v2 9 슬롯 (2026-04-26 spec 18 — Codex+Claude 공동).
+ *
+ * 폴백 row (옛 v1 또는 JSON 파싱 실패):
+ *   - 모든 v2 필드가 빈 문자열 → 프론트는 positive_prompt 가 비면 v1 (en/ko) 카드로 폴백.
+ */
+export interface VisionRecipeV2 {
+  /** 사람 읽는 2-3 문장 영문 요약 (한국어 번역은 ko 필드에 들어감). */
+  summary: string;
+  /** t2i 재생성용 80-200 단어 영문 프롬프트 (subject FIRST ordering). */
+  positivePrompt: string;
+  /** 콤마 분리 회피 리스트 — image-specific + 표준 t2i guards. */
+  negativePrompt: string;
+  composition: string;
+  subject: string;
+  clothingOrMaterials: string;
+  environment: string;
+  lightingCameraStyle: string;
+  /** 추정 금지 — 비전이 모르는 영역 명시. */
+  uncertain: string;
+}
+
+export interface VisionAnalysisResponse extends VisionRecipeV2 {
+  /** 옛 호환: v2 성공 시 summary + positive_prompt 합본, 폴백 시 옛 단락. */
   en: string;
-  /** 한글 번역. 번역만 실패해도 en 은 보존되고 ko=null. */
+  /** 한글 번역 — v2 성공 시 summary 번역, 폴백 시 단락 번역. ko=null 은 번역 실패. */
   ko: string | null;
   /** 백엔드: "ollama" | "fallback". Mock 경로: "mock". */
   provider: "ollama" | "fallback" | "mock";
