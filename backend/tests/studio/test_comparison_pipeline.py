@@ -940,7 +940,9 @@ async def test_edit_run_pipeline_forwards_width_height_to_vision() -> None:
     fake_task.emit = AsyncMock(return_value=None)
     fake_task.close = AsyncMock(return_value=None)
 
-    with patch("studio.router.run_vision_pipeline", new=_fake_vision):
+    # task #16 (2026-04-26): _run_edit_pipeline 이 studio.pipelines.edit 로 이동.
+    # 호출 site 가 거기이므로 patch 대상도 동일 모듈로 정정.
+    with patch("studio.pipelines.edit.run_vision_pipeline", new=_fake_vision):
         await _run_edit_pipeline(
             fake_task,
             image_bytes=_tiny_png_bytes(),
@@ -1056,22 +1058,29 @@ async def test_edit_persists_source_to_disk(monkeypatch, tmp_path: Path) -> None
     from httpx import ASGITransport, AsyncClient
 
     from main import app  # type: ignore
-    from studio import history_db, router as studio_router
+    from studio import history_db, storage as studio_storage
+    from studio.pipelines import edit as edit_pipeline
 
     # 임시 STUDIO_OUTPUT_DIR + edit-source 서브디렉토리
+    # task #16 (2026-04-26): 본래 모듈은 studio.storage / studio.pipelines.edit.
+    # router 의 동일 이름은 re-export 인데 monkeypatch 는 lookup 모듈 이름을
+    # 갱신해야 실 코드 경로에 적용됨.
     out_dir = tmp_path / "studio-out"
     out_dir.mkdir(parents=True, exist_ok=True)
     edit_src_dir = out_dir / "edit-source"
     edit_src_dir.mkdir(parents=True, exist_ok=True)
-    monkeypatch.setattr(studio_router, "STUDIO_OUTPUT_DIR", out_dir)
-    monkeypatch.setattr(studio_router, "EDIT_SOURCE_DIR", edit_src_dir)
+    monkeypatch.setattr(studio_storage, "STUDIO_OUTPUT_DIR", out_dir)
+    monkeypatch.setattr(studio_storage, "EDIT_SOURCE_DIR", edit_src_dir)
+    monkeypatch.setattr(edit_pipeline, "EDIT_SOURCE_DIR", edit_src_dir)
 
     # 임시 DB
     _set_temp_db(monkeypatch, tmp_path)
     await history_db.init_studio_history_db()
 
     # ComfyUI 디스패치는 mock-fallback 으로 우회
-    from studio.router import ComfyDispatchResult
+    # task #16 (2026-04-26): ComfyDispatchResult 본래 위치는 studio.pipelines.
+    # router 도 re-export 하지만 동일 클래스 객체 보장 위해 본래 위치에서 import.
+    from studio.pipelines import ComfyDispatchResult
 
     async def fake_dispatch(*args, **kwargs):
         return ComfyDispatchResult(
@@ -1090,8 +1099,10 @@ async def test_edit_persists_source_to_disk(monkeypatch, tmp_path: Path) -> None
     })()
 
     with (
-        patch.object(studio_router, "_dispatch_to_comfy", new=AsyncMock(side_effect=fake_dispatch)),
-        patch.object(studio_router, "run_vision_pipeline", new=AsyncMock(return_value=fake_vision_result)),
+        # task #16 (2026-04-26): _dispatch_to_comfy / run_vision_pipeline 호출 site
+        # 가 studio.pipelines.edit 로 이동 — 거기서 patch 해야 가로챔.
+        patch.object(edit_pipeline, "_dispatch_to_comfy", new=AsyncMock(side_effect=fake_dispatch)),
+        patch.object(edit_pipeline, "run_vision_pipeline", new=AsyncMock(return_value=fake_vision_result)),
     ):
         transport = ASGITransport(app=app)
         async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as cli:
