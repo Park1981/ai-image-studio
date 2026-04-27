@@ -14,7 +14,6 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { IconBtn } from "@/components/chrome/Chrome";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
@@ -57,9 +56,6 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
   const selectedItem = genItems.find((i) => i.id === selectedId);
 
   const [viewerHovered, setViewerHovered] = useState(false);
-  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
-  const cycleGrid = () =>
-    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
   /** 결과/히스토리 공용 — 이 이미지를 /edit 의 원본으로 보내고 라우팅. */
   const sendToEdit = async (it: { id: string; imageRef: string; label: string }) => {
@@ -130,21 +126,10 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
         </StudioEmptyState>
       )}
 
-      <HistorySectionHeader
-        title="생성 히스토리"
-        count={genItems.length}
-        actions={
-          <IconBtn
-            icon="grid"
-            title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
-            onClick={cycleGrid}
-          />
-        }
-      />
+      <HistorySectionHeader title="생성 히스토리" count={genItems.length} />
 
       <HistoryGallery
         items={genItems}
-        gridCols={gridCols}
         selectedId={selectedId ?? null}
         onTileClick={(it) => selectItem(it.id)}
         onTileExpand={(it) => onLightboxOpen(it.imageRef)}

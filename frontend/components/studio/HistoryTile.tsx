@@ -5,6 +5,11 @@
  *  - hover 시 하단 액션 바에 [자세히 · 원본으로? · 삭제] 일렬 노출
  *  - double-click 도 계속 "자세히" 로 동작 (편의 유지)
  *
+ * 2026-04-27 액션바 풀 통일:
+ *  - 자체 BarButton 제거 → ResultHoverActionBar + ActionBarButton 사용
+ *  - 결과 뷰어와 동일한 글래스 pill + spring 통통 인터랙션
+ *  - 호버 시 마운트가 아닌 항상 마운트 + hovered prop 토글 → spring 애니메이션 살림
+ *
  * 삭제는 서버에도 전파 (useHistoryStore.remove + api-client.deleteHistoryItem).
  */
 
@@ -12,7 +17,9 @@
 
 import { useState, type CSSProperties } from "react";
 import ImageTile from "@/components/ui/ImageTile";
-import Icon, { type IconName } from "@/components/ui/Icon";
+import ResultHoverActionBar, {
+  ActionBarButton,
+} from "@/components/studio/ResultHoverActionBar";
 import { deleteHistoryItem } from "@/lib/api/history";
 import type { HistoryItem } from "@/lib/api/types";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -43,63 +50,6 @@ interface Props {
   onSendToEdit?: () => void;
   aspect?: string;
   style?: CSSProperties;
-}
-
-/** hover 바 공통 버튼 — 아이콘 only (좁은 그리드에서 레이아웃 안 깨지게 2026-04-24). */
-function BarButton({
-  icon,
-  title,
-  onClick,
-  variant = "neutral",
-}: {
-  icon: IconName;
-  title: string;
-  onClick: (e: React.MouseEvent) => void;
-  variant?: "neutral" | "primary" | "danger";
-}) {
-  const [hov, setHov] = useState(false);
-  const palette = {
-    neutral: {
-      bg: "rgba(0,0,0,.55)",
-      bgHov: "rgba(0,0,0,.75)",
-    },
-    primary: {
-      bg: "rgba(74,158,255,.88)",
-      bgHov: "rgba(74,158,255,1)",
-    },
-    danger: {
-      bg: "rgba(0,0,0,.55)",
-      bgHov: "rgba(192,57,43,.92)",
-    },
-  }[variant];
-  return (
-    <button
-      type="button"
-      title={title}
-      onClick={onClick}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        all: "unset",
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        // 정사각 원형 아이콘 버튼 — 라벨 제거에 맞춰 padding 도 균일
-        width: 26,
-        height: 26,
-        borderRadius: "var(--radius-full)",
-        color: "#fff",
-        background: hov ? palette.bgHov : palette.bg,
-        backdropFilter: "blur(4px)",
-        border: "1px solid rgba(255,255,255,.18)",
-        transition: "background .15s, transform .15s",
-        transform: hov ? "scale(1.08)" : "scale(1)",
-      }}
-    >
-      <Icon name={icon} size={12} stroke={2.2} />
-    </button>
-  );
 }
 
 export default function HistoryTile({
@@ -162,72 +112,43 @@ export default function HistoryTile({
         }}
       />
 
-      {/* hover 액션 바 — 하단에 그라디언트 + 버튼 일렬 */}
-      {hover && (
-        <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: "22px 8px 8px",
-            background:
-              "linear-gradient(to top, rgba(0,0,0,.55) 0%, transparent 100%)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 6,
-            pointerEvents: "none", // 버튼만 클릭, 그라디언트는 통과
-          }}
-        >
-          <div
-            style={{
-              display: "inline-flex",
-              gap: 6,
-              pointerEvents: "auto",
-            }}
-          >
-            {triggerExpand && (
-              <BarButton
-                icon="zoom-in"
-                title="라이트박스에서 크게 보기"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  // 라이트박스 메타 패널이 "현재 선택된 아이템" 기준이므로
-                  // 이 타일을 먼저 선택 → 그 뒤 확장. 아니면 이전 선택의 메타가 보임.
-                  onClick();
-                  triggerExpand();
-                }}
-              />
-            )}
-            {onUseAsSource && (
-              <BarButton
-                icon="edit"
-                title="이 이미지를 수정 원본으로"
-                variant="primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onUseAsSource();
-                }}
-              />
-            )}
-            {onSendToEdit && (
-              <BarButton
-                icon="edit"
-                title="수정으로 이동"
-                variant="primary"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSendToEdit();
-                }}
-              />
-            )}
-          </div>
-          <div style={{ pointerEvents: "auto" }}>
-            <BarButton icon="x" title="삭제" variant="danger" onClick={handleDelete} />
-          </div>
-        </div>
-      )}
+      {/* 결과 뷰어와 동일한 글래스 pill — 호버 시 통통 등장 */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <ResultHoverActionBar hovered={hover}>
+          {triggerExpand && (
+            <ActionBarButton
+              icon="zoom-in"
+              title="라이트박스에서 크게 보기"
+              onClick={() => {
+                // 라이트박스 메타 패널이 "현재 선택된 아이템" 기준이므로
+                // 이 타일을 먼저 선택 → 그 뒤 확장. 아니면 이전 선택의 메타가 보임.
+                onClick();
+                triggerExpand();
+              }}
+            />
+          )}
+          {onUseAsSource && (
+            <ActionBarButton
+              icon="edit"
+              title="이 이미지를 수정 원본으로"
+              onClick={onUseAsSource}
+            />
+          )}
+          {onSendToEdit && (
+            <ActionBarButton
+              icon="edit"
+              title="수정으로 이동"
+              onClick={onSendToEdit}
+            />
+          )}
+          <ActionBarButton
+            icon="x"
+            title="삭제"
+            variant="danger"
+            onClick={handleDelete}
+          />
+        </ResultHoverActionBar>
+      </div>
     </div>
   );
 }

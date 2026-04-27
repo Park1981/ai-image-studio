@@ -96,6 +96,13 @@ body {
   color: var(--ink);
 }
 
+/* 스크롤바 자리 항상 reserve — 페이지 길이 변동 시 viewport 폭이 흔들리지 않게.
+ * 2026-04-27 오빠 피드백: 히스토리 섹션 펼치면 폭 ~10px 변동 (스크롤바 등장).
+ * scrollbar-gutter: stable 로 ResizeObserver 가 측정하는 폭이 일정 → 컬럼 안정. */
+html {
+  scrollbar-gutter: stable;
+}
+
 body {
   font-family:
     "Pretendard Variable", Pretendard, "Noto Sans KR",
@@ -312,13 +319,15 @@ button {
  *  - top: 64px = AppHeader(52px) + 12px gap.
  *  - StudioModeHeader 직후에 배치 → 폼 길어지면 sticky 로 따라옴.
  *  - 그라디언트는 카드 아래쪽이 fade out → 그 아래 콘텐츠가 자연스럽게 카드 뒤로 스크롤.
+ *  - z-index 20: PromptHistoryPeek 의 zIndex 5 보다 위 — 시계 아이콘이 CTA 위로 비집고 나오지 않도록.
+ *  - background var(--bg) 25% 까지 진하게 → 뒤로 스크롤되는 텍스트가 깔끔히 가려짐.
  */
 .ais-cta-sticky-top {
   position: sticky;
   top: 64px;
   padding-bottom: 12px;
-  z-index: 4;
-  background: linear-gradient(to top, transparent, var(--bg) 35%);
+  z-index: 20;
+  background: linear-gradient(to top, transparent, var(--bg) 25%);
 }
 .ais-cta-primary {
   all: unset;

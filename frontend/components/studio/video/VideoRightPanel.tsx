@@ -14,8 +14,6 @@
 
 "use client";
 
-import { useState } from "react";
-import { IconBtn } from "@/components/chrome/Chrome";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
@@ -36,10 +34,6 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
   const { running, pipelineLabel } = useVideoRunning();
   const items = useHistoryStore((s) => s.items);
   const videoResults = items.filter((x) => x.mode === "video");
-
-  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
-  const cycleGrid = () =>
-    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
   /** 현재 재생할 mp4: lastVideoRef (세션) — 진입 시 빈 상태 (히스토리 fallback 제거) */
   const playingRef = lastVideoRef ?? null;
@@ -68,21 +62,10 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
         }
       />
 
-      <HistorySectionHeader
-        title="영상 히스토리"
-        count={videoResults.length}
-        actions={
-          <IconBtn
-            icon="grid"
-            title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
-            onClick={cycleGrid}
-          />
-        }
-      />
+      <HistorySectionHeader title="영상 히스토리" count={videoResults.length} />
 
       <HistoryGallery
         items={videoResults}
-        gridCols={gridCols}
         // selectedId 는 HistoryItem.id 기준 — playingRef(imageRef) 로 선택 표시.
         selectedId={
           videoResults.find((v) => v.imageRef === playingRef)?.id ?? null

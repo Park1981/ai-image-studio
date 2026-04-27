@@ -65,17 +65,19 @@ export default function ResultHoverActionBar({ hovered, summary, children }: Pro
         alignItems: "center",
         justifyContent: summary ? "space-between" : "center",
         gap: 12,
+        // 2026-04-27 오빠 피드백: opacity transition 제거.
+        //  Chrome 렌더링 이슈 — opacity 0→1 transition 중 backdrop-filter 가 점진 적용되며
+        //  처음 ~150ms 는 frosted 효과 없이 탁한 회색 배경으로 보이다가 transition 끝난 뒤에야
+        //  진짜 frosted glass 효과 활성. 두 단계로 "탁함 → 유리" 변동으로 인지됨.
+        //  → opacity 는 instant 토글, transform spring 만 transition → backdrop-filter 처음부터 활성.
         opacity: visible ? 1 : 0,
-        // 통통 튀는 spring (back-out): 약간 작아진 상태(0.92)에서 normal scale 로 + 아래에서 위로
         transform: visible
           ? "translateY(0) scale(1)"
           : "translateY(14px) scale(0.92)",
-        // pointer-events 차단 → 숨겨진 상태에서 이미지 클릭/드래그 방해 X
         pointerEvents: visible ? "auto" : "none",
-        // 등장: 240ms 백아웃 (overshoot 살짝) · 사라짐: 160ms ease-out
         transition: visible
-          ? "opacity .22s ease-out, transform .26s cubic-bezier(0.34, 1.56, 0.64, 1)"
-          : "opacity .14s ease-out, transform .18s ease-out",
+          ? "transform .26s cubic-bezier(0.34, 1.56, 0.64, 1)"
+          : "transform .18s ease-out",
         color: "#fff",
       }}
     >
@@ -88,32 +90,36 @@ export default function ResultHoverActionBar({ hovered, summary, children }: Pro
             lineHeight: 1.4,
             color: "rgba(255,255,255,.92)",
             overflow: "hidden",
-            // 요약도 글래스 pill 안으로 들어갈 수 있게 padding
+            // frosted glass — 요약 pill (2026-04-27 강화: blur 18 + saturate · 더 투명)
             padding: "8px 12px",
-            background: "rgba(20,22,28,.62)",
-            backdropFilter: "blur(10px)",
-            WebkitBackdropFilter: "blur(10px)",
+            background: "rgba(28,30,38,.32)",
+            backdropFilter: "blur(18px) saturate(180%)",
+            WebkitBackdropFilter: "blur(18px) saturate(180%)",
             borderRadius: "var(--radius-full)",
-            border: "1px solid rgba(255,255,255,.14)",
+            border: "1px solid rgba(255,255,255,.18)",
+            boxShadow: "inset 0 1px 0 rgba(255,255,255,.08)",
           }}
         >
           {summary}
         </div>
       )}
-      {/* 버튼 그룹 = 글래스 pill — 부유감 강조 */}
+      {/* 버튼 그룹 = frosted glass pill — 부유감 + 유리 강조 */}
       <div
         style={{
           display: "flex",
           gap: 4,
           flexShrink: 0,
           padding: 4,
-          background: "rgba(20,22,28,.62)",
-          backdropFilter: "blur(10px)",
-          WebkitBackdropFilter: "blur(10px)",
+          // 2026-04-27 글래스 강화: background 더 투명 (.62 → .32) + blur 18 + saturate 180%
+          // → 진짜 frosted glass 느낌 (Apple/iOS 스타일)
+          background: "rgba(28,30,38,.32)",
+          backdropFilter: "blur(18px) saturate(180%)",
+          WebkitBackdropFilter: "blur(18px) saturate(180%)",
           borderRadius: "var(--radius-full)",
-          border: "1px solid rgba(255,255,255,.14)",
+          // edge highlight — 유리 가장자리 광 효과
+          border: "1px solid rgba(255,255,255,.22)",
           boxShadow:
-            "0 8px 24px rgba(0,0,0,.32), 0 2px 6px rgba(0,0,0,.18)",
+            "0 8px 28px rgba(0,0,0,.28), 0 2px 6px rgba(0,0,0,.14), inset 0 1px 0 rgba(255,255,255,.12)",
         }}
       >
         {children}
@@ -146,14 +152,18 @@ export function ActionBarButton({
   const [hov, setHov] = useState(false);
   // focus-visible 만 추적 (마우스 클릭 시는 표시 안 함 — 키보드 사용자 전용 outline).
   const [focusVisible, setFocusVisible] = useState(false);
+  // 2026-04-27 오빠 피드백: 모든 variant 평소 transparent → 일관성 ↑ + 호버 진입 시 깜빡임 차단.
+  // 이전: primary 만 평소 .78 파란색이 미리 들어가 있어 (1) 다른 버튼과 통일감 깨짐
+  //       (2) 등장 transition 과 ActionBarButton 자체 hover transition 이 동시 진행되며
+  //       0.1~0.2초 동안 두 색이 겹쳐 보이는 깜빡임 발생. 평소 transparent 로 두면 해결.
   const palette = {
     neutral: {
       bg: "transparent",
       bgHov: "rgba(255,255,255,.16)",
     },
     primary: {
-      bg: "rgba(74,158,255,.78)",
-      bgHov: "rgba(74,158,255,1)",
+      bg: "transparent",
+      bgHov: "rgba(74,158,255,.85)",
     },
     danger: {
       bg: "transparent",

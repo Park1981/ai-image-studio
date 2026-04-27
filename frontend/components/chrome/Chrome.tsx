@@ -93,7 +93,9 @@ export function TopBar({
         alignItems: "center",
         position: "sticky",
         top: 0,
-        zIndex: 5,
+        // z-index 위계 (2026-04-27 오빠 피드백): 헤더 30 > sticky CTA 20 > PromptHistoryPeek 5
+        // → 헤더는 항상 viewport 가장 위 (시계 아이콘 / 잘린 텍스트 비집고 못 올라옴)
+        zIndex: 30,
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>{left}</div>

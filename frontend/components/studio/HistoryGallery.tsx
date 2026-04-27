@@ -10,6 +10,11 @@
  *  - 가장 최신 섹션 1개만 기본 펼침 (오늘 없으면 어제가 자동 펼침)
  *  - /generate, /edit, /video 3 페이지 공용
  *
+ * 2026-04-27 풀 자동 반응형:
+ *  - gridCols prop 제거 → ResizeObserver 로 컨테이너 폭 측정 → 자동 컬럼 계산
+ *  - 최소 타일 폭 ~180px 기준, 2~6 컬럼 cap (4K 까지 실용)
+ *  - 사용자 토글 제거 (자세히 보기 라이트박스로 큰 이미지 확인 가능)
+ *
  * 디자인 의도:
  *  - 균일 정사각 그리드는 비율 다양한 이미지(세로/가로/영상)에 부자연스러운 여백을 만듦.
  *    Masonry 는 여백 없이 원본 비율 유지 → 갤러리 느낌.
@@ -18,7 +23,13 @@
 
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import type { HistoryItem } from "@/lib/api/types";
 import { groupByDate, isClosedSection } from "@/lib/date-sections";
 import HistoryTile from "./HistoryTile";
@@ -27,7 +38,6 @@ import SectionHeader from "./SectionHeader";
 interface Props {
   /** 호출부에서 mode 로 이미 필터링된 리스트 */
   items: HistoryItem[];
-  gridCols: 2 | 3 | 4;
   selectedId: string | null;
 
   onTileClick: (it: HistoryItem) => void;
@@ -43,9 +53,24 @@ interface Props {
   emptyMessage?: ReactNode;
 }
 
+/**
+ * 컨테이너 폭 → 컬럼 수 매핑.
+ *  - 최소 타일 폭 240px + gap 12px 기준 (2026-04-27 오빠 피드백 — 더 큰 thumbnail)
+ *  - 2~6 컬럼 cap (4K 모니터에서도 thumbnail 식별 가능 영역)
+ */
+const MIN_TILE_WIDTH = 240;
+const TILE_GAP = 12;
+const MIN_COLS = 2;
+const MAX_COLS = 6;
+
+function computeAutoCols(width: number): number {
+  if (width <= 0) return 3; // 측정 전 기본값
+  const cols = Math.floor((width + TILE_GAP) / (MIN_TILE_WIDTH + TILE_GAP));
+  return Math.max(MIN_COLS, Math.min(MAX_COLS, cols));
+}
+
 export default function HistoryGallery({
   items,
-  gridCols,
   selectedId,
   onTileClick,
   onTileExpand,
@@ -75,10 +100,31 @@ export default function HistoryGallery({
     });
   };
 
+  /* ── 자동 컬럼 측정 (ResizeObserver) ── */
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [autoCols, setAutoCols] = useState(3);
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    // 초기값 한 번 즉시 측정 (ResizeObserver 첫 콜백 전 깜빡임 방지)
+    setAutoCols(computeAutoCols(el.getBoundingClientRect().width));
+    const ro = new ResizeObserver((entries) => {
+      const w = entries[0]?.contentRect.width ?? 0;
+      setAutoCols((prev) => {
+        const next = computeAutoCols(w);
+        return next === prev ? prev : next; // 같은 값이면 setState skip
+      });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
   if (items.length === 0) {
     if (typeof emptyMessage === "string") {
       return (
         <div
+          ref={containerRef}
           style={{
             padding: "28px 20px",
             background: "var(--surface)",
@@ -93,11 +139,12 @@ export default function HistoryGallery({
         </div>
       );
     }
-    return <>{emptyMessage}</>;
+    return <div ref={containerRef}>{emptyMessage}</div>;
   }
 
   return (
     <div
+      ref={containerRef}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -121,7 +168,7 @@ export default function HistoryGallery({
             {!closed && (
               <MasonryRow
                 items={s.items}
-                gridCols={gridCols}
+                gridCols={autoCols}
                 selectedId={selectedId}
                 onTileClick={onTileClick}
                 onTileExpand={onTileExpand}
@@ -157,7 +204,7 @@ function MasonryRow({
   onAfterDelete,
 }: {
   items: HistoryItem[];
-  gridCols: 2 | 3 | 4;
+  gridCols: number;
   selectedId: string | null;
   onTileClick: (it: HistoryItem) => void;
   onTileExpand: (it: HistoryItem) => void;
@@ -189,7 +236,7 @@ function MasonryRow({
     <div
       style={{
         display: "flex",
-        gap: 12,
+        gap: TILE_GAP,
         marginTop: 10,
         alignItems: "flex-start",
       }}
@@ -201,7 +248,7 @@ function MasonryRow({
             flex: 1,
             display: "flex",
             flexDirection: "column",
-            gap: 12,
+            gap: TILE_GAP,
             // 좁은 컬럼에서 타일 내부 텍스트 ellipsis 보장
             minWidth: 0,
           }}

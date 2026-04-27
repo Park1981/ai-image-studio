@@ -16,7 +16,6 @@
 "use client";
 
 import { useState } from "react";
-import { IconBtn } from "@/components/chrome/Chrome";
 import ComparisonAnalysisCard from "@/components/studio/ComparisonAnalysisCard";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
@@ -60,9 +59,6 @@ export default function EditRightPanel({
   const { analyze, isBusy } = useComparisonAnalysis();
 
   const [viewerHovered, setViewerHovered] = useState(false);
-  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
-  const cycleGrid = () =>
-    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
   /** 짝 일치 조건 — Before/After 슬라이더는 진짜 한 쌍만 표시 */
   const pairMatched =
@@ -109,21 +105,10 @@ export default function EditRightPanel({
       )}
 
       {/* ── 히스토리 ── */}
-      <HistorySectionHeader
-        title="수정 히스토리"
-        count={editResults.length}
-        actions={
-          <IconBtn
-            icon="grid"
-            title={`그리드 (${gridCols} 컬럼 · 클릭으로 변경)`}
-            onClick={cycleGrid}
-          />
-        }
-      />
+      <HistorySectionHeader title="수정 히스토리" count={editResults.length} />
 
       <HistoryGallery
         items={editResults}
-        gridCols={gridCols}
         selectedId={afterId}
         onTileClick={(it) => {
           // 히스토리 타일 클릭 = "이 수정 다시 보기"
