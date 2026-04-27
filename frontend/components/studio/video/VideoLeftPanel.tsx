@@ -170,19 +170,19 @@ export default function VideoLeftPanel({
         </div>
       </div>
 
-      {/* AI 프롬프트 보정 우회 토글 (2026-04-27):
-       *  Generate 와 동일 패턴 — Vision + gemma4 단계 모두 skip.
-       *  ON 시 백엔드는 prompt 를 그대로 LTX-2.3 프롬프트로 사용 (영문 권장).
+      {/* AI 프롬프트 보정 토글 (2026-04-27):
+       *  Generate 와 동일 패턴 — 직관 매칭 (ON=기능 ON · OFF=기능 OFF).
+       *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약 (Generate 보다 큼).
        */}
       <Toggle
-        checked={skipUpgrade}
-        onChange={setSkipUpgrade}
+        checked={!skipUpgrade}
+        onChange={(v) => setSkipUpgrade(!v)}
         align="right"
-        label={skipUpgrade ? "✏️ 프롬프트 직접 사용" : "🪄 AI 프롬프트 보정"}
+        label="🪄 AI 프롬프트 보정"
         desc={
           skipUpgrade
-            ? "정제된 영문 프롬프트 그대로 · 비전+gemma4 우회 (~15초 절약)"
-            : "이미지 분석 + 한국어 → 영문 정제 (기본)"
+            ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약)"
+            : "ON · 이미지 분석 + 한국어 → 영문 정제 (기본)"
         }
       />
 

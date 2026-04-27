@@ -167,22 +167,22 @@ export default function GenerateLeftPanel({
         </div>
       </div>
 
-      {/* AI 프롬프트 보정 우회 토글 (2026-04-27 오빠 피드백):
-       *  사용자가 이미 정제된 영문 프롬프트를 복사해서 붙여넣은 케이스 — gemma4 단계 skip.
-       *  의미 반전 + 라벨 동적 패턴 (Lightning 과 통일) — 토글 상태가 곧 모드 명.
-       *    OFF (기본 · skipUpgrade=false) → 🪄 AI 프롬프트 보정
-       *    ON  (강화 · skipUpgrade=true)  → ✏️ 프롬프트 직접 사용
-       *  ON 일 때 skipUpgrade → useGeneratePipeline 이 prompt 를 preUpgradedPrompt 로 전송.
+      {/* AI 프롬프트 보정 토글 (2026-04-27 오빠 피드백):
+       *  사용자 직관 매칭 — 토글 ON=기능 ON / OFF=기능 OFF.
+       *    ON  (기본 · skipUpgrade=false) → gemma4 실행 (보정 ON)
+       *    OFF (skipUpgrade=true)         → gemma4 skip (정제된 프롬프트 그대로)
+       *  Lightning 의 의미 반전 + 라벨 동적 패턴은 "빠른/퀄리티" 모드 선택이라 자연스러웠지만,
+       *  보정 토글은 단순 기능 ON/OFF 라 직관 따르는 게 옳음 (오빠 피드백).
        */}
       <Toggle
-        checked={skipUpgrade}
-        onChange={setSkipUpgrade}
+        checked={!skipUpgrade}
+        onChange={(v) => setSkipUpgrade(!v)}
         align="right"
-        label={skipUpgrade ? "✏️ 프롬프트 직접 사용" : "🪄 AI 프롬프트 보정"}
+        label="🪄 AI 프롬프트 보정"
         desc={
           skipUpgrade
-            ? "정제된 프롬프트 그대로 · gemma4 우회 (~10초 절약)"
-            : "한국어/자연어 → 영문 정제 (기본)"
+            ? "OFF · 프롬프트 그대로 사용 (~10초 절약)"
+            : "ON · 한국어/자연어 → 영문 정제 (기본)"
         }
       />
 
