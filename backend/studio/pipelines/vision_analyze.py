@@ -28,13 +28,20 @@ log = logging.getLogger(__name__)
 
 
 # stage type → progress 매핑 (callback 으로 도착하는 신호 → SSE stage event)
+# 2026-04-27 라벨 일관화: vision-call → vision-analyze 통일 (edit/video 와 동일 type).
+# 백엔드 함수는 다르지만 사용자 시점에선 "이미지 분석" 동일 동작.
 _VISION_PROGRESS = {
-    "vision-call": 20,
+    "vision-call": 20,  # vision_pipeline.analyze_image_detailed 가 callback 으로 보내는 신호명
     "translation": 70,
 }
 _VISION_LABEL = {
-    "vision-call": "비전 분석 (qwen2.5vl)",
+    "vision-call": "이미지 분석 (qwen2.5vl)",
     "translation": "한국어 번역 (gemma4)",
+}
+# callback 신호명 → SSE stage type 매핑 (백엔드 함수 콜백명은 유지 · SSE type 만 통일)
+_STAGE_TYPE_MAP = {
+    "vision-call": "vision-analyze",
+    "translation": "translation",
 }
 
 
@@ -65,11 +72,14 @@ async def _run_vision_analyze_pipeline(
         )
 
         # ── 2단계: callback 으로 vision-call / translation 단계 전환 알림 ──
+        # callback 의 stage_type 은 vision_pipeline 내부 신호명 ("vision-call" 등)
+        # → _STAGE_TYPE_MAP 으로 SSE stage type ("vision-analyze") 으로 변환 후 emit.
         async def on_progress(stage_type: str) -> None:
+            sse_type = _STAGE_TYPE_MAP.get(stage_type, stage_type)
             await task.emit(
                 "stage",
                 {
-                    "type": stage_type,
+                    "type": sse_type,
                     "progress": _VISION_PROGRESS.get(stage_type, 50),
                     "stageLabel": _VISION_LABEL.get(stage_type, stage_type),
                 },
@@ -88,6 +98,32 @@ async def _run_vision_analyze_pipeline(
         except GpuBusyError as e:
             await task.emit("error", {"message": str(e), "code": "gpu_busy"})
             return
+
+        # ── Phase 6 cleanup (시각 일관성): stage 완료 시점에 결과 흡수 emit ──
+        # Edit/Video 의 prompt-merge / vision-analyze 패턴과 동일 — 같은 type 두 번
+        # emit 시 PipelineTimeline 의 byType Map 이 마지막 payload 로 덮어씌우므로
+        # renderDetail 콜백이 결과 정보를 보조 박스로 표시 가능.
+        await task.emit(
+            "stage",
+            {
+                "type": "vision-analyze",
+                "progress": 65,
+                "stageLabel": "이미지 분석 완료",
+                "summary": result.summary,
+                "provider": result.provider,
+                "fallback": result.fallback,
+            },
+        )
+        if result.ko:
+            await task.emit(
+                "stage",
+                {
+                    "type": "translation",
+                    "progress": 95,
+                    "stageLabel": "한국어 번역 완료",
+                    "summaryKo": result.ko,
+                },
+            )
 
         # ── 3단계: done event with full result payload (옛 JSON 응답 shape) ──
         payload: dict[str, Any] = {

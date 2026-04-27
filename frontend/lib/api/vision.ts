@@ -163,9 +163,9 @@ async function mockAnalyze(
   await sleep(150);
   if (opts.onStage) {
     opts.onStage({
-      type: "vision-call",
+      type: "vision-analyze",
       progress: 20,
-      stageLabel: "비전 분석 (qwen2.5vl)",
+      stageLabel: "이미지 분석 (qwen2.5vl)",
     });
   }
   await sleep(300 + Math.random() * 300);

@@ -174,13 +174,13 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
         saved_w = dispatch.width or resolved_w
         saved_h = dispatch.height or resolved_h
 
-        # 6. 후처리
+        # 6. 결과 저장 (Phase 6 cleanup 라벨 일관화 — postprocess → save-output 통일)
         await task.emit(
             "stage",
             {
-                "type": "postprocess",
+                "type": "save-output",
                 "progress": 97,
-                "stageLabel": "후처리",
+                "stageLabel": "결과 저장",
             },
         )
         await asyncio.sleep(0.15)

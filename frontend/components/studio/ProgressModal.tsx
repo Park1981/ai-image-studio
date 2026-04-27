@@ -27,10 +27,10 @@ import { useVideoStore } from "@/stores/useVideoStore";
 import { useVisionStore } from "@/stores/useVisionStore";
 import { useVisionCompareStore } from "@/stores/useVisionCompareStore";
 // 2026-04-27 (C2-P1-2): 3 mode 타임라인 + TimelineRow + DetailBox 분해.
-// 2026-04-27 (Phase 2/3): Edit/Video PipelineTimeline 으로 교체. Generate 는 GenerateTimeline 유지.
+// 2026-04-27 (Phase 2/3): Edit/Video PipelineTimeline 으로 교체.
 // 2026-04-27 (Phase 6): vision/compare 도 PipelineTimeline 단일 컴포넌트로 통일.
+// 2026-04-27 (post-Phase-6 cleanup): Generate 도 PipelineTimeline 으로 갈아끼움 → 5 mode 풀 통일.
 import { PipelineTimeline } from "./progress/PipelineTimeline";
-import { GenerateTimeline } from "./progress/Timelines";
 
 const MODE_TITLES: Record<PipelineMode, string> = {
   generate: "이미지 생성 중",
@@ -103,11 +103,8 @@ export default function ProgressModal({
             padding: "16px 22px 22px",
           }}
         >
-          {mode === "generate" ? (
-            <GenerateTimeline />
-          ) : (
-            <PipelineTimeline mode={mode} />
-          )}
+          <PipelineTimeline mode={mode} />
+
         </div>
       </section>
     </div>
