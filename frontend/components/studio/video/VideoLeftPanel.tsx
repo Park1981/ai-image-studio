@@ -177,15 +177,16 @@ export default function VideoLeftPanel({
         sourceHeight={sourceHeight}
       />
 
-      {/* ── 고퀄 모드 토글 (Generate / Edit 와 통일 · 의미 반전)
-       *  OFF=Lightning 빠름 (기본) / ON=💎 고퀄 모드 (강화 옵션 · 얼굴 보존 우선)
+      {/* ── 퀄리티 모드 토글 (Generate / Edit 와 통일 · 의미 반전)
+       *  OFF=Lightning 빠름 (기본) / ON=💎 퀄리티 모드 (강화 옵션 · 얼굴 보존 우선)
+       *  라벨 동적 분기 (2026-04-27 후속): 토글 상태가 곧 모드 명.
        *  store 의 lightning 의미는 그대로 (true=빠름) — UI 만 반전 (`!lightning`).
        */}
       <Toggle
         checked={!lightning}
         onChange={(v) => setLightning(!v)}
         align="right"
-        label="💎 고퀄 모드"
+        label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
         desc={
           lightning
             ? "Lightning 4-step · 약 5분 · 얼굴 변할 수 있음 (기본)"

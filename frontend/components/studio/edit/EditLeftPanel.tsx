@@ -190,15 +190,16 @@ export default function EditLeftPanel({
         </div>
       </div>
 
-      {/* ── 고퀄 모드 토글 (Generate 와 통일 · 우측 토글 · 의미 반전) ──
-       *  OFF=Lightning 빠름 (기본) / ON=💎 고퀄 모드 (강화 옵션)
+      {/* ── 퀄리티 모드 토글 (Generate 와 통일 · 우측 토글 · 의미 반전) ──
+       *  OFF=Lightning 빠름 (기본) / ON=💎 퀄리티 모드 (강화 옵션)
+       *  라벨 동적 분기 (2026-04-27 후속): 토글 상태가 곧 모드 명.
        *  store 의 lightning 의미는 그대로 (true=LoRA ON=빠름) — UI 만 반전 (`!lightning`).
        */}
       <Toggle
         checked={!lightning}
         onChange={(v) => setLightning(!v)}
         align="right"
-        label="💎 고퀄 모드"
+        label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
         desc={
           lightning
             ? "Lightning 4-step · 빠름 · 약간 낮은 디테일 (기본)"

@@ -619,11 +619,13 @@ function PreferencesSection() {
   const {
     hideGeneratePrompts,
     hideEditPrompts,
+    hideVideoPrompts,
     lightningByDefault,
     autoStartComfy,
     autoCompareAnalysis,
     setHideGeneratePrompts,
     setHideEditPrompts,
+    setHideVideoPrompts,
     setLightningByDefault,
     setAutoStartComfy,
     setAutoCompareAnalysis,
@@ -634,14 +636,23 @@ function PreferencesSection() {
       <Toggle
         checked={hideGeneratePrompts}
         onChange={setHideGeneratePrompts}
+        align="right"
         label="생성 프롬프트 숨기기"
         desc="ON: 바로 생성 + 진행 모달 프롬프트 접힘 / OFF: 생성 전 AI 프롬프트 검수 모달 + 진행 중 펼침"
       />
       <Toggle
         checked={hideEditPrompts}
         onChange={setHideEditPrompts}
+        align="right"
         label="수정 프롬프트 숨기기"
         desc="ON: 진행 모달 프롬프트 접힘 (깔끔) / OFF: 진행 중 비전 분석·영어 프롬프트 펼침"
+      />
+      <Toggle
+        checked={hideVideoPrompts}
+        onChange={setHideVideoPrompts}
+        align="right"
+        label="영상 프롬프트 숨기기"
+        desc="ON: 진행 모달 프롬프트 접힘 (깔끔) / OFF: 진행 중 비전 분석·LTX 영어 프롬프트 펼침"
       />
       <Toggle
         checked={lightningByDefault}
@@ -652,18 +663,21 @@ function PreferencesSection() {
             "다음부터 생성 화면 진입 시 반영돼요.",
           );
         }}
+        align="right"
         label="Lightning 모드 기본 ON"
         desc="생성 화면 진입 시 ⚡ 4-step 자동 선택"
       />
       <Toggle
         checked={autoCompareAnalysis}
         onChange={setAutoCompareAnalysis}
+        align="right"
         label="수정 후 자동 비교 분석"
         desc="Edit 결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 skip)"
       />
       <Toggle
         checked={autoStartComfy}
         onChange={setAutoStartComfy}
+        align="right"
         label="앱 시작 시 ComfyUI 자동 실행"
         desc="VRAM 계속 점유 — 주의"
       />

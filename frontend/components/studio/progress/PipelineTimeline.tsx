@@ -138,6 +138,7 @@ function usePipelineCtx(
   const editAnalysis = useEditStore((s) => s.editVisionAnalysis);
   const hideEdit = useSettingsStore((s) => s.hideEditPrompts);
   const hideGen = useSettingsStore((s) => s.hideGeneratePrompts);
+  const hideVideo = useSettingsStore((s) => s.hideVideoPrompts);
 
   // warmup stage 가 도착했는지 — Phase 5 자동 기동 시 활성. stageHistory 안 type 검사.
   const warmupArrived = stageHistory.some((s) => s.type === "comfyui-warmup");
@@ -147,6 +148,7 @@ function usePipelineCtx(
     editVisionAnalysis: mode === "edit" ? editAnalysis : undefined,
     hideEditPrompts: mode === "edit" ? hideEdit : undefined,
     hideGeneratePrompts: mode === "generate" ? hideGen : undefined,
+    hideVideoPrompts: mode === "video" ? hideVideo : undefined,
     warmupArrived,
   };
 }

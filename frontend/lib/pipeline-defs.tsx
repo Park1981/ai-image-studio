@@ -56,6 +56,8 @@ export interface PipelineCtx {
   hideEditPrompts?: boolean;
   /** ProgressModal 의 prompt 토글 — Generate 의 detail 박스 표시/숨김 */
   hideGeneratePrompts?: boolean;
+  /** ProgressModal 의 prompt 토글 — Video 의 detail 박스 표시/숨김 (Phase 4 후속 · 2026-04-27) */
+  hideVideoPrompts?: boolean;
 }
 
 /** 백엔드가 SSE 로 보내는 stage event payload — 임의 필드 (mode 별 다름). */
@@ -166,7 +168,9 @@ export const PIPELINE_DEFS: Record<HistoryMode, StageDef[]> = {
       type: "vision-analyze",
       label: "이미지 비전 분석",
       subLabel: "qwen2.5vl:7b",
-      renderDetail: (p) => {
+      renderDetail: (p, c) => {
+        // Phase 4 후속 (2026-04-27): hideVideoPrompts 토글 분기 (Edit 와 동일).
+        if (c.hideVideoPrompts) return null;
         const description = p.description as string | undefined;
         return description ? (
           <DetailBox kind="info" title="비전 설명">
@@ -185,7 +189,8 @@ export const PIPELINE_DEFS: Record<HistoryMode, StageDef[]> = {
       type: "prompt-merge",
       label: "영상 프롬프트 통합",
       subLabel: "gemma4-un",
-      renderDetail: (p) => {
+      renderDetail: (p, c) => {
+        if (c.hideVideoPrompts) return null;
         const finalPrompt = p.finalPrompt as string | undefined;
         const finalPromptKo = p.finalPromptKo as string | undefined;
         const provider = p.provider as string | undefined;

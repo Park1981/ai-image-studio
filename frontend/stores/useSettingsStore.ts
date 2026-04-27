@@ -43,6 +43,13 @@ export interface SettingsState {
    * 사전 모달 분기는 Edit 에 없음 — 단순 표시 토글.
    */
   hideEditPrompts: boolean;
+  /**
+   * 영상 진행 모달의 detail 영역 (비전 분석 / LTX 영어 프롬프트 등) 숨김.
+   * 기본 true (깔끔 모드). false 시 진행 모달의 stage detail 박스 자동 펼침.
+   * 사전 모달 분기는 Video 에 없음 — 단순 표시 토글 (Edit 와 동일).
+   * 추가일: 2026-04-27 (Phase 4 후속).
+   */
+  hideVideoPrompts: boolean;
   lightningByDefault: boolean;
   autoStartComfy: boolean;
   /** Edit 결과 완료 후 자동 비교 분석 (백그라운드). 기본 false. */
@@ -58,6 +65,7 @@ export interface SettingsState {
   setVisionModel: (v: string) => void;
   setHideGeneratePrompts: (v: boolean) => void;
   setHideEditPrompts: (v: boolean) => void;
+  setHideVideoPrompts: (v: boolean) => void;
   setLightningByDefault: (v: boolean) => void;
   setAutoStartComfy: (v: boolean) => void;
   setAutoCompareAnalysis: (v: boolean) => void;
@@ -95,6 +103,7 @@ export const useSettingsStore = create<SettingsState>()(
 
       hideGeneratePrompts: true,
       hideEditPrompts: true,
+      hideVideoPrompts: true,
       lightningByDefault: false,
       autoStartComfy: false,
       autoCompareAnalysis: false,
@@ -107,6 +116,7 @@ export const useSettingsStore = create<SettingsState>()(
       setVisionModel: (v) => set({ visionModel: v }),
       setHideGeneratePrompts: (v) => set({ hideGeneratePrompts: v }),
       setHideEditPrompts: (v) => set({ hideEditPrompts: v }),
+      setHideVideoPrompts: (v) => set({ hideVideoPrompts: v }),
       setLightningByDefault: (v) => set({ lightningByDefault: v }),
       setAutoStartComfy: (v) => set({ autoStartComfy: v }),
       setAutoCompareAnalysis: (v) => set({ autoCompareAnalysis: v }),
@@ -124,7 +134,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "ais:settings",
       storage: createJSONStorage(() => localStorage),
-      version: 3,
+      version: 4,
       migrate: (persisted: unknown, fromVersion: number) => {
         const obj = (persisted as Record<string, unknown>) || {};
         // v1 → v2: autoCompareAnalysis 기본 false 추가
@@ -143,6 +153,11 @@ export const useSettingsStore = create<SettingsState>()(
             obj.hideGeneratePrompts = true;
           }
           obj.hideEditPrompts = true;
+        }
+        // v3 → v4: hideVideoPrompts 신설 (Phase 4 후속 · 2026-04-27).
+        // 기본 true (Edit/Generate 와 일관 — 깔끔 모드 기본).
+        if (fromVersion < 4) {
+          obj.hideVideoPrompts = true;
         }
         return obj as unknown as SettingsState;
       },
