@@ -188,7 +188,13 @@ def test_vision_model_override_propagates() -> None:
 
 @pytest.mark.asyncio
 async def test_vision_analyze_route_happy_path() -> None:
-    """POST /api/studio/vision-analyze multipart + meta 정상 처리."""
+    """POST /api/studio/vision-analyze + SSE stream → done event payload 검증.
+
+    Phase 6 (2026-04-27): 동기 JSON → task-based SSE 로 전환. POST 는 {task_id, stream_url}
+    반환, 실 결과는 SSE drain 후 done event payload 에서 추출.
+    """
+    import json as _json
+
     from httpx import ASGITransport, AsyncClient
 
     from main import app  # type: ignore
@@ -210,14 +216,33 @@ async def test_vision_analyze_route_happy_path() -> None:
         ),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as cli:
             res = await cli.post(
                 "/api/studio/vision-analyze",
                 files={"image": ("tiny.png", _tiny_png_bytes(), "image/png")},
                 data={"meta": "{}"},
             )
-    assert res.status_code == 200
-    data = res.json()
+            assert res.status_code == 200
+            stream_url = res.json()["stream_url"]
+
+            # SSE drain — done event payload 추출 (옛 JSON 응답 shape 동일)
+            data: dict | None = None
+            async with cli.stream("GET", stream_url) as sr:
+                pending_event: str | None = None
+                async for line in sr.aiter_lines():
+                    if line.startswith("event:"):
+                        pending_event = line[6:].strip()
+                        continue
+                    if line.startswith("data:"):
+                        try:
+                            payload = _json.loads(line[5:].strip())
+                        except _json.JSONDecodeError:
+                            continue
+                        if pending_event == "done":
+                            data = payload
+                            break
+
+    assert data is not None
     assert data["en"].startswith("A moody")
     assert data["ko"] and "초상" in data["ko"]
     assert data["provider"] == "ollama"

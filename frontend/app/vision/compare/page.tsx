@@ -19,7 +19,7 @@
 
 import { useEffect, useState } from "react";
 import AppHeader from "@/components/chrome/AppHeader";
-import AnalysisProgressModal from "@/components/studio/AnalysisProgressModal";
+import ProgressModal from "@/components/studio/ProgressModal";
 import CompareAnalysisPanel from "@/components/studio/compare/CompareAnalysisPanel";
 import CompareLeftPanel from "@/components/studio/compare/CompareLeftPanel";
 import CompareViewer from "@/components/studio/compare/CompareViewer";
@@ -86,6 +86,9 @@ export default function VisionComparePage() {
   const setRunning = useVisionCompareStore((s) => s.setRunning);
   const setAnalysis = useVisionCompareStore((s) => s.setAnalysis);
   const setViewerMode = useVisionCompareStore((s) => s.setViewerMode);
+  // Phase 6 (2026-04-27): 진행 모달 통일 — stage 이벤트 store 누적
+  const pushStage = useVisionCompareStore((s) => s.pushStage);
+  const resetStages = useVisionCompareStore((s) => s.resetStages);
   const addPromptHistory = usePromptHistoryStore((s) => s.add);
 
   const visionModel = useSettingsStore((s) => s.visionModel);
@@ -142,6 +145,7 @@ export default function VisionComparePage() {
 
     setRunning(true);
     setAnalysis(null);
+    resetStages();
     addPromptHistory("compare", hint);
 
     try {
@@ -153,6 +157,15 @@ export default function VisionComparePage() {
         compareHint: hint,
         visionModel,
         ollamaModel,
+        onStage: (e) => {
+          pushStage({
+            type: e.type,
+            label: e.stageLabel,
+            progress: e.progress,
+            arrivedAt: Date.now(),
+            payload: e.extra,
+          });
+        },
         // historyItemId 미전송 → 백엔드가 DB 저장 자동 스킵 = 완전 휘발 보장
       });
 
@@ -178,11 +191,7 @@ export default function VisionComparePage() {
   return (
     <StudioPage>
       {progressOpen && (
-        <AnalysisProgressModal
-          mode="compare"
-          running={running}
-          onClose={() => setProgressOpen(false)}
-        />
+        <ProgressModal mode="compare" onClose={() => setProgressOpen(false)} />
       )}
       <AppHeader />
 

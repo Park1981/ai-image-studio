@@ -22,10 +22,10 @@
 
 "use client";
 
-import type { HistoryMode } from "@/lib/api/types";
 import {
   PIPELINE_DEFS,
   type PipelineCtx,
+  type PipelineMode,
   type StageDef,
 } from "@/lib/pipeline-defs";
 import { useEditStore } from "@/stores/useEditStore";
@@ -35,9 +35,11 @@ import {
 } from "@/stores/useGenerateStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useVideoStore } from "@/stores/useVideoStore";
+import { useVisionStore } from "@/stores/useVisionStore";
+import { useVisionCompareStore } from "@/stores/useVisionCompareStore";
 import { TimelineRow } from "./TimelineRow";
 
-export function PipelineTimeline({ mode }: { mode: HistoryMode }) {
+export function PipelineTimeline({ mode }: { mode: PipelineMode }) {
   const { stageHistory, running } = usePipelineRuntime(mode);
   const ctx = usePipelineCtx(mode, stageHistory);
 
@@ -110,15 +112,19 @@ interface PipelineRuntime {
 }
 
 /** mode 별 store 에서 stageHistory + running 가져오기.
- *  Phase 3 시점: 3 mode 모두 진짜 stageHistory 보유.
- *  hook 규칙 위배 회피 — 모든 store 를 항상 구독하고 mode 로 분기. */
-function usePipelineRuntime(mode: HistoryMode): PipelineRuntime {
+ *  hook 규칙 위배 회피 — 모든 store 를 항상 구독하고 mode 로 분기.
+ *  Phase 6 (2026-04-27): vision/compare 추가. */
+function usePipelineRuntime(mode: PipelineMode): PipelineRuntime {
   const genStageHistory = useGenerateStore((s) => s.stageHistory);
   const genRunning = useGenerateStore((s) => s.generating);
   const editStageHistory = useEditStore((s) => s.stageHistory);
   const editRunning = useEditStore((s) => s.running);
   const videoStageHistory = useVideoStore((s) => s.stageHistory);
   const videoRunning = useVideoStore((s) => s.running);
+  const visionStageHistory = useVisionStore((s) => s.stageHistory);
+  const visionRunning = useVisionStore((s) => s.running);
+  const compareStageHistory = useVisionCompareStore((s) => s.stageHistory);
+  const compareRunning = useVisionCompareStore((s) => s.running);
 
   if (mode === "generate") {
     return { stageHistory: genStageHistory, running: genRunning };
@@ -126,12 +132,18 @@ function usePipelineRuntime(mode: HistoryMode): PipelineRuntime {
   if (mode === "edit") {
     return { stageHistory: editStageHistory, running: editRunning };
   }
-  return { stageHistory: videoStageHistory, running: videoRunning };
+  if (mode === "video") {
+    return { stageHistory: videoStageHistory, running: videoRunning };
+  }
+  if (mode === "vision") {
+    return { stageHistory: visionStageHistory, running: visionRunning };
+  }
+  return { stageHistory: compareStageHistory, running: compareRunning };
 }
 
 /** PipelineCtx 묶음 — mode 별로 필요한 ctx 만 채워 보냄 (다른 mode 의 값은 undefined). */
 function usePipelineCtx(
-  mode: HistoryMode,
+  mode: PipelineMode,
   stageHistory: StageEvent[],
 ): PipelineCtx {
   const research = useGenerateStore((s) => s.research);
@@ -142,6 +154,10 @@ function usePipelineCtx(
 
   // warmup stage 가 도착했는지 — Phase 5 자동 기동 시 활성. stageHistory 안 type 검사.
   const warmupArrived = stageHistory.some((s) => s.type === "comfyui-warmup");
+  // Phase 6 — compare 의 intent-refine stage 도착 여부 (Edit context 캐시 미스 시만)
+  const intentRefineArrived = stageHistory.some(
+    (s) => s.type === "intent-refine",
+  );
 
   return {
     research: mode === "generate" ? research : undefined,
@@ -150,6 +166,7 @@ function usePipelineCtx(
     hideGeneratePrompts: mode === "generate" ? hideGen : undefined,
     hideVideoPrompts: mode === "video" ? hideVideo : undefined,
     warmupArrived,
+    intentRefineArrived: mode === "compare" ? intentRefineArrived : undefined,
   };
 }
 

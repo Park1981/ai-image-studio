@@ -32,6 +32,9 @@ from .video import (
     _extract_image_dims,
     _run_video_pipeline_task,
 )
+# Phase 6 (2026-04-27): Vision/Compare 도 task-based SSE 로 통일
+from .vision_analyze import _run_vision_analyze_pipeline
+from .compare_analyze import _run_compare_analyze_pipeline
 from ..storage import STUDIO_MAX_IMAGE_BYTES
 
 __all__ = [
@@ -51,6 +54,8 @@ __all__ = [
     "_run_generate_pipeline",
     "_run_edit_pipeline",
     "_run_video_pipeline_task",
+    "_run_vision_analyze_pipeline",
+    "_run_compare_analyze_pipeline",
     # 사이즈/유틸 상수
     "_EDIT_MAX_IMAGE_BYTES",
     "_VIDEO_MAX_IMAGE_BYTES",

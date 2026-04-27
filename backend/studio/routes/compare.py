@@ -5,50 +5,52 @@ context 분기:
   edit (default): analyze_pair v3 — 도메인 분기 + 5 슬롯 매트릭스 + 의도 점수
   compare:       analyze_pair_generic — Vision Compare 메뉴 (5축 generic)
 
-공용 GPU gate 로 ComfyUI 샘플링과 직렬화 — 16GB VRAM 충돌 방지.
-30s 대기 후에도 gate 가 바쁘면 503 (의도된 backpressure).
+Phase 6 (2026-04-27): 동기 JSON 응답 → task-based SSE 로 전환.
+  POST /compare-analyze              → { task_id, stream_url }
+  GET  /compare-analyze/stream/{id}  → SSE (event: stage / done / error)
 
-task #17 (2026-04-26): router.py 풀 분해 2탄.
+GPU lock + ComfyUI 충돌 방지 정책은 백그라운드 파이프라인이 그대로 유지.
 """
 
 from __future__ import annotations
 
 import json
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import StreamingResponse
 
-from .. import history_db, ollama_unload
-from .._gpu_lock import GpuBusyError, gpu_slot
-from ..comparison_pipeline import analyze_pair, analyze_pair_generic
-from ..prompt_pipeline import clarify_edit_intent
-from ..storage import STUDIO_MAX_IMAGE_BYTES, TASK_ID_RE
-from ._common import log
+# Phase 6: 백그라운드 파이프라인 import (compare 도메인 로직 자체는 변경 없음)
+from ..comparison_pipeline import analyze_pair, analyze_pair_generic  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치)
+from ..pipelines import _run_compare_analyze_pipeline
+from ..prompt_pipeline import clarify_edit_intent  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치)
+from ..schemas import TaskCreated
+from ..storage import STUDIO_MAX_IMAGE_BYTES
+from ..tasks import TASKS, _new_task
+from ._common import _spawn, _stream_task
 
 router = APIRouter()
 
-@router.post("/compare-analyze")
-async def compare_analyze(
+
+@router.post("/compare-analyze", response_model=TaskCreated)
+async def create_compare_analyze_task(
     source: UploadFile = File(...),
     result: UploadFile = File(...),
     meta: str = Form(...),
 ):
-    """Edit 결과(result) 와 원본(source) 을 qwen2.5vl 로 5축 비교 평가.
+    """비교 분석 요청 (multipart). Phase 6 — task 생성 + SSE.
 
     multipart:
-      source: 원본 이미지 파일
-      result: 수정 결과 이미지 파일
-      meta: JSON {editPrompt, historyItemId?, visionModel?, ollamaModel?}
+      source: 원본 이미지 파일 (Vision Compare 컨텍스트에선 IMAGE_A)
+      result: 결과 이미지 파일 (Vision Compare 컨텍스트에선 IMAGE_B)
+      meta: JSON {context?, editPrompt?, compareHint?, historyItemId?, visionModel?, ollamaModel?}
 
-    historyItemId 가 주어지면 분석 결과를 DB 에 영구 저장 (saved=True).
-    HTTP 200 원칙 — 비전 실패해도 fallback 결과로 200 반환 (analysis.fallback=True).
-    동시 호출 시 공용 GPU gate 로 직렬화 → 30s 대기 후 busy 면 503 (의도 설계).
+    응답: { task_id, stream_url } — 클라이언트가 stream_url 로 SSE 구독.
     """
     try:
         meta_obj = json.loads(meta)
     except json.JSONDecodeError as e:
         raise HTTPException(400, f"meta JSON invalid: {e}") from e
 
-    # context 분기: 기본 "edit" (Edit 호출자 무영향) · "compare" 면 generic 코드 경로
     context = (meta_obj.get("context") or "edit").strip().lower()
     edit_prompt = (meta_obj.get("editPrompt") or "").strip()
     compare_hint = (meta_obj.get("compareHint") or "").strip()
@@ -66,90 +68,36 @@ async def compare_analyze(
     ):
         raise HTTPException(413, "image too large")
 
-    # spec 19 후속 (Codex P1 #2): refined_intent 준비를 lock 밖에서 수행.
-    # 이전엔 _COMPARE_LOCK 안에서 clarify_edit_intent (gemma4) 호출 가능했음 →
-    # cold start ~5초가 다른 compare 요청을 30s lock timeout 까지 밀어붙임.
-    # lock 의 본 목적은 qwen2.5vl 비전 호출과 ComfyUI VRAM 충돌 회피이므로
-    # gemma4 text 호출은 lock 밖이 안전 (다른 모델 + 작은 메모리).
-    refined_intent = ""
-    if context != "compare":
-        # edit context 만 refined_intent 사용 (Vision Compare 는 compare_hint 만)
-        if (
-            isinstance(history_item_id_raw, str)
-            and TASK_ID_RE.match(history_item_id_raw)
-        ):
-            try:
-                cached_item = await history_db.get_item(history_item_id_raw)
-                if cached_item and cached_item.get("refinedIntent"):
-                    refined_intent = cached_item["refinedIntent"]
-            except Exception as cache_err:
-                log.info(
-                    "compare-analyze refined_intent cache lookup failed (non-fatal): %s",
-                    cache_err,
-                )
-        # 캐시 미스 + edit_prompt 있으면 fresh 호출.
-        # compare 분석 gate 와는 분리하되, 공용 GPU gate 는 적용해 ComfyUI 와 충돌 방지.
-        if not refined_intent and edit_prompt:
-            try:
-                async with gpu_slot("compare-refine"):
-                    refined_intent = await clarify_edit_intent(
-                        edit_prompt,
-                        model=text_override or "gemma4-un:latest",
-                        timeout=60.0,
-                    )
-            except GpuBusyError as e:
-                raise HTTPException(503, str(e)) from e
-            except Exception as exc:
-                log.info(
-                    "compare-analyze refine failed (non-fatal): %s", exc
-                )
+    task = await _new_task()
+    task.worker = _spawn(
+        _run_compare_analyze_pipeline(
+            task,
+            source_bytes=source_bytes,
+            result_bytes=result_bytes,
+            context=context,
+            edit_prompt=edit_prompt,
+            compare_hint=compare_hint,
+            history_item_id_raw=history_item_id_raw,
+            vision_override=vision_override,
+            text_override=text_override,
+        )
+    )
+    return TaskCreated(
+        task_id=task.task_id,
+        stream_url=f"/api/studio/compare-analyze/stream/{task.task_id}",
+    )
 
-    # 공용 GPU gate — qwen2.5vl 비전 호출과 ComfyUI 샘플링 동시 활성 차단.
-    try:
-        async with gpu_slot("compare-analyze"):
-            if context == "compare":
-                # Vision Compare 메뉴 — 사용자가 임의로 고른 두 이미지 비교
-                # source = IMAGE_A, result = IMAGE_B (multipart 필드명 재활용)
-                result_obj = await analyze_pair_generic(
-                    image_a_bytes=source_bytes,
-                    image_b_bytes=result_bytes,
-                    compare_hint=compare_hint,
-                    vision_model=vision_override,
-                    text_model=text_override,
-                )
-            else:
-                # edit context — refined_intent 는 위에서 별도 짧은 gate 로 준비됨
-                result_obj = await analyze_pair(
-                    source_bytes=source_bytes,
-                    result_bytes=result_bytes,
-                    edit_prompt=edit_prompt,
-                    vision_model=vision_override,
-                    text_model=text_override,
-                    refined_intent=refined_intent,
-                )
 
-            # spec 19 후속 (옵션 1 · 사용자 진단): 자동 비교 분석 후 모델
-            # unload 명령을 gate 안에서 보내야 다음 ComfyUI dispatch 와 race 가 없다.
-            try:
-                await ollama_unload.force_unload_all_loaded_models(wait_sec=0.0)
-            except Exception as unload_err:
-                log.info(
-                    "compare-analyze post-unload failed (non-fatal): %s",
-                    unload_err,
-                )
-    except GpuBusyError as e:
-        raise HTTPException(503, str(e)) from e
-
-    # historyItemId 가 TASK_ID_RE 매치 + DB 에 존재할 때만 저장
-    # (Vision Compare 메뉴는 historyItemId 미전송 → 자동 스킵 = 완전 휘발 보장)
-    saved = False
-    if isinstance(history_item_id_raw, str) and TASK_ID_RE.match(history_item_id_raw):
-        try:
-            saved = await history_db.update_comparison(
-                history_item_id_raw, result_obj.to_dict()
-            )
-        except Exception as db_err:
-            log.warning("compare-analyze DB persist failed: %s", db_err)
-            saved = False
-
-    return {"analysis": result_obj.to_dict(), "saved": saved}
+@router.get("/compare-analyze/stream/{task_id}")
+async def compare_analyze_stream(task_id: str, request: Request):
+    task = TASKS.get(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="task not found")
+    return StreamingResponse(
+        _stream_task(task, request),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )

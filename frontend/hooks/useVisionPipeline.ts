@@ -38,6 +38,9 @@ export function useVisionPipeline(): UseVisionPipeline {
   const setRunning = useVisionStore((s) => s.setRunning);
   const setResult = useVisionStore((s) => s.setResult);
   const addEntry = useVisionStore((s) => s.addEntry);
+  // Phase 6 (2026-04-27): SSE stage 이벤트 → store 누적 → PipelineTimeline 렌더
+  const pushStage = useVisionStore((s) => s.pushStage);
+  const resetStages = useVisionStore((s) => s.resetStages);
 
   // 설정
   const visionModelSel = useSettingsStore((s) => s.visionModel);
@@ -60,10 +63,20 @@ export function useVisionPipeline(): UseVisionPipeline {
     }
 
     setRunning(true);
+    resetStages();
     try {
       const result = await analyzeImage(currentImage, {
         visionModel: visionModelSel,
         ollamaModel: ollamaModelSel,
+        onStage: (e) => {
+          pushStage({
+            type: e.type,
+            label: e.stageLabel,
+            progress: e.progress,
+            arrivedAt: Date.now(),
+            payload: e.extra,
+          });
+        },
       });
 
       // v2 9 슬롯 — 옛 row (positivePrompt 비어있음) 도 그대로 흐름

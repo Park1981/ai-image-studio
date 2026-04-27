@@ -2,18 +2,33 @@
  * lib/api/vision.ts — Vision Analyzer (단일 이미지 → 영/한 상세 설명).
  * 2026-04-24 · C3.
  *
- * Mock 모드에선 800ms 지연 + 가짜 영/한 텍스트 반환.
- * Real 모드에선 POST /api/studio/vision-analyze (multipart) 호출.
+ * Phase 6 (2026-04-27): 동기 JSON 응답 → task-based SSE 로 전환.
+ *   - POST → {task_id, stream_url} 받음 → SSE drain → done event payload 추출
+ *   - opts.onStage 콜백으로 stage 이벤트 실시간 전달 (PipelineTimeline 연동)
+ *   - 옛 호출자 호환 — analyzeImage() 시그니처 유지 (Promise<Result>).
+ *
+ * Mock 모드: 단계별 sleep + onStage emit + 가짜 결과 반환 (실 백엔드 패턴 모사).
+ * Real 모드: POST /api/studio/vision-analyze (multipart) + GET stream/{id} SSE.
  */
 
-import { STUDIO_BASE, USE_MOCK, sleep } from "./client";
+import { STUDIO_BASE, USE_MOCK, parseSSE, sleep } from "./client";
 import type { VisionAnalysisResponse } from "./types";
+
+export interface AnalyzeStageEvent {
+  type: string;
+  progress: number;
+  stageLabel: string;
+  /** 백엔드가 보낸 추가 payload (현재는 사용 안 함 · 미래 확장용) */
+  extra?: Record<string, unknown>;
+}
 
 export interface AnalyzeImageOptions {
   /** 비전 모델 override (기본: 백엔드 DEFAULT_OLLAMA_ROLES.vision) */
   visionModel?: string;
   /** 번역(텍스트) 모델 override (기본: gemma4-un:latest) */
   ollamaModel?: string;
+  /** Phase 6 — stage 이벤트 도착 시 호출 (PipelineTimeline 의 stageHistory 갱신) */
+  onStage?: (e: AnalyzeStageEvent) => void;
 }
 
 /**
@@ -70,34 +85,98 @@ export async function analyzeImage(
     }),
   );
 
-  const res = await fetch(`${STUDIO_BASE}/api/studio/vision-analyze`, {
+  // Phase 6: POST 가 task_id + stream_url 반환 (옛처럼 직접 결과 X)
+  const createRes = await fetch(`${STUDIO_BASE}/api/studio/vision-analyze`, {
     method: "POST",
     body: form,
   });
-  if (!res.ok) {
-    // 413 (too large) / 400 (bad meta or empty) 등 — 프론트 토스트용 메시지
+  if (!createRes.ok) {
     let detail = "";
     try {
-      const j = (await res.json()) as { detail?: string };
+      const j = (await createRes.json()) as { detail?: string };
       detail = j.detail || "";
     } catch {
       /* non-json body */
     }
-    throw new Error(`vision-analyze ${res.status}: ${detail || "요청 실패"}`);
+    throw new Error(
+      `vision-analyze ${createRes.status}: ${detail || "요청 실패"}`,
+    );
   }
-  return (await res.json()) as VisionAnalysisResponse;
+  const { stream_url } = (await createRes.json()) as {
+    task_id: string;
+    stream_url: string;
+  };
+
+  // SSE drain — done event payload 추출. stage 이벤트는 onStage 콜백으로 전달.
+  const streamRes = await fetch(`${STUDIO_BASE}${stream_url}`, {
+    headers: { accept: "text/event-stream" },
+  });
+  if (!streamRes.ok) {
+    throw new Error(`vision-analyze stream ${streamRes.status}`);
+  }
+
+  for await (const evt of parseSSE(streamRes)) {
+    if (evt.event === "error") {
+      const payload = evt.data as { message?: string };
+      throw new Error(payload.message || "vision-analyze error");
+    }
+    if (evt.event === "stage") {
+      if (opts.onStage) {
+        const payload = evt.data as {
+          type: string;
+          progress: number;
+          stageLabel: string;
+        } & Record<string, unknown>;
+        const { type, progress, stageLabel, ...extra } = payload;
+        opts.onStage({
+          type,
+          progress,
+          stageLabel,
+          extra: Object.keys(extra).length > 0 ? extra : undefined,
+        });
+      }
+      continue;
+    }
+    if (evt.event === "done") {
+      // SSE done payload 는 백엔드 done emit shape (옛 JSON 응답 그대로) — 옛 검증 정책 유지.
+      return evt.data as unknown as VisionAnalysisResponse;
+    }
+  }
+  throw new Error("vision-analyze: stream closed without done event");
 }
 
 /* ───────── Mock ───────── */
 
 async function mockAnalyze(
   _sourceImage: string | File,
-  _opts: AnalyzeImageOptions,
+  opts: AnalyzeImageOptions,
 ): Promise<VisionAnalysisResponse> {
-  // 인자 사용 안 함 — Mock 은 고정 응답. underscore prefix 만으로는 lint 통과 안 돼서 명시적 noop.
   void _sourceImage;
-  void _opts;
-  await sleep(600 + Math.random() * 400);
+  // Mock 도 stage 이벤트 emit — 진행 모달 정상 표시 보존 (Phase 4 mock 도 stage 변환 정책 일관)
+  if (opts.onStage) {
+    opts.onStage({
+      type: "vision-encoding",
+      progress: 5,
+      stageLabel: "이미지 인코딩",
+    });
+  }
+  await sleep(150);
+  if (opts.onStage) {
+    opts.onStage({
+      type: "vision-call",
+      progress: 20,
+      stageLabel: "비전 분석 (qwen2.5vl)",
+    });
+  }
+  await sleep(300 + Math.random() * 300);
+  if (opts.onStage) {
+    opts.onStage({
+      type: "translation",
+      progress: 70,
+      stageLabel: "한국어 번역 (gemma4)",
+    });
+  }
+  await sleep(150);
   return {
     en: "Editorial-style portrait photograph, soft north-facing window light pooling on the subject's left cheek, shallow depth of field with creamy bokeh, neutral warm palette blending ochre and muted terracotta, fine skin texture retained with subtle 35mm film grain, balanced rule-of-thirds composition, slight matte film look, quiet contemplative mood.",
     ko: "에디토리얼 스타일 인물 사진, 북쪽 창가에서 들어오는 부드러운 빛이 피사체의 왼쪽 볼에 고임, 크리미한 보케가 만드는 얕은 심도, 오커와 뮤트 테라코타가 섞인 뉴트럴 웜 팔레트, 35mm 필름의 미묘한 그레인이 살아있는 섬세한 피부 질감, 삼분할 구도의 균형 있는 프레이밍, 매트한 필름 룩, 차분하고 사색적인 분위기.",
@@ -106,7 +185,6 @@ async function mockAnalyze(
     width: 1024,
     height: 1024,
     sizeBytes: 482_000,
-    // ── Vision Recipe v2 9 슬롯 (Mock 더미) ──
     summary:
       "An editorial portrait of a contemplative figure lit by soft north window light.",
     positivePrompt:

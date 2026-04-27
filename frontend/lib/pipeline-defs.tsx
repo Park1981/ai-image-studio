@@ -22,6 +22,18 @@ import EditVisionBlock from "@/components/studio/EditVisionBlock";
 import { DetailBox } from "@/components/studio/progress/DetailBox";
 import type { EditVisionAnalysis, HistoryMode } from "@/lib/api/types";
 
+/**
+ * PipelineMode — 진행 모달이 처리하는 모든 모드 union.
+ *
+ * Phase 6 (2026-04-27): vision / compare 도 진행 모달 통일에 합류.
+ *   - HistoryMode (generate/edit/video) = 결과가 history 에 저장
+ *   - vision = history 에 저장 (Vision Analyzer 결과)
+ *   - compare = 휘발 (Vision Compare 결과 + Edit 비교 분석 — 둘 다 store 내부만)
+ *
+ * 단순히 union 으로 표현 — vision/compare 는 PIPELINE_DEFS 에서만 stage 정의 가짐.
+ */
+export type PipelineMode = HistoryMode | "vision" | "compare";
+
 /* ────────────────────────────────────────────────
  * 타입 정의
  * ──────────────────────────────────────────────── */
@@ -58,6 +70,9 @@ export interface PipelineCtx {
   hideGeneratePrompts?: boolean;
   /** ProgressModal 의 prompt 토글 — Video 의 detail 박스 표시/숨김 (Phase 4 후속 · 2026-04-27) */
   hideVideoPrompts?: boolean;
+  /** Compare 모드 (Edit context · 캐시 미스 시) refined_intent stage 도착 여부.
+   *  Vision Compare 메뉴는 emit 안 함 → row 안 보임. Phase 6 (2026-04-27). */
+  intentRefineArrived?: boolean;
 }
 
 /** 백엔드가 SSE 로 보내는 stage event payload — 임의 필드 (mode 별 다름). */
@@ -67,7 +82,7 @@ export type StagePayload = Record<string, unknown>;
  * PIPELINE_DEFS — 진실의 출처
  * ──────────────────────────────────────────────── */
 
-export const PIPELINE_DEFS: Record<HistoryMode, StageDef[]> = {
+export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
   /* ── Generate (6 stage · 기존 GEN_STAGE_ORDER 와 1:1 매칭) ── */
   generate: [
     { type: "prompt-parse", label: "프롬프트 해석" },
@@ -227,5 +242,46 @@ export const PIPELINE_DEFS: Record<HistoryMode, StageDef[]> = {
       subLabel: "ltx-2.3-22b-fp8",
     },
     { type: "save-output", label: "MP4 저장", subLabel: "h264 인코딩" },
+  ],
+
+  /* ── Vision Analyzer (3 stage · qwen2.5vl + gemma4 번역) — Phase 6 ── */
+  vision: [
+    { type: "vision-encoding", label: "이미지 인코딩", subLabel: "browser" },
+    {
+      type: "vision-call",
+      label: "비전 분석",
+      subLabel: "qwen2.5vl",
+    },
+    {
+      // gemma4 번역 — 미래 토글 OFF 시 enabled 한 줄로 자동 숨김 (옵션 B 통일 가치).
+      type: "translation",
+      label: "한국어 번역",
+      subLabel: "gemma4-un",
+      enabled: (c) => !c.gemma4Off,
+    },
+  ],
+
+  /* ── Compare (Edit 비교 + Vision Compare 공용 · 4 stage) — Phase 6 ── */
+  compare: [
+    { type: "compare-encoding", label: "이미지 A/B 인코딩", subLabel: "browser" },
+    {
+      // refined_intent — Edit context 의 캐시 미스 + edit_prompt 있을 때만 도착.
+      // Vision Compare 메뉴는 이 stage emit 안 함 → enabled 가 false 라 row 안 보임.
+      type: "intent-refine",
+      label: "수정 의도 정제",
+      subLabel: "gemma4-un",
+      enabled: (c) => c.intentRefineArrived === true,
+    },
+    {
+      type: "vision-pair",
+      label: "두 이미지 비교 분석",
+      subLabel: "qwen2.5vl",
+    },
+    {
+      type: "translation",
+      label: "한국어 번역",
+      subLabel: "gemma4-un",
+      enabled: (c) => !c.gemma4Off,
+    },
   ],
 };

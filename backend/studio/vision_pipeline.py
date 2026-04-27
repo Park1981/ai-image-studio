@@ -26,7 +26,11 @@ import logging
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Awaitable, Callable
+
+# Phase 6 (2026-04-27): progress callback 시그니처 — analyze_* 함수가 단계 transition
+# 시점에 호출. router (task-based SSE) 가 stage emit 으로 변환. None 이면 무영향.
+ProgressCallback = Callable[[str], Awaitable[None]]
 
 from ._json_utils import coerce_str as _coerce_str
 from ._json_utils import parse_strict_json as _parse_strict_json
@@ -1004,6 +1008,7 @@ async def analyze_image_detailed(
     timeout: float = DEFAULT_TIMEOUT,
     width: int = 0,
     height: int = 0,
+    progress_callback: ProgressCallback | None = None,
 ) -> VisionAnalysisResult:
     """단일 이미지 → Vision Recipe v2 (9 슬롯 JSON) + 한글 번역.
 
@@ -1019,7 +1024,17 @@ async def analyze_image_detailed(
     resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
 
+    # Phase 6: callback 호출 헬퍼 — None 또는 예외 시 무영향 (분석 자체에 영향 없음).
+    async def _signal(stage_type: str) -> None:
+        if progress_callback is None:
+            return
+        try:
+            await progress_callback(stage_type)
+        except Exception as cb_err:  # pragma: no cover - 방어적
+            log.info("progress_callback raised (non-fatal): %s", cb_err)
+
     # ── 1단계: v2 JSON 호출 ──
+    await _signal("vision-call")
     raw = await _call_vision_recipe_v2(
         image_bytes,
         width=width,
@@ -1058,6 +1073,7 @@ async def analyze_image_detailed(
         # ko 번역 — summary 만 번역 (positive_prompt 는 t2i 입력용이라 영문 유지)
         ko: str | None = None
         if slots["summary"]:
+            await _signal("translation")
             ko = await translate_to_korean(
                 slots["summary"],
                 model=resolved_text,
@@ -1089,6 +1105,7 @@ async def analyze_image_detailed(
             en="", ko=None, provider="fallback", fallback=True
         )
 
+    await _signal("translation")
     legacy_ko = await translate_to_korean(
         legacy_en, model=resolved_text, timeout=60.0, ollama_url=resolved_url
     )

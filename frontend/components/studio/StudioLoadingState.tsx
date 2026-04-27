@@ -6,7 +6,7 @@
  *
  * 정책 (audit §4.5):
  *   - 결과 카드 내부 로딩은 **lightweight placeholder**.
- *   - 상세 진행률은 ProgressModal / AnalysisProgressModal 이 단일 primary.
+ *   - 상세 진행률은 ProgressModal 이 단일 primary (Phase 6 통일 후 vision/compare 도 포함).
  *   - 이 컴포넌트는 percent bar 를 받지 않음 (의도적).
  *
  * Size:
