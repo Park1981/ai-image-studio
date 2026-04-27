@@ -78,6 +78,27 @@ export default function EditLeftPanel({
         description="원본 이미지와 수정 지시로 새로운 결과 이미지를 만듭니다."
       />
 
+      {/* Primary CTA — sticky 상단 (Generate 와 통일 · 폼 길어져도 시야 안) */}
+      <div className="ais-cta-sticky-top">
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={ctaDisabled}
+          className="ais-cta-primary"
+        >
+          {running ? (
+            <>
+              <Spinner /> 처리 중…
+            </>
+          ) : (
+            <>
+              <Icon name="wand" size={16} />
+              수정 생성
+            </>
+          )}
+        </button>
+      </div>
+
       {/* ── 원본 이미지 ── */}
       <div>
         <div className="ais-field-header">
@@ -156,41 +177,21 @@ export default function EditLeftPanel({
         </div>
       </div>
 
-      {/* ── Lightning 토글 ── */}
+      {/* ── 고퀄 모드 토글 (Generate 와 통일 · 우측 토글 · 의미 반전) ──
+       *  OFF=Lightning 빠름 (기본) / ON=💎 고퀄 모드 (강화 옵션)
+       *  store 의 lightning 의미는 그대로 (true=LoRA ON=빠름) — UI 만 반전 (`!lightning`).
+       */}
       <Toggle
-        checked={lightning}
-        onChange={setLightning}
-        label={lightning ? "⚡ Lightning 4-step" : "표준 40-step"}
+        checked={!lightning}
+        onChange={(v) => setLightning(!v)}
+        align="right"
+        label="💎 고퀄 모드"
         desc={
           lightning
-            ? "빠름 · 약간 낮은 디테일"
-            : "풀 퀄리티 · 약 ~38s 예상"
+            ? "Lightning 4-step · 빠름 · 약간 낮은 디테일 (기본)"
+            : "Lightning OFF · 풀 퀄리티 · 약 ~38s 예상"
         }
       />
-
-      {/* spacer (sticky CTA 가 위로 올라오지 않게) */}
-      <div style={{ flex: 1 }} />
-
-      {/* ── Primary CTA (sticky 하단) ── */}
-      <div className="ais-cta-sticky">
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={ctaDisabled}
-          className="ais-cta-primary"
-        >
-          {running ? (
-            <>
-              <Spinner /> 처리 중…
-            </>
-          ) : (
-            <>
-              <Icon name="wand" size={16} />
-              수정 생성
-            </>
-          )}
-        </button>
-      </div>
     </StudioLeftPanel>
   );
 }

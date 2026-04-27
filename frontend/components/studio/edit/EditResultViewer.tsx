@@ -58,16 +58,35 @@ export default function EditResultViewer({
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
       style={{
-        // 바깥 wrapper — 섹션 가로 꽉 + BeforeAfter 가운데 정렬.
-        // BeforeAfter 는 aspectRatio + maxHeight 70vh 때문에 세로형 이미지일 땐
-        // width 가 height × ratio 로 축소됨. flex center 로 뷰어 가운데 정렬.
+        // 2026-04-27 매트 카드 (Generate 와 통일): 카드 안 padding → 슬라이더가 떠있는 느낌.
+        // dot grid 배경 (Figma 캔버스 톤) + boxShadow + border (액자).
+        // BeforeAfter 자체에 자체 dimensions (aspectRatio + maxHeight) → 카드 안 자유 정렬.
         width: "100%",
         display: "flex",
         justifyContent: "center",
+        backgroundColor: "var(--surface)",
+        backgroundImage:
+          "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
+        backgroundSize: "16px 16px",
+        borderRadius: "var(--radius-card)",
+        border: "1px solid var(--line)",
+        boxShadow: "var(--shadow-sm)",
+        padding: 24,
+        boxSizing: "border-box",
       }}
     >
       {/* 내부 wrapper — BeforeAfter 와 크기가 같아 액션바가 이미지 하단에만 깔림 */}
-      <div style={{ position: "relative" }}>
+      <div
+        style={{
+          position: "relative",
+          // 슬라이더 자체 그림자 + 옅은 테두리 (매트 위 떠있는 사진 효과)
+          borderRadius: "var(--radius-md)",
+          overflow: "hidden",
+          boxShadow:
+            "0 10px 32px rgba(0,0,0,.14), 0 3px 10px rgba(0,0,0,.08)",
+          border: "1px solid rgba(0,0,0,.06)",
+        }}
+      >
         <BeforeAfterSlider
           beforeSrc={sourceImage}
           afterSeed={afterItem.imageRef || afterItem.id}
