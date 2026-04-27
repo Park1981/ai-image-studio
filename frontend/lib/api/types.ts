@@ -411,6 +411,39 @@ export interface ProcessStatusSnapshot {
   cpuPercent: number | null;
   /** 프로세스별 VRAM 분류 + 로드 모델 정보. 측정 실패 시 null. */
   vramBreakdown: VramBreakdown | null;
+  /** 프로세스별 RAM 분류 (RSS · GB). 측정 실패 시 null (2026-04-27 신설). */
+  ramBreakdown: RamBreakdown | null;
+}
+
+/**
+ * 설정 시스템 메트릭 카드용 — Backend / ComfyUI / Ollama / 기타 RAM 분해 (RSS · GB).
+ * 백엔드 /process/status 응답의 ram_breakdown 필드 그대로 매핑 (snake → camel).
+ */
+export interface RamBreakdown {
+  /** Backend FastAPI Python 프로세스 (현재 PID 기준) */
+  backendGb: number;
+  /** ComfyUI 프로세스 (process_manager 띄운 PID) */
+  comfyuiGb: number;
+  /** Ollama 프로세스 (start.ps1 띄운 경우는 name 매칭) */
+  ollamaGb: number;
+  /** 기타 시스템 (vm.used - 위 3개 합) */
+  otherGb: number;
+}
+
+/**
+ * 설정 히스토리 통계 카드용 — 갯수 + 디스크 사용량 + 모드별 (2026-04-27 신설).
+ * 백엔드 /api/studio/history/stats 응답의 snake_case → camelCase 매핑.
+ */
+export interface HistoryStats {
+  count: number;
+  totalSizeBytes: number;
+  /** SQLite DB 파일 자체 크기 (이미지/영상 파일과 별개) */
+  dbSizeBytes: number;
+  byMode: {
+    generate: { count: number; sizeBytes: number };
+    edit: { count: number; sizeBytes: number };
+    video: { count: number; sizeBytes: number };
+  };
 }
 
 /**

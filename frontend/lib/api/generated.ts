@@ -183,6 +183,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/history/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * History Stats
+         * @description 히스토리 통계 — 갯수 + 디스크 사용량 + 모드별 분해 (2026-04-27).
+         */
+        get: operations["history_stats_api_studio_history_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/history/{item_id}": {
         parameters: {
             query?: never;
@@ -871,6 +891,26 @@ export interface operations {
         };
     };
     clear_history_api_studio_history_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    history_stats_api_studio_history_stats_get: {
         parameters: {
             query?: never;
             header?: never;

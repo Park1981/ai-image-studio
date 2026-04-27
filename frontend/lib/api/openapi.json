@@ -766,6 +766,26 @@
         ]
       }
     },
+    "/api/studio/history/stats": {
+      "get": {
+        "description": "히스토리 통계 — 갯수 + 디스크 사용량 + 모드별 분해 (2026-04-27).",
+        "operationId": "history_stats_api_studio_history_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "History Stats",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
     "/api/studio/history/{item_id}": {
       "delete": {
         "operationId": "delete_history_api_studio_history__item_id__delete",

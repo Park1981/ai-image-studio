@@ -23,7 +23,11 @@ from .. import history_db
 from ..presets import ASPECT_RATIOS, EDIT_MODEL, GENERATE_MODEL
 from ..schemas import ProcessAction
 from ..storage import _cleanup_edit_source_file, _cleanup_result_file
-from ..system_metrics import get_system_metrics, get_vram_breakdown
+from ..system_metrics import (
+    get_ram_breakdown,
+    get_system_metrics,
+    get_vram_breakdown,
+)
 from ._common import _proc_mgr, log
 
 router = APIRouter()
@@ -115,6 +119,23 @@ async def process_status():
         log.warning("vram breakdown 측정 실패: %s", exc)
         breakdown = {}
 
+    # RAM breakdown — 프로세스별 RSS (2026-04-27 신설).
+    # backend 는 항상 현재 프로세스, comfyui/ollama 는 process_manager 가 알면 사용.
+    import os as _os  # 함수 내부 — 모듈 레벨 import 회피 (단순 사용)
+
+    ollama_proc = getattr(_proc_mgr, "_ollama_process", None)
+    ollama_pid = ollama_proc.pid if ollama_proc is not None else None
+    ram_breakdown: dict[str, Any] = {}
+    try:
+        ram_breakdown = await get_ram_breakdown(
+            backend_pid=_os.getpid(),
+            comfyui_pid=comfyui_pid,
+            ollama_pid=ollama_pid,
+        )
+    except Exception as exc:
+        log.warning("ram breakdown 측정 실패: %s", exc)
+        ram_breakdown = {}
+
     # comfyui 묶음 — VRAM + GPU% (GPU 메트릭 nvidia-smi 의존)
     comfyui_payload: dict[str, Any] = {"running": comfyui_ok}
     for key in ("vram_used_gb", "vram_total_gb", "gpu_percent"):
@@ -132,6 +153,7 @@ async def process_status():
         "comfyui": comfyui_payload,
         "system": system_payload,
         "vram_breakdown": breakdown,
+        "ram_breakdown": ram_breakdown,
     }
 
 
@@ -185,6 +207,12 @@ async def list_history(
     )
     total = await history_db.count_items(safe_mode)
     return {"items": items, "total": total}
+
+
+@router.get("/history/stats")
+async def history_stats():
+    """히스토리 통계 — 갯수 + 디스크 사용량 + 모드별 분해 (2026-04-27)."""
+    return await history_db.get_stats()
 
 
 @router.get("/history/{item_id}")
