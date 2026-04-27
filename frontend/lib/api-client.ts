@@ -4,10 +4,10 @@
  * 기존 `@/lib/api-client` import 경로 보존을 위한 re-export 만 유지.
  *
  * 2026-04-27 (C2-P1-3): active frontend 코드의 24 사용처 모두 직접 import 로 전환됨.
- *   - hooks/use*.ts (5)        → lib/api/{generate,edit,video,vision,compare}
- *   - app/**/page.tsx (2)      → lib/api/{compare,types}
- *   - components/** (16)       → lib/api/{types,client,history,process}
- *   - stores/useHistoryStore   → lib/api/types
+ *   - hooks/use*.ts (5)         lib/api/{generate,edit,video,vision,compare}
+ *   - app/[route]/page.tsx (2)  lib/api/{compare,types}
+ *   - components/[...] (16)     lib/api/{types,client,history,process}
+ *   - stores/useHistoryStore    lib/api/types
  *
  * @deprecated 신규 코드는 lib/api/{generate, edit, video, vision, compare,
  * history, process, client, types} 에서 직접 import 할 것.
