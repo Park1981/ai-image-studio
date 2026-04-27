@@ -343,21 +343,10 @@ export type GenStage =
   | { type: "done"; item: HistoryItem; savedToHistory: boolean };
 
 export type EditStage =
-  | {
-      type: "step";
-      step: 1 | 2 | 3 | 4;
-      done: boolean;
-      /** step 1 done 에서 도착하는 비전 설명 */
-      description?: string;
-      /** step 1 done 에서 도착하는 구조 분석 (Phase 1 · 2026-04-25 · 휘발) */
-      editVisionAnalysis?: EditVisionAnalysis;
-      /** step 2 done 에서 도착하는 최종 프롬프트 (영문) */
-      finalPrompt?: string;
-      /** step 2 done 에서 도착하는 한국어 번역 (v2 · 2026-04-23) */
-      finalPromptKo?: string | null;
-      /** step 2 provider (ollama/fallback) */
-      provider?: string;
-    }
+  // Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+  //   "step" variant 제거 — 백엔드가 더 이상 step emit 안 함.
+  //   detail (description / finalPrompt / editVisionAnalysis) 은 stage event 의
+  //   payload extra 필드로 들어옴 (& Record<string, unknown>).
   | {
       /** ComfyUI 샘플링 중 진행률/스텝 업데이트 (step 4 내부) */
       type: "sampling";
@@ -486,19 +475,9 @@ export interface VideoRequest {
 }
 
 export type VideoStage =
-  | {
-      type: "step";
-      step: 1 | 2 | 3 | 4 | 5;
-      done: boolean;
-      /** step 1 done 의 비전 설명 */
-      description?: string;
-      /** step 2 done 의 최종 LTX 프롬프트 (영문) */
-      finalPrompt?: string;
-      /** step 2 done 의 한글 번역 */
-      finalPromptKo?: string | null;
-      /** step 2 provider (ollama/fallback) */
-      provider?: string;
-    }
+  // Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+  //   "step" variant 제거 — 백엔드가 더 이상 step emit 안 함.
+  //   detail (description / finalPrompt 등) 은 stage event 의 payload extra 필드.
   | {
       /** ComfyUI 샘플링 상세 (step 4 내부) */
       type: "sampling";

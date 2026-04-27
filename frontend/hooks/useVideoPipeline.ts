@@ -82,12 +82,11 @@ export function useVideoPipeline(
         on: {
           sampling: (e) =>
             setSampling(e.samplingStep ?? null, e.samplingTotal ?? null),
-          // Phase 3 (2026-04-27 진행 모달 store 통일):
-          //   step 이벤트는 transitional 로 백엔드가 보내지만 store 에선 무시.
+          // Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+          //   step handler 제거 — 백엔드/lib/api 둘 다 step event 안 보냄 (transitional 종료).
           //   detail (description / finalPrompt / finalPromptKo / provider) 은
           //   stage payload 에 흡수되어 stageHistory[].payload 로 들어가고
           //   PipelineTimeline 이 사용.
-          step: () => {},
           stage: (e) => {
             setPipelineProgress(e.progress, e.stageLabel);
             // 백엔드가 보낸 임의 payload 를 stageHistory 에 그대로 보관.

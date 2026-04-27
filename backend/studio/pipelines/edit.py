@@ -51,16 +51,15 @@ async def _run_edit_pipeline(
     source_height: int = 0,
 ) -> None:
     try:
-        # Phase 2 (2026-04-27 진행 모달 store 통일):
+        # Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+        #   step emit 완전 제거 (Phase 2 transitional 종료).
         #   stage emit 의 payload 안에 detail (description / finalPrompt /
         #   finalPromptKo / provider / editVisionAnalysis) 을 흡수.
-        #   step emit 은 transitional 유지 — 옛 EditTimeline 호환 (Phase 4 에서 제거).
         #   진입 emit + 완료 emit 둘 다 유지 (PipelineTimeline 의 running row 표시 용).
         #   완료 emit 에만 payload 풍부.
 
         # Step 1: vision analysis — pipelineProgress 10 → 30
         await task.emit("stage", {"type": "vision-analyze", "progress": 10, "stageLabel": "비전 분석"})
-        await task.emit("step", {"step": 1, "done": False})
         async with gpu_slot("edit-vision"):
             vision = await run_vision_pipeline(
                 image_bytes,
@@ -73,20 +72,9 @@ async def _run_edit_pipeline(
                 width=source_width,
                 height=source_height,
             )
-        # step 1 done payload — Phase 1 (2026-04-25):
-        #   기존 description (사용자 표시용 요약) 은 그대로 유지.
-        #   신규 editVisionAnalysis 는 구조 분석 성공 시에만 payload 포함 (휘발 · DB X).
-        step1_done_payload: dict[str, Any] = {
-            "step": 1,
-            "done": True,
-            "description": vision.image_description,
-        }
         # getattr 로 안전 접근 — 기존 테스트의 경량 mock (속성 없음) 호환.
         _analysis = getattr(vision, "edit_vision_analysis", None)
-        if _analysis is not None:
-            step1_done_payload["editVisionAnalysis"] = _analysis.to_dict()
-        await task.emit("step", step1_done_payload)
-        # Phase 2: stage 완료 payload 에 description + editVisionAnalysis 흡수.
+        # stage 완료 payload 에 description + editVisionAnalysis 흡수.
         vision_done_stage: dict[str, Any] = {
             "type": "vision-analyze",
             "progress": 30,
@@ -99,19 +87,8 @@ async def _run_edit_pipeline(
 
         # Step 2: prompt merge (이미 vision 파이프라인에서 완료) — 40 → 50
         await task.emit("stage", {"type": "prompt-merge", "progress": 40, "stageLabel": "프롬프트 병합"})
-        await task.emit("step", {"step": 2, "done": False})
         await asyncio.sleep(0.2)
-        await task.emit(
-            "step",
-            {
-                "step": 2,
-                "done": True,
-                "finalPrompt": vision.final_prompt,
-                "finalPromptKo": vision.upgrade.translation,
-                "provider": vision.upgrade.provider,
-            },
-        )
-        # Phase 2: prompt-merge 완료 stage 에 finalPrompt/finalPromptKo/provider 흡수.
+        # prompt-merge 완료 stage 에 finalPrompt/finalPromptKo/provider 흡수.
         await task.emit(
             "stage",
             {
@@ -126,14 +103,11 @@ async def _run_edit_pipeline(
 
         # Step 3: size/style auto-extraction — 55 → 65
         await task.emit("stage", {"type": "param-extract", "progress": 55, "stageLabel": "파라미터 추출"})
-        await task.emit("step", {"step": 3, "done": False})
         await asyncio.sleep(0.15)
-        await task.emit("step", {"step": 3, "done": True})
         await task.emit("stage", {"type": "param-extract", "progress": 65, "stageLabel": "파라미터 확정"})
 
         # Step 4: ComfyUI dispatch — 70 → 95 (샘플링 실시간 %)
         await task.emit("stage", {"type": "comfyui-sampling", "progress": 70, "stageLabel": "ComfyUI 샘플링 대기"})
-        await task.emit("step", {"step": 4, "done": False})
 
         actual_seed = int(time.time() * 1000)
 
@@ -166,7 +140,6 @@ async def _run_edit_pipeline(
         result_w = dispatch.width or 0
         result_h = dispatch.height or 0
 
-        await task.emit("step", {"step": 4, "done": True})
         await task.emit("stage", {"type": "save-output", "progress": 98, "stageLabel": "결과 저장"})
 
         # ── source 영구 저장 (비교 분석용) ──
