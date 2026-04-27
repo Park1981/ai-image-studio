@@ -41,7 +41,7 @@ except Exception:  # pragma: no cover — 테스트/독립 실행 환경
 
 # unload 명령 응답 받은 후 GPU 메모리 실제 반납까지 기다리는 시간.
 # Ollama 가 비동기로 메모리 해제하므로 즉시 nvidia-smi 에 반영 안 됨.
-# 1.0초 = spec 19 에서 swap 차단 효과 검증된 값. force_unload_all_before_comfy 와
+# 1.0초 = spec 19 에서 swap 차단 효과 검증된 값. force_unload_all_loaded_models 와
 # vision/video pipeline 의 단계별 unload 가 모두 이 상수를 공유 (DRY).
 GPU_RELEASE_WAIT_SEC = 1.0
 
@@ -99,19 +99,23 @@ async def unload_model(
         return False
 
 
-async def force_unload_all_before_comfy(
+async def force_unload_all_loaded_models(
     *,
     ollama_url: str | None = None,
     wait_sec: float = GPU_RELEASE_WAIT_SEC,
 ) -> dict:
-    """ComfyUI 디스패치 직전 안전장치 — 로드된 모든 Ollama 모델 unload + 대기.
+    """로드된 모든 Ollama 모델 강제 unload + GPU 반납 대기 (공용 안전장치).
+
+    2026-04-27 (N5): force_unload_all_before_comfy → force_unload_all_loaded_models.
+    실제 호출처가 ComfyUI 디스패치 직전뿐 아니라 compare-analyze 완료 후 정리에도
+    쓰이므로 generic 이름으로 변경. 동작은 동일.
 
     흐름:
       1) /api/ps 로 현재 로드된 모델 조회
       2) 각 모델에 keep_alive=0 unload 명령 (병렬)
       3) wait_sec 동안 sleep (GPU 메모리 실제 반납 대기)
 
-    실패 / 빈 결과 모두 graceful — ComfyUI 디스패치는 그대로 진행.
+    실패 / 빈 결과 모두 graceful — 호출 흐름은 그대로 진행.
 
     Returns:
         {"unloaded": [model_names], "wait_sec": float}
@@ -137,7 +141,12 @@ async def force_unload_all_before_comfy(
         await asyncio.sleep(wait_sec)
 
     log.info(
-        "ollama force_unload_all_before_comfy: unloaded=%s wait=%.1fs",
+        "ollama force_unload_all_loaded_models: unloaded=%s wait=%.1fs",
         unloaded, wait_sec if unloaded else 0.0,
     )
     return {"unloaded": unloaded, "wait_sec": wait_sec if unloaded else 0.0}
+
+
+# 2026-04-27 (N5): 옛 이름 호환 alias — 외부 import 안전망.
+# 모든 신규 코드는 force_unload_all_loaded_models 사용 권장.
+force_unload_all_before_comfy = force_unload_all_loaded_models

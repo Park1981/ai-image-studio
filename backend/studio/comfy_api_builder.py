@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from itertools import count
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 from .presets import (
     EDIT_MODEL,
@@ -102,6 +102,40 @@ def _build_loaders(
     return unet_id, clip_id, vae_id
 
 
+def _apply_lora_chain(
+    api: ApiPrompt,
+    nid: Callable[[], str],
+    *,
+    base_model: NodeRef,
+    loras: Iterable[tuple[str, float]],
+) -> NodeRef:
+    """LoraLoaderModelOnly 노드 체인을 base_model 위에 순차 적용 (공용 헬퍼).
+
+    2026-04-27 (Claude F): 이미지 (_build_lora_chain) + 영상 (_build_video_lora_chain)
+    의 동일 LoraLoaderModelOnly 패턴을 단일 helper 로 추출 — 호출자는 (name, strength)
+    리스트만 만들면 됨. 노드 class_type / input shape 변경 시 한 곳만 갱신.
+
+    Args:
+        loras: (lora_name, strength_model) 튜플 시퀀스. 비어있으면 base_model 그대로 반환.
+
+    Returns:
+        체인의 최종 NodeRef. loras 가 비어있으면 base_model 와 동일.
+    """
+    model_ref: NodeRef = base_model
+    for name, strength in loras:
+        lid = nid()
+        api[lid] = {
+            "class_type": "LoraLoaderModelOnly",
+            "inputs": {
+                "model": model_ref,
+                "lora_name": name,
+                "strength_model": float(strength),
+            },
+        }
+        model_ref = [lid, 0]
+    return model_ref
+
+
 def _build_lora_chain(
     api: ApiPrompt,
     nid: Callable[[], str],
@@ -115,31 +149,16 @@ def _build_lora_chain(
 
     체인 순서:
         base_model → [LightningLoRA 1.0] → [Extra LoRA n (strength 각각)] → ...
+
+    2026-04-27 (Claude F): 핵심 노드 체인 로직은 _apply_lora_chain 위임.
+    이 함수는 Lightning 분기를 처리해 (name, strength) 리스트를 만든다.
     """
-    model_ref: NodeRef = base_model
+    chain: list[tuple[str, float]] = []
     if lightning and lightning_lora_name:
-        light_id = nid()
-        api[light_id] = {
-            "class_type": "LoraLoaderModelOnly",
-            "inputs": {
-                "model": model_ref,
-                "lora_name": lightning_lora_name,
-                "strength_model": 1.0,
-            },
-        }
-        model_ref = [light_id, 0]
+        chain.append((lightning_lora_name, 1.0))
     for extra in extra_loras:
-        ex_id = nid()
-        api[ex_id] = {
-            "class_type": "LoraLoaderModelOnly",
-            "inputs": {
-                "model": model_ref,
-                "lora_name": extra.name,
-                "strength_model": float(extra.strength),
-            },
-        }
-        model_ref = [ex_id, 0]
-    return model_ref
+        chain.append((extra.name, float(extra.strength)))
+    return _apply_lora_chain(api, nid, base_model=base_model, loras=chain)
 
 
 def _apply_model_sampling(
@@ -569,20 +588,15 @@ def _build_video_lora_chain(
     base_model: NodeRef,
     loras: list[VideoLoraEntry],
 ) -> NodeRef:
-    """VideoLoraEntry 리스트를 순차 적용. (lightning 토글 없음, 전부 고정 적용)"""
-    model_ref = base_model
-    for lora in loras:
-        lid = nid()
-        api[lid] = {
-            "class_type": "LoraLoaderModelOnly",
-            "inputs": {
-                "model": model_ref,
-                "lora_name": lora.name,
-                "strength_model": float(lora.strength),
-            },
-        }
-        model_ref = [lid, 0]
-    return model_ref
+    """VideoLoraEntry 리스트를 순차 적용. (lightning 토글 없음, 전부 고정 적용)
+
+    2026-04-27 (Claude F): 노드 체인 자체는 _apply_lora_chain 공유 (이미지와 동일 패턴).
+    """
+    return _apply_lora_chain(
+        api, nid,
+        base_model=base_model,
+        loras=[(lora.name, float(lora.strength)) for lora in loras],
+    )
 
 
 def build_video_from_request(

@@ -3,6 +3,27 @@ history_db.py - studio_history 테이블 (SQLite · aiosqlite).
 
 프론트 HistoryItem 과 1:1 대응. 레거시 `generations` 테이블과 분리.
 같은 DB 파일(settings.history_db_path)에 테이블만 별개로 추가.
+
+Schema version (2026-04-27 · C2-P2-3 도입):
+    SCHEMA_VERSION = 현재 6.
+    PRAGMA user_version 으로 추적 — SQLite 빌트인 (별도 schema_version 테이블 불필요).
+
+    버전 이력:
+      v2 (2026-04-23) — upgraded_prompt_ko 컬럼
+      v3 (2026-04-24) — CHECK(mode) 에 'video' 추가 (테이블 재생성)
+      v4 (2026-04-24) — source_ref + comparison_analysis 컬럼
+      v5 (2026-04-24) — video 메타 4개 (adult/duration_sec/fps/frame_count)
+      v6 (2026-04-26) — refined_intent (Edit 한 사이클 gemma4 정제 캐시)
+
+    신규 버전 추가 정책:
+      1) 컬럼 추가 (`ALTER TABLE ... ADD COLUMN ...`) — try/except 로 idempotent.
+      2) 또는 테이블 재생성 (CHECK 제약 변경 등) — _migrate_add_video_mode 패턴.
+      3) SCHEMA_VERSION 상수 + 1.
+      4) init_studio_history_db() 가 모든 마이그레이션 실행 후 PRAGMA user_version 갱신.
+      5) 다음 실행에서 user_version=SCHEMA_VERSION 이면 마이그레이션 자체 skip
+         (성능 — 빈 ALTER 도 매번 실행 안 함).
+
+    legacy DB (user_version=0) 호환: 모든 마이그레이션이 idempotent 라 안전 재실행.
 """
 
 from __future__ import annotations
@@ -23,6 +44,24 @@ except Exception:
 
 
 log = logging.getLogger(__name__)
+
+
+# Schema version — 2026-04-27 (C2-P2-3) 도입.
+# 신규 마이그레이션 추가 시 + 1 + init 함수에 idempotent 적용 함수 추가.
+SCHEMA_VERSION = 6
+
+
+async def _get_schema_version(db: aiosqlite.Connection) -> int:
+    """PRAGMA user_version 으로 현재 schema 버전 조회 (legacy DB 는 0)."""
+    cur = await db.execute("PRAGMA user_version")
+    row = await cur.fetchone()
+    return int(row[0]) if row and row[0] is not None else 0
+
+
+async def _set_schema_version(db: aiosqlite.Connection, version: int) -> None:
+    """PRAGMA user_version = N 설정. 다음 init 호출 시 skip 판정에 사용."""
+    # PRAGMA 는 parameterized 안 됨 — 정수만 받으므로 f-string 안전.
+    await db.execute(f"PRAGMA user_version = {int(version)}")
 
 
 CREATE_TABLE = """
@@ -133,11 +172,32 @@ async def _migrate_add_video_mode(db: aiosqlite.Connection) -> None:
 
 
 async def init_studio_history_db() -> None:
-    """테이블/인덱스 생성 (idempotent) + 증분 마이그레이션."""
+    """테이블/인덱스 생성 (idempotent) + 증분 마이그레이션.
+
+    2026-04-27 (C2-P2-3): PRAGMA user_version 추적 도입.
+    user_version = SCHEMA_VERSION 이면 마이그레이션 step 자체 skip (빠른 부팅).
+    """
     async with aiosqlite.connect(_DB_PATH) as db:
         await db.execute(CREATE_TABLE)
         await db.execute(CREATE_IDX_CREATED)
         await db.execute(CREATE_IDX_MODE)
+        await db.commit()
+
+        current_version = await _get_schema_version(db)
+        if current_version >= SCHEMA_VERSION:
+            log.debug(
+                "studio_history schema v%d 최신 — 마이그레이션 skip (PRAGMA user_version=%d)",
+                SCHEMA_VERSION,
+                current_version,
+            )
+            log.info("studio_history DB ready at %s", _DB_PATH)
+            return
+
+        log.info(
+            "studio_history schema migration: v%d → v%d",
+            current_version,
+            SCHEMA_VERSION,
+        )
         # v2 (2026-04-23): upgraded_prompt_ko 컬럼 추가 (기존 DB 마이그레이션)
         try:
             await db.execute(
@@ -194,8 +254,12 @@ async def init_studio_history_db() -> None:
         except Exception:
             # 이미 존재하면 정상 (idempotent)
             pass
+        # 모든 마이그레이션 적용 후 schema version 마킹 (다음 부팅에서 skip).
+        await _set_schema_version(db, SCHEMA_VERSION)
         await db.commit()
-    log.info("studio_history DB ready at %s", _DB_PATH)
+    log.info(
+        "studio_history DB ready at %s (schema v%d)", _DB_PATH, SCHEMA_VERSION
+    )
 
 
 async def insert_item(item: dict[str, Any]) -> None:

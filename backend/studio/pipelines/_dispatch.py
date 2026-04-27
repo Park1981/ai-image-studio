@@ -267,7 +267,7 @@ async def _dispatch_to_comfy(
 
         # The unload must happen while holding the shared GPU slot; otherwise a
         # concurrent vision/upgrade call can load Ollama between unload and submit.
-        await ollama_unload.force_unload_all_before_comfy()
+        await ollama_unload.force_unload_all_loaded_models()
 
         async with ComfyUITransport() as comfy:
             uploaded_name: str | None = None

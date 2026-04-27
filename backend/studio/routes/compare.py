@@ -131,7 +131,7 @@ async def compare_analyze(
             # spec 19 후속 (옵션 1 · 사용자 진단): 자동 비교 분석 후 모델
             # unload 명령을 gate 안에서 보내야 다음 ComfyUI dispatch 와 race 가 없다.
             try:
-                await ollama_unload.force_unload_all_before_comfy(wait_sec=0.0)
+                await ollama_unload.force_unload_all_loaded_models(wait_sec=0.0)
             except Exception as unload_err:
                 log.info(
                     "compare-analyze post-unload failed (non-fatal): %s",

@@ -11,6 +11,14 @@ system_metrics.get_vram_breakdown() 이 get() 으로 조회해 응답에 포함.
   - keep_alive 정책에 따라 unload 됐을 수 있으나, 휴리스틱으로 충분.
 
 Thread safety: 단일 워커 가정 + 단순 dict 쓰기는 GIL 보호. 별도 lock 불필요.
+
+⚠️ 멀티 워커 정책 (2026-04-27 N7):
+  - 현재 .env / start.* 정책 = `uvicorn --workers 1` (단일 프로세스).
+  - 향후 `--workers 2+` 설정 시:
+      (a) 각 worker 가 별도 _state dict 를 가져 헤더 UI 가 worker 별 다른 값 표시
+      (b) record() 가 호출된 worker 만 정확하게 추적 (다른 worker 는 빈 dict)
+  - 마이그레이션 필요 시: Redis (간단) 또는 SQLite memory-mapped (빌트인) 공유.
+  - GPU 자체가 단일 자원이라 worker 늘려도 GPU lock 으로 직렬화돼 큰 이득 없음 — 그대로 유지 권장.
 """
 
 from __future__ import annotations

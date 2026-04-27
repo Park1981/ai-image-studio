@@ -295,25 +295,38 @@ async def get_vram_breakdown(
     ollama_nvidia_gb = ollama_mib / 1024
     ollama_total_gb = max(ollama_nvidia_gb, ollama_api_gb)
 
+    # ComfyUI 마지막 dispatch 정보 (폴백 분기에 사용 + 응답 build 에 재사용).
+    last = dispatch_state.get()
+    has_comfy_dispatch = bool(last.get("model")) if isinstance(last, dict) else False
+
     # 폴백: nvidia-smi compute-apps 가 ComfyUI 못 잡았을 때 — total - (ollama + other) 차이를 할당.
     # ollama_total_gb 사용 (API 보고 포함) — Ollama 동시 점유 swap 케이스 정확히 분리.
+    # 2026-04-27 (N8): ComfyUI dispatch 기록 없으면 갭은 ComfyUI 가 아닌 Other (Chrome /
+    #   게임 / driver) 로 분류. 잘못된 "ComfyUI 9.2G" 표시 차단.
     if comfyui_mib == 0.0 and total_used_gb is not None and total_used_gb > 0:
         other_gb_calc = other_mib / 1024
         accounted_gb = ollama_total_gb + other_gb_calc
         unaccounted_gb = total_used_gb - accounted_gb
         # 의미 있는 점유분만 (0.5GB 미만은 잡음 — driver 자체 사용분 등)
         if unaccounted_gb > 0.5:
-            comfyui_mib = unaccounted_gb * 1024
-            logger.debug(
-                "vram breakdown 폴백 — compute-apps 매칭 실패, total %.1fG - ollama %.1fG - other %.1fG = ComfyUI %.1fG 추정",
-                total_used_gb,
-                ollama_total_gb,
-                other_gb_calc,
-                unaccounted_gb,
-            )
-
-    # ComfyUI 마지막 dispatch 정보
-    last = dispatch_state.get()
+            if has_comfy_dispatch:
+                # ComfyUI dispatch 했고 nvidia-smi 가 used_memory 못 읽었으면 (Windows 권한 등)
+                # ComfyUI 로 추정 — 옛 동작.
+                comfyui_mib = unaccounted_gb * 1024
+                logger.debug(
+                    "vram breakdown 폴백 — compute-apps 매칭 실패, total %.1fG - ollama %.1fG - other %.1fG = ComfyUI %.1fG 추정",
+                    total_used_gb,
+                    ollama_total_gb,
+                    other_gb_calc,
+                    unaccounted_gb,
+                )
+            else:
+                # ComfyUI dispatch 기록 없음 → 갭은 외부 점유 (Chrome 등). Other 분류.
+                other_mib += unaccounted_gb * 1024
+                logger.debug(
+                    "vram breakdown — ComfyUI dispatch 기록 없음, unaccounted %.1fG 를 Other 로 분류",
+                    unaccounted_gb,
+                )
     comfyui_block: dict[str, Any] = {
         "vram_gb": round(comfyui_mib / 1024, 1),
     }
