@@ -42,10 +42,12 @@ jobs:
           pip install ruff pytest pytest-asyncio
 
       - name: Ruff
-        run: ruff check .
+        run: python -m ruff check .
 
       - name: Pytest
-        run: pytest tests/ -q
+        # `python -m pytest` 가 cwd 를 sys.path 에 자동 추가 — backend/ 에서 실행 시
+        # `studio` 모듈 import 가능 (CLAUDE.md 로컬 명령과 일관).
+        run: python -m pytest tests/ -q
 
   frontend:
     name: Frontend (tsc + lint + test + build)
