@@ -32,6 +32,7 @@ import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import { useEditInputs, useEditRunning } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 
 interface Props {
@@ -52,6 +53,11 @@ export default function EditLeftPanel({
   } = useEditInputs();
   const { running } = useEditRunning();
   const items = useHistoryStore((s) => s.items);
+  // 수정 후 자동 비교 분석 토글 — 설정 → Edit 좌측 패널 이동 (오빠 피드백 2026-04-27).
+  const autoCompareAnalysis = useSettingsStore((s) => s.autoCompareAnalysis);
+  const setAutoCompareAnalysis = useSettingsStore(
+    (s) => s.setAutoCompareAnalysis,
+  );
 
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
 
@@ -205,6 +211,16 @@ export default function EditLeftPanel({
             ? "Lightning 4-step · 빠름 · 약간 낮은 디테일 (기본)"
             : "Lightning OFF · 풀 퀄리티 · 약 ~38s 예상"
         }
+      />
+
+      {/* 수정 후 자동 비교 분석 — 옛 설정 토글에서 이 위치로 이동 (오빠 피드백 2026-04-27).
+       *  결과 완료 시 백그라운드로 5축 평가. VRAM>13GB 면 자동 skip. */}
+      <Toggle
+        checked={autoCompareAnalysis}
+        onChange={setAutoCompareAnalysis}
+        align="right"
+        label="🔍 수정 후 자동 비교 분석"
+        desc="결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 자동 skip)"
       />
     </StudioLeftPanel>
   );

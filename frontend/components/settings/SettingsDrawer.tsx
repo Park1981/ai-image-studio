@@ -573,71 +573,34 @@ function PreferencesSection() {
     hideGeneratePrompts,
     hideEditPrompts,
     hideVideoPrompts,
-    lightningByDefault,
-    autoCompareAnalysis,
     setHideGeneratePrompts,
     setHideEditPrompts,
     setHideVideoPrompts,
-    setLightningByDefault,
-    setAutoCompareAnalysis,
   } = useSettingsStore();
-  // autoStartComfy / setAutoStartComfy 는 store 보존 — 토글만 비노출 (2026-04-27).
+  // 비노출 (오빠 피드백 2026-04-27 후속4):
+  //  - lightningByDefault — 각 페이지 좌측 패널 lightning 토글로 충분 (중복 제거).
+  //  - autoCompareAnalysis — Edit 좌측 패널로 이동 (작업 단위 contextual 결정).
+  //  - autoStartComfy — 당장 불필요.
+  //  store 의 필드 + setter 는 모두 보존 (다른 곳에서 사용 / 미래 복원 대비).
+
+  // 통합 토글 — 3개 모두 동시 on/off (오빠 피드백 2026-04-27 후속4).
+  // checked: 3개 모두 ON 일 때만 ON 표시 (옛 사용자가 따로 토글한 케이스 대비).
+  const hideAll = hideGeneratePrompts && hideEditPrompts && hideVideoPrompts;
+  const onToggleHideAll = (v: boolean) => {
+    setHideGeneratePrompts(v);
+    setHideEditPrompts(v);
+    setHideVideoPrompts(v);
+  };
 
   return (
     <Section title="프리퍼런스" desc="기본 동작 토글 · 모든 변경 즉시 저장">
       <Toggle
-        checked={hideGeneratePrompts}
-        onChange={setHideGeneratePrompts}
+        checked={hideAll}
+        onChange={onToggleHideAll}
         align="right"
-        label="생성 프롬프트 숨기기"
-        desc="ON: 바로 생성 + 진행 모달 프롬프트 접힘 / OFF: 생성 전 AI 프롬프트 검수 모달 + 진행 중 펼침"
+        label="프롬프트 숨기기 (생성 · 수정 · 영상)"
+        desc="ON: 진행 모달 프롬프트 접힘 + 생성 전 검수 모달 미노출 / OFF: 펼침 + 검수 모달 노출"
       />
-      <Toggle
-        checked={hideEditPrompts}
-        onChange={setHideEditPrompts}
-        align="right"
-        label="수정 프롬프트 숨기기"
-        desc="ON: 진행 모달 프롬프트 접힘 (깔끔) / OFF: 진행 중 비전 분석·영어 프롬프트 펼침"
-      />
-      <Toggle
-        checked={hideVideoPrompts}
-        onChange={setHideVideoPrompts}
-        align="right"
-        label="영상 프롬프트 숨기기"
-        desc="ON: 진행 모달 프롬프트 접힘 (깔끔) / OFF: 진행 중 비전 분석·LTX 영어 프롬프트 펼침"
-      />
-      <Toggle
-        checked={lightningByDefault}
-        onChange={(v) => {
-          setLightningByDefault(v);
-          toast.info(
-            v ? "Lightning 기본 ON" : "Lightning 기본 OFF",
-            "다음부터 생성 화면 진입 시 반영돼요.",
-          );
-        }}
-        align="right"
-        label="Lightning 모드 기본 ON"
-        desc="생성 화면 진입 시 ⚡ 4-step 자동 선택"
-      />
-      <Toggle
-        checked={autoCompareAnalysis}
-        onChange={setAutoCompareAnalysis}
-        align="right"
-        label="수정 후 자동 비교 분석"
-        desc="Edit 결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 skip)"
-      />
-      {/* "앱 시작 시 ComfyUI 자동 실행" — 당장 불필요로 비노출 (오빠 피드백 2026-04-27).
-       *  store 의 autoStartComfy + AppShell 의 AutoStartBoot 동작은 그대로 — 토글만 숨김.
-       *  필요 시 이 블록만 다시 활성화. */}
-      {/*
-      <Toggle
-        checked={autoStartComfy}
-        onChange={setAutoStartComfy}
-        align="right"
-        label="앱 시작 시 ComfyUI 자동 실행"
-        desc="VRAM 계속 점유 — 주의"
-      />
-      */}
     </Section>
   );
 }
