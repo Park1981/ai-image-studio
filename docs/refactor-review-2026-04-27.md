@@ -760,8 +760,48 @@ Phase 0' 5건은 완료. 다음 라운드는 Phase 1 보강으로 이동.
 3. **Claude A `_ollama_client.py`** ✅ 완료
    - GPU gate 안정화 후 별도 단계로 진행. HTTP client 통합과 동시성 제어를 한 patch 에 묶지 않는 원칙 유지.
 
-4. **Frontend hook 테스트 확장**
+4. **Frontend hook 테스트 확장** ✅ 완료 (2026-04-27)
    - 이번 baseline 은 공통 유틸 중심 8 tests. 다음은 useGenerate/Edit/Video/VisionPipeline 직접 테스트.
+   - 처리: 19 tests (use-image-paste-target.test.ts 6개 + snap-dimension.test.ts 5개 추가).
 
-5. **UI/컴포넌트 분해**
+5. **UI/컴포넌트 분해** ✅ 완료 (2026-04-27)
    - `vision/compare/page.tsx`, `ProgressModal`, `ImageLightbox`, `VisionResultCard` 순서로 검토.
+   - 처리:
+     - vision/compare/page.tsx 883 → 217 (-75%) · components/studio/compare/{Left,Viewer,Analysis}.tsx
+     - VisionResultCard 865 → 68 (-92%) · vision-result/{RecipeV2View, PromptToggle, SummaryCard, DetailCard, LegacyV1View}.tsx
+     - ImageLightbox 910 → 465 (-49%) · lightbox/InfoPanel.tsx
+     - ProgressModal 945 → 402 (-57%) · progress/Timelines.tsx
+
+---
+
+## 16. Phase 1 보강 — 2026-04-27 완료 묶음
+
+문서 §6 Phase 1 + §15 잔여 항목 일괄 처리. 6 commits (`921cdc2 → ac40c5d`).
+
+### 16.1 백엔드 DRY (Claude 사각지대 5건)
+- **N6** `GPU_RELEASE_WAIT_SEC` 단일 상수 (1.5→1.0초 통일 · `vision/video pipeline + force_unload` 공유)
+- **N9** `_coerce_score → _json_utils.coerce_score` 이동 (모델 응답 파싱 도메인 통합)
+- **N1** `_proc_mgr.py` 단일 모듈 (`routes/_common + pipelines/_dispatch` try/except 중복 제거)
+- **Claude E** `_run_upgrade_call` 헬퍼 — `upgrade_generate/edit/video` 보일러플레이트 통합 (SYSTEM 분기 유지)
+- **Claude G** `_errors.py` 도메인 예외 (`OllamaError/ComfyError/StudioError`) + Ollama HTTP wrap
+
+### 16.2 Frontend (Codex+Claude 합의)
+- **C2-P1-7** `useImagePasteTarget` hook — `StudioUploadSlot + vision/compare/page.tsx` 분산 listener 통합
+- **C2-P1-8** `ResultHoverActionBar focus-within` + `ActionBarButton focus-visible` (키보드 a11y)
+- **C2-P1-1** `vision/compare/page.tsx` 859줄 분해 (Left/Viewer/Analysis 패널)
+- **C2-P1-2** 800줄대 컴포넌트 3개 분해 (VisionResultCard/ImageLightbox/ProgressModal · 합 2720→935)
+- **C2-P1-3** `api-client` barrel 24 사용처 직접 import 전환 (active 코드 0건 잔존)
+- **#8** Hook 테스트 확장 (npm test 8 → 19)
+
+### 16.3 베이스라인 (Phase 1 보강 후)
+- backend pytest **209 passed** (회귀 0)
+- backend ruff **clean**
+- frontend tsc **clean**
+- frontend lint **clean**
+- frontend npm test **19 passed**
+
+### 16.4 미해결 (차후 라운드)
+- **UI P0-1** viewport 정책 (데스크톱-only vs 반응형 — 사용자 결정 필요)
+- **N5/N7/N8** force_unload 함수명 / dispatch_state multi-worker / VRAM Other 분류 정밀화 (P2-P3)
+- **Claude F** LoRA 체인 통합 (`_apply_loras` 헬퍼)
+- **C2-P2-X** OpenAPI / CI 게이트 / SQLite 버전화 / startup script / visual regression / 디자인 시스템 문서
