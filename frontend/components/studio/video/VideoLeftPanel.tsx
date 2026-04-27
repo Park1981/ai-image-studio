@@ -206,35 +206,6 @@ export default function VideoLeftPanel({
         }
       />
 
-      {/* ── VRAM 주의 배너 ── */}
-      <div
-        style={{
-          padding: "10px 12px",
-          background: "var(--amber-soft)",
-          border: "1px solid rgba(250,173,20,.35)",
-          borderRadius: "var(--radius)",
-          fontSize: 11.5,
-          color: "var(--amber-ink)",
-          lineHeight: 1.55,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            fontWeight: 600,
-            marginBottom: 3,
-          }}
-        >
-          <Icon name="search" size={12} />
-          16GB VRAM 주의
-        </div>
-        공식 fp8 체크포인트(29GB)는 VRAM 초과. NVIDIA Control Panel →
-        “CUDA Sysmem Fallback: Prefer” 활성화 또는 <code>.env</code>에{" "}
-        <code>LTX_UNET_NAME</code> 지정으로 경량 variant 교체.
-      </div>
-
     </StudioLeftPanel>
   );
 }
@@ -262,15 +233,21 @@ function VideoResolutionSlider({
     : { width: 0, height: 0 };
   // 시간 가중치 — 1536 기준 대비 (픽셀수 제곱 근사)
   const timeFactor = Math.pow(longerEdge / VIDEO_LONGER_EDGE_MAX, 2);
-  const speedLabel =
-    timeFactor > 0.8
-      ? "고품질"
-      : timeFactor > 0.4
-        ? "표준"
-        : timeFactor > 0.18
-          ? "빠름"
-          : "매우 빠름";
+  const speed = pickSpeedTone(timeFactor);
   const ratio = hasSource ? simplifyRatio(sourceWidth!, sourceHeight!) : "—";
+
+  /** 원본 해상도로 longerEdge 설정 — clamp + step 스냅 */
+  const useOriginalSize = () => {
+    if (!hasSource) return;
+    const longer = Math.max(sourceWidth!, sourceHeight!);
+    const clamped = Math.min(
+      VIDEO_LONGER_EDGE_MAX,
+      Math.max(VIDEO_LONGER_EDGE_MIN, longer),
+    );
+    const stepped =
+      Math.round(clamped / VIDEO_LONGER_EDGE_STEP) * VIDEO_LONGER_EDGE_STEP;
+    setLongerEdge(stepped);
+  };
 
   return (
     <div
@@ -286,8 +263,9 @@ function VideoResolutionSlider({
       <div
         style={{
           display: "flex",
-          alignItems: "baseline",
+          alignItems: "center",
           justifyContent: "space-between",
+          gap: 8,
           marginBottom: 8,
         }}
       >
@@ -296,16 +274,64 @@ function VideoResolutionSlider({
         >
           영상 해상도
         </label>
-        <span
-          className="mono"
-          style={{
-            fontSize: 10.5,
-            color: "var(--ink-4)",
-            letterSpacing: ".04em",
-          }}
-        >
-          긴 변 {longerEdge}px · {speedLabel}
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+          {/* 원본 크기 버튼 — clamp + step snap (오빠 피드백) */}
+          <button
+            type="button"
+            onClick={useOriginalSize}
+            disabled={!hasSource}
+            title={
+              hasSource
+                ? `원본 크기로 (${Math.max(sourceWidth!, sourceHeight!)}px)`
+                : "원본 이미지 업로드 후 사용 가능"
+            }
+            style={{
+              all: "unset",
+              cursor: hasSource ? "pointer" : "not-allowed",
+              fontSize: 10.5,
+              fontWeight: 600,
+              padding: "3px 9px",
+              borderRadius: "var(--radius-full)",
+              border: "1px solid var(--line)",
+              background: "var(--bg-2)",
+              color: hasSource ? "var(--ink-2)" : "var(--ink-4)",
+              transition: "all .15s",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 3,
+            }}
+          >
+            📐 원본
+          </button>
+          {/* 속도 chip — 색상 dot + 라벨 (시간 트레이드오프 시각화) */}
+          <span
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 5,
+              padding: "3px 9px",
+              borderRadius: "var(--radius-full)",
+              background: speed.bg,
+              border: `1px solid ${speed.border}`,
+              fontSize: 10.5,
+              fontWeight: 600,
+              color: speed.ink,
+            }}
+            title={`${longerEdge}px 긴 변 · 처리 속도 ${speed.label}`}
+          >
+            <span
+              aria-hidden
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                background: speed.dot,
+                flexShrink: 0,
+              }}
+            />
+            {speed.label}
+          </span>
+        </div>
       </div>
       <input
         type="range"
@@ -321,7 +347,7 @@ function VideoResolutionSlider({
           cursor: hasSource ? "pointer" : "not-allowed",
         }}
       />
-      {/* 눈금 */}
+      {/* 눈금 + 현재 값 */}
       <div
         style={{
           display: "flex",
@@ -333,6 +359,9 @@ function VideoResolutionSlider({
         className="mono"
       >
         <span>{VIDEO_LONGER_EDGE_MIN}</span>
+        <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>
+          긴 변 {longerEdge}px
+        </span>
         <span>{VIDEO_LONGER_EDGE_MAX}</span>
       </div>
       <div
@@ -362,6 +391,52 @@ function VideoResolutionSlider({
       </div>
     </div>
   );
+}
+
+/** 처리 속도 → 색상 톤 매핑 (오빠 피드백 — 추상 라벨 → 색상 chip).
+ *  매우 빠름 = emerald · 빠름 = cyan · 표준 = amber · 고품질 = rose
+ *  배경/테두리는 옅게, dot 만 진한 색 → 시각 노이즈 ↓ */
+function pickSpeedTone(timeFactor: number): {
+  label: string;
+  bg: string;
+  border: string;
+  ink: string;
+  dot: string;
+} {
+  if (timeFactor > 0.8) {
+    return {
+      label: "고품질",
+      bg: "rgba(244,63,94,.08)",
+      border: "rgba(244,63,94,.32)",
+      ink: "#be123c",
+      dot: "#f43f5e",
+    };
+  }
+  if (timeFactor > 0.4) {
+    return {
+      label: "표준",
+      bg: "rgba(245,158,11,.10)",
+      border: "rgba(245,158,11,.32)",
+      ink: "#b45309",
+      dot: "#f59e0b",
+    };
+  }
+  if (timeFactor > 0.18) {
+    return {
+      label: "빠름",
+      bg: "rgba(6,182,212,.10)",
+      border: "rgba(6,182,212,.32)",
+      ink: "#0e7490",
+      dot: "#06b6d4",
+    };
+  }
+  return {
+    label: "매우 빠름",
+    bg: "rgba(34,197,94,.10)",
+    border: "rgba(34,197,94,.32)",
+    ink: "#15803d",
+    dot: "#22c55e",
+  };
 }
 
 /** 정수 비율 근사 — "16:9" / "3:4" 등 */
