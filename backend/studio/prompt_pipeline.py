@@ -407,6 +407,71 @@ async def translate_to_korean(
         return None
 
 
+async def _run_upgrade_call(
+    *,
+    system: str,
+    user_msg: str,
+    original: str,
+    model: str,
+    timeout: float,
+    resolved_url: str,
+    include_translation: bool,
+    log_label: str,
+) -> UpgradeResult:
+    """upgrade_*_prompt 공통 흐름 헬퍼 (Claude E · 2026-04-27).
+
+    3 함수 (generate/edit/video) 의 공통 보일러플레이트 통합:
+      1. _call_ollama_chat 호출 → 빈 응답 시 ValueError
+      2. _strip_repeat_noise + strip
+      3. 실패 시 fallback UpgradeResult 반환 (provider=fallback)
+      4. 성공 시 옵션으로 translate_to_korean 호출
+      5. 성공 UpgradeResult 반환
+
+    호출자는 (system, user_msg, original) 만 결정하면 되고 SYSTEM 분기 +
+    user message 조립 로직은 함수별로 유지.
+
+    Args:
+        system: SYSTEM_GENERATE / SYSTEM_EDIT / build_system_video(...) 등
+        user_msg: 함수별로 조립된 user 메시지
+        original: 폴백 시 upgraded 자리에 들어갈 원본 (사용자 입력)
+        log_label: 실패 로그 prefix (예: "gemma4 upgrade", "Edit prompt upgrade")
+    """
+    try:
+        upgraded_raw = await _call_ollama_chat(
+            ollama_url=resolved_url,
+            model=model,
+            system=system,
+            user=user_msg,
+            timeout=timeout,
+        )
+        en = _strip_repeat_noise(upgraded_raw.strip()).strip()
+        if not en:
+            raise ValueError("Empty response from Ollama")
+    except Exception as e:
+        log.warning("%s failed, falling back to original: %s", log_label, e)
+        return UpgradeResult(
+            upgraded=original,
+            fallback=True,
+            provider="fallback",
+            original=original,
+            translation=None,
+        )
+
+    ko = None
+    if include_translation:
+        ko = await translate_to_korean(
+            en, model=model, timeout=60.0, ollama_url=resolved_url
+        )
+
+    return UpgradeResult(
+        upgraded=en,
+        fallback=False,
+        provider="ollama",
+        original=original,
+        translation=ko,
+    )
+
+
 async def upgrade_generate_prompt(
     prompt: str,
     model: str = "gemma4-un:latest",
@@ -460,41 +525,15 @@ async def upgrade_generate_prompt(
         user_lines.append(hints_clean)
     user_msg = "\n".join(user_lines)
 
-    try:
-        # Call 1: 영문 업그레이드 (plain text)
-        upgraded_raw = await _call_ollama_chat(
-            ollama_url=resolved_url,
-            model=model,
-            system=SYSTEM_GENERATE,
-            user=user_msg,
-            timeout=timeout,
-        )
-        en = _strip_repeat_noise(upgraded_raw.strip()).strip()
-        if not en:
-            raise ValueError("Empty response from Ollama")
-    except Exception as e:
-        log.warning("gemma4 upgrade failed, falling back to original: %s", e)
-        return UpgradeResult(
-            upgraded=prompt,
-            fallback=True,
-            provider="fallback",
-            original=prompt,
-            translation=None,
-        )
-
-    # Call 2: 번역 (옵션 · 실패해도 en 은 살아남음)
-    ko = None
-    if include_translation:
-        ko = await translate_to_korean(
-            en, model=model, timeout=60.0, ollama_url=resolved_url
-        )
-
-    return UpgradeResult(
-        upgraded=en,
-        fallback=False,
-        provider="ollama",
+    return await _run_upgrade_call(
+        system=SYSTEM_GENERATE,
+        user_msg=user_msg,
         original=prompt,
-        translation=ko,
+        model=model,
+        timeout=timeout,
+        resolved_url=resolved_url,
+        include_translation=include_translation,
+        log_label="gemma4 upgrade",
     )
 
 
@@ -614,40 +653,15 @@ async def upgrade_edit_prompt(
     user_msg_parts.append(f"[Edit instruction]\n{edit_instruction.strip()}")
     user_msg = "\n\n".join(user_msg_parts)
 
-    try:
-        upgraded_raw = await _call_ollama_chat(
-            ollama_url=resolved_url,
-            model=model,
-            system=SYSTEM_EDIT,
-            user=user_msg,
-            timeout=timeout,
-        )
-        en = _strip_repeat_noise(upgraded_raw.strip()).strip()
-        if not en:
-            raise ValueError("Empty response from Ollama")
-    except Exception as e:
-        log.warning("Edit prompt upgrade failed: %s", e)
-        return UpgradeResult(
-            upgraded=edit_instruction,
-            fallback=True,
-            provider="fallback",
-            original=edit_instruction,
-            translation=None,
-        )
-
-    # 번역 (옵션)
-    ko = None
-    if include_translation:
-        ko = await translate_to_korean(
-            en, model=model, timeout=60.0, ollama_url=resolved_url
-        )
-
-    return UpgradeResult(
-        upgraded=en,
-        fallback=False,
-        provider="ollama",
+    return await _run_upgrade_call(
+        system=SYSTEM_EDIT,
+        user_msg=user_msg,
         original=edit_instruction,
-        translation=ko,
+        model=model,
+        timeout=timeout,
+        resolved_url=resolved_url,
+        include_translation=include_translation,
+        log_label="Edit prompt upgrade",
     )
 
 
@@ -683,40 +697,15 @@ async def upgrade_video_prompt(
         f"[User direction]\n{user_direction.strip()}"
     )
 
-    try:
-        upgraded_raw = await _call_ollama_chat(
-            ollama_url=resolved_url,
-            model=model,
-            system=build_system_video(adult=adult),
-            user=user_msg,
-            timeout=timeout,
-        )
-        en = _strip_repeat_noise(upgraded_raw.strip()).strip()
-        if not en:
-            raise ValueError("Empty response from Ollama")
-    except Exception as e:
-        log.warning("Video prompt upgrade failed: %s", e)
-        return UpgradeResult(
-            upgraded=user_direction,
-            fallback=True,
-            provider="fallback",
-            original=user_direction,
-            translation=None,
-        )
-
-    # 번역 (옵션 · 실패해도 en 은 살아남음)
-    ko = None
-    if include_translation:
-        ko = await translate_to_korean(
-            en, model=model, timeout=60.0, ollama_url=resolved_url
-        )
-
-    return UpgradeResult(
-        upgraded=en,
-        fallback=False,
-        provider="ollama",
+    return await _run_upgrade_call(
+        system=build_system_video(adult=adult),
+        user_msg=user_msg,
         original=user_direction,
-        translation=ko,
+        model=model,
+        timeout=timeout,
+        resolved_url=resolved_url,
+        include_translation=include_translation,
+        log_label="Video prompt upgrade",
     )
 
 

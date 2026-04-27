@@ -442,8 +442,9 @@ async def run_vision_pipeline(
     # 이전엔 clarify (gemma4 14.85GB) + analyze (qwen2.5vl 14GB) 가 동시 점유 →
     # 28GB > 16GB VRAM 한계 → swap. 이제 단계 전환마다 unload 로 swap 차단.
     # 비용: gemma4 cold reload ~5초 (upgrade 단계). swap 회피 가치 압도적.
+    # 2026-04-27 (N6): GPU_RELEASE_WAIT_SEC 단일 상수 공유.
     await ollama_unload.unload_model(text_model, ollama_url=resolved_url)
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(ollama_unload.GPU_RELEASE_WAIT_SEC)
 
     # ── 1단계: 비전 매트릭스 분석 ──
     analysis: EditVisionAnalysis | None = None
@@ -493,8 +494,9 @@ async def run_vision_pipeline(
 
     # spec 19 옵션 B: 비전 (qwen2.5vl) 호출 끝났으니 gemma4 호출 전 unload.
     # upgrade + translate 가 gemma4 reuse 라 cold reload 비용 한 번만.
+    # 2026-04-27 (N6): GPU_RELEASE_WAIT_SEC 단일 상수 공유.
     await ollama_unload.unload_model(vision_model, ollama_url=resolved_url)
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(ollama_unload.GPU_RELEASE_WAIT_SEC)
 
     # 정제 intent 가 있으면 upgrade 에도 함께 전달 (image_description 위에 추가)
     upgrade_input = (

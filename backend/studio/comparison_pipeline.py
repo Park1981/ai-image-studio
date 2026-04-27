@@ -26,6 +26,7 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from ._json_utils import coerce_score as _coerce_score
 from ._json_utils import parse_strict_json as _parse_strict_json
 from ._ollama_client import call_chat_payload
 from .presets import DEFAULT_OLLAMA_ROLES
@@ -633,24 +634,8 @@ def _coerce_intent(raw: Any) -> str:
     return s if s in ("edit", "preserve") else "preserve"
 
 
-def _coerce_score(raw: Any) -> int | None:
-    """0-100 정수로 정규화. None / 비정수 → None.
-
-    2026-04-26 (Codex 진단): 모델이 "95" / "95%" / "95/100" 같은 문자열로
-    응답해도 None 으로 돌리지 않도록 string 방어 추가. 종합 0% 버그 근본 차단.
-    """
-    if isinstance(raw, bool):
-        return None
-    if isinstance(raw, (int, float)):
-        return max(0, min(100, int(raw)))
-    if isinstance(raw, str):
-        # "95" / "95%" / "95/100" / " 95 " / "95 (high)" 등 처리
-        s = raw.strip().rstrip("%").split("/")[0].split("(")[0].strip()
-        try:
-            return max(0, min(100, int(float(s))))
-        except (ValueError, TypeError):
-            return None
-    return None
+# _coerce_score 는 ._json_utils.coerce_score 로 이동 (2026-04-27 N9).
+# `from studio.comparison_pipeline import _coerce_score` 호환 위해 위에서 alias import.
 
 
 def _coerce_v3_slots(

@@ -17,11 +17,9 @@ from fastapi import Request
 from ..tasks import Task
 
 # 레거시 process_manager 재활용 (실 프로세스 제어 + VRAM 조회).
-# 모듈 단위 단일 인스턴스 — system 라우트가 주로 사용 + compare 후 unload 등에서도 참조.
-try:
-    from services.process_manager import process_manager as _proc_mgr  # type: ignore
-except Exception:  # pragma: no cover - 테스트 환경
-    _proc_mgr = None
+# 2026-04-27 (N1): _proc_mgr.py 단일 모듈로 통합 — 한 곳에서 import.
+# system.py 가 `from ._common import _proc_mgr` 로 재export 사용 → noqa: F401.
+from .._proc_mgr import process_manager as _proc_mgr  # noqa: F401
 
 
 log = logging.getLogger("studio.routes")

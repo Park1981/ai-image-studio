@@ -82,8 +82,9 @@ async def run_video_pipeline(
     # spec 19 옵션 B: 비전 (qwen2.5vl ~14GB) 호출 끝났으니 gemma4 호출 전 unload.
     # 16GB VRAM 한계 → 두 모델 동시 점유 시 swap 발생. 단계별 unload 로 차단.
     # 비용: gemma4 cold load ~5초. swap 회피 가치 압도적 (LTX 샘플링 매우 무거움).
+    # 2026-04-27 (N6): GPU_RELEASE_WAIT_SEC 단일 상수 공유.
     await ollama_unload.unload_model(resolved_vision, ollama_url=resolved_url)
-    await asyncio.sleep(1.0)
+    await asyncio.sleep(ollama_unload.GPU_RELEASE_WAIT_SEC)
 
     upgrade = await upgrade_video_prompt(
         user_direction=user_direction,

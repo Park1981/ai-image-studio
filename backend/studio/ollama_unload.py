@@ -13,11 +13,14 @@ ollama_unload.py — Ollama 강제 unload 헬퍼 (spec 19 후속 · 2026-04-26).
   ComfyUI 디스패치 직전 명시적으로:
     1) /api/ps 로 현재 로드된 모든 모델 조회
     2) 각 모델에 /api/generate keep_alive=0 호출 → 즉시 unload 큐 등록
-    3) 1.5초 대기 → GPU 메모리 실제 반납 보장
+    3) GPU_RELEASE_WAIT_SEC 대기 → GPU 메모리 실제 반납 보장
     4) 그 후 ComfyUI 가 깨끗한 VRAM 에서 작업 시작
 
-비용: 매 generate/edit/video 마다 +1.5초 (ComfyUI 30초+ 작업 대비 무시 가능).
+비용: 매 generate/edit/video 마다 +GPU_RELEASE_WAIT_SEC 초 (ComfyUI 30초+ 대비 미미).
 효과: swap 차단 → sampling 속도 정상화.
+
+2026-04-27 (N6 단일화): vision_pipeline / video_pipeline 의 단계별 unload sleep 도
+이 상수를 공유 — 한 곳에서 조정하면 전체 일관 적용.
 """
 
 from __future__ import annotations
@@ -38,8 +41,9 @@ except Exception:  # pragma: no cover — 테스트/독립 실행 환경
 
 # unload 명령 응답 받은 후 GPU 메모리 실제 반납까지 기다리는 시간.
 # Ollama 가 비동기로 메모리 해제하므로 즉시 nvidia-smi 에 반영 안 됨.
-# 1.5초가 안전한 균형점 (실측: 1초도 보통 충분, 1.5초로 여유).
-GPU_RELEASE_WAIT_SEC = 1.5
+# 1.0초 = spec 19 에서 swap 차단 효과 검증된 값. force_unload_all_before_comfy 와
+# vision/video pipeline 의 단계별 unload 가 모두 이 상수를 공유 (DRY).
+GPU_RELEASE_WAIT_SEC = 1.0
 
 # /api/ps + /api/generate 호출 자체는 빠름 — 짧은 timeout 으로 충분.
 _PS_TIMEOUT = 5.0

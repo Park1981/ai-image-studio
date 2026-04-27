@@ -28,6 +28,9 @@ from pydantic import BaseModel
 
 from .. import ollama_unload
 from .._gpu_lock import GpuBusyError, acquire_gpu_slot, release_gpu_slot
+# 레거시 process_manager 재활용 — Studio 파이프라인 완료 시 idle shutdown 타이머 트리거.
+# 2026-04-27 (N1): _proc_mgr.py 단일 모듈로 통합 — 한 곳에서 import.
+from .._proc_mgr import process_manager as _proc_mgr
 from ..comfy_api_builder import _snap_dimension  # noqa: F401 — re-export 호환
 from ..comfy_transport import (
     ComfyUITransport,
@@ -40,12 +43,6 @@ if TYPE_CHECKING:
     from ..tasks import Task
 
 log = logging.getLogger(__name__)
-
-# 레거시 process_manager 재활용 — Studio 파이프라인 완료 시 idle shutdown 타이머 트리거.
-try:
-    from services.process_manager import process_manager as _proc_mgr  # type: ignore
-except Exception:  # pragma: no cover - 테스트 환경
-    _proc_mgr = None
 
 
 # ComfyUI 가 실제로 안 돌고 있어서 /prompt 가 실패해도 UI 는 Mock 이미지로 완주되게 할지.

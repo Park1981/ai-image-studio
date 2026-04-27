@@ -76,3 +76,25 @@ def coerce_str(v: Any) -> str:
     if isinstance(v, str):
         return v.strip()
     return ""
+
+
+def coerce_score(raw: Any) -> int | None:
+    """0-100 정수로 정규화. None / 비정수 → None.
+
+    2026-04-26 (Codex 진단): 모델이 "95" / "95%" / "95/100" 같은 문자열로
+    응답해도 None 으로 돌리지 않도록 string 방어 추가. 종합 0% 버그 근본 차단.
+    2026-04-27 (N9): comparison_pipeline 에서 _json_utils 로 이동 — 모델 응답
+    파싱 도메인 한 곳에 통합 (parse_strict_json / coerce_str / coerce_score).
+    """
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, (int, float)):
+        return max(0, min(100, int(raw)))
+    if isinstance(raw, str):
+        # "95" / "95%" / "95/100" / " 95 " / "95 (high)" 등 처리
+        s = raw.strip().rstrip("%").split("/")[0].split("(")[0].strip()
+        try:
+            return max(0, min(100, int(float(s))))
+        except (ValueError, TypeError):
+            return None
+    return None
