@@ -304,19 +304,7 @@ function StatusLine({
           :{port}
         </span>
       </div>
-      <span
-        style={{
-          fontSize: 11,
-          fontWeight: 600,
-          padding: "3px 9px",
-          borderRadius: "var(--radius-full)",
-          background: running ? "rgba(82,196,26,.12)" : "var(--bg-2)",
-          color: running ? "#15803d" : "var(--ink-3)",
-          border: `1px solid ${running ? "rgba(82,196,26,.32)" : "var(--line)"}`,
-        }}
-      >
-        {running ? "실행 중" : "정지"}
-      </span>
+      {/* 상태 chip 제거 (2026-04-27 오빠 피드백) — 좌측 dot 이 이미 상태 표시함. */}
       <button
         type="button"
         onClick={onToggle}
@@ -576,15 +564,14 @@ function PreferencesSection() {
     hideEditPrompts,
     hideVideoPrompts,
     lightningByDefault,
-    autoStartComfy,
     autoCompareAnalysis,
     setHideGeneratePrompts,
     setHideEditPrompts,
     setHideVideoPrompts,
     setLightningByDefault,
-    setAutoStartComfy,
     setAutoCompareAnalysis,
   } = useSettingsStore();
+  // autoStartComfy / setAutoStartComfy 는 store 보존 — 토글만 비노출 (2026-04-27).
 
   return (
     <Section title="프리퍼런스" desc="기본 동작 토글 · 모든 변경 즉시 저장">
@@ -629,6 +616,10 @@ function PreferencesSection() {
         label="수정 후 자동 비교 분석"
         desc="Edit 결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 skip)"
       />
+      {/* "앱 시작 시 ComfyUI 자동 실행" — 당장 불필요로 비노출 (오빠 피드백 2026-04-27).
+       *  store 의 autoStartComfy + AppShell 의 AutoStartBoot 동작은 그대로 — 토글만 숨김.
+       *  필요 시 이 블록만 다시 활성화. */}
+      {/*
       <Toggle
         checked={autoStartComfy}
         onChange={setAutoStartComfy}
@@ -636,6 +627,7 @@ function PreferencesSection() {
         label="앱 시작 시 ComfyUI 자동 실행"
         desc="VRAM 계속 점유 — 주의"
       />
+      */}
     </Section>
   );
 }
