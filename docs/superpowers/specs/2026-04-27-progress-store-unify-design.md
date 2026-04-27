@@ -332,9 +332,20 @@ function usePipelineCtx(mode: HistoryMode): PipelineCtx {
 ## 4. 백엔드 emit 통일
 
 ### 4.1 변경 원칙
-- `task.emit("stage", {...})` 만 사용 (이중 트랙 제거)
-- step 이벤트 폐기 (Edit/Video 도 `step` 안 보냄). step-번호 의존 제거.
-- stage 의 payload 안에 detail 정보 포함:
+
+**Phase 1 (transitional · 안전 우선)**:
+- 백엔드는 `stage` + `step` **둘 다 emit** (옛 EditTimeline/VideoTimeline 깨지지 않게 보호)
+- `stage` payload 안에 detail 정보 추가 흡수 (PipelineTimeline 이 사용)
+- 옛 step 이벤트는 그대로 유지 (옛 컴포넌트가 사용 계속)
+
+**Phase 4 (정리 단계)**:
+- 옛 step 이벤트 emit 제거 (이중 트랙 종료)
+- step-번호 의존 store 필드 제거 (stepDone/currentStep/stepHistory)
+- 모든 timeline 이 PipelineTimeline 으로 통일된 후
+
+**왜 transitional 인가**: Phase 1 끝 시점에 옛 EditTimeline/VideoTimeline 이 아직 살아있음 (Phase 2/3 에서 교체). 백엔드 step emit 즉시 제거하면 옛 컴포넌트가 step 받지 못해 진행 표시 깨짐. 둘 다 보내는 게 회귀 위험 0.
+
+### 4.2 stage payload 흡수 예시
 
 ```python
 # Edit step 1 완료 (현재)
@@ -350,16 +361,18 @@ await task.emit("stage", {
 })
 ```
 
-### 4.2 Edit/Video pipeline 변경 요약
-| 단계 | 현재 emit | 통일 후 emit |
-|------|-----------|--------------|
-| 1 진입 | `stage(vision-analyze, 10) + step(1, false)` | `stage(vision-analyze, 10)` |
-| 1 완료 | `step(1, true, description=...)` + `stage(vision-analyze, 30)` | `stage(vision-analyze, 30, description=...)` |
-| 2 진입 | `stage(prompt-merge, 40) + step(2, false)` | `stage(prompt-merge, 40)` |
-| 2 완료 | `step(2, true, finalPrompt=..., finalPromptKo=..., provider=...)` + `stage(prompt-merge, 50)` | `stage(prompt-merge, 50, finalPrompt=..., finalPromptKo=..., provider=...)` |
-| ... | ... | ... |
+### 4.3 Edit/Video pipeline 변경 요약 (Phase 1 transitional)
 
-Generate 는 이미 통일된 패턴 (변경 0).
+| 단계 | 현재 emit | Phase 1 (transitional · 둘 다) | Phase 4 (정리 후) |
+|------|-----------|-------------------------------|-------------------|
+| 1 진입 | `stage(vision-analyze, 10) + step(1, false)` | `stage(vision-analyze, 10) + step(1, false)` (변경 0) | `stage(vision-analyze, 10)` |
+| 1 완료 | `step(1, true, description=...)` + `stage(vision-analyze, 30)` | `step(1, true, description=...)` + `stage(vision-analyze, 30, description=..., editVisionAnalysis=...)` | `stage(vision-analyze, 30, description=..., editVisionAnalysis=...)` |
+| 2 완료 | `step(2, true, finalPrompt=..., finalPromptKo=..., provider=...)` + `stage(prompt-merge, 50)` | `step(2, true, finalPrompt=..., finalPromptKo=..., provider=...)` + `stage(prompt-merge, 50, finalPrompt=..., finalPromptKo=..., provider=...)` | `stage(prompt-merge, 50, finalPrompt=..., finalPromptKo=..., provider=...)` |
+| ... | ... | ... | ... |
+
+핵심: Phase 1 에서는 stage payload 만 풍부해짐 (step 도 그대로). Phase 4 에서 step 제거.
+
+Generate 는 이미 통일된 패턴 — Phase 1 에서 변경 0.
 
 ### 4.3 SSE 클라이언트 (consumePipelineStream) 변경
 `frontend/hooks/usePipelineStream.ts` (또는 동등 위치) 의 stage handler 가 payload 의 임의 필드를 store 의 stageHistory[].payload 로 흘려 보내도록 수정. step 이벤트는 무시 (또는 호환을 위해 그대로 두되 마이그레이션 후 제거).
@@ -401,7 +414,7 @@ async def _ensure_comfyui_ready(task: Task, progress_at: int) -> None:
 - [ ] `frontend/components/studio/progress/PipelineTimeline.tsx` 신설
 - [ ] `frontend/components/studio/progress/DetailBox.tsx` 추출 (기존 Timelines.tsx 의 DetailBox)
 - [ ] `frontend/components/studio/progress/TimelineRow.tsx` 추출 (기존 Timelines.tsx 의 TimelineRow)
-- [ ] 백엔드 `edit.py` / `video.py` 의 step emit 폐기 + stage payload 에 detail 흡수
+- [ ] 백엔드 `edit.py` / `video.py` 의 stage emit 에 detail payload **추가** (step emit 은 그대로 유지 · transitional)
 - [ ] 검증 — pytest 201/201 + tsc clean + lint clean
 - [ ] **Commit + Push**: "refactor(progress): StageDef 시스템 + PipelineTimeline 도입 (Phase 1)"
 
@@ -423,6 +436,7 @@ async def _ensure_comfyui_ready(task: Task, progress_at: int) -> None:
 ### Phase 4 — 정리 + Master 머지 (~1h)
 - [ ] 기존 `progress/Timelines.tsx` 의 GenerateTimeline/EditTimeline/VideoTimeline 제거 (또는 PipelineTimeline 호출하는 thin wrapper 만 유지)
 - [ ] `useGenerateStore` 의 stage/stageHistory 가 통일 인터페이스에 맞게 정렬 (별도 작업 거의 없음)
+- [ ] **백엔드 step emit 제거** — `edit.py` / `video.py` 의 `task.emit("step", ...)` 모두 삭제 (transitional 종료)
 - [ ] 옛 `step` SSE 핸들러 dead code 제거
 - [ ] pytest 회귀 + 실 동작 3 mode 모두 한 번씩
 - [ ] **Master merge** — `git checkout master && git merge --no-ff claude/progress-store-unify`
