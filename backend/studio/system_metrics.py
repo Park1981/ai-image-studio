@@ -351,3 +351,97 @@ async def get_vram_breakdown(
         },
         "other_gb": round(other_mib / 1024, 1),
     }
+
+
+# ─────────────────────────────────────────────
+# RAM breakdown (2026-04-27 신설) — 프로세스별 RSS 분류
+# ─────────────────────────────────────────────
+
+_OLLAMA_NAME_HINTS_RAM = ("ollama",)
+
+
+def _query_ram_breakdown(
+    backend_pid: int | None,
+    comfyui_pid: int | None,
+    ollama_pid: int | None,
+) -> dict[str, Any]:
+    """프로세스별 RAM 사용량 분류 (RSS · GB) — psutil 동기.
+
+    분류:
+      - backend  : 우리 FastAPI 프로세스
+      - comfyui  : process_manager 가 띄운 PID
+      - ollama   : start.ps1 가 띄운 ollama (name 매칭) 또는 process_manager PID
+      - other_gb : 시스템 나머지 (vm.used - 위 3개 합)
+
+    실패 graceful — 측정 불가 시 빈 dict.
+    """
+    backend_mb = 0.0
+    comfyui_mb = 0.0
+    ollama_mb = 0.0
+
+    # PID 직접 매칭 — 가장 정확.
+    direct_pids: dict[int, str] = {}
+    if backend_pid:
+        direct_pids[backend_pid] = "backend"
+    if comfyui_pid:
+        direct_pids[comfyui_pid] = "comfyui"
+    if ollama_pid:
+        direct_pids[ollama_pid] = "ollama"
+
+    try:
+        for proc in psutil.process_iter(["pid", "name", "memory_info"]):
+            try:
+                info = proc.info
+                pid = int(info.get("pid") or 0)
+                mem = info.get("memory_info")
+                if not mem:
+                    continue
+                rss_mb = mem.rss / (1024**2)
+                kind = direct_pids.get(pid)
+                if kind == "backend":
+                    backend_mb += rss_mb
+                    continue
+                if kind == "comfyui":
+                    comfyui_mb += rss_mb
+                    continue
+                if kind == "ollama":
+                    ollama_mb += rss_mb
+                    continue
+                # 이름 휴리스틱 (start.ps1 이 띄운 ollama 케이스).
+                name = (info.get("name") or "").lower()
+                if any(h in name for h in _OLLAMA_NAME_HINTS_RAM):
+                    ollama_mb += rss_mb
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception as exc:  # pragma: no cover
+        logger.warning("RAM breakdown 측정 실패: %s", exc)
+        return {}
+
+    # 시스템 총 사용 (other 계산)
+    try:
+        vm = psutil.virtual_memory()
+        total_used_mb = vm.used / (1024**2)
+    except Exception:
+        total_used_mb = 0.0
+
+    accounted_mb = backend_mb + comfyui_mb + ollama_mb
+    other_mb = max(0.0, total_used_mb - accounted_mb)
+
+    return {
+        "backend_gb": round(backend_mb / 1024, 2),
+        "comfyui_gb": round(comfyui_mb / 1024, 2),
+        "ollama_gb": round(ollama_mb / 1024, 2),
+        "other_gb": round(other_mb / 1024, 1),
+    }
+
+
+async def get_ram_breakdown(
+    *,
+    backend_pid: int | None = None,
+    comfyui_pid: int | None = None,
+    ollama_pid: int | None = None,
+) -> dict[str, Any]:
+    """비동기 wrapper — psutil process_iter 가 sync 라 to_thread 로."""
+    return await asyncio.to_thread(
+        _query_ram_breakdown, backend_pid, comfyui_pid, ollama_pid
+    )

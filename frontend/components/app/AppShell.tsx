@@ -74,6 +74,7 @@ function ProcessStatusPoller() {
         gpuPercent: snapshot.gpuPercent,
         cpuPercent: snapshot.cpuPercent,
         vramBreakdown: snapshot.vramBreakdown,
+        ramBreakdown: snapshot.ramBreakdown,
       });
     };
 

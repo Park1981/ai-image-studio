@@ -4,7 +4,12 @@
  */
 
 import { STUDIO_BASE, USE_MOCK } from "./client";
-import type { OllamaModel, ProcessStatusSnapshot, VramBreakdown } from "./types";
+import type {
+  OllamaModel,
+  ProcessStatusSnapshot,
+  RamBreakdown,
+  VramBreakdown,
+} from "./types";
 
 /**
  * 백엔드 /process/status 폴링 — 프로세스 상태 + CPU/RAM/GPU%/VRAM 원샷 조회.
@@ -43,6 +48,12 @@ export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null
             expires_in_sec?: number | null;
           }>;
         };
+        other_gb?: number;
+      };
+      ram_breakdown?: {
+        backend_gb?: number;
+        comfyui_gb?: number;
+        ollama_gb?: number;
         other_gb?: number;
       };
     };
@@ -85,6 +96,18 @@ export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null
       };
     }
 
+    // RAM breakdown — snake → camel.
+    let ramBreakdown: RamBreakdown | null = null;
+    const rb = data.ram_breakdown;
+    if (rb) {
+      ramBreakdown = {
+        backendGb: rb.backend_gb ?? 0,
+        comfyuiGb: rb.comfyui_gb ?? 0,
+        ollamaGb: rb.ollama_gb ?? 0,
+        otherGb: rb.other_gb ?? 0,
+      };
+    }
+
     return {
       ollamaRunning: !!data.ollama?.running,
       comfyuiRunning: !!data.comfyui?.running,
@@ -93,6 +116,7 @@ export async function fetchProcessStatus(): Promise<ProcessStatusSnapshot | null
       gpuPercent: data.comfyui?.gpu_percent ?? null,
       cpuPercent: data.system?.cpu_percent ?? null,
       vramBreakdown,
+      ramBreakdown,
     };
   } catch {
     return null;

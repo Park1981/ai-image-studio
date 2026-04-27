@@ -8,7 +8,7 @@
 
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import { Toggle } from "@/components/ui/primitives";
 import { GENERATE_MODEL, EDIT_MODEL } from "@/lib/model-presets";
@@ -19,7 +19,8 @@ import { useGenerateStore } from "@/stores/useGenerateStore";
 import { toast } from "@/stores/useToastStore";
 import { setProcessStatus } from "@/lib/api/process";
 import { USE_MOCK } from "@/lib/api/client";
-import { clearHistory as apiClearHistory } from "@/lib/api/history";
+import { clearHistory as apiClearHistory, getHistoryStats } from "@/lib/api/history";
+import type { HistoryStats } from "@/lib/api/types";
 import { useSettings } from "./SettingsContext";
 
 /* ─────────────────────────────────
@@ -81,6 +82,7 @@ export default function SettingsDrawer() {
           }}
         >
           <ProcessSection />
+          <SystemMetricsSection />
           <ModelSection />
           {/* 프롬프트 템플릿 — 사용 빈도 낮음으로 비노출 (오빠 피드백 2026-04-27).
            *  TemplatesSection 함수와 store 의 templates/addTemplate/removeTemplate 은 보존 —
@@ -326,6 +328,238 @@ function StatusLine({
       >
         {running ? "정지" : "시작"}
       </button>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────
+   1.5 System Metrics (2026-04-27 신설 · 헤더 4-bar 의 상세 버전)
+   ───────────────────────────────── */
+
+/** CPU/GPU/VRAM/RAM 한 줄/한 막대 + VRAM/RAM 들여쓰기 분해.
+ *  데이터 = useProcessStore (5초 폴링 결과 재사용 — 추가 fetch 없음). */
+function SystemMetricsSection() {
+  const cpuPercent = useProcessStore((s) => s.cpuPercent);
+  const gpuPercent = useProcessStore((s) => s.gpuPercent);
+  const vram = useProcessStore((s) => s.vram);
+  const ram = useProcessStore((s) => s.ram);
+  const vramBreakdown = useProcessStore((s) => s.vramBreakdown);
+  const ramBreakdown = useProcessStore((s) => s.ramBreakdown);
+
+  return (
+    <Section title="시스템 자원" desc="실시간 (5초 주기 갱신)">
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          gap: 14,
+          padding: "12px 14px",
+          background: "var(--surface)",
+          border: "1px solid var(--line)",
+          borderRadius: "var(--radius)",
+        }}
+      >
+        <MetricBar
+          label="CPU"
+          accent="#06b6d4"
+          percent={cpuPercent}
+          rightText={cpuPercent != null ? `${cpuPercent.toFixed(1)}%` : "—"}
+        />
+        <MetricBar
+          label="GPU"
+          accent="#22c55e"
+          percent={gpuPercent}
+          rightText={gpuPercent != null ? `${gpuPercent.toFixed(1)}%` : "—"}
+        />
+        <div>
+          <MetricBar
+            label="VRAM"
+            accent="#8b5cf6"
+            percent={
+              vram && vram.totalGb > 0
+                ? (vram.usedGb / vram.totalGb) * 100
+                : null
+            }
+            rightText={
+              vram ? `${vram.usedGb.toFixed(1)} / ${vram.totalGb.toFixed(0)} GB` : "—"
+            }
+          />
+          {vramBreakdown && (
+            <BreakdownLines
+              lines={[
+                {
+                  label: "Ollama",
+                  value: vramBreakdown.ollama.vramGb,
+                  detail: vramBreakdown.ollama.models.length
+                    ? vramBreakdown.ollama.models[0].name
+                    : undefined,
+                },
+                {
+                  label: "ComfyUI",
+                  value: vramBreakdown.comfyui.vramGb,
+                  detail: vramBreakdown.comfyui.models.length
+                    ? vramBreakdown.comfyui.models[0]
+                    : undefined,
+                },
+                { label: "기타", value: vramBreakdown.otherGb },
+              ]}
+              unit="GB"
+            />
+          )}
+        </div>
+        <div>
+          <MetricBar
+            label="RAM"
+            accent="#f59e0b"
+            percent={
+              ram && ram.totalGb > 0
+                ? (ram.usedGb / ram.totalGb) * 100
+                : null
+            }
+            rightText={
+              ram ? `${ram.usedGb.toFixed(1)} / ${ram.totalGb.toFixed(0)} GB` : "—"
+            }
+          />
+          {ramBreakdown && (
+            <BreakdownLines
+              lines={[
+                { label: "Backend", value: ramBreakdown.backendGb },
+                { label: "ComfyUI", value: ramBreakdown.comfyuiGb },
+                { label: "Ollama", value: ramBreakdown.ollamaGb },
+                { label: "기타", value: ramBreakdown.otherGb },
+              ]}
+              unit="GB"
+            />
+          )}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+/** 막대 한 줄 — label + bar + 우측 수치. percent null = 측정 불가 (회색 빈 막대). */
+function MetricBar({
+  label,
+  accent,
+  percent,
+  rightText,
+}: {
+  label: string;
+  accent: string;
+  percent: number | null;
+  rightText: string;
+}) {
+  const clamped = percent == null ? 0 : Math.max(0, Math.min(100, percent));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "baseline",
+          justifyContent: "space-between",
+          gap: 8,
+        }}
+      >
+        <span
+          style={{
+            fontSize: 11.5,
+            fontWeight: 600,
+            color: "var(--ink-2)",
+            letterSpacing: ".02em",
+          }}
+        >
+          {label}
+        </span>
+        <span
+          className="mono"
+          style={{
+            fontSize: 11,
+            color: "var(--ink-3)",
+            fontWeight: 500,
+          }}
+        >
+          {rightText}
+        </span>
+      </div>
+      <div
+        style={{
+          height: 6,
+          width: "100%",
+          background: "var(--bg-2)",
+          borderRadius: "var(--radius-full)",
+          overflow: "hidden",
+        }}
+      >
+        <div
+          style={{
+            height: "100%",
+            width: `${clamped}%`,
+            background: accent,
+            transition: "width .3s ease, background .2s",
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** 들여쓰기 분해 라인 — VRAM/RAM 아래 ↳ 형태. value 0 도 표시 (점유 없음 명시). */
+function BreakdownLines({
+  lines,
+  unit,
+}: {
+  lines: Array<{ label: string; value: number; detail?: string }>;
+  unit: string;
+}) {
+  return (
+    <div
+      style={{
+        marginTop: 6,
+        paddingLeft: 10,
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+      }}
+    >
+      {lines.map((l) => (
+        <div
+          key={l.label}
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            gap: 8,
+            fontSize: 10.5,
+          }}
+        >
+          <span style={{ color: "var(--ink-4)" }}>
+            <span style={{ marginRight: 4 }}>↳</span>
+            {l.label}
+            {l.detail && (
+              <span
+                className="mono"
+                style={{
+                  marginLeft: 6,
+                  fontSize: 9.5,
+                  color: "var(--ink-4)",
+                  opacity: 0.7,
+                }}
+              >
+                {l.detail}
+              </span>
+            )}
+          </span>
+          <span
+            className="mono"
+            style={{
+              color: "var(--ink-3)",
+              fontWeight: 500,
+            }}
+          >
+            {l.value.toFixed(2)} {unit}
+          </span>
+        </div>
+      ))}
     </div>
   );
 }
@@ -606,11 +840,37 @@ function PreferencesSection() {
 }
 
 /* ─────────────────────────────────
-   5. History 관리 (추가 섹션)
+   5. History (2026-04-27 통계 카드 확장)
    ───────────────────────────────── */
+
+/** 바이트 → 사람 친화 문자열 (KB/MB/GB). */
+function fmtBytes(n: number): string {
+  if (!n || n < 0) return "0 B";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${(n / 1024).toFixed(1)} KB`;
+  if (n < 1024 * 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 function HistorySection() {
   const count = useHistoryStore((s) => s.items.length);
   const clear = useHistoryStore((s) => s.clear);
+
+  // 서버 통계 — 설정 열릴 때마다 1회 + 30초 주기 갱신.
+  const [stats, setStats] = useState<HistoryStats | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    const tick = async () => {
+      const s = await getHistoryStats();
+      if (!cancelled) setStats(s);
+    };
+    tick();
+    const id = setInterval(tick, 30_000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, []);
 
   const handleClear = async () => {
     if (count === 0) return;
@@ -620,7 +880,6 @@ function HistorySection() {
       );
       if (!ok) return;
     }
-    // 서버에도 전파 (USE_MOCK=true 면 no-op)
     try {
       await apiClearHistory();
     } catch (e) {
@@ -630,56 +889,210 @@ function HistorySection() {
       );
     }
     clear();
+    setStats({
+      count: 0,
+      totalSizeBytes: 0,
+      dbSizeBytes: stats?.dbSizeBytes ?? 0,
+      byMode: {
+        generate: { count: 0, sizeBytes: 0 },
+        edit: { count: 0, sizeBytes: 0 },
+        video: { count: 0, sizeBytes: 0 },
+      },
+    });
     toast.success("히스토리 비워짐");
   };
 
+  // 갯수 = 서버 통계 우선, 없으면 store 폴백.
+  const displayCount = stats?.count ?? count;
+  const totalSize = stats?.totalSizeBytes ?? 0;
+  const dbSize = stats?.dbSizeBytes ?? 0;
+
   return (
-    <Section title="히스토리" desc="생성/수정 기록 관리">
+    <Section title="히스토리" desc="생성/수정/영상 기록 + 디스크 사용량">
       <div
         style={{
           display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 12px",
+          flexDirection: "column",
           background: "var(--surface)",
           border: "1px solid var(--line)",
           borderRadius: "var(--radius)",
+          overflow: "hidden",
         }}
       >
-        <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-          <span style={{ fontSize: 13, fontWeight: 500 }}>저장된 기록</span>
-          <span
-            className="mono"
-            style={{
-              fontSize: 11,
-              color: "var(--ink-4)",
-              letterSpacing: ".04em",
-            }}
-          >
-            {count} items
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={handleClear}
-          disabled={count === 0}
+        {/* 상단 — 총 갯수 + 총 용량 */}
+        <div
           style={{
-            all: "unset",
-            cursor: count === 0 ? "not-allowed" : "pointer",
-            padding: "5px 10px",
-            fontSize: 11.5,
-            fontWeight: 500,
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid var(--line)",
-            background: "var(--bg)",
-            color: count === 0 ? "var(--ink-4)" : "#C0392B",
-            opacity: count === 0 ? 0.5 : 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            padding: "10px 12px",
+            borderBottom: "1px solid var(--line)",
           }}
         >
-          모두 삭제
-        </button>
+          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+              저장된 기록
+            </span>
+            <span
+              className="mono"
+              style={{ fontSize: 10.5, color: "var(--ink-4)" }}
+            >
+              DB {fmtBytes(dbSize)}
+            </span>
+          </div>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
+            <span
+              className="mono"
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: "var(--ink)",
+              }}
+            >
+              {displayCount}
+            </span>
+            <span
+              className="mono"
+              style={{
+                fontSize: 11,
+                color: "var(--ink-3)",
+                fontWeight: 500,
+              }}
+            >
+              {fmtBytes(totalSize)}
+            </span>
+          </div>
+        </div>
+
+        {/* 모드별 분해 */}
+        {stats && (
+          <>
+            <HistoryModeRow
+              icon="image"
+              accent="#3b82f6"
+              label="이미지 생성"
+              count={stats.byMode.generate.count}
+              sizeBytes={stats.byMode.generate.sizeBytes}
+            />
+            <HistoryModeRow
+              icon="wand"
+              accent="#8b5cf6"
+              label="이미지 수정"
+              count={stats.byMode.edit.count}
+              sizeBytes={stats.byMode.edit.sizeBytes}
+            />
+            <HistoryModeRow
+              icon="play"
+              accent="#f43f5e"
+              label="영상 생성"
+              count={stats.byMode.video.count}
+              sizeBytes={stats.byMode.video.sizeBytes}
+              divider={false}
+            />
+          </>
+        )}
+
+        {/* 하단 액션 */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            padding: "8px 12px",
+            background: "var(--bg-2)",
+            borderTop: "1px solid var(--line)",
+          }}
+        >
+          <button
+            type="button"
+            onClick={handleClear}
+            disabled={displayCount === 0}
+            style={{
+              all: "unset",
+              cursor: displayCount === 0 ? "not-allowed" : "pointer",
+              padding: "5px 10px",
+              fontSize: 11.5,
+              fontWeight: 500,
+              borderRadius: "var(--radius-sm)",
+              border: "1px solid var(--line)",
+              background: "var(--bg)",
+              color: displayCount === 0 ? "var(--ink-4)" : "#C0392B",
+              opacity: displayCount === 0 ? 0.5 : 1,
+            }}
+          >
+            모두 삭제
+          </button>
+        </div>
       </div>
     </Section>
+  );
+}
+
+function HistoryModeRow({
+  icon,
+  accent,
+  label,
+  count,
+  sizeBytes,
+  divider = true,
+}: {
+  icon: IconName;
+  accent: string;
+  label: string;
+  count: number;
+  sizeBytes: number;
+  divider?: boolean;
+}) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 12px",
+        borderBottom: divider ? "1px solid var(--line)" : "none",
+        opacity: count === 0 ? 0.55 : 1,
+      }}
+    >
+      <span
+        aria-hidden
+        style={{ color: accent, display: "inline-flex", flexShrink: 0 }}
+      >
+        <Icon name={icon} size={14} stroke={1.7} />
+      </span>
+      <span
+        style={{
+          fontSize: 12,
+          color: "var(--ink-3)",
+          fontWeight: 500,
+          flex: 1,
+        }}
+      >
+        {label}
+      </span>
+      <span
+        className="mono"
+        style={{
+          fontSize: 11.5,
+          color: "var(--ink)",
+          fontWeight: 600,
+          minWidth: 30,
+          textAlign: "right",
+        }}
+      >
+        {count}
+      </span>
+      <span
+        className="mono"
+        style={{
+          fontSize: 10.5,
+          color: "var(--ink-4)",
+          minWidth: 60,
+          textAlign: "right",
+        }}
+      >
+        {fmtBytes(sizeBytes)}
+      </span>
+    </div>
   );
 }
 
