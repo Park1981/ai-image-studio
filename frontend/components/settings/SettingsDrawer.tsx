@@ -169,23 +169,44 @@ function Section({
 }) {
   return (
     <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-      <div>
+      {/* 헤더 — 좌측 accent 세로 바 + 타이틀 (큰/진한) + desc (작은/옅은).
+       *  2026-04-27 (오빠 피드백): 타이틀과 desc 의 시각 구분 강화 +
+       *  섹션 분리감 위해 좌측 accent 바 추가 (페이지 SectionAccentBar 패턴과 통일). */}
+      <div style={{ display: "flex", gap: 10, alignItems: "stretch" }}>
         <div
+          aria-hidden
           style={{
-            fontSize: 11,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: ".08em",
-            color: "var(--ink-3)",
+            width: 3,
+            background: "var(--accent)",
+            borderRadius: 2,
+            flexShrink: 0,
           }}
-        >
-          {title}
-        </div>
-        {desc && (
-          <div style={{ fontSize: 11.5, color: "var(--ink-4)", marginTop: 2 }}>
-            {desc}
+        />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: "var(--ink)",
+              letterSpacing: "-.005em",
+              lineHeight: 1.2,
+            }}
+          >
+            {title}
           </div>
-        )}
+          {desc && (
+            <div
+              style={{
+                fontSize: 11,
+                color: "var(--ink-4)",
+                marginTop: 3,
+                lineHeight: 1.35,
+              }}
+            >
+              {desc}
+            </div>
+          )}
+        </div>
       </div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {children}
