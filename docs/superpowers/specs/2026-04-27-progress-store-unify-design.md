@@ -409,14 +409,19 @@ async def _ensure_comfyui_ready(task: Task, progress_at: int) -> None:
 
 ## 6. 마이그레이션 순서 (Phase 분리)
 
-### Phase 1 — 기반 시스템 (~2.5h)
-- [ ] `frontend/lib/pipeline-defs.ts` 신설 (StageDef, PipelineCtx, PIPELINE_DEFS)
-- [ ] `frontend/components/studio/progress/PipelineTimeline.tsx` 신설
-- [ ] `frontend/components/studio/progress/DetailBox.tsx` 추출 (기존 Timelines.tsx 의 DetailBox)
-- [ ] `frontend/components/studio/progress/TimelineRow.tsx` 추출 (기존 Timelines.tsx 의 TimelineRow)
-- [ ] 백엔드 `edit.py` / `video.py` 의 stage emit 에 detail payload **추가** (step emit 은 그대로 유지 · transitional)
-- [ ] 검증 — pytest 201/201 + tsc clean + lint clean
-- [ ] **Commit + Push**: "refactor(progress): StageDef 시스템 + PipelineTimeline 도입 (Phase 1)"
+### Phase 1 — 인프라 준비만 ✅ 완료 (실제 1h · `c74db66`)
+**원안 변경**: 진행 중 발견된 안전 우선 정책 — 백엔드 emit 변경을 Phase 2/3 으로 이전.
+- [x] `frontend/lib/pipeline-defs.tsx` 신설 (StageDef, PipelineCtx, PIPELINE_DEFS · JSX 포함이라 .tsx)
+- [x] `frontend/components/studio/progress/PipelineTimeline.tsx` 신설
+- [x] `frontend/components/studio/progress/DetailBox.tsx` 추출
+- [x] `frontend/components/studio/progress/TimelineRow.tsx` 추출
+- [x] `frontend/stores/useGenerateStore.ts` StageEvent 에 payload?: Record 옵셔널 추가
+- [x] 검증 — pytest 210/210 + tsc clean + lint clean
+- [x] **Commit + Push**: `c74db66 refactor(progress): StageDef 시스템 + PipelineTimeline 인프라 (Phase 1)`
+
+**❗ 원안에서 Phase 2 로 이전된 작업** (안전 우선):
+- 백엔드 `edit.py` / `video.py` 의 stage emit 보강 → Phase 2 (edit) / Phase 3 (video) 에서 store 변경과 같은 commit 에 묶음.
+- **이유**: Edit/Video 의 stage 진입+완료 2번 emit 패턴이 PipelineTimeline 의 isDone 판정과 충돌 가능 (같은 type 두 번 → arrivedIdx 모호). 백엔드 emit + store 변경 + 사용처 교체를 같은 commit 으로 묶는 게 atomic + 회귀 위험 0.
 
 ### Phase 2 — Edit 마이그레이션 (~1.5h)
 - [ ] `useEditStore` 의 stepDone/currentStep/stepHistory 제거 + stageHistory 도입
