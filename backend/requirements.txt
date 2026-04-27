@@ -17,6 +17,12 @@ pydantic-settings>=2.2.0
 # 이미지 처리 (PNG Info 임베딩, 썸네일)
 Pillow>=10.0.0
 
+# multipart form data (Edit/Video/Compare 업로드)
+python-multipart>=0.0.9
+
+# 시스템 메트릭 (CPU/RAM 측정 — system_metrics.py)
+psutil>=5.9.0
+
 # Python 타입
 python-dotenv>=1.0.0
 
