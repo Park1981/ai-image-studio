@@ -9,7 +9,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import Icon from "@/components/ui/Icon";
+import Icon, { type IconName } from "@/components/ui/Icon";
 import { Toggle } from "@/components/ui/primitives";
 import { GENERATE_MODEL, EDIT_MODEL } from "@/lib/model-presets";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -336,12 +336,18 @@ function StatusLine({
 
 /** 모델 정보 — 4개 라우트 (생성/수정/영상/비전) 표시 전용.
  *  카드 한 개 안에 행 4개. 라벨 = 보통 톤 / 모델명 = 진하게 + mono.
- *  좌측에 라벨별 accent dot 으로 분류. */
-const MODEL_ROWS: { label: string; accent: string; model: string }[] = [
-  { label: "이미지 생성", accent: "#3b82f6", model: GENERATE_MODEL.displayName }, // blue
-  { label: "이미지 수정", accent: "#8b5cf6", model: EDIT_MODEL.displayName },     // violet
-  { label: "영상 생성",   accent: "#f43f5e", model: "LTX Video 2.3" },           // rose
-  { label: "이미지 분석", accent: "#22c55e", model: "qwen2.5vl:7b" },            // green
+ *  좌측 아이콘 = 메인 메뉴 카드와 동일 (image/wand/play/scan-eye) + accent 컬러.
+ *  2026-04-27 (오빠 피드백): dot 원형 → 아이콘 변경. */
+const MODEL_ROWS: {
+  label: string;
+  icon: IconName;
+  accent: string;
+  model: string;
+}[] = [
+  { label: "이미지 생성", icon: "image",    accent: "#3b82f6", model: GENERATE_MODEL.displayName }, // blue
+  { label: "이미지 수정", icon: "wand",     accent: "#8b5cf6", model: EDIT_MODEL.displayName },     // violet
+  { label: "영상 생성",   icon: "play",     accent: "#f43f5e", model: "LTX Video 2.3" },           // rose
+  { label: "이미지 분석", icon: "scan-eye", accent: "#22c55e", model: "qwen2.5vl:7b" },            // green
 ];
 
 function ModelSection() {
@@ -361,6 +367,7 @@ function ModelSection() {
           <ModelRow
             key={r.label}
             label={r.label}
+            icon={r.icon}
             accent={r.accent}
             model={r.model}
             divider={idx < MODEL_ROWS.length - 1}
@@ -373,11 +380,13 @@ function ModelSection() {
 
 function ModelRow({
   label,
+  icon,
   accent,
   model,
   divider,
 }: {
   label: string;
+  icon: IconName;
   accent: string;
   model: string;
   divider: boolean;
@@ -393,14 +402,15 @@ function ModelRow({
       }}
     >
       <span
+        aria-hidden
         style={{
-          width: 6,
-          height: 6,
-          borderRadius: "50%",
-          background: accent,
+          color: accent,
+          display: "inline-flex",
           flexShrink: 0,
         }}
-      />
+      >
+        <Icon name={icon} size={16} stroke={1.7} />
+      </span>
       <span
         style={{
           fontSize: 12,
