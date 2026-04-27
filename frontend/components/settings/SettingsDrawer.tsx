@@ -17,10 +17,10 @@ import { useProcessStore, type ProcStatus } from "@/stores/useProcessStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { toast } from "@/stores/useToastStore";
-import { setProcessStatus } from "@/lib/api/process";
+import { setProcessStatus, listOllamaModels } from "@/lib/api/process";
 import { USE_MOCK } from "@/lib/api/client";
 import { clearHistory as apiClearHistory, getHistoryStats } from "@/lib/api/history";
-import type { HistoryStats } from "@/lib/api/types";
+import type { HistoryStats, OllamaModel } from "@/lib/api/types";
 import { useSettings } from "./SettingsContext";
 
 /* ─────────────────────────────────
@@ -83,7 +83,9 @@ export default function SettingsDrawer() {
         >
           <ProcessSection />
           <SystemMetricsSection />
-          <ModelSection />
+          {/* 모델 섹션 비노출 (오빠 피드백 2026-04-27 후속): ProcessSection 의
+           *  Ollama/ComfyUI 펼침으로 흡수됨. ModelSection 함수는 보존 — 필요 시 복원. */}
+          {/* <ModelSection /> */}
           {/* 프롬프트 템플릿 — 사용 빈도 낮음으로 비노출 (오빠 피드백 2026-04-27).
            *  TemplatesSection 함수와 store 의 templates/addTemplate/removeTemplate 은 보존 —
            *  필요 시 이 한 줄만 다시 활성화. */}
@@ -196,14 +198,33 @@ function Section({
    1. Process Status (read-only · 2026-04-27)
    ───────────────────────────────── */
 
-/** 프로세스 상태 + 수동 시작/정지 (2026-04-27 복원).
- *  ProcessStatusPoller (5초) 가 실 상태 동기화. start.ps1 이 라이프사이클 관리하지만
- *  디버깅 / VRAM 정리 위해 수동 컨트롤 필요. */
+/** 프로세스 상태 + 시작/정지 + 펼침 (모델 정보).
+ *  Ollama 펼침: listOllamaModels — 실제 등록된 모델 동적 fetch.
+ *  ComfyUI 펼침: 우리 앱이 사용하는 4개 모델 (생성/수정/영상/분석 — 정의값).
+ *  ProcessStatusPoller (5초) 가 실 상태 동기화. */
 function ProcessSection() {
   const ollama = useProcessStore((s) => s.ollama);
   const comfyui = useProcessStore((s) => s.comfyui);
   const setOllama = useProcessStore((s) => s.setOllama);
   const setComfyui = useProcessStore((s) => s.setComfyui);
+
+  // 펼침 상태 — 각 서비스 독립.
+  const [ollamaOpen, setOllamaOpen] = useState(false);
+  const [comfyuiOpen, setComfyuiOpen] = useState(false);
+
+  // Ollama 등록 모델 — 펼침 처음 열릴 때 fetch (lazy).
+  const [ollamaModels, setOllamaModels] = useState<OllamaModel[] | null>(null);
+  useEffect(() => {
+    if (!ollamaOpen || ollamaModels !== null) return;
+    let cancelled = false;
+    (async () => {
+      const list = await listOllamaModels();
+      if (!cancelled) setOllamaModels(list);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ollamaOpen, ollamaModels]);
 
   const toggle = async (key: "ollama" | "comfyui", current: ProcStatus) => {
     const next: ProcStatus = current === "running" ? "stopped" : "running";
@@ -225,19 +246,27 @@ function ProcessSection() {
   };
 
   return (
-    <Section title="프로세스" desc="로컬 AI 런타임 상태">
-      <StatusLine
+    <Section title="로컬 서비스" desc="AI 런타임 상태 + 등록 모델">
+      <ServiceCard
         name="Ollama"
         port={11434}
         status={ollama}
+        open={ollamaOpen}
+        onExpand={() => setOllamaOpen((v) => !v)}
         onToggle={() => toggle("ollama", ollama)}
-      />
-      <StatusLine
+      >
+        <OllamaModelList models={ollamaModels} />
+      </ServiceCard>
+      <ServiceCard
         name="ComfyUI"
         port={8188}
         status={comfyui}
+        open={comfyuiOpen}
+        onExpand={() => setComfyuiOpen((v) => !v)}
         onToggle={() => toggle("comfyui", comfyui)}
-      />
+      >
+        <ComfyuiModelList />
+      </ServiceCard>
       {/* Mock 모드 안내 — start.ps1 정상 실행 시 USE_MOCK=false 라 숨김. */}
       {USE_MOCK && (
         <div
@@ -254,18 +283,177 @@ function ProcessSection() {
   );
 }
 
-/** 프로세스 한 줄 — 카드 + dot + name + 포트 + 상태 칩 + 토글 버튼.
- *  하단 desc 는 제거 (gemma4 / Qwen Image 등 — 사용자 의미 ↓).
- *  토글 버튼은 chip 옆 작은 아이콘 — 디버깅/VRAM 정리 시점 사용. */
+/** 서비스 카드 — StatusLine + 펼침 토글 + 펼침 컨텐츠. */
+function ServiceCard({
+  name,
+  port,
+  status,
+  open,
+  onExpand,
+  onToggle,
+  children,
+}: {
+  name: string;
+  port: number;
+  status: ProcStatus;
+  open: boolean;
+  onExpand: () => void;
+  onToggle: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--radius)",
+        overflow: "hidden",
+      }}
+    >
+      <StatusLine
+        name={name}
+        port={port}
+        status={status}
+        open={open}
+        onExpand={onExpand}
+        onToggle={onToggle}
+      />
+      {open && (
+        <div
+          style={{
+            borderTop: "1px solid var(--line)",
+            background: "var(--bg-2)",
+            padding: "8px 12px",
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Ollama 등록 모델 목록 — 실제 fetch 결과. */
+function OllamaModelList({ models }: { models: OllamaModel[] | null }) {
+  if (models === null) {
+    return (
+      <div style={{ fontSize: 11, color: "var(--ink-4)", padding: "4px 0" }}>
+        모델 목록 불러오는 중…
+      </div>
+    );
+  }
+  if (models.length === 0) {
+    return (
+      <div style={{ fontSize: 11, color: "var(--ink-4)", padding: "4px 0" }}>
+        등록된 Ollama 모델이 없습니다. <code>ollama pull qwen2.5vl:7b</code> 등으로 추가.
+      </div>
+    );
+  }
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      {models.map((m) => (
+        <div
+          key={m.name}
+          style={{
+            display: "flex",
+            alignItems: "baseline",
+            justifyContent: "space-between",
+            gap: 8,
+            fontSize: 11.5,
+          }}
+        >
+          <span
+            className="mono"
+            style={{ color: "var(--ink)", fontWeight: 600 }}
+          >
+            {m.name}
+          </span>
+          <span
+            className="mono"
+            style={{ color: "var(--ink-4)", fontSize: 10.5 }}
+          >
+            {m.size_gb} GB
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** ComfyUI 사용 모델 — 우리 앱 정의 (생성/수정/영상/분석). */
+const COMFYUI_MODEL_ROWS: {
+  label: string;
+  icon: IconName;
+  accent: string;
+  model: string;
+}[] = [
+  { label: "이미지 생성", icon: "image",    accent: "#3b82f6", model: GENERATE_MODEL.displayName },
+  { label: "이미지 수정", icon: "wand",     accent: "#8b5cf6", model: EDIT_MODEL.displayName },
+  { label: "영상 생성",   icon: "play",     accent: "#f43f5e", model: "LTX Video 2.3" },
+  { label: "이미지 분석", icon: "scan-eye", accent: "#22c55e", model: "qwen2.5vl:7b" },
+];
+
+function ComfyuiModelList() {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      {COMFYUI_MODEL_ROWS.map((r) => (
+        <div
+          key={r.label}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            fontSize: 11.5,
+          }}
+        >
+          <span
+            aria-hidden
+            style={{ color: r.accent, display: "inline-flex", flexShrink: 0 }}
+          >
+            <Icon name={r.icon} size={13} stroke={1.7} />
+          </span>
+          <span
+            style={{
+              color: "var(--ink-3)",
+              fontWeight: 500,
+              minWidth: 76,
+            }}
+          >
+            {r.label}
+          </span>
+          <span
+            className="mono"
+            style={{
+              color: "var(--ink)",
+              fontWeight: 600,
+              flex: 1,
+              textAlign: "right",
+            }}
+          >
+            {r.model}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 프로세스 한 줄 — dot + name + 포트 + 펼침 버튼 + 시작/정지.
+ *  카드 박스는 부모 ServiceCard 가 담당 (펼침 영역 통합).
+ *  좌측 dot 이 상태 표시 — chip 제거됨 (오빠 피드백). */
 function StatusLine({
   name,
   port,
   status,
+  open,
+  onExpand,
   onToggle,
 }: {
   name: string;
   port: number;
   status: ProcStatus;
+  open: boolean;
+  onExpand: () => void;
   onToggle: () => void;
 }) {
   const running = status === "running";
@@ -276,9 +464,6 @@ function StatusLine({
         alignItems: "center",
         gap: 12,
         padding: "10px 12px",
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius)",
       }}
     >
       <span
@@ -306,7 +491,32 @@ function StatusLine({
           :{port}
         </span>
       </div>
-      {/* 상태 chip 제거 (2026-04-27 오빠 피드백) — 좌측 dot 이 이미 상태 표시함. */}
+      {/* 펼침 토글 — 클릭 시 모델 목록 표시/접힘 */}
+      <button
+        type="button"
+        onClick={onExpand}
+        title={open ? "접기" : "모델 보기"}
+        aria-label={open ? "접기" : "모델 보기"}
+        aria-expanded={open}
+        style={{
+          all: "unset",
+          cursor: "pointer",
+          fontSize: 10.5,
+          fontWeight: 500,
+          padding: "4px 8px",
+          borderRadius: "var(--radius-sm)",
+          border: "1px solid var(--line)",
+          background: "var(--bg)",
+          color: "var(--ink-3)",
+          transition: "all .15s",
+          flexShrink: 0,
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 3,
+        }}
+      >
+        {open ? "▴ 접기" : "▾ 모델"}
+      </button>
       <button
         type="button"
         onClick={onToggle}
@@ -347,7 +557,7 @@ function SystemMetricsSection() {
   const ramBreakdown = useProcessStore((s) => s.ramBreakdown);
 
   return (
-    <Section title="시스템 자원" desc="실시간 (5초 주기 갱신)">
+    <Section title="리소스 모니터">
       <div
         style={{
           display: "flex",
@@ -591,6 +801,7 @@ const MODEL_ROWS: {
   { label: "이미지 분석", icon: "scan-eye", accent: "#22c55e", model: "qwen2.5vl:7b" },            // green
 ];
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function ModelSection() {
   return (
     <Section title="모델" desc="각 작업에 사용 중인 로컬 모델">
@@ -834,7 +1045,7 @@ function PreferencesSection() {
   };
 
   return (
-    <Section title="프리퍼런스" desc="기본 동작 토글 · 모든 변경 즉시 저장">
+    <Section title="기본 설정" desc="기본 동작 토글 · 모든 변경 즉시 저장">
       <Toggle
         checked={hideAll}
         onChange={onToggleHideAll}
