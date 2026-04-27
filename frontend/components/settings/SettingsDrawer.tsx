@@ -503,14 +503,21 @@ function MetricBar({
   );
 }
 
-/** 들여쓰기 분해 라인 — VRAM/RAM 아래 ↳ 형태. value 0 도 표시 (점유 없음 명시). */
+/** 들여쓰기 분해 라인 — VRAM/RAM 아래 ↳ 형태.
+ *  값이 < 0.05 GB (≈ 50MB) 인 항목은 숨김 (오빠 피드백 2026-04-27 — 0GB 노이즈 제거).
+ *  모든 값이 임계 미만이면 컴포넌트 자체 안 그림. */
 function BreakdownLines({
   lines,
   unit,
+  threshold = 0.05,
 }: {
   lines: Array<{ label: string; value: number; detail?: string }>;
   unit: string;
+  /** 이 값 미만은 숨김 (default 0.05 GB) */
+  threshold?: number;
 }) {
+  const visible = lines.filter((l) => l.value >= threshold);
+  if (visible.length === 0) return null;
   return (
     <div
       style={{
@@ -521,7 +528,7 @@ function BreakdownLines({
         gap: 2,
       }}
     >
-      {lines.map((l) => (
+      {visible.map((l) => (
         <div
           key={l.label}
           style={{
