@@ -56,7 +56,7 @@
 |----|------|------|------|
 | P1-1 | `router.py` 분리 | **✅ 완료 (대규모)** | 1,769→118 facade. `routes/` 7 파일 + `pipelines/` 5 파일. mock.patch 5건 갱신. |
 | P1-2 | legacy quarantine | **✅ 완료** | `backend/legacy/{routers,services,tests}/` 격리. main.py 등록 끊김. |
-| P1-3 | preset parity test | **❌ 미처리** | `find backend/tests -name "*preset*"` 결과 0. 백엔드/프론트 동기화 사고가 spec 누적 중 2회 발생 (Lightning 8/1.5 + extra LoRA 교체) → drift detection 자체 가치 큼. |
+| P1-3 | preset parity test | **✅ 처리** | `backend/tests/studio/test_model_preset_parity.py` 추가. frontend `model-presets.ts` 를 Node+TypeScript transpile 로 JSON export 후 backend `presets.py` dataclass snapshot 과 비교. |
 | P1-4 | mock 정책 명시 | **✅ 처리** | `config.py` 의 `settings.comfy_mock_fallback` 으로 이동. 기본 False. `_dispatch.py` 는 설정값을 읽고, frontend header 는 `NEXT_PUBLIC_USE_MOCK` badge 표시. |
 | P1-5 | Edit upload validation | **✅ 처리** | size + image 형식 검증 적용. Phase 1에서 `storage.STUDIO_MAX_IMAGE_BYTES` 단일 상수로 Edit/Video/Vision/Compare 4곳 통합 완료. |
 | P1-6 | versioned migrations | **❌ 미처리** | `history_db.py` 여전히 ALTER TABLE 인라인 (line 144/159/177/191). `schema_version` 테이블 미도입. P2 강등 가능. |
@@ -292,7 +292,7 @@ Codex 가 같은 코드 베이스를 독립 리뷰. P0 3 개를 새로 잡았는
 ```text
 1. C2-P1-6 STUDIO_MAX_IMAGE_BYTES 단일화 (30분 · N2) ✅ 완료
    → `storage.py` 상수 1개 + Edit/Video/Vision/Compare import 갱신
-2. C2-P1-5 모델 프리셋 parity test (3-4h)
+2. C2-P1-5 모델 프리셋 parity test (3-4h) ✅ 완료
    → backend presets.py vs frontend model-presets.ts JSON export 후 비교
 3. C2-P1-7 paste listener 중앙화 (3-4h)
    → useImagePasteTarget(activeSlotId) hook
@@ -756,7 +756,7 @@ Phase 0' 5건은 완료. 다음 라운드는 Phase 1 보강으로 이동.
 1. **C2-P1-6 / N2 업로드 제한 상수 단일화** ✅ 완료
    - `storage.STUDIO_MAX_IMAGE_BYTES` 단일 소스.
 
-2. **C2-P1-5 모델 프리셋 parity test**
+2. **C2-P1-5 모델 프리셋 parity test** ✅ 완료
    - backend presets vs frontend model-presets drift 방지.
 
 3. **Claude A `_ollama_client.py`**
