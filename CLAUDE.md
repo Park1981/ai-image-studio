@@ -136,6 +136,18 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **VramBadge amber 임계 통일**: 0.75 → 0.80 (SystemMetrics 와 일치 · breakdown 오버레이 트리거와 동일).
 - **검증**: pytest 166/166 · tsc clean · lint clean · 실측 backend 응답 확인 (ComfyUI 15.2G + Ollama 0G 정상 표시, 폴백 작동).
 
+**2026-04-27 진행 모달 store 통일 (Phase 1-4)** — pytest 210/210 · tsc+lint clean · 4 commit (`c74db66 → e7dd53a → a82c947 → 3fe5d76`).
+3 mode (Generate/Edit/Video) 의 분리된 진행 모달 패턴 → 단일 StageDef 시스템 통합.
+- **신규 모듈 3개**: `frontend/lib/pipeline-defs.tsx` (StageDef + PipelineCtx + PIPELINE_DEFS · 단일 진실의 출처) · `frontend/components/studio/progress/{PipelineTimeline,TimelineRow,DetailBox}.tsx`
+- **백엔드 emit 통일**: edit.py + video.py 의 `task.emit("step", ...)` 모두 제거 → `task.emit("stage", {...})` payload 안에 detail (description / finalPrompt / finalPromptKo / provider / editVisionAnalysis) 흡수. Generate 는 이미 stage-only 패턴 (변경 0).
+- **프론트 store 통일**: `useEditStore` / `useVideoStore` 의 `stepDone/currentStep/stepHistory` 제거 → `stageHistory: StageEvent[]` + `pushStage`. 백엔드 raw payload 를 그대로 보관 (`StageEvent.payload?: Record<string, unknown>`).
+- **PipelineTimeline 단일 컴포넌트**: 3 mode 공용. PIPELINE_DEFS[mode] filter (enabled 콜백) → row 결정 · stageHistory 도착 순서로 done/running/pending 판정 · StageDef.renderDetail 콜백이 stage 별 보조 박스 자동 렌더 (EditVisionBlock chip / finalPrompt DetailBox 등).
+- **잠재 버그 fix 1건**: `PIPELINE_DEFS.video` 의 `workflow-build` → `workflow-dispatch` (백엔드 emit 과 매칭 안 돼서 row 가 안 보였던 무성한 버그).
+- **interrupt 판정 통일**: 옛 `currentStep === 4` (Edit/Video) → `lastStage === "comfyui-sampling"` 통일 (3 mode 동일 판정).
+- **mock 함수도 stage 변환**: lib/api/edit.ts + video.ts 의 mock 도 step yield → stage emit 으로 (Mock 모드 진행 모달 정상 표시 보존).
+- **Phase 5 자동 기동 준비 완료**: PIPELINE_DEFS 의 `comfyui-warmup` stage 정의됨 (enabled: warmupArrived). Phase 5 에서 백엔드 `_dispatch.py::_ensure_comfyui_ready` 만 추가하면 자동 작동 (프론트 추가 코드 0).
+- 설계 문서: `docs/superpowers/specs/2026-04-27-progress-store-unify-design.md` (진실의 출처 — 다음 세션 인계용)
+
 **2026-04-26 router.py 풀 분해 + legacy quarantine** — pytest 201/201 · ruff F clean · main.py import OK.
 3 커밋 (`ba7e6e2 → df872e3 → 0c4b999`) 으로 `backend/studio/router.py` 1,769 → **118줄 (facade only · -93%)** 달성. 옛 라우터 + services + tests 15 파일 `backend/legacy/` 격리.
 - **Step 1 (`ba7e6e2`) — pipelines/ 추출**: `studio/pipelines/{_dispatch,generate,edit,video,__init__}.py` 신규 5 파일 (1,045줄). `_run_*_pipeline` + `_dispatch_to_comfy` + `ComfyDispatchResult` + `_save_comfy_output/_video` + `_cleanup_comfy_temp` + `_mark_generation_complete` + `COMFY_*` 상수 분리. **🔴 잠재 NameError fix 1건**: 옛 router.py 1213줄의 `getattr(settings, "ltx_unet_name", None)` 가 `settings` import 없이 참조됐었음 → pipelines/video.py 에 명시 import 추가 (Video 호출 시 NameError 터질 뻔).
