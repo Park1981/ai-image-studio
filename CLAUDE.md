@@ -148,6 +148,23 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **Phase 5 자동 기동 준비 완료**: PIPELINE_DEFS 의 `comfyui-warmup` stage 정의됨 (enabled: warmupArrived). Phase 5 에서 백엔드 `_dispatch.py::_ensure_comfyui_ready` 만 추가하면 자동 작동 (프론트 추가 코드 0).
 - 설계 문서: `docs/superpowers/specs/2026-04-27-progress-store-unify-design.md` (진실의 출처 — 다음 세션 인계용)
 
+**2026-04-27 Tier 3 — OpenAPI 자동 타입 생성** — pytest 215 · vitest 50/50 · tsc+lint clean.
+백엔드 Pydantic schema 를 단일 진실의 출처로 만들고, frontend 타입을 자동 동기화. schema drift 자동 감지 인프라.
+- **신규 의존성**: `openapi-typescript ^7.13.0` (devDep · `npm install -D`).
+- **신규 스크립트** (`backend/scripts/dump_openapi.py`): FastAPI app 의 풀 OpenAPI 3.1 spec 을 JSON 으로 dump. `tests/_snapshots/openapi.json` (contract test subset) 과 분리 — 풀 spec 은 `frontend/lib/api/openapi.json` 으로 출력.
+- **신규 npm script**: `gen:types` (`openapi:dump` + `openapi:gen`) — backend 가 OpenAPI dump 후 openapi-typescript 가 변환 → `frontend/lib/api/generated.ts` (1,261줄 자동 생성).
+- **신규 helper** (`frontend/lib/api/generated-helpers.ts`): generated.ts 의 자주 쓰이는 schema 를 친숙한 alias 로 re-export. `Schemas["X"]` / `Paths["/x/y"]` + 편의 alias (TaskCreated / GenerateBody / UpgradeOnlyBody / ResearchBody / ProcessAction).
+- **점진 마이그레이션 시범 5건**: `lib/api/{generate,edit,video,vision,compare}.ts` 의 inline cast (`as { task_id: string; stream_url: string }`) → `as TaskCreated` 로 교체. 백엔드 schema 변경 시 tsc 가 자동 drift 감지.
+- **유지 정책**: `lib/api/types.ts` 의 한글 주석 / 의도적 narrow union (HistoryItem mode 분기 / EditVisionAnalysis 도메인 분기 등) 은 손으로 유지 — 자동 생성 + 손 편집 hybrid.
+- **CI 통합 보류**: `npm run gen:types` 는 수동 호출 (백엔드 schema 변경 시). 단일 개발자 환경이라 ROI 충분.
+- **사용 패턴**: 백엔드 schema 변경 시 → `npm run gen:types` → tsc 가 frontend 영향 자동 표시 → 변경 사항 적용.
+
+**2026-04-27 Tier 2 — Phase 6 산출물 단위 테스트** — vitest 19→50 (+31) · tsc+lint clean.
+신규 테스트 3 파일 (904줄):
+- `__tests__/stores-stage-history.test.ts` (11): useVisionStore + useVisionCompareStore 의 stageHistory/pushStage/resetStages — 초기 상태 / 누적 / payload 보존 / reset 격리 / intent-refine 옵셔널.
+- `__tests__/api-vision-compare.test.ts` (8): analyzeImage + compareAnalyze 의 SSE drain 패턴 + onStage callback 검증. POST → {task_id, stream_url} → GET stream → done payload 추출. error event throw / 응답 검증 / mock-seed:// 거부. jsdom Blob/Response 호환 우회 (makeBlobResponse 헬퍼).
+- `__tests__/pipeline-defs-consistency.test.ts` (12): 5 mode stage type 중복 X / 핵심 stage 존재 / label 길이 sane / ComfyUI 미사용 mode 의 comfyui-* 부재 / enabled 콜백 검증 (research/warmup/gemma4Off/intentRefineArrived). Phase 3 의 workflow-build/dispatch type mismatch 같은 잠재 버그 자동 차단.
+
 **2026-04-27 Phase 6 후속 — 진행 모달 라벨 체계화 + Generate timeline 통일** — pytest 215/215 · tsc+lint clean.
 - **5 mode 라벨 일관화**: ComfyUI 샘플링 라벨 mode 별 사용자 친화화 (`이미지 생성` / `이미지 수정` / `영상 생성`) · Vision 의 `vision-call` → `vision-analyze` type 통일 (edit/video 와 동일) + label "이미지 분석" 으로 일관 · Workflow 라벨 (`전달` / `구성`) → 모두 `워크플로우 설정` · Generate `gemma4-upgrade` label `프롬프트 강화` + subLabel `gemma4-un` (다른 stage 와 명명 패턴 일관) · `claude-research` label `프롬프트 조사` / subLabel `Claude · 최신 팁` · Vision/Compare subLabel `qwen2.5vl` → `qwen2.5vl:7b`.
 - **Generate `postprocess` → `save-output` 통일**: 백엔드 `pipelines/generate.py` emit type + label "후처리" → "결과 저장". 다른 mode 와 마지막 stage 패턴 일관.

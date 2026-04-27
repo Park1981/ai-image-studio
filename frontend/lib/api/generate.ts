@@ -13,6 +13,7 @@ import {
   sleep,
   uid,
 } from "./client";
+import type { TaskCreated } from "./generated-helpers";
 import type {
   GenStage,
   GenerateRequest,
@@ -113,10 +114,8 @@ async function* realGenerateStream(
   if (!createRes.ok) {
     throw new Error(`generate create failed: ${createRes.status}`);
   }
-  const { task_id, stream_url } = (await createRes.json()) as {
-    task_id: string;
-    stream_url: string;
-  };
+  // Tier 3 (2026-04-27): generated OpenAPI 타입 사용 — backend schema 변경 시 자동 drift 감지
+  const { task_id, stream_url } = (await createRes.json()) as TaskCreated;
 
   // 2. GET stream (SSE)
   const streamRes = await fetch(`${STUDIO_BASE}${stream_url}`, {

@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "openapi:dump": "cd ../backend && \"D:/AI-Image-Studio/.venv/Scripts/python.exe\" scripts/dump_openapi.py",
+    "openapi:gen": "openapi-typescript lib/api/openapi.json -o lib/api/generated.ts",
+    "gen:types": "npm run openapi:dump && npm run openapi:gen"
   },
   "dependencies": {
     "framer-motion": "^12.38.0",
@@ -27,6 +30,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.3",
     "jsdom": "^29.0.2",
+    "openapi-typescript": "^7.13.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.4"
