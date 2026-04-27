@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Icon from "@/components/ui/Icon";
 import StudioUploadSlot from "@/components/studio/StudioUploadSlot";
 
@@ -190,7 +190,7 @@ export default function SourceImageCard({
                 pointerEvents: "none",
               }}
             />
-            {/* 사이즈 배지 */}
+            {/* 사이즈 배지 — bottom-left */}
             {sourceWidth && sourceHeight && (
               <span
                 className="mono"
@@ -210,30 +210,7 @@ export default function SourceImageCard({
                 {sourceWidth}×{sourceHeight}
               </span>
             )}
-            {/* 변경 버튼 */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                pickFn?.();
-              }}
-              style={{
-                position: "absolute",
-                bottom: 8,
-                right: 8,
-                fontSize: 10,
-                color: "rgba(255,255,255,.8)",
-                background: "rgba(0,0,0,.35)",
-                border: "none",
-                borderRadius: 4,
-                padding: "2px 7px",
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              변경
-            </button>
-            {/* ⓘ 상세 */}
+            {/* ⓘ 상세 — top-left (단일 이미지 컨텍스트) */}
             <button
               type="button"
               onClick={(e) => {
@@ -264,34 +241,69 @@ export default function SourceImageCard({
             >
               i
             </button>
-            {/* × 해제 */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleClear();
-              }}
+            {/* 변경 + 해제 — top-right cluster (CompareImageSlot 와 디자인 통일 · 2026-04-27).
+             *  ActionPill: blur 배경 + round-full + 아이콘+텍스트. */}
+            <div
               style={{
                 position: "absolute",
                 top: 8,
                 right: 8,
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: "rgba(0,0,0,.4)",
-                color: "#fff",
-                border: "none",
-                cursor: "pointer",
-                display: "grid",
-                placeItems: "center",
+                display: "flex",
+                gap: 6,
               }}
-              title="이미지 해제"
             >
-              <Icon name="x" size={10} />
-            </button>
+              <ActionPill
+                title="이미지 변경"
+                onClick={() => pickFn?.()}
+              >
+                <Icon name="refresh" size={11} /> 변경
+              </ActionPill>
+              <ActionPill title="이미지 해제" onClick={handleClear}>
+                <Icon name="x" size={11} />
+              </ActionPill>
+            </div>
           </>
         )}
       </StudioUploadSlot>
     </div>
+  );
+}
+
+/** ActionPill — blur 배경 + round-full pill 버튼.
+ *  CompareImageSlot 와 동일 스타일 (오빠 피드백 2026-04-27 — 두 컴포넌트 통일).
+ *  추후 두 곳 외에 더 쓰이면 별도 파일로 추출 검토. */
+function ActionPill({
+  children,
+  onClick,
+  title,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      title={title}
+      style={{
+        all: "unset",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 4,
+        padding: "4px 8px",
+        background: "rgba(0,0,0,.55)",
+        backdropFilter: "blur(6px)",
+        color: "#fff",
+        fontSize: 11,
+        borderRadius: "var(--radius-full)",
+      }}
+    >
+      {children}
+    </button>
   );
 }
