@@ -472,6 +472,13 @@ export interface VideoRequest {
    * false        — LoRA 체인 스킵 + 30-step full sigmas (20분+, 얼굴 보존 최강)
    */
   lightning?: boolean;
+  /**
+   * AI 프롬프트 보정 (vision + gemma4) 우회 (2026-04-27).
+   * 사용자가 이미 정제된 영문 프롬프트를 입력한 경우 — vision + gemma4 단계 skip.
+   * 값 = 사용자 입력 prompt (백엔드가 그대로 LTX-2.3 으로 전달).
+   * undefined / 빈 문자열이면 평소처럼 보정 수행.
+   */
+  preUpgradedPrompt?: string;
 }
 
 export type VideoStage =

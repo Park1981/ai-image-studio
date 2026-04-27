@@ -66,6 +66,8 @@ async function* realVideoStream(
       longerEdge: req.longerEdge,
       ollamaModel: req.ollamaModel,
       visionModel: req.visionModel,
+      // skipUpgrade ON 시 vision + gemma4 단계 모두 우회 (~15초 절약).
+      preUpgradedPrompt: req.preUpgradedPrompt,
     }),
   );
 

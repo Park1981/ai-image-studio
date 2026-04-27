@@ -191,6 +191,14 @@ async def create_video_task(
     adult = bool(meta_obj.get("adult", False))
     # Lightning 토글 — 기본 True (4-step 초고속). False 면 full 30-step.
     lightning = bool(meta_obj.get("lightning", True))
+    # AI 프롬프트 보정 우회 (2026-04-27) — 사용자가 정제된 영문 프롬프트 직접 입력한 케이스.
+    # None 또는 빈 문자열이면 평소처럼 vision + gemma4 단계 수행.
+    pre_upgraded_raw = (
+        meta_obj.get("preUpgradedPrompt") or meta_obj.get("pre_upgraded_prompt")
+    )
+    pre_upgraded_prompt: str | None = (
+        pre_upgraded_raw.strip() if isinstance(pre_upgraded_raw, str) and pre_upgraded_raw.strip() else None
+    )
     # longerEdge: 사용자 지정 긴 변 픽셀. 누락/0 이면 기본값.
     longer_edge_raw = meta_obj.get("longerEdge") or meta_obj.get("longer_edge")
     longer_edge: int | None = None
@@ -235,6 +243,7 @@ async def create_video_task(
             source_h,
             longer_edge,
             lightning,
+            pre_upgraded_prompt=pre_upgraded_prompt,
         )
     )
     return TaskCreated(

@@ -72,6 +72,10 @@ export interface VideoState {
    */
   lightning: boolean;
 
+  /** AI 프롬프트 보정 (vision + gemma4) 우회 — true 면 prompt 를 preUpgradedPrompt 로 그대로 전송.
+   *  사용자가 이미 정제된 영문 프롬프트를 복사해서 붙여넣은 케이스용. default false. */
+  skipUpgrade: boolean;
+
   /* 파이프라인 상태 (세션 한정) */
   running: boolean;
   /** 진행 모달용 stage 이벤트 타임라인 (Phase 3 통일).
@@ -98,6 +102,7 @@ export interface VideoState {
   setAdult: (v: boolean) => void;
   setLongerEdge: (v: number) => void;
   setLightning: (v: boolean) => void;
+  setSkipUpgrade: (v: boolean) => void;
   setRunning: (running: boolean) => void;
   setSampling: (step: number | null, total: number | null) => void;
   setPipelineProgress: (progress: number, label?: string) => void;
@@ -117,6 +122,7 @@ export const useVideoStore = create<VideoState>((set) => ({
   adult: false,
   longerEdge: VIDEO_LONGER_EDGE_DEFAULT,
   lightning: true,
+  skipUpgrade: false,
 
   running: false,
   stageHistory: [],
@@ -150,6 +156,8 @@ export const useVideoStore = create<VideoState>((set) => ({
   },
 
   setLightning: (v) => set({ lightning: v }),
+
+  setSkipUpgrade: (v) => set({ skipUpgrade: v }),
 
   setRunning: (running) =>
     set(
@@ -213,6 +221,8 @@ export const useVideoInputs = () =>
       setLongerEdge: s.setLongerEdge,
       lightning: s.lightning,
       setLightning: s.setLightning,
+      skipUpgrade: s.skipUpgrade,
+      setSkipUpgrade: s.setSkipUpgrade,
     })),
   );
 

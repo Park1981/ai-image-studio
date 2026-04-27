@@ -56,6 +56,9 @@ export interface GenerateState {
   lightning: boolean;
   /** 활성 스타일 LoRA id (GENERATE_STYLES.id 와 매칭) — null 이면 미사용 */
   styleId: string | null;
+  /** AI 프롬프트 보정 (gemma4) 우회 — true 면 prompt 를 preUpgradedPrompt 로 그대로 전송.
+   *  사용자가 이미 정제된 영문 프롬프트를 복사해서 붙여넣은 케이스용. default false. */
+  skipUpgrade: boolean;
 
   // 실행 상태 (영속 X)
   generating: boolean;
@@ -91,6 +94,8 @@ export interface GenerateState {
   applyLightning: (on: boolean) => void;
   /** 스타일 LoRA 토글 — id 또는 null. 활성 시 호환성 처리는 호출부에서 (Lightning OFF 등) */
   setStyleId: (id: string | null) => void;
+  /** AI 프롬프트 보정 우회 토글 */
+  setSkipUpgrade: (v: boolean) => void;
 }
 
 export const useGenerateStore = create<GenerateState>()(
@@ -107,6 +112,7 @@ export const useGenerateStore = create<GenerateState>()(
         research: true,
         lightning: false,
         styleId: null,
+        skipUpgrade: false,
 
         generating: false,
         progress: 0,
@@ -195,12 +201,14 @@ export const useGenerateStore = create<GenerateState>()(
 
         applyLightning: (on) => set({ lightning: on }),
         setStyleId: (id) => set({ styleId: id }),
+        setSkipUpgrade: (v) => set({ skipUpgrade: v }),
       };
     },
     {
       name: "ais:generate",
       storage: createJSONStorage(() => localStorage),
-      version: 5,
+      version: 6,
+      // v5 → v6: skipUpgrade 신규 필드 (옛 사용자는 기본값 false 적용)
       // v4 → v5: styleId 신규 필드 (옛 사용자는 기본값 null 적용)
       // v3 → v4: prompt 영속 제거. 프롬프트는 히스토리/템플릿에서 복원.
       // v2 → v3: steps/cfg/seed 필드 제거 (UI 삭제에 맞춰 store 정리)
@@ -235,6 +243,9 @@ export const useGenerateStore = create<GenerateState>()(
         if (version < 5) {
           state = { ...state, styleId: null };
         }
+        if (version < 6) {
+          state = { ...state, skipUpgrade: false };
+        }
         return state;
       },
       // 진행 상태 제외 (영속 X)
@@ -246,6 +257,7 @@ export const useGenerateStore = create<GenerateState>()(
         research: s.research,
         lightning: s.lightning,
         styleId: s.styleId,
+        skipUpgrade: s.skipUpgrade,
       }),
     },
   ),
@@ -290,6 +302,8 @@ export const useGenerateInputs = () =>
       applyLightning: s.applyLightning,
       styleId: s.styleId,
       setStyleId: s.setStyleId,
+      skipUpgrade: s.skipUpgrade,
+      setSkipUpgrade: s.setSkipUpgrade,
     })),
   );
 

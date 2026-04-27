@@ -62,6 +62,7 @@ export function useGeneratePipeline(): UseGeneratePipeline {
   const lightning = useGenerateStore((s) => s.lightning);
   const research = useGenerateStore((s) => s.research);
   const styleId = useGenerateStore((s) => s.styleId);
+  const skipUpgrade = useGenerateStore((s) => s.skipUpgrade);
   // 실행 상태
   const generating = useGenerateStore((s) => s.generating);
   const setRunning = useGenerateStore((s) => s.setRunning);
@@ -190,6 +191,14 @@ export function useGeneratePipeline(): UseGeneratePipeline {
         "ComfyUI 정지 상태",
         "설정에서 시작해도 되고, Mock 은 그대로 돌아가.",
       );
+    }
+
+    // skipUpgrade ON: 사용자가 이미 정제된 영문 프롬프트를 입력 — gemma4 단계 스킵.
+    // prompt 자체를 preUpgradedPrompt 로 보내면 백엔드가 upgrade 호출 우회 (~10초 절약).
+    // 사전 검수 모달도 의미 없으니 같이 우회.
+    if (skipUpgrade) {
+      await runStream(prompt);
+      return;
     }
 
     if (!hideGeneratePrompts) {
