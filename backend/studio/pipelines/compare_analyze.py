@@ -156,6 +156,33 @@ async def _run_compare_analyze_pipeline(
                         progress_callback=on_progress,
                     )
 
+                # ── Phase 6 cleanup (시각 일관성): stage 완료 시점 결과 흡수 emit ──
+                # vision-pair done 시 overall 점수 + summary, translation done 시 한글 summary.
+                # PipelineTimeline byType Map 이 마지막 payload 로 덮어씌움 → renderDetail 가 사용.
+                await task.emit(
+                    "stage",
+                    {
+                        "type": "vision-pair",
+                        "progress": 70,
+                        "stageLabel": "비교 분석 완료",
+                        "overall": getattr(result_obj, "overall", None),
+                        "summaryEn": getattr(result_obj, "summary_en", ""),
+                        "provider": getattr(result_obj, "provider", "ollama"),
+                        "fallback": getattr(result_obj, "fallback", False),
+                    },
+                )
+                summary_ko = getattr(result_obj, "summary_ko", "")
+                if summary_ko and summary_ko != "한글 번역 실패":
+                    await task.emit(
+                        "stage",
+                        {
+                            "type": "translation",
+                            "progress": 95,
+                            "stageLabel": "한국어 번역 완료",
+                            "summaryKo": summary_ko,
+                        },
+                    )
+
                 # spec 19 후속 — gate 안에서 unload 보내야 다음 ComfyUI dispatch 와 race 0
                 try:
                     await ollama_unload.force_unload_all_loaded_models(

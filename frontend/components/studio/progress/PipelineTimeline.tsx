@@ -12,12 +12,12 @@
  *
  * mode 별 store 구독:
  *   - generate: useGenerateStore (stageHistory + generating + research)
- *   - edit:    useEditStore     (stageHistory · Phase 2 (2026-04-27) 도입 완료)
- *   - video:   useVideoStore    (stageHistory · Phase 3 (2026-04-27) 도입 완료)
+ *   - edit:    useEditStore     (stageHistory)
+ *   - video:   useVideoStore    (stageHistory)
+ *   - vision:  useVisionStore   (stageHistory · Phase 6 도입)
+ *   - compare: useVisionCompareStore (stageHistory · Phase 6 도입)
  *
- * Phase 3 시점 사용:
- *   - Edit / Video 는 PipelineTimeline 적용 완료
- *   - Generate 는 옛 GenerateTimeline 유지 (Phase 4 에서 교체 또는 wrapper)
+ * 5 mode 풀 통일 완료 (post-Phase-6 cleanup) — 단일 컴포넌트.
  */
 
 "use client";

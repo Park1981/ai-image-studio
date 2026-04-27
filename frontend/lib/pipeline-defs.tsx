@@ -83,17 +83,17 @@ export type StagePayload = Record<string, unknown>;
  * ──────────────────────────────────────────────── */
 
 export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
-  /* ── Generate (6 stage · 기존 GEN_STAGE_ORDER 와 1:1 매칭) ── */
+  /* ── Generate (7 stage · 라벨 체계화 2026-04-27) ── */
   generate: [
     { type: "prompt-parse", label: "프롬프트 해석" },
     {
       type: "claude-research",
-      label: "Claude 조사",
-      subLabel: "최신 프롬프트 팁",
+      label: "프롬프트 조사",
+      subLabel: "Claude · 최신 팁",
       enabled: (c) => c.research === true,
     },
-    { type: "gemma4-upgrade", label: "gemma4 업그레이드" },
-    { type: "workflow-dispatch", label: "워크플로우 전달" },
+    { type: "gemma4-upgrade", label: "프롬프트 강화", subLabel: "gemma4-un" },
+    { type: "workflow-dispatch", label: "워크플로우 설정" },
     {
       type: "comfyui-warmup",
       label: "ComfyUI 깨우는 중",
@@ -101,15 +101,19 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       // Phase 5 (자동 기동) 도입 시 백엔드가 emit → 자동 표시.
       enabled: (c) => c.warmupArrived === true,
     },
-    { type: "comfyui-sampling", label: "ComfyUI 샘플링" },
-    { type: "postprocess", label: "후처리" },
+    {
+      type: "comfyui-sampling",
+      label: "이미지 생성",
+      subLabel: "qwen-image-2512",
+    },
+    { type: "save-output", label: "결과 저장" },
   ],
 
-  /* ── Edit (6 stage · 기존 4 step 매핑 + warmup) ── */
+  /* ── Edit (6 stage · 라벨 체계화 2026-04-27) ── */
   edit: [
     {
       type: "vision-analyze",
-      label: "비전 분석",
+      label: "이미지 분석",
       subLabel: "qwen2.5vl:7b",
       renderDetail: (p, c) => {
         if (c.hideEditPrompts) return null;
@@ -171,17 +175,17 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     { type: "param-extract", label: "사이즈/스타일 추출", subLabel: "auto" },
     {
       type: "comfyui-sampling",
-      label: "ComfyUI 샘플링",
+      label: "이미지 수정",
       subLabel: "qwen-image-edit-2511",
     },
     { type: "save-output", label: "결과 저장" },
   ],
 
-  /* ── Video (6 stage · 기존 5 step 매핑 + warmup) ── */
+  /* ── Video (6 stage · 라벨 체계화 2026-04-27) ── */
   video: [
     {
       type: "vision-analyze",
-      label: "이미지 비전 분석",
+      label: "이미지 분석",
       subLabel: "qwen2.5vl:7b",
       renderDetail: (p, c) => {
         // Phase 4 후속 (2026-04-27): hideVideoPrompts 토글 분기 (Edit 와 동일).
@@ -202,7 +206,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     },
     {
       type: "prompt-merge",
-      label: "영상 프롬프트 통합",
+      label: "프롬프트 통합",
       subLabel: "gemma4-un",
       renderDetail: (p, c) => {
         if (c.hideVideoPrompts) return null;
@@ -233,12 +237,12 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       // (Phase 3 2026-04-27 fix: 옛 정의 "workflow-build" 는 백엔드 emit 과
       // 매칭 안 돼서 row 가 안 보이는 잠재 버그였음.)
       type: "workflow-dispatch",
-      label: "워크플로우 구성",
+      label: "워크플로우 설정",
       subLabel: "LTX i2v builder",
     },
     {
       type: "comfyui-sampling",
-      label: "ComfyUI 샘플링",
+      label: "영상 생성",
       subLabel: "ltx-2.3-22b-fp8",
     },
     { type: "save-output", label: "MP4 저장", subLabel: "h264 인코딩" },
@@ -248,9 +252,24 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
   vision: [
     { type: "vision-encoding", label: "이미지 인코딩", subLabel: "browser" },
     {
-      type: "vision-call",
-      label: "비전 분석",
-      subLabel: "qwen2.5vl",
+      // 2026-04-27 라벨 일관화: vision-call → vision-analyze (edit/video 와 동일 type)
+      type: "vision-analyze",
+      label: "이미지 분석",
+      subLabel: "qwen2.5vl:7b",
+      // Edit/Video 패턴 일관 — 이미지 분석 완료 시 summary 박스 표시 (provider="fallback" → warn 톤)
+      renderDetail: (p) => {
+        const summary = p.summary as string | undefined;
+        const provider = p.provider as string | undefined;
+        if (!summary) return null;
+        return (
+          <DetailBox
+            kind={provider === "fallback" ? "warn" : "info"}
+            title={`분석 요약 (${provider ?? "?"})`}
+          >
+            {summary}
+          </DetailBox>
+        );
+      },
     },
     {
       // gemma4 번역 — 미래 토글 OFF 시 enabled 한 줄로 자동 숨김 (옵션 B 통일 가치).
@@ -258,6 +277,15 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       label: "한국어 번역",
       subLabel: "gemma4-un",
       enabled: (c) => !c.gemma4Off,
+      renderDetail: (p) => {
+        const summaryKo = p.summaryKo as string | undefined;
+        if (!summaryKo) return null;
+        return (
+          <DetailBox kind="muted" title="한국어 요약">
+            {summaryKo}
+          </DetailBox>
+        );
+      },
     },
   ],
 
@@ -274,14 +302,42 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     },
     {
       type: "vision-pair",
-      label: "두 이미지 비교 분석",
-      subLabel: "qwen2.5vl",
+      label: "이미지 비교 분석",
+      subLabel: "qwen2.5vl:7b",
+      // Edit/Video 패턴 일관 — overall 점수 + summary_en 박스
+      renderDetail: (p) => {
+        const summaryEn = p.summaryEn as string | undefined;
+        const overall = p.overall as number | undefined;
+        const provider = p.provider as string | undefined;
+        if (!summaryEn && overall == null) return null;
+        const title =
+          overall != null
+            ? `비교 요약 · 종합 ${overall}% (${provider ?? "?"})`
+            : `비교 요약 (${provider ?? "?"})`;
+        return (
+          <DetailBox
+            kind={provider === "fallback" ? "warn" : "info"}
+            title={title}
+          >
+            {summaryEn ?? "—"}
+          </DetailBox>
+        );
+      },
     },
     {
       type: "translation",
       label: "한국어 번역",
       subLabel: "gemma4-un",
       enabled: (c) => !c.gemma4Off,
+      renderDetail: (p) => {
+        const summaryKo = p.summaryKo as string | undefined;
+        if (!summaryKo) return null;
+        return (
+          <DetailBox kind="muted" title="한국어 요약">
+            {summaryKo}
+          </DetailBox>
+        );
+      },
     },
   ],
 };

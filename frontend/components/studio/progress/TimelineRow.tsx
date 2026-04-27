@@ -1,8 +1,7 @@
 /**
  * TimelineRow — 진행 모달 timeline 의 단일 row (bullet + label + elapsed).
  *
- * 2026-04-27 (Phase 1): progress/Timelines.tsx 에서 추출 — PipelineTimeline 도 공용으로 사용.
- * 옛 Timelines.tsx (GenerateTimeline / EditTimeline / VideoTimeline) 도 import 로 사용 (Phase 2/3 까지).
+ * 2026-04-27 (Phase 1): 추출. post-Phase-6 cleanup 후 PipelineTimeline 단일 사용.
  */
 
 "use client";

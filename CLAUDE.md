@@ -148,6 +148,13 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **Phase 5 자동 기동 준비 완료**: PIPELINE_DEFS 의 `comfyui-warmup` stage 정의됨 (enabled: warmupArrived). Phase 5 에서 백엔드 `_dispatch.py::_ensure_comfyui_ready` 만 추가하면 자동 작동 (프론트 추가 코드 0).
 - 설계 문서: `docs/superpowers/specs/2026-04-27-progress-store-unify-design.md` (진실의 출처 — 다음 세션 인계용)
 
+**2026-04-27 Phase 6 후속 — 진행 모달 라벨 체계화 + Generate timeline 통일** — pytest 215/215 · tsc+lint clean.
+- **5 mode 라벨 일관화**: ComfyUI 샘플링 라벨 mode 별 사용자 친화화 (`이미지 생성` / `이미지 수정` / `영상 생성`) · Vision 의 `vision-call` → `vision-analyze` type 통일 (edit/video 와 동일) + label "이미지 분석" 으로 일관 · Workflow 라벨 (`전달` / `구성`) → 모두 `워크플로우 설정` · Generate `gemma4-upgrade` label `프롬프트 강화` + subLabel `gemma4-un` (다른 stage 와 명명 패턴 일관) · `claude-research` label `프롬프트 조사` / subLabel `Claude · 최신 팁` · Vision/Compare subLabel `qwen2.5vl` → `qwen2.5vl:7b`.
+- **Generate `postprocess` → `save-output` 통일**: 백엔드 `pipelines/generate.py` emit type + label "후처리" → "결과 저장". 다른 mode 와 마지막 stage 패턴 일관.
+- **Generate timeline 통일 (post-Phase-6 cleanup)**: 옛 `progress/Timelines.tsx::GenerateTimeline` 제거. ProgressModal 이 5 mode 모두 `<PipelineTimeline mode={...} />` 단일 컴포넌트 사용.
+- **Vision/Compare 보조 박스 추가** (시각 일관성): backend 가 stage 완료 시점에 결과 정보 흡수해 추가 emit (vision: summary / compare: overall+summary_en + summary_ko) → frontend `PIPELINE_DEFS.vision/compare` 의 stage 에 `renderDetail` 추가. Edit/Video 의 `prompt-merge` 보조 박스 패턴과 동일.
+- **참조 문서**: `docs/progress-modal-display.md` (5 mode 의 모든 stage label / subLabel / 보조 박스 / Settings 토글 영향 표).
+
 **2026-04-27 Phase 6 — Vision/Compare 진행 모달 통일** — pytest 215/215 · tsc+lint clean.
 3 mode (Generate/Edit/Video) 의 진행 모달 통일에 이어 **Vision Analyzer + Compare 까지 단일 PipelineTimeline 으로 수렴**. `AnalysisProgressModal` 제거 → `<ProgressModal mode="vision|compare" />`.
 - **백엔드 task-based SSE 전환**: `/api/studio/vision-analyze` + `/api/studio/compare-analyze` 모두 동기 JSON 응답 → `{task_id, stream_url}` + SSE 패턴. POST → background spawn → GET stream/{id} → done event payload 추출.
