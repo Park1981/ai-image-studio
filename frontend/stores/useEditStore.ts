@@ -2,6 +2,12 @@
  * useEditStore - 수정 모드 입력/파이프라인 상태.
  * sourceImage 는 data URL (업로드) 또는 히스토리에서 선택한 imageRef.
  * 영속 안 함 (세션 한정) — 이미지 바이너리 커서 localStorage 가 빠르게 참.
+ *
+ * 2026-04-27 (Phase 2 진행 모달 store 통일):
+ *   stepDone/currentStep/stepHistory 제거 → stageHistory: StageEvent[] 도입.
+ *   백엔드 stage emit 의 payload (description / finalPrompt / editVisionAnalysis 등)
+ *   를 그대로 보관 — PipelineTimeline 의 StageDef.renderDetail 이 사용.
+ *   step emit 은 백엔드가 transitional 로 보내지만 store 에선 무시 (Phase 4 정리).
  */
 
 "use client";
@@ -9,20 +15,7 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type { EditVisionAnalysis } from "@/lib/api/types";
-
-export interface EditStepDetail {
-  n: 1 | 2 | 3 | 4;
-  startedAt: number;
-  doneAt: number | null;
-  /** step 1 에서 받은 vision 설명 */
-  description?: string;
-  /** step 2 에서 받은 최종 프롬프트 (영문) */
-  finalPrompt?: string;
-  /** step 2 에서 받은 한국어 번역 (v2 · 2026-04-23) */
-  finalPromptKo?: string | null;
-  /** step 2 provider (ollama/fallback) */
-  provider?: string;
-}
+import type { StageEvent } from "@/stores/useGenerateStore";
 
 export interface EditState {
   /** data URL (업로드) 또는 히스토리 imageRef */
@@ -38,11 +31,10 @@ export interface EditState {
 
   // 파이프라인 상태
   running: boolean;
-  /** 현재 완료된 step (0 = 시작 전, 1~4 = 각 단계 완료) */
-  stepDone: number;
-  currentStep: 1 | 2 | 3 | 4 | null;
-  /** 진행 모달용 상세 타임라인 */
-  stepHistory: EditStepDetail[];
+  /** 진행 모달용 stage 이벤트 타임라인 (Phase 2 통일).
+   *  백엔드 emit("stage", {...}) 가 도착할 때마다 push.
+   *  같은 type 이 진입 + 완료로 두 번 들어오면 byType Map 이 후자 (payload 풍부) 로 덮어씀. */
+  stageHistory: StageEvent[];
   /** 실행 시작 시각 (ms since epoch) — 경과 시간 계산용 */
   startedAt: number | null;
   /** ComfyUI 샘플러 현재 스텝 */
@@ -58,8 +50,8 @@ export interface EditState {
 
   /**
    * Edit 비전 구조 분석 (Phase 1 · 2026-04-25 · 휘발).
-   * SSE step 1 done 에서 수신한 구조 JSON. resetPipeline 으로 초기화.
-   * persist X — 새로고침/세션 종료 시 사라짐 (Vision Compare 패턴).
+   * 백엔드 stage("vision-analyze", done) payload 의 editVisionAnalysis 필드에서 추출.
+   * resetPipeline 으로 초기화. persist X — 새로고침/세션 종료 시 사라짐.
    */
   editVisionAnalysis: EditVisionAnalysis | null;
 
@@ -73,13 +65,10 @@ export interface EditState {
   setPrompt: (v: string) => void;
   setLightning: (v: boolean) => void;
   setRunning: (running: boolean) => void;
-  setStep: (step: 1 | 2 | 3 | 4 | null, done: boolean) => void;
-  /** n 만 필수. 나머지는 부분 업데이트 — 기존 필드 (특히 startedAt) 는 머지에서 보존. */
-  recordStepDetail: (
-    detail: Partial<EditStepDetail> & { n: EditStepDetail["n"] },
-  ) => void;
   setCompareX: (v: number) => void;
   setPipelineProgress: (progress: number, label?: string) => void;
+  /** Phase 2: stage 이벤트 도착 시 호출. arrivedAt 자동 부여. */
+  pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
   /** Phase 1: step 1 done 에서 받은 구조 분석 저장 (휘발). */
   setEditVisionAnalysis: (analysis: EditVisionAnalysis | null) => void;
   resetPipeline: () => void;
@@ -97,9 +86,7 @@ export const useEditStore = create<EditState>((set) => ({
   lightning: false,
 
   running: false,
-  stepDone: 0,
-  currentStep: null,
-  stepHistory: [],
+  stageHistory: [],
   startedAt: null,
   samplingStep: null,
   samplingTotal: null,
@@ -124,9 +111,7 @@ export const useEditStore = create<EditState>((set) => ({
       running
         ? {
             running,
-            stepDone: 0,
-            currentStep: 1,
-            stepHistory: [],
+            stageHistory: [],
             startedAt: Date.now(),
             samplingStep: null,
             samplingTotal: null,
@@ -137,32 +122,6 @@ export const useEditStore = create<EditState>((set) => ({
           }
         : { running },
     ),
-  setStep: (step, done) =>
-    set({
-      currentStep: step,
-      stepDone: done ? (step ?? 0) : step ? step - 1 : 0,
-    }),
-  recordStepDetail: (detail) =>
-    set((s) => {
-      const existing = s.stepHistory.find((x) => x.n === detail.n);
-      if (existing) {
-        // done 도착 시 완료 시각 + 상세 merge. 기존 startedAt 을 후순위로 두지 않기 위해
-        // detail 먼저, 그 위에 x.startedAt 을 다시 덮어 보존.
-        return {
-          stepHistory: s.stepHistory.map((x) =>
-            x.n === detail.n ? { ...x, ...detail, startedAt: x.startedAt } : x,
-          ),
-        };
-      }
-      // 새 엔트리 — startedAt 없으면 현재 시각 기본.
-      const fresh: EditStepDetail = {
-        startedAt: Date.now(),
-        doneAt: null,
-        ...detail,
-        n: detail.n,
-      };
-      return { stepHistory: [...s.stepHistory, fresh] };
-    }),
   setCompareX: (v) => set({ compareX: v }),
   setEditVisionAnalysis: (analysis) => set({ editVisionAnalysis: analysis }),
   setPipelineProgress: (progress, label) =>
@@ -170,12 +129,14 @@ export const useEditStore = create<EditState>((set) => ({
       pipelineProgress: progress,
       pipelineLabel: label ?? s.pipelineLabel,
     })),
+  pushStage: (evt) =>
+    set((s) => ({
+      stageHistory: [...s.stageHistory, { ...evt, arrivedAt: Date.now() }],
+    })),
   resetPipeline: () =>
     set({
       running: false,
-      stepDone: 0,
-      currentStep: null,
-      stepHistory: [],
+      stageHistory: [],
       startedAt: null,
       samplingStep: null,
       samplingTotal: null,

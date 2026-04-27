@@ -368,15 +368,20 @@ export type EditStage =
   /**
    * 백엔드가 emit 하는 전체 파이프라인 진행률 (0~100) + 단계 라벨.
    * Generate 의 GenStage 와 동일한 의미로 통일 — ProgressModal 의 상단 진행바는 이 값만 사용.
+   *
+   * 2026-04-27 (Phase 2 진행 모달 store 통일):
+   *   백엔드 stage emit payload 의 임의 detail 필드 (description / finalPrompt /
+   *   finalPromptKo / provider / editVisionAnalysis 등) 을 그대로 통과시킴.
+   *   PipelineTimeline 의 StageDef.renderDetail 이 stageHistory[].payload 에서 사용.
    */
-  | {
+  | ({
       type: "stage";
       stageType: string;
       progress: number;
       stageLabel: string;
       samplingStep?: number;
       samplingTotal?: number;
-    }
+    } & Record<string, unknown>)
   | { type: "done"; item: HistoryItem; savedToHistory: boolean };
 
 export interface OllamaModel {

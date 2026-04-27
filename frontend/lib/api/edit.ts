@@ -137,8 +137,24 @@ async function* realEditStream(
         stageLabel: string;
         samplingStep?: number | null;
         samplingTotal?: number | null;
-      };
-      // 전체 파이프라인 진행률 (ProgressModal 상단 바용)
+      } & Record<string, unknown>;
+      // Phase 2 (2026-04-27 진행 모달 store 통일):
+      //   백엔드 stage emit payload 의 모든 필드 (description / finalPrompt /
+      //   finalPromptKo / provider / editVisionAnalysis 등) 를 그대로 통과.
+      //   PipelineTimeline.StageDef.renderDetail 이 stageHistory[].payload 에서 사용.
+      const {
+        type: rawType,
+        progress: _p,
+        stageLabel: _sl,
+        samplingStep: _ss,
+        samplingTotal: _st,
+        ...extra
+      } = payload;
+      void _p;
+      void _sl;
+      void _ss;
+      void _st;
+      // 전체 파이프라인 진행률 (ProgressModal 상단 바용) + 임의 payload 흡수.
       yield {
         type: "stage",
         stageType: payload.type,
@@ -146,9 +162,10 @@ async function* realEditStream(
         stageLabel: payload.stageLabel,
         samplingStep: payload.samplingStep ?? undefined,
         samplingTotal: payload.samplingTotal ?? undefined,
+        ...extra,
       };
       // ComfyUI 샘플링일 때 추가로 샘플러 스텝 표시용 "sampling" 이벤트도 방출
-      if (payload.type === "comfyui-sampling") {
+      if (rawType === "comfyui-sampling") {
         yield {
           type: "sampling",
           progress: payload.progress ?? 0,

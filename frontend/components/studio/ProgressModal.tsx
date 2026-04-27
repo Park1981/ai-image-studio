@@ -25,8 +25,9 @@ import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useVideoStore } from "@/stores/useVideoStore";
 // 2026-04-27 (C2-P1-2): 3 mode 타임라인 + TimelineRow + DetailBox 분해.
+// 2026-04-27 (Phase 2): Edit 는 PipelineTimeline 으로 교체. Generate/Video 는 Phase 3 에서 통일.
+import { PipelineTimeline } from "./progress/PipelineTimeline";
 import {
-  EditTimeline,
   GenerateTimeline,
   VideoTimeline,
 } from "./progress/Timelines";
@@ -102,7 +103,7 @@ export default function ProgressModal({
           {mode === "generate" ? (
             <GenerateTimeline />
           ) : mode === "edit" ? (
-            <EditTimeline />
+            <PipelineTimeline mode="edit" />
           ) : (
             <VideoTimeline />
           )}
@@ -117,18 +118,20 @@ function useComfyInterruptAvailability(mode: HistoryMode): boolean {
   const genStageHistory = useGenerateStore((s) => s.stageHistory);
 
   const editRunning = useEditStore((s) => s.running);
-  const editCurrentStep = useEditStore((s) => s.currentStep);
+  // Phase 2 (2026-04-27): currentStep===4 → lastStage==="comfyui-sampling" 판정.
+  const editStageHistory = useEditStore((s) => s.stageHistory);
 
   const videoRunning = useVideoStore((s) => s.running);
   const videoCurrentStep = useVideoStore((s) => s.currentStep);
 
   const lastGenStage = genStageHistory[genStageHistory.length - 1]?.type;
+  const lastEditStage = editStageHistory[editStageHistory.length - 1]?.type;
 
   if (mode === "generate") {
     return genRunning && lastGenStage === "comfyui-sampling";
   }
   if (mode === "edit") {
-    return editRunning && editCurrentStep === 4;
+    return editRunning && lastEditStage === "comfyui-sampling";
   }
   if (mode === "video") {
     return videoRunning && videoCurrentStep === 4;

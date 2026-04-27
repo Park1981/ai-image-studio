@@ -51,6 +51,13 @@ async def _run_edit_pipeline(
     source_height: int = 0,
 ) -> None:
     try:
+        # Phase 2 (2026-04-27 진행 모달 store 통일):
+        #   stage emit 의 payload 안에 detail (description / finalPrompt /
+        #   finalPromptKo / provider / editVisionAnalysis) 을 흡수.
+        #   step emit 은 transitional 유지 — 옛 EditTimeline 호환 (Phase 4 에서 제거).
+        #   진입 emit + 완료 emit 둘 다 유지 (PipelineTimeline 의 running row 표시 용).
+        #   완료 emit 에만 payload 풍부.
+
         # Step 1: vision analysis — pipelineProgress 10 → 30
         await task.emit("stage", {"type": "vision-analyze", "progress": 10, "stageLabel": "비전 분석"})
         await task.emit("step", {"step": 1, "done": False})
@@ -79,7 +86,16 @@ async def _run_edit_pipeline(
         if _analysis is not None:
             step1_done_payload["editVisionAnalysis"] = _analysis.to_dict()
         await task.emit("step", step1_done_payload)
-        await task.emit("stage", {"type": "vision-analyze", "progress": 30, "stageLabel": "비전 분석 완료"})
+        # Phase 2: stage 완료 payload 에 description + editVisionAnalysis 흡수.
+        vision_done_stage: dict[str, Any] = {
+            "type": "vision-analyze",
+            "progress": 30,
+            "stageLabel": "비전 분석 완료",
+            "description": vision.image_description,
+        }
+        if _analysis is not None:
+            vision_done_stage["editVisionAnalysis"] = _analysis.to_dict()
+        await task.emit("stage", vision_done_stage)
 
         # Step 2: prompt merge (이미 vision 파이프라인에서 완료) — 40 → 50
         await task.emit("stage", {"type": "prompt-merge", "progress": 40, "stageLabel": "프롬프트 병합"})
@@ -95,7 +111,18 @@ async def _run_edit_pipeline(
                 "provider": vision.upgrade.provider,
             },
         )
-        await task.emit("stage", {"type": "prompt-merge", "progress": 50, "stageLabel": "프롬프트 병합 완료"})
+        # Phase 2: prompt-merge 완료 stage 에 finalPrompt/finalPromptKo/provider 흡수.
+        await task.emit(
+            "stage",
+            {
+                "type": "prompt-merge",
+                "progress": 50,
+                "stageLabel": "프롬프트 병합 완료",
+                "finalPrompt": vision.final_prompt,
+                "finalPromptKo": vision.upgrade.translation,
+                "provider": vision.upgrade.provider,
+            },
+        )
 
         # Step 3: size/style auto-extraction — 55 → 65
         await task.emit("stage", {"type": "param-extract", "progress": 55, "stageLabel": "파라미터 추출"})

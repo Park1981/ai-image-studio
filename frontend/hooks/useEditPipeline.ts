@@ -41,10 +41,9 @@ export function useEditPipeline({
   const running = useEditStore((s) => s.running);
   const setRunning = useEditStore((s) => s.setRunning);
   const setSource = useEditStore((s) => s.setSource);
-  const setStep = useEditStore((s) => s.setStep);
-  const recordStepDetail = useEditStore((s) => s.recordStepDetail);
   const setSampling = useEditStore((s) => s.setSampling);
   const setPipelineProgress = useEditStore((s) => s.setPipelineProgress);
+  const pushStage = useEditStore((s) => s.pushStage);
   const setEditVisionAnalysis = useEditStore((s) => s.setEditVisionAnalysis);
   const resetPipeline = useEditStore((s) => s.resetPipeline);
   // 히스토리
@@ -80,31 +79,49 @@ export function useEditPipeline({
         on: {
           sampling: (e) =>
             setSampling(e.samplingStep ?? null, e.samplingTotal ?? null),
-          step: (e) => {
-            setStep(e.step, e.done);
-            if (!e.done) {
-              recordStepDetail({
-                n: e.step,
-                startedAt: Date.now(),
-                doneAt: null,
-              });
-            } else {
-              // done 시 startedAt 안 넘김 → store merge 가 기존 startedAt 보존.
-              recordStepDetail({
-                n: e.step,
-                doneAt: Date.now(),
-                description: e.description,
-                finalPrompt: e.finalPrompt,
-                finalPromptKo: e.finalPromptKo,
-                provider: e.provider,
-              });
-              // Phase 1 (2026-04-25): step 1 done 에 구조 분석 payload 포함 가능.
-              if (e.step === 1 && e.editVisionAnalysis) {
-                setEditVisionAnalysis(e.editVisionAnalysis);
-              }
+          // Phase 2 (2026-04-27 진행 모달 store 통일):
+          //   step 이벤트는 transitional 로 백엔드가 보내지만 store 에선 무시.
+          //   detail (description / finalPrompt / editVisionAnalysis) 은 stage payload
+          //   에 흡수되어 stageHistory[].payload 로 들어가고 PipelineTimeline 이 사용.
+          step: () => {},
+          stage: (e) => {
+            setPipelineProgress(e.progress, e.stageLabel);
+            // 백엔드가 보낸 임의 payload 를 stageHistory 에 그대로 보관.
+            // e.type 은 discriminator ("stage") · 백엔드 raw type 은 e.stageType.
+            // stageType/progress/stageLabel/sampling* 외 필드 (description /
+            // finalPrompt / finalPromptKo / provider / editVisionAnalysis 등) 가 payload.
+            const {
+              type: _discriminator,
+              stageType,
+              progress: _progress,
+              stageLabel: _stageLabel,
+              samplingStep: _ss,
+              samplingTotal: _st,
+              ...payload
+            } = e;
+            void _discriminator;
+            void _progress;
+            void _stageLabel;
+            void _ss;
+            void _st;
+            const hasPayload = Object.keys(payload).length > 0;
+            pushStage({
+              type: stageType,
+              label: e.stageLabel ?? "",
+              progress: e.progress,
+              ...(hasPayload ? { payload } : {}),
+            });
+            // Phase 1 호환: vision-analyze 완료 stage 의 editVisionAnalysis
+            // 필드를 휘발 store 에도 별도 보관 (PIPELINE_DEFS edit 의 ctx 가 사용).
+            const visionAnalysis = (
+              payload as { editVisionAnalysis?: unknown }
+            ).editVisionAnalysis;
+            if (stageType === "vision-analyze" && visionAnalysis) {
+              setEditVisionAnalysis(
+                visionAnalysis as Parameters<typeof setEditVisionAnalysis>[0],
+              );
             }
           },
-          stage: (e) => setPipelineProgress(e.progress, e.stageLabel),
           done: (e) => {
             resetPipeline();
             addItem(e.item);

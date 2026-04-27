@@ -12,12 +12,12 @@
  *
  * mode 별 store 구독:
  *   - generate: useGenerateStore (stageHistory + generating + research)
- *   - edit:    useEditStore     (stageHistory · Phase 2 도입 예정 — 그 전엔 빈 배열 폴백)
+ *   - edit:    useEditStore     (stageHistory · Phase 2 (2026-04-27) 도입 완료)
  *   - video:   useVideoStore    (stageHistory · Phase 3 도입 예정 — 그 전엔 빈 배열 폴백)
  *
- * Phase 1 시점 사용:
- *   - Generate 만 즉시 PipelineTimeline 적용 (ProgressModal 의 GenerateTimeline → PipelineTimeline)
- *   - Edit/Video 는 옛 EditTimeline/VideoTimeline 유지 (Phase 2/3 에서 교체)
+ * Phase 2 시점 사용:
+ *   - Generate / Edit 는 PipelineTimeline 적용 완료
+ *   - Video 는 옛 VideoTimeline 유지 (Phase 3 에서 교체)
  */
 
 "use client";
@@ -110,11 +110,12 @@ interface PipelineRuntime {
 }
 
 /** mode 별 store 에서 stageHistory + running 가져오기.
- *  Phase 1 시점: Generate 만 진짜 stageHistory 보유. Edit/Video 는 빈 배열 폴백 (Phase 2/3 에서 도입).
+ *  Phase 2 시점: Generate / Edit 진짜 stageHistory 보유. Video 는 빈 배열 폴백 (Phase 3).
  *  hook 규칙 위배 회피 — 모든 store 를 항상 구독하고 mode 로 분기. */
 function usePipelineRuntime(mode: HistoryMode): PipelineRuntime {
   const genStageHistory = useGenerateStore((s) => s.stageHistory);
   const genRunning = useGenerateStore((s) => s.generating);
+  const editStageHistory = useEditStore((s) => s.stageHistory);
   const editRunning = useEditStore((s) => s.running);
   const videoRunning = useVideoStore((s) => s.running);
 
@@ -122,8 +123,7 @@ function usePipelineRuntime(mode: HistoryMode): PipelineRuntime {
     return { stageHistory: genStageHistory, running: genRunning };
   }
   if (mode === "edit") {
-    // Phase 2 까지 stageHistory 없음 — 빈 배열 폴백.
-    return { stageHistory: [], running: editRunning };
+    return { stageHistory: editStageHistory, running: editRunning };
   }
   // video — Phase 3 까지 stageHistory 없음 — 빈 배열 폴백.
   return { stageHistory: [], running: videoRunning };
