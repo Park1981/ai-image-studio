@@ -14,6 +14,7 @@ import {
   sleep,
   uid,
 } from "./client";
+import type { TaskCreated } from "./generated-helpers";
 import type { HistoryItem, VideoRequest, VideoStage } from "./types";
 
 export async function* videoImageStream(
@@ -75,10 +76,8 @@ async function* realVideoStream(
   if (!createRes.ok) {
     throw new Error(`video create failed: ${createRes.status}`);
   }
-  const { stream_url } = (await createRes.json()) as {
-    task_id: string;
-    stream_url: string;
-  };
+  // Tier 3 (2026-04-27): generated OpenAPI 타입 사용
+  const { stream_url } = (await createRes.json()) as TaskCreated;
 
   const streamRes = await fetch(`${STUDIO_BASE}${stream_url}`, {
     headers: { accept: "text/event-stream" },

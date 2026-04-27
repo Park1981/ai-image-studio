@@ -12,6 +12,7 @@
  */
 
 import { STUDIO_BASE, USE_MOCK, parseSSE, sleep } from "./client";
+import type { TaskCreated } from "./generated-helpers";
 import type { VisionAnalysisResponse } from "./types";
 
 export interface AnalyzeStageEvent {
@@ -102,10 +103,8 @@ export async function analyzeImage(
       `vision-analyze ${createRes.status}: ${detail || "요청 실패"}`,
     );
   }
-  const { stream_url } = (await createRes.json()) as {
-    task_id: string;
-    stream_url: string;
-  };
+  // Tier 3 (2026-04-27): generated OpenAPI 타입 사용
+  const { stream_url } = (await createRes.json()) as TaskCreated;
 
   // SSE drain — done event payload 추출. stage 이벤트는 onStage 콜백으로 전달.
   const streamRes = await fetch(`${STUDIO_BASE}${stream_url}`, {

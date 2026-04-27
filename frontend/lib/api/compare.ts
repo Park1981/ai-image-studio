@@ -12,6 +12,7 @@
 
 import { STUDIO_BASE, USE_MOCK, parseSSE, sleep } from "./client";
 import type { AnalyzeStageEvent } from "./vision";
+import type { TaskCreated } from "./generated-helpers";
 import type { ComparisonAnalysis, VisionCompareAnalysis } from "./types";
 
 export interface CompareAnalyzeRequest {
@@ -198,10 +199,8 @@ export async function compareAnalyze(
   if (!createRes.ok) {
     throw new Error(`compare-analyze failed: ${createRes.status}`);
   }
-  const { stream_url } = (await createRes.json()) as {
-    task_id: string;
-    stream_url: string;
-  };
+  // Tier 3 (2026-04-27): generated OpenAPI 타입 사용
+  const { stream_url } = (await createRes.json()) as TaskCreated;
 
   // SSE drain — done event payload 추출. stage 이벤트는 onStage 콜백.
   const streamRes = await fetch(`${STUDIO_BASE}${stream_url}`, {
