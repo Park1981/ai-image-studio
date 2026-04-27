@@ -14,7 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
-import type { UpgradeOnlyResult } from "@/lib/api-client";
+import type { UpgradeOnlyResult } from "@/lib/api/types";
 
 export interface UpgradeConfirmPayload {
   /** 최종 ComfyUI 로 보낼 영문 프롬프트 (사용자 수정 반영) */

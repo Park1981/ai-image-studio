@@ -13,7 +13,8 @@
 import { useState, type CSSProperties } from "react";
 import ImageTile from "@/components/ui/ImageTile";
 import Icon, { type IconName } from "@/components/ui/Icon";
-import { deleteHistoryItem, type HistoryItem } from "@/lib/api-client";
+import { deleteHistoryItem } from "@/lib/api/history";
+import type { HistoryItem } from "@/lib/api/types";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
 

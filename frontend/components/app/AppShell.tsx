@@ -14,7 +14,7 @@ import HistoryBootstrap from "./HistoryBootstrap";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { toast } from "@/stores/useToastStore";
-import { fetchProcessStatus, setProcessStatus } from "@/lib/api-client";
+import { fetchProcessStatus, setProcessStatus } from "@/lib/api/process";
 
 /* 진입 시 autoStartComfy 프리퍼런스 반영 — 한 세션에서 1회만.
    이전: setComfyui("running") 만 호출 → UI 만 거짓 running 표시 (실제 backend 미시작).

@@ -21,7 +21,7 @@ import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
 import VideoPlayerCard from "@/components/studio/VideoPlayerCard";
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 import { filenameFromRef } from "@/lib/image-actions";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useVideoStore, useVideoRunning } from "@/stores/useVideoStore";

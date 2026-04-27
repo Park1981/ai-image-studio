@@ -36,7 +36,7 @@ import {
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { usePromptHistoryStore } from "@/stores/usePromptHistoryStore";
-import { compareAnalyze } from "@/lib/api-client";
+import { compareAnalyze } from "@/lib/api/compare";
 import { useImagePasteTarget } from "@/hooks/useImagePasteTarget";
 import { toast } from "@/stores/useToastStore";
 import type { VisionCompareAnalysis } from "@/lib/api/types";

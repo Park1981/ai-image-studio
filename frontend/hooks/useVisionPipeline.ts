@@ -12,7 +12,7 @@
 
 "use client";
 
-import { analyzeImage } from "@/lib/api-client";
+import { analyzeImage } from "@/lib/api/vision";
 import { resizeImageToThumbnail } from "@/lib/image-actions";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";

@@ -17,12 +17,9 @@ import { useProcessStore, type ProcStatus } from "@/stores/useProcessStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { toast } from "@/stores/useToastStore";
-import {
-  setProcessStatus,
-  clearHistory as apiClearHistory,
-  listOllamaModels,
-  type OllamaModel,
-} from "@/lib/api-client";
+import { setProcessStatus, listOllamaModels } from "@/lib/api/process";
+import { clearHistory as apiClearHistory } from "@/lib/api/history";
+import type { OllamaModel } from "@/lib/api/types";
 import { useEffect, useState } from "react";
 import { useSettings } from "./SettingsContext";
 

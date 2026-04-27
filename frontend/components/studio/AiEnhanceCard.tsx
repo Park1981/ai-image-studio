@@ -17,7 +17,7 @@ import { useState } from "react";
 import Icon from "@/components/ui/Icon";
 import EditVisionBlock from "@/components/studio/EditVisionBlock";
 import { toast } from "@/stores/useToastStore";
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 
 export default function AiEnhanceCard({ item }: { item: HistoryItem }) {
   const [openOriginal, setOpenOriginal] = useState(false);

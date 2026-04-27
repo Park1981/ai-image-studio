@@ -7,7 +7,7 @@
 
 "use client";
 
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 import ImageTile from "@/components/ui/ImageTile";
 import { Meta, SmallBtn } from "@/components/ui/primitives";
 import { GENERATE_MODEL, activeLoras, countExtraLoras } from "@/lib/model-presets";

@@ -13,7 +13,8 @@
 "use client";
 
 import { useEffect } from "react";
-import { listHistory, USE_MOCK } from "@/lib/api-client";
+import { listHistory } from "@/lib/api/history";
+import { USE_MOCK } from "@/lib/api/client";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
 

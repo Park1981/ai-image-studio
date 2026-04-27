@@ -19,7 +19,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 import { groupByDate, isClosedSection } from "@/lib/date-sections";
 import HistoryTile from "./HistoryTile";
 import SectionHeader from "./SectionHeader";

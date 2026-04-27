@@ -12,7 +12,7 @@
 
 "use client";
 
-import { editImageStream } from "@/lib/api-client";
+import { editImageStream } from "@/lib/api/edit";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { useEditStore } from "@/stores/useEditStore";

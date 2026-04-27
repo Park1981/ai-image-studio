@@ -7,7 +7,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 
 const MAX_HISTORY = 200;
 

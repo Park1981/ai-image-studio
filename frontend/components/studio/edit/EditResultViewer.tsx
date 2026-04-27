@@ -15,7 +15,7 @@ import BeforeAfterSlider from "@/components/studio/BeforeAfterSlider";
 import ResultHoverActionBar, {
   ActionBarButton,
 } from "@/components/studio/ResultHoverActionBar";
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
 import { useEditStore } from "@/stores/useEditStore";
 import { toast } from "@/stores/useToastStore";

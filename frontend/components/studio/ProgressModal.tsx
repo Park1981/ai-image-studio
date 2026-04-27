@@ -18,7 +18,7 @@
 import { useEffect, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
-import { interruptCurrent } from "@/lib/api-client";
+import { interruptCurrent } from "@/lib/api/process";
 import type { HistoryMode } from "@/lib/api/types";
 import { toast } from "@/stores/useToastStore";
 import {

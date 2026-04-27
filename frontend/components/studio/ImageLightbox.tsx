@@ -23,7 +23,7 @@ import {
   type WheelEvent,
 } from "react";
 import Icon from "@/components/ui/Icon";
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 import { copyText } from "@/lib/image-actions";
 import BeforeAfterSlider from "./BeforeAfterSlider";
 import ComparisonAnalysisCard from "./ComparisonAnalysisCard";

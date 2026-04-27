@@ -24,7 +24,7 @@ import StudioEmptyState from "@/components/studio/StudioEmptyState";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 import { useEditStore, useEditInputs } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";

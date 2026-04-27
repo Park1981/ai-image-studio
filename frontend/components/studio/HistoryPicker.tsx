@@ -7,7 +7,7 @@
 
 "use client";
 
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 import ImageTile from "@/components/ui/ImageTile";
 
 interface HistoryPickerProps {

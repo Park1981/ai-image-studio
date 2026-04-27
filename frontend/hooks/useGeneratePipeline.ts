@@ -20,8 +20,8 @@ import {
   generateImageStream,
   researchPrompt,
   upgradeOnly,
-  type UpgradeOnlyResult,
-} from "@/lib/api-client";
+} from "@/lib/api/generate";
+import type { UpgradeOnlyResult } from "@/lib/api/types";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { GENERATE_MODEL } from "@/lib/model-presets";
 import { useGenerateStore } from "@/stores/useGenerateStore";

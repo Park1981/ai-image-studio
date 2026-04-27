@@ -20,7 +20,7 @@ import SettingsButton from "@/components/settings/SettingsButton";
 import SystemMetrics from "./SystemMetrics";
 import SystemStatusChip from "./SystemStatusChip";
 import Icon from "@/components/ui/Icon";
-import { USE_MOCK } from "@/lib/api-client";
+import { USE_MOCK } from "@/lib/api/client";
 
 /** 홈 아이콘 버튼 — 메뉴 페이지 좌측 상단 (BackBtn 자리 대체).
  *  icon-only · tooltip "메인으로" · 단축키 없음 (Esc 충돌 회피).

@@ -8,7 +8,7 @@
 
 "use client";
 
-import { videoImageStream } from "@/lib/api-client";
+import { videoImageStream } from "@/lib/api/video";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";

@@ -16,12 +16,12 @@
 "use client";
 
 import { useCallback, useRef, useSyncExternalStore } from "react";
-import { compareAnalyze } from "@/lib/api-client";
+import { compareAnalyze } from "@/lib/api/compare";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
-import type { ComparisonAnalysis, HistoryItem } from "@/lib/api-client";
+import type { ComparisonAnalysis, HistoryItem } from "@/lib/api/types";
 
 /** RTX 4070 Ti SUPER 16GB 기준 — ComfyUI + qwen2.5vl 동시 실행 OOM 방지 임계치 */
 const VRAM_THRESHOLD_GB = 13;

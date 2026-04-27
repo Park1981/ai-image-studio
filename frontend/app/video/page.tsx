@@ -32,7 +32,7 @@ import VideoRightPanel from "@/components/studio/video/VideoRightPanel";
 import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
 import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { useVideoPipeline } from "@/hooks/useVideoPipeline";
-import type { HistoryItem } from "@/lib/api-client";
+import type { HistoryItem } from "@/lib/api/types";
 import { filenameFromRef } from "@/lib/image-actions";
 import { useVideoInputs, useVideoRunning } from "@/stores/useVideoStore";
 
