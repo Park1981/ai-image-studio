@@ -18,6 +18,7 @@ from typing import Any
 
 from PIL import Image
 
+from .._gpu_lock import gpu_slot
 from ..comfy_api_builder import build_edit_from_request
 from ..presets import DEFAULT_OLLAMA_ROLES, EDIT_MODEL
 from ..storage import (
@@ -28,7 +29,6 @@ from ..storage import (
 )
 from ..tasks import Task
 from ..vision_pipeline import run_vision_pipeline
-from .. import ollama_unload
 from ._dispatch import _dispatch_to_comfy, _mark_generation_complete
 
 log = logging.getLogger(__name__)
@@ -53,17 +53,18 @@ async def _run_edit_pipeline(
         # Step 1: vision analysis — pipelineProgress 10 → 30
         await task.emit("stage", {"type": "vision-analyze", "progress": 10, "stageLabel": "비전 분석"})
         await task.emit("step", {"step": 1, "done": False})
-        vision = await run_vision_pipeline(
-            image_bytes,
-            prompt,
-            vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
-            text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
-            # spec 19 후속 (Codex P1 #1): SOURCE 이미지 aspect 정보 전달.
-            # 이전엔 analyze_edit_source 가 받게 만들었는데 여기서 안 넘겨
-            # dead code 였음. 이제 layout/composition 정확도 ↑.
-            width=source_width,
-            height=source_height,
-        )
+        async with gpu_slot("edit-vision"):
+            vision = await run_vision_pipeline(
+                image_bytes,
+                prompt,
+                vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
+                text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
+                # spec 19 후속 (Codex P1 #1): SOURCE 이미지 aspect 정보 전달.
+                # 이전엔 analyze_edit_source 가 받게 만들었는데 여기서 안 넘겨
+                # dead code 였음. 이제 layout/composition 정확도 ↑.
+                width=source_width,
+                height=source_height,
+            )
         # step 1 done payload — Phase 1 (2026-04-25):
         #   기존 description (사용자 표시용 요약) 은 그대로 유지.
         #   신규 editVisionAnalysis 는 구조 분석 성공 시에만 payload 포함 (휘발 · DB X).
@@ -108,10 +109,7 @@ async def _run_edit_pipeline(
 
         actual_seed = int(time.time() * 1000)
 
-        # spec 19 후속 (옵션 A): Edit 한 사이클은 qwen2.5vl (~14GB) + gemma4
-        # (~14.85GB) 둘 다 호출 → 누적 메모리 점유 위험. ComfyUI 디스패치 전
-        # 전부 unload + 1.5초 대기.
-        await ollama_unload.force_unload_all_before_comfy()
+        # Ollama unload + GPU gate 는 _dispatch_to_comfy 내부에서 공통 처리.
 
         def _make_edit_prompt(uploaded_name: str | None) -> dict[str, Any]:
             # Edit 는 업로드 이후에만 호출됨 → uploaded_name 반드시 있음

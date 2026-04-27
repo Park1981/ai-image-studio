@@ -16,7 +16,7 @@ Thread safety: 단일 워커 가정 + 단순 dict 쓰기는 GIL 보호. 별도 l
 from __future__ import annotations
 
 import time
-from typing import Any, TypedDict
+from typing import TypedDict
 
 
 class LastDispatch(TypedDict, total=False):

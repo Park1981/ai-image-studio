@@ -55,15 +55,15 @@ def _silence_proactor_reset(loop: asyncio.AbstractEventLoop) -> None:
     """
     default_handler = loop.get_exception_handler()
 
-    def _handler(l: asyncio.AbstractEventLoop, context: dict) -> None:
+    def _handler(inner_loop: asyncio.AbstractEventLoop, context: dict) -> None:
         exc = context.get("exception")
         if isinstance(exc, (ConnectionResetError, ConnectionAbortedError)):
             logger.debug("proactor 소켓 reset 무시: %s", exc)
             return
         if default_handler is None:
-            l.default_exception_handler(context)
+            inner_loop.default_exception_handler(context)
         else:
-            default_handler(l, context)
+            default_handler(inner_loop, context)
 
     loop.set_exception_handler(_handler)
 

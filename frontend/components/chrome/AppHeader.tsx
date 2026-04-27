@@ -20,6 +20,7 @@ import SettingsButton from "@/components/settings/SettingsButton";
 import SystemMetrics from "./SystemMetrics";
 import SystemStatusChip from "./SystemStatusChip";
 import Icon from "@/components/ui/Icon";
+import { USE_MOCK } from "@/lib/api-client";
 
 /** 홈 아이콘 버튼 — 메뉴 페이지 좌측 상단 (BackBtn 자리 대체).
  *  icon-only · tooltip "메인으로" · 단축키 없음 (Esc 충돌 회피).
@@ -61,6 +62,33 @@ function HomeBtn({ onClick }: { onClick: () => void }) {
   );
 }
 
+function MockModeBadge() {
+  if (!USE_MOCK) return null;
+
+  return (
+    <div
+      role="status"
+      title="NEXT_PUBLIC_USE_MOCK=true"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        height: 26,
+        padding: "0 9px",
+        borderRadius: "var(--radius-full)",
+        border: "1px solid rgba(245,158,11,.42)",
+        background: "rgba(245,158,11,.10)",
+        color: "var(--amber-ink)",
+        fontSize: 10.5,
+        fontWeight: 700,
+        letterSpacing: ".06em",
+        whiteSpace: "nowrap",
+      }}
+    >
+      MOCK
+    </div>
+  );
+}
+
 export default function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
@@ -82,6 +110,7 @@ export default function AppHeader() {
       }
       right={
         <>
+          <MockModeBadge />
           <SystemStatusChip />
           <SystemMetrics />
           <SettingsButton />

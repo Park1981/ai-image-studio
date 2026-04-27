@@ -21,6 +21,7 @@ from PIL import Image
 
 from config import settings  # type: ignore[import-not-found]
 
+from .._gpu_lock import gpu_slot
 from ..comfy_api_builder import build_video_from_request
 from ..presets import (
     DEFAULT_OLLAMA_ROLES,
@@ -30,7 +31,6 @@ from ..presets import (
 from ..storage import _persist_history
 from ..tasks import Task
 from ..video_pipeline import run_video_pipeline
-from .. import ollama_unload
 from ._dispatch import (
     _dispatch_to_comfy,
     _mark_generation_complete,
@@ -83,13 +83,14 @@ async def _run_video_pipeline_task(
         )
         await task.emit("step", {"step": 1, "done": False})
 
-        video_res = await run_video_pipeline(
-            image_bytes,
-            prompt,
-            vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
-            text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
-            adult=adult,
-        )
+        async with gpu_slot("video-vision"):
+            video_res = await run_video_pipeline(
+                image_bytes,
+                prompt,
+                vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
+                text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
+                adult=adult,
+            )
 
         await task.emit(
             "step",
@@ -168,9 +169,7 @@ async def _run_video_pipeline_task(
         )
         await task.emit("step", {"step": 4, "done": False})
 
-        # spec 19 후속 (옵션 A): Video 도 vision + upgrade 후 ComfyUI 디스패치 →
-        # gemma4 + qwen2.5vl 누적 점유 가능. unload + 1.5초 대기.
-        await ollama_unload.force_unload_all_before_comfy()
+        # Ollama unload + GPU gate 는 _dispatch_to_comfy 내부에서 공통 처리.
 
         dispatch = await _dispatch_to_comfy(
             task,

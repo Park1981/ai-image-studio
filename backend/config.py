@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     comfyui_executable: str = ""
     comfyui_models_path: str = ""
     comfyui_auto_shutdown_minutes: int = 10
+    # ComfyUI dispatch 실패 시 mock-seed:// 로 완주할지 여부.
+    # 운영 기본값은 False: 실제 실패를 프론트 error 로 노출한다.
+    comfy_mock_fallback: bool = False
 
     # Ollama 설정
     ollama_url: str = "http://127.0.0.1:11434"

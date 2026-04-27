@@ -21,7 +21,6 @@ import io
 import json
 from unittest.mock import AsyncMock, patch
 
-import pytest
 from PIL import Image
 
 from studio.prompt_pipeline import (
@@ -33,7 +32,6 @@ from studio.vision_pipeline import (
     EDIT_VISION_ANALYSIS_SYSTEM,
     OBJECT_SCENE_SLOTS,
     PERSON_SLOTS,
-    EditSlotEntry,
     EditVisionAnalysis,
     analyze_edit_source,
     run_vision_pipeline,

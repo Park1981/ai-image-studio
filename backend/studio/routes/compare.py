@@ -5,20 +5,20 @@ context 분기:
   edit (default): analyze_pair v3 — 도메인 분기 + 5 슬롯 매트릭스 + 의도 점수
   compare:       analyze_pair_generic — Vision Compare 메뉴 (5축 generic)
 
-mutex (_COMPARE_LOCK) 로 ComfyUI 샘플링과 직렬화 — 16GB VRAM 충돌 방지.
-30s 대기 후에도 락이면 503 (의도된 backpressure).
+공용 GPU gate 로 ComfyUI 샘플링과 직렬화 — 16GB VRAM 충돌 방지.
+30s 대기 후에도 gate 가 바쁘면 503 (의도된 backpressure).
 
 task #17 (2026-04-26): router.py 풀 분해 2탄.
 """
 
 from __future__ import annotations
 
-import asyncio
 import json
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from .. import history_db, ollama_unload
+from .._gpu_lock import GpuBusyError, gpu_slot
 from ..comparison_pipeline import analyze_pair, analyze_pair_generic
 from ..prompt_pipeline import clarify_edit_intent
 from ..storage import TASK_ID_RE
@@ -26,12 +26,6 @@ from ._common import log
 
 router = APIRouter()
 
-# ComfyUI 샘플링과 직렬화하기 위한 mutex — vision 호출이 ComfyUI 와 동시 활성 시
-# VRAM 16GB 환경에서 충돌 방지. analyze_pair 내부 timeout 은 240s (DEFAULT_TIMEOUT)
-# 이라, 선행 호출이 길게 걸리면 후속은 30s 후 503 반환 — 이는 의도된 backpressure 설계
-# (단일 프로세스 + 단일 GPU 보호).
-_COMPARE_LOCK = asyncio.Lock()
-_COMPARE_LOCK_TIMEOUT_SEC = 30.0
 _COMPARE_MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MB (vision/video 라우트 동일값)
 
 
@@ -50,7 +44,7 @@ async def compare_analyze(
 
     historyItemId 가 주어지면 분석 결과를 DB 에 영구 저장 (saved=True).
     HTTP 200 원칙 — 비전 실패해도 fallback 결과로 200 반환 (analysis.fallback=True).
-    동시 호출 시 _COMPARE_LOCK 으로 직렬화 → 30s 대기 후 락이면 503 (의도 설계).
+    동시 호출 시 공용 GPU gate 로 직렬화 → 30s 대기 후 busy 면 503 (의도 설계).
     """
     try:
         meta_obj = json.loads(meta)
@@ -96,52 +90,58 @@ async def compare_analyze(
                     "compare-analyze refined_intent cache lookup failed (non-fatal): %s",
                     cache_err,
                 )
-        # 캐시 미스 + edit_prompt 있으면 fresh 호출 (lock 밖)
+        # 캐시 미스 + edit_prompt 있으면 fresh 호출.
+        # compare 분석 gate 와는 분리하되, 공용 GPU gate 는 적용해 ComfyUI 와 충돌 방지.
         if not refined_intent and edit_prompt:
             try:
-                refined_intent = await clarify_edit_intent(
-                    edit_prompt,
-                    model=text_override or "gemma4-un:latest",
-                    timeout=60.0,
-                )
+                async with gpu_slot("compare-refine"):
+                    refined_intent = await clarify_edit_intent(
+                        edit_prompt,
+                        model=text_override or "gemma4-un:latest",
+                        timeout=60.0,
+                    )
+            except GpuBusyError as e:
+                raise HTTPException(503, str(e)) from e
             except Exception as exc:
                 log.info(
                     "compare-analyze refine failed (non-fatal): %s", exc
                 )
 
-    # mutex — ComfyUI 샘플링과 충돌 회피용 직렬화. 30s 대기 후에도 락이면 503.
-    # 이제 lock 안엔 qwen2.5vl 비전 호출 (analyze_pair / analyze_pair_generic)
-    # 만 들어감 → 동시성 개선.
+    # 공용 GPU gate — qwen2.5vl 비전 호출과 ComfyUI 샘플링 동시 활성 차단.
     try:
-        await asyncio.wait_for(
-            _COMPARE_LOCK.acquire(), timeout=_COMPARE_LOCK_TIMEOUT_SEC
-        )
-    except asyncio.TimeoutError as e:
-        raise HTTPException(503, "compare-analyze busy (locked > 30s)") from e
+        async with gpu_slot("compare-analyze"):
+            if context == "compare":
+                # Vision Compare 메뉴 — 사용자가 임의로 고른 두 이미지 비교
+                # source = IMAGE_A, result = IMAGE_B (multipart 필드명 재활용)
+                result_obj = await analyze_pair_generic(
+                    image_a_bytes=source_bytes,
+                    image_b_bytes=result_bytes,
+                    compare_hint=compare_hint,
+                    vision_model=vision_override,
+                    text_model=text_override,
+                )
+            else:
+                # edit context — refined_intent 는 위에서 별도 짧은 gate 로 준비됨
+                result_obj = await analyze_pair(
+                    source_bytes=source_bytes,
+                    result_bytes=result_bytes,
+                    edit_prompt=edit_prompt,
+                    vision_model=vision_override,
+                    text_model=text_override,
+                    refined_intent=refined_intent,
+                )
 
-    try:
-        if context == "compare":
-            # Vision Compare 메뉴 — 사용자가 임의로 고른 두 이미지 비교
-            # source = IMAGE_A, result = IMAGE_B (multipart 필드명 재활용)
-            result_obj = await analyze_pair_generic(
-                image_a_bytes=source_bytes,
-                image_b_bytes=result_bytes,
-                compare_hint=compare_hint,
-                vision_model=vision_override,
-                text_model=text_override,
-            )
-        else:
-            # edit context — refined_intent 는 위에서 lock 밖에 준비됨
-            result_obj = await analyze_pair(
-                source_bytes=source_bytes,
-                result_bytes=result_bytes,
-                edit_prompt=edit_prompt,
-                vision_model=vision_override,
-                text_model=text_override,
-                refined_intent=refined_intent,
-            )
-    finally:
-        _COMPARE_LOCK.release()
+            # spec 19 후속 (옵션 1 · 사용자 진단): 자동 비교 분석 후 모델
+            # unload 명령을 gate 안에서 보내야 다음 ComfyUI dispatch 와 race 가 없다.
+            try:
+                await ollama_unload.force_unload_all_before_comfy(wait_sec=0.0)
+            except Exception as unload_err:
+                log.info(
+                    "compare-analyze post-unload failed (non-fatal): %s",
+                    unload_err,
+                )
+    except GpuBusyError as e:
+        raise HTTPException(503, str(e)) from e
 
     # historyItemId 가 TASK_ID_RE 매치 + DB 에 존재할 때만 저장
     # (Vision Compare 메뉴는 historyItemId 미전송 → 자동 스킵 = 완전 휘발 보장)
@@ -154,17 +154,5 @@ async def compare_analyze(
         except Exception as db_err:
             log.warning("compare-analyze DB persist failed: %s", db_err)
             saved = False
-
-    # spec 19 후속 (옵션 1 · 사용자 진단): 자동 비교 분석 후 모델 (qwen2.5vl
-    # + gemma4 합 28GB) 이 keep_alive 처리 deferred 로 메모리에 남아있을
-    # 수 있음. ComfyUI 가 곧바로 안 호출되니 wait_sec=0 으로 unload 명령만
-    # 즉시 발송 → 헤더 VRAM Breakdown 깨끗 + 다음 작업 안전. graceful (실패해도
-    # 응답 영향 X — 헬퍼가 내부에서 모든 예외 흡수).
-    try:
-        await ollama_unload.force_unload_all_before_comfy(wait_sec=0.0)
-    except Exception as unload_err:
-        log.info(
-            "compare-analyze post-unload failed (non-fatal): %s", unload_err
-        )
 
     return {"analysis": result_obj.to_dict(), "saved": saved}

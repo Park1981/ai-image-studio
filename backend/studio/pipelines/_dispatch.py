@@ -22,9 +22,12 @@ import uuid
 from pathlib import Path
 from typing import Any, Awaitable, Callable, TYPE_CHECKING
 
+from config import settings  # type: ignore[import-not-found]
 from PIL import Image
 from pydantic import BaseModel
 
+from .. import ollama_unload
+from .._gpu_lock import GpuBusyError, acquire_gpu_slot, release_gpu_slot
 from ..comfy_api_builder import _snap_dimension  # noqa: F401 — re-export 호환
 from ..comfy_transport import (
     ComfyUITransport,
@@ -47,7 +50,7 @@ except Exception:  # pragma: no cover - 테스트 환경
 
 # ComfyUI 가 실제로 안 돌고 있어서 /prompt 가 실패해도 UI 는 Mock 이미지로 완주되게 할지.
 # False 면 에러를 프론트로 올리고 토스트. True 면 폴백해서 mock-seed:// 리턴.
-COMFY_MOCK_FALLBACK = True
+COMFY_MOCK_FALLBACK = settings.comfy_mock_fallback
 
 
 def _mark_generation_complete() -> None:
@@ -259,7 +262,16 @@ async def _dispatch_to_comfy(
     """
     client_id = f"{client_prefix}-{uuid.uuid4().hex[:10]}"
     save_fn = save_output or _save_comfy_output
+    gpu_operation = f"comfyui-{mode}"
+    gpu_acquired = False
     try:
+        await acquire_gpu_slot(gpu_operation)
+        gpu_acquired = True
+
+        # The unload must happen while holding the shared GPU slot; otherwise a
+        # concurrent vision/upgrade call can load Ollama between unload and submit.
+        await ollama_unload.force_unload_all_before_comfy()
+
         async with ComfyUITransport() as comfy:
             uploaded_name: str | None = None
             if upload_bytes is not None:
@@ -304,8 +316,14 @@ async def _dispatch_to_comfy(
     except asyncio.CancelledError:
         # 클라이언트가 끊었거나 interrupt 호출 — 상위로 재-raise 해서 파이프라인 정리
         raise
+    except GpuBusyError as e:
+        log.warning("ComfyUI dispatch busy: %s", e)
+        raise
     except Exception as e:
         log.warning("ComfyUI dispatch failed: %s", e)
         return ComfyDispatchResult(
             image_ref=_mock_ref_or_raise(str(e)), comfy_error=str(e)
         )
+    finally:
+        if gpu_acquired:
+            release_gpu_slot(gpu_operation)

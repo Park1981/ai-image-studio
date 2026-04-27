@@ -14,6 +14,7 @@ import json
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from PIL import Image
 
+from .._gpu_lock import GpuBusyError, gpu_slot
 from ..vision_pipeline import analyze_image_detailed
 from ._common import log
 
@@ -64,13 +65,17 @@ async def vision_analyze(
     except Exception as e:
         log.warning("vision-analyze PIL size read failed: %s", e)
 
-    result = await analyze_image_detailed(
-        image_bytes,
-        vision_model=vision_model_override,
-        text_model=ollama_model_override,
-        width=width,
-        height=height,
-    )
+    try:
+        async with gpu_slot("vision-analyze"):
+            result = await analyze_image_detailed(
+                image_bytes,
+                vision_model=vision_model_override,
+                text_model=ollama_model_override,
+                width=width,
+                height=height,
+            )
+    except GpuBusyError as e:
+        raise HTTPException(503, str(e)) from e
 
     # 응답: 옛 호환 필드 (en/ko) + Vision Recipe v2 9 슬롯 (2026-04-26 spec 18)
     return {

@@ -10,11 +10,8 @@ comparison_pipeline + history_db 마이그레이션 + /compare-analyze 라우트
 
 from __future__ import annotations
 
-import asyncio
 import io
 import json
-import os
-import tempfile
 from pathlib import Path
 
 import aiosqlite
@@ -430,7 +427,7 @@ def test_system_compare_v3_1_has_rubric_and_extra_slots() -> None:
 @pytest.mark.asyncio
 async def test_call_vision_pair_injects_format_json_and_refined_intent() -> None:
     """_call_vision_pair 가 Ollama payload 에 format=json + refined_intent 주입."""
-    from unittest.mock import AsyncMock, MagicMock, patch
+    from unittest.mock import MagicMock, patch
 
     from studio.comparison_pipeline import _call_vision_pair
 
@@ -548,7 +545,7 @@ async def test_analyze_pair_parses_transform_prompt_and_uncertain() -> None:
 @pytest.mark.asyncio
 async def test_analyze_pair_passes_refined_intent_to_vision_call() -> None:
     """spec 19: analyze_pair 호출 시 refined_intent 가 _call_vision_pair 로 전달되는지 검증."""
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import patch
 
     from studio.comparison_pipeline import analyze_pair
 
@@ -769,7 +766,7 @@ async def test_compare_analyze_skips_clarify_when_refined_intent_cached(
 
     캐시 히트 → analyze_pair 의 refined_intent 인자에 캐시 값 그대로 전달.
     """
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import patch
 
     from httpx import ASGITransport, AsyncClient
 
@@ -858,7 +855,7 @@ async def test_compare_analyze_runs_clarify_intent_outside_lock(
     30s lock timeout 으로 503 받을 수 있었음. lock 밖으로 옮긴 후엔 vision
     호출 직전까지 기다리지 않고 미리 정제 수행.
     """
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import patch
 
     from httpx import ASGITransport, AsyncClient
 
@@ -1009,7 +1006,7 @@ def test_parse_strict_json_handles_escaped_backslash_then_quote() -> None:
 @pytest.mark.asyncio
 async def test_translate_section_parsing_uppercase_headers() -> None:
     """번역 모델이 대문자 헤더 [FACE_ID] 로 응답해도 정상 파싱."""
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import patch
 
     from studio.comparison_pipeline import _translate_comments_to_ko
 

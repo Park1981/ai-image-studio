@@ -319,10 +319,10 @@ def build_generate_from_request(
         resolved_h = aspect.height
     d = GENERATE_MODEL.defaults
     lightning_lora = next(
-        (l for l in GENERATE_MODEL.loras if l.role == "lightning"),
+        (lora for lora in GENERATE_MODEL.loras if lora.role == "lightning"),
         None,
     )
-    extras = [l for l in GENERATE_MODEL.loras if l.role == "extra"]
+    extras = [lora for lora in GENERATE_MODEL.loras if lora.role == "extra"]
 
     # ── 스타일 프리셋 적용 (있으면 sampling 파라미터 + LoRA 체인 override + 트리거 prepend) ──
     style = get_generate_style(style_id)
@@ -524,10 +524,10 @@ def build_edit_from_request(
 ) -> ApiPrompt:
     d = EDIT_MODEL.defaults
     lightning_lora = next(
-        (l for l in EDIT_MODEL.loras if l.role == "lightning"),
+        (lora for lora in EDIT_MODEL.loras if lora.role == "lightning"),
         None,
     )
-    extras = [l for l in EDIT_MODEL.loras if l.role == "extra"]
+    extras = [lora for lora in EDIT_MODEL.loras if lora.role == "extra"]
 
     steps = EDIT_MODEL.lightning.steps if lightning else d.steps
     cfg = EDIT_MODEL.lightning.cfg if lightning else d.cfg

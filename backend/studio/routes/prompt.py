@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from .._gpu_lock import GpuBusyError, gpu_slot
 from ..claude_cli import research_prompt
 from ..comfy_api_builder import _snap_dimension
 from ..comfy_transport import ComfyUITransport
@@ -49,13 +50,18 @@ async def upgrade_only(body: UpgradeOnlyBody):
         resolved_w = aspect.width
         resolved_h = aspect.height
 
-    upgrade = await upgrade_generate_prompt(
-        prompt=body.prompt,
-        model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
-        research_context="\n".join(research_hints) if research_hints else None,
-        width=resolved_w,
-        height=resolved_h,
-    )
+    try:
+        async with gpu_slot("upgrade-only"):
+            upgrade = await upgrade_generate_prompt(
+                prompt=body.prompt,
+                model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
+                research_context="\n".join(research_hints) if research_hints else None,
+                width=resolved_w,
+                height=resolved_h,
+            )
+    except GpuBusyError as e:
+        raise HTTPException(503, str(e)) from e
+
     return {
         "upgradedPrompt": upgrade.upgraded,
         "upgradedPromptKo": upgrade.translation,

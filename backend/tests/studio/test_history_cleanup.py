@@ -7,9 +7,7 @@ DB 통합은 aiosqlite in-memory 픽스처 없이는 복잡하므로 manual QA �
 
 from __future__ import annotations
 
-from pathlib import Path
 
-import pytest
 
 from studio.router import (
     EDIT_SOURCE_DIR,

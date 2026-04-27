@@ -1,0 +1,28 @@
+# AI Image Studio · backend ruff 설정 (2026-04-27)
+# Codex 라운드 2 P0-2 + 라운드 3 fact-check 합산 정책:
+#   - 분포 26건 = active 6 + tests 19 + legacy 1
+#   - legacy/ 격리 (CLAUDE.md Rules: 코드 본체 무수정)
+#   - tests/ 는 list comp 변수 `l` 면제 (E741)
+#   - active 코드는 풀 적용 (production quality)
+
+# Python 3.13 (CLAUDE.md Architecture)
+target-version = "py313"
+
+# 가독성 + 한글 주석 여유
+line-length = 100
+
+# legacy quarantine — backend/legacy/{routers,services,tests}/ 전체 ruff 제외
+# 사유: 옛 라우터 + services + tests 격리 (HEAD `0c4b999`).
+#   본체 무수정 정책 — 살리려면 main.py 에 from legacy.routers import X 추가만.
+#   ruff 가 옛 코드 lint 잡으면 격리 의미 무색해짐.
+extend-exclude = ["legacy"]
+
+[lint]
+# 디폴트 select (E4/E7/E9 + F) 유지. strict 화는 차후 별도 결정.
+# 현재 baseline: active 6건 + tests 19건 모두 fix 후 clean 시작.
+
+[lint.per-file-ignores]
+# 테스트 코드의 list comprehension 단일 문자 변수 `l` 면제.
+# 사유: `[l for l in items if l.role == "extra"]` 같은 패턴이 tests 에서 흔하고
+#   가독성 차이 미미. production 코드는 명시적 이름 강제 (active 6건 fix 적용).
+"tests/**/*.py" = ["E741"]

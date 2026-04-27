@@ -181,8 +181,7 @@ async def test_upgrade_only_route_passes_aspect_to_upgrade() -> None:
     이전엔 /generate 만 aspect 전달하고 /upgrade-only 는 빠져 있어
     "업그레이드 확인 모달" 사용 시 SYSTEM_GENERATE 에 size context 누락됐음.
     """
-    import json
-    from unittest.mock import AsyncMock, patch
+    from unittest.mock import patch
 
     from httpx import ASGITransport, AsyncClient
 

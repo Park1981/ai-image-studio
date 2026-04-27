@@ -15,6 +15,7 @@ import time
 import uuid
 from typing import Any
 
+from .._gpu_lock import gpu_slot
 from ..claude_cli import research_prompt
 from ..comfy_api_builder import _snap_dimension, build_generate_from_request
 from ..presets import DEFAULT_OLLAMA_ROLES, GENERATE_MODEL, get_aspect
@@ -22,7 +23,6 @@ from ..prompt_pipeline import upgrade_generate_prompt
 from ..schemas import GenerateBody
 from ..storage import _persist_history
 from ..tasks import Task
-from .. import ollama_unload
 from ._dispatch import _dispatch_to_comfy, _mark_generation_complete
 
 log = logging.getLogger(__name__)
@@ -114,15 +114,16 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
                     "stageLabel": "gemma4 업그레이드",
                 },
             )
-            upgrade = await upgrade_generate_prompt(
-                prompt=body.prompt,
-                model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
-                research_context="\n".join(research_hints) if research_hints else None,
-                # spec 19 후속 (F + Codex 리뷰 fix): resolved_w/h 가 항상 정확
-                # (preset 이든 직접 지정이든) → SYSTEM_GENERATE composition 정확도 ↑
-                width=resolved_w,
-                height=resolved_h,
-            )
+            async with gpu_slot("generate-upgrade"):
+                upgrade = await upgrade_generate_prompt(
+                    prompt=body.prompt,
+                    model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
+                    research_context="\n".join(research_hints) if research_hints else None,
+                    # spec 19 후속 (F + Codex 리뷰 fix): resolved_w/h 가 항상 정확
+                    # (preset 이든 직접 지정이든) → SYSTEM_GENERATE composition 정확도 ↑
+                    width=resolved_w,
+                    height=resolved_h,
+                )
 
         # 4. API 포맷 조립
         await task.emit(
@@ -144,10 +145,7 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             },
         )
 
-        # spec 19 후속 (옵션 A): ComfyUI 디스패치 직전 Ollama 강제 unload
-        # → gemma4 (~14.85GB) 가 unload 되지 않고 남아 ComfyUI 가 swap 모드로
-        #   진입하던 race condition 차단. 1.5초 대기로 GPU 메모리 실제 반납 보장.
-        await ollama_unload.force_unload_all_before_comfy()
+        # Ollama unload + GPU gate 는 _dispatch_to_comfy 내부에서 공통 처리.
 
         def _make_generate_prompt(_uploaded: str | None) -> dict[str, Any]:
             return build_generate_from_request(
