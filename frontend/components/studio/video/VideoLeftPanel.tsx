@@ -54,6 +54,7 @@ export default function VideoLeftPanel({
     adult, setAdult,
     longerEdge, setLongerEdge,
     lightning, setLightning,
+    skipUpgrade, setSkipUpgrade,
   } = useVideoInputs();
   const { running } = useVideoRunning();
 
@@ -168,6 +169,22 @@ export default function VideoLeftPanel({
           )}
         </div>
       </div>
+
+      {/* AI 프롬프트 보정 우회 토글 (2026-04-27):
+       *  Generate 와 동일 패턴 — Vision + gemma4 단계 모두 skip.
+       *  ON 시 백엔드는 prompt 를 그대로 LTX-2.3 프롬프트로 사용 (영문 권장).
+       */}
+      <Toggle
+        checked={skipUpgrade}
+        onChange={setSkipUpgrade}
+        align="right"
+        label={skipUpgrade ? "✏️ 프롬프트 직접 사용" : "🪄 AI 프롬프트 보정"}
+        desc={
+          skipUpgrade
+            ? "정제된 영문 프롬프트 그대로 · 비전+gemma4 우회 (~15초 절약)"
+            : "이미지 분석 + 한국어 → 영문 정제 (기본)"
+        }
+      />
 
       {/* ── 영상 해상도 슬라이더 ── */}
       <VideoResolutionSlider

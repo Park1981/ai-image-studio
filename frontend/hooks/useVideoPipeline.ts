@@ -34,6 +34,7 @@ export function useVideoPipeline(
   const adult = useVideoStore((s) => s.adult);
   const longerEdge = useVideoStore((s) => s.longerEdge);
   const lightning = useVideoStore((s) => s.lightning);
+  const skipUpgrade = useVideoStore((s) => s.skipUpgrade);
   // 실행 상태
   const running = useVideoStore((s) => s.running);
   const setRunning = useVideoStore((s) => s.setRunning);
@@ -77,6 +78,8 @@ export function useVideoPipeline(
         lightning,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
+        // skipUpgrade ON: 사용자가 정제된 영문 프롬프트 직접 입력 — vision + gemma4 우회.
+        preUpgradedPrompt: skipUpgrade ? prompt : undefined,
       }),
       {
         on: {

@@ -7,6 +7,7 @@
 
 ### 진행 모달 통일 + Tier 2/3 (현재 master)
 
+- **AI 프롬프트 보정 우회 토글** (`claude/prompt-skip-toggle`). Generate / Video 좌측 패널 프롬프트 카드 직후 신규 토글 (`🪄 AI 프롬프트 보정` ⇄ `✏️ 프롬프트 직접 사용`). 사용자가 정제된 영문 프롬프트를 복사해 붙여넣은 케이스 — gemma4(+vision) 단계 우회. Generate: 기존 `preUpgradedPrompt` 재사용 (백엔드 변경 0). Video: `VideoRequest.preUpgradedPrompt` 신설 + `pipelines/video.py` 분기 (~15초 절약 · vision/gemma4 둘 다 skip). 의미 반전 + 라벨 동적 패턴 (Lightning 과 통일). 스토어 `useGenerateStore` v5→v6 / `useVideoStore` skipUpgrade 신설. Edit 는 매트릭스 분석 본질이라 보류. pytest 215 / vitest 50 / tsc / lint clean.
 - **Harness cleanup** — CLAUDE.md / MEMORY.md / docs/ 정리. 변경 로그 → `docs/changelog.md` (이 파일) 분리. 옛 audit/review 문서 → `docs/archive/`.
 - **Tier 3 — OpenAPI 자동 타입 생성** (`ef64d63`). `openapi-typescript ^7.13.0` (devDep) + `backend/scripts/dump_openapi.py` (FastAPI 풀 OpenAPI 3.1 dump) + npm script `gen:types` (chain). `frontend/lib/api/generated.ts` (1,261줄 자동) + `generated-helpers.ts` (Schemas/Paths alias). 시범 마이그레이션 5건 (lib/api/{generate,edit,video,vision,compare}.ts inline cast → `as TaskCreated`). hybrid 정책 — 한글 주석 + narrow union 은 types.ts 손편집 유지.
 - **Tier 2 — Phase 6 산출물 단위 테스트** (`d5ee0b0`). vitest 19 → 50 (+31). 신규 3 파일: `stores-stage-history.test.ts` (Vision/VisionCompare store 의 stageHistory) · `api-vision-compare.test.ts` (SSE drain + onStage callback · jsdom Blob 호환 우회) · `pipeline-defs-consistency.test.ts` (5 mode 정적 검증).

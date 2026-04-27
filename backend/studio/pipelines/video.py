@@ -30,7 +30,8 @@ from ..presets import (
 )
 from ..storage import STUDIO_MAX_IMAGE_BYTES, _persist_history
 from ..tasks import Task
-from ..video_pipeline import run_video_pipeline
+from ..prompt_pipeline import UpgradeResult
+from ..video_pipeline import VideoPipelineResult, run_video_pipeline
 from ._dispatch import (
     _dispatch_to_comfy,
     _mark_generation_complete,
@@ -65,6 +66,8 @@ async def _run_video_pipeline_task(
     source_height: int = 0,
     longer_edge: int | None = None,
     lightning: bool = True,
+    *,
+    pre_upgraded_prompt: str | None = None,
 ) -> None:
     """Video i2v 파이프라인 백그라운드 실행 (5 step).
 
@@ -82,49 +85,86 @@ async def _run_video_pipeline_task(
         #   finalPromptKo / provider) 흡수. 진입 emit + 완료 emit 둘 다 유지
         #   (PipelineTimeline 의 running row 표시 용). 완료 emit 에만 payload 풍부.
 
-        # ── Step 1: vision ── (0 → 20)
-        await task.emit(
-            "stage",
-            {"type": "vision-analyze", "progress": 5, "stageLabel": "비전 분석"},
-        )
-
-        async with gpu_slot("video-vision"):
-            video_res = await run_video_pipeline(
-                image_bytes,
-                prompt,
-                vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
-                text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
-                adult=adult,
+        # ── Step 1+2: vision-analyze + prompt-merge ──
+        # pre_upgraded_prompt 가 있으면 두 단계 모두 우회 (사용자가 정제된 영문 입력 케이스).
+        # vision (qwen2.5vl ~14GB) + gemma4 (14.85GB) 둘 다 안 호출 → ~15초 절약.
+        if pre_upgraded_prompt:
+            video_res = VideoPipelineResult(
+                image_description="(pre-upgraded — vision skipped)",
+                final_prompt=pre_upgraded_prompt,
+                vision_ok=False,
+                upgrade=UpgradeResult(
+                    upgraded=pre_upgraded_prompt,
+                    fallback=False,
+                    provider="pre-confirmed",
+                    original=prompt,
+                ),
+            )
+            # 진입+완료 emit 한 번에 (UI 타임라인 일관성 — 빈 단계 표시).
+            await task.emit(
+                "stage",
+                {
+                    "type": "vision-analyze",
+                    "progress": 20,
+                    "stageLabel": "비전 분석 우회 (사전 확정 프롬프트)",
+                    "description": video_res.image_description,
+                },
+            )
+            await task.emit(
+                "stage",
+                {
+                    "type": "prompt-merge",
+                    "progress": 30,
+                    "stageLabel": "프롬프트 병합 우회 (사전 확정)",
+                    "finalPrompt": video_res.final_prompt,
+                    "finalPromptKo": None,
+                    "provider": "pre-confirmed",
+                },
+            )
+        else:
+            # ── Step 1: vision ── (0 → 20)
+            await task.emit(
+                "stage",
+                {"type": "vision-analyze", "progress": 5, "stageLabel": "비전 분석"},
             )
 
-        # stage 완료 payload 에 description 흡수.
-        await task.emit(
-            "stage",
-            {
-                "type": "vision-analyze",
-                "progress": 20,
-                "stageLabel": "비전 분석 완료",
-                "description": video_res.image_description,
-            },
-        )
+            async with gpu_slot("video-vision"):
+                video_res = await run_video_pipeline(
+                    image_bytes,
+                    prompt,
+                    vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
+                    text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
+                    adult=adult,
+                )
 
-        # ── Step 2: prompt-merge ── (20 → 30)
-        await task.emit(
-            "stage",
-            {"type": "prompt-merge", "progress": 25, "stageLabel": "프롬프트 병합"},
-        )
-        # prompt-merge 완료 stage 에 finalPrompt/finalPromptKo/provider 흡수.
-        await task.emit(
-            "stage",
-            {
-                "type": "prompt-merge",
-                "progress": 30,
-                "stageLabel": "프롬프트 병합 완료",
-                "finalPrompt": video_res.final_prompt,
-                "finalPromptKo": video_res.upgrade.translation,
-                "provider": video_res.upgrade.provider,
-            },
-        )
+            # stage 완료 payload 에 description 흡수.
+            await task.emit(
+                "stage",
+                {
+                    "type": "vision-analyze",
+                    "progress": 20,
+                    "stageLabel": "비전 분석 완료",
+                    "description": video_res.image_description,
+                },
+            )
+
+            # ── Step 2: prompt-merge ── (20 → 30)
+            await task.emit(
+                "stage",
+                {"type": "prompt-merge", "progress": 25, "stageLabel": "프롬프트 병합"},
+            )
+            # prompt-merge 완료 stage 에 finalPrompt/finalPromptKo/provider 흡수.
+            await task.emit(
+                "stage",
+                {
+                    "type": "prompt-merge",
+                    "progress": 30,
+                    "stageLabel": "프롬프트 병합 완료",
+                    "finalPrompt": video_res.final_prompt,
+                    "finalPromptKo": video_res.upgrade.translation,
+                    "provider": video_res.upgrade.provider,
+                },
+            )
 
         # ── Step 3: workflow-dispatch ── (30 → 35)
         await task.emit(

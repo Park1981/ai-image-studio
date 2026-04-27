@@ -55,6 +55,7 @@ export default function GenerateLeftPanel({
     aspectLocked, setAspectLocked,
     research, setResearch,
     lightning, applyLightning,
+    skipUpgrade, setSkipUpgrade,
   } = useGenerateInputs();
   const { generating, progress, stage } = useGenerateRunning();
   const addTemplate = useSettingsStore((s) => s.addTemplate);
@@ -165,6 +166,25 @@ export default function GenerateLeftPanel({
           </div>
         </div>
       </div>
+
+      {/* AI 프롬프트 보정 우회 토글 (2026-04-27 오빠 피드백):
+       *  사용자가 이미 정제된 영문 프롬프트를 복사해서 붙여넣은 케이스 — gemma4 단계 skip.
+       *  의미 반전 + 라벨 동적 패턴 (Lightning 과 통일) — 토글 상태가 곧 모드 명.
+       *    OFF (기본 · skipUpgrade=false) → 🪄 AI 프롬프트 보정
+       *    ON  (강화 · skipUpgrade=true)  → ✏️ 프롬프트 직접 사용
+       *  ON 일 때 skipUpgrade → useGeneratePipeline 이 prompt 를 preUpgradedPrompt 로 전송.
+       */}
+      <Toggle
+        checked={skipUpgrade}
+        onChange={setSkipUpgrade}
+        align="right"
+        label={skipUpgrade ? "✏️ 프롬프트 직접 사용" : "🪄 AI 프롬프트 보정"}
+        desc={
+          skipUpgrade
+            ? "정제된 프롬프트 그대로 · gemma4 우회 (~10초 절약)"
+            : "한국어/자연어 → 영문 정제 (기본)"
+        }
+      />
 
       {/* Claude 조사 토글 — Lightning 과 동일 패턴 (우측 토글 · amber 톤) */}
       <ResearchBanner checked={research} onChange={setResearch} />
