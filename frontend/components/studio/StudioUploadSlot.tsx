@@ -35,6 +35,7 @@
 
 import type { CSSProperties, DragEvent, ReactNode } from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useImagePasteTarget } from "@/hooks/useImagePasteTarget";
 
 interface Props {
   /** 채워진 상태 여부. true 면 filled shell 로 렌더. */
@@ -91,71 +92,29 @@ export default function StudioUploadSlot({
     onReady?.(pick);
   }, [onReady, pick]);
 
-  // 최신 상태를 ref 에 보관 — paste listener 는 1회 등록 후 재등록 비용 줄이기.
-  // (closure 캡처 이슈 회피). useEffect 에서 동기화 (render-time ref 쓰기 회피).
-  const hoverRef = useRef(hover);
-  const requireHoverRef = useRef(pasteRequireHover);
-  const onFilesRef = useRef(onFiles);
-  useEffect(() => {
-    hoverRef.current = hover;
-  }, [hover]);
-  useEffect(() => {
-    requireHoverRef.current = pasteRequireHover;
-  }, [pasteRequireHover]);
-  useEffect(() => {
-    onFilesRef.current = onFiles;
-  }, [onFiles]);
-
-  // ── P-2: 전역 Ctrl+V paste 리스너 ──
-  useEffect(() => {
-    if (!pasteEnabled) return;
-    const handler = (e: ClipboardEvent) => {
-      const active = document.activeElement as HTMLElement | null;
-      const activeIsInput =
-        !!active &&
-        (active.tagName === "TEXTAREA" ||
-          active.tagName === "INPUT" ||
-          active.isContentEditable);
-
-      // 가드 정책 (Compare 버그 fix 2026-04-25):
-      //   - 단일 slot (pasteRequireHover=false): focus 가드 필수.
-      //     textarea 에서 Ctrl+V 하면 텍스트 paste 가 정답 → 이미지 로직 skip.
-      //   - 멀티 slot (pasteRequireHover=true): 호버 자체가 명시적 의도.
-      //     textarea 에 이전 focus 가 남아 있어도 slot 호버 + Ctrl+V 면 업로드.
-      //     (텍스트 paste 는 브라우저 기본 동작으로 textarea 에 먼저 들어가고,
-      //      우리 리스너는 bubble 단계에서 이미지만 처리 — 충돌 없음.)
-      if (requireHoverRef.current) {
-        // 호버 중인 slot 만 응답. 호버 없으면 무시.
-        if (!hoverRef.current) return;
-      } else {
-        // 단일 slot 모드: textarea/input focus 시 skip.
-        if (activeIsInput) return;
+  // ── P-2: 전역 Ctrl+V paste — useImagePasteTarget hook 위임 (2026-04-27 C2-P1-7) ──
+  // 가드 정책 (Compare 버그 fix 2026-04-25):
+  //   - 단일 slot (pasteRequireHover=false): focus 가드 필수 — textarea 텍스트 paste 보존.
+  //   - 멀티 slot (pasteRequireHover=true): 호버 자체가 명시적 의도 → focus 무관, 호버만 체크.
+  // hover 는 컴포넌트 state 에서 직접 읽기 (closure 안 — hook 재등록 없이 최신 값 추적은
+  // hook 자체가 ref 패턴으로 처리).
+  useImagePasteTarget({
+    enabled: pasteEnabled,
+    shouldSkip: ({ activeIsInput }) => {
+      if (pasteRequireHover) {
+        // 호버 중인 slot 만 응답.
+        return !hover;
       }
-
-      // 클립보드에서 이미지 추출.
-      const items = e.clipboardData?.items;
-      if (!items) return;
-      let imageItem: DataTransferItem | null = null;
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].type.startsWith("image/")) {
-          imageItem = items[i];
-          break;
-        }
-      }
-      if (!imageItem) return;
-
-      e.preventDefault();
-      const file = imageItem.getAsFile();
-      if (!file) return;
-
+      // 단일 slot: textarea/input focus 면 텍스트 paste 양보.
+      return activeIsInput;
+    },
+    onImage: (file) => {
       // onFiles 시그니처는 FileList. DataTransfer 로 흉내.
       const dt = new DataTransfer();
       dt.items.add(file);
-      onFilesRef.current?.(dt.files);
-    };
-    document.addEventListener("paste", handler);
-    return () => document.removeEventListener("paste", handler);
-  }, [pasteEnabled]);
+      onFiles?.(dt.files);
+    },
+  });
 
   const common: CSSProperties = {
     position: "relative",
