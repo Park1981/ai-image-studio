@@ -28,10 +28,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-import httpx
-
 from ._json_utils import coerce_str as _coerce_str
 from ._json_utils import parse_strict_json as _parse_strict_json
+from ._ollama_client import call_chat_payload
 from .presets import DEFAULT_OLLAMA_ROLES
 from .prompt_pipeline import (
     _DEFAULT_OLLAMA_URL,
@@ -558,12 +557,11 @@ async def _describe_image(
         "options": {"temperature": temperature},
     }
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.post(f"{ollama_url}/api/chat", json=payload)
-            res.raise_for_status()
-            data = res.json()
-            content = (data.get("message") or {}).get("content", "")
-            return content.strip()
+        return await call_chat_payload(
+            ollama_url=ollama_url,
+            payload=payload,
+            timeout=timeout,
+        )
     except Exception as e:
         log.warning("Vision model call failed (%s): %s", vision_model, e)
         return ""
@@ -763,11 +761,11 @@ async def _call_vision_edit_source(
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.post(f"{ollama_url}/api/chat", json=payload)
-            res.raise_for_status()
-            data = res.json()
-            return ((data.get("message") or {}).get("content") or "").strip()
+        return await call_chat_payload(
+            ollama_url=ollama_url,
+            payload=payload,
+            timeout=timeout,
+        )
     except Exception as e:
         log.warning("edit-source vision call failed (%s): %s", vision_model, e)
         return ""
@@ -985,11 +983,11 @@ async def _call_vision_recipe_v2(
         "options": {"temperature": 0.4, "num_ctx": 8192},
     }
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.post(f"{ollama_url}/api/chat", json=payload)
-            res.raise_for_status()
-            data = res.json()
-            return ((data.get("message") or {}).get("content") or "").strip()
+        return await call_chat_payload(
+            ollama_url=ollama_url,
+            payload=payload,
+            timeout=timeout,
+        )
     except Exception as e:
         log.warning("vision recipe v2 call failed (%s): %s", vision_model, e)
         return ""

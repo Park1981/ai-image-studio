@@ -19,10 +19,10 @@ import logging
 import subprocess
 from typing import Any, TypedDict
 
-import httpx
 import psutil
 
 from . import dispatch_state
+from ._ollama_client import get_ps
 
 # config.py 는 backend 가 sys.path 에 있을 때 top-level 모듈로 노출됨
 # (uvicorn main:app 진입 + tests/conftest.py 가 backend 추가). 패턴 기존 모듈과 통일.
@@ -184,15 +184,13 @@ async def _query_ollama_ps() -> list[dict[str, Any]]:
 
     keep_alive=0 정책에선 보통 빈 리스트지만, 호출 직후 ~5s 동안은 떠 있음.
     """
-    url = f"{settings.ollama_url}/api/ps"
     try:
-        async with httpx.AsyncClient(timeout=_OLLAMA_PS_TIMEOUT) as client:
-            res = await client.get(url)
-            if res.status_code != 200:
-                return []
-            data = res.json()
-            return list(data.get("models") or [])
-    except (httpx.HTTPError, OSError, ValueError) as exc:
+        data = await get_ps(
+            ollama_url=settings.ollama_url,
+            timeout=_OLLAMA_PS_TIMEOUT,
+        )
+        return list(data.get("models") or [])
+    except Exception as exc:
         # Ollama 미실행이면 ConnectError — 흔한 케이스라 debug
         logger.debug("Ollama /api/ps 호출 실패: %s", exc)
         return []

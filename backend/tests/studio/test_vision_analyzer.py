@@ -271,7 +271,7 @@ async def test_call_vision_recipe_v2_payload_declares_single_source() -> None:
             return _FakeResponse()
 
     with patch(
-        "studio.vision_pipeline.httpx.AsyncClient",
+        "studio._ollama_client.httpx.AsyncClient",
         new=MagicMock(return_value=_FakeClient()),
     ):
         await _call_vision_recipe_v2(

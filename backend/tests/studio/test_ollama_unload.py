@@ -38,7 +38,7 @@ async def test_list_loaded_models_parses_ollama_ps() -> None:
     fake_client.get = AsyncMock(return_value=fake_response)
 
     with patch(
-        "studio.ollama_unload.httpx.AsyncClient",
+        "studio._ollama_client.httpx.AsyncClient",
         return_value=fake_client,
     ):
         models = await list_loaded_models(ollama_url="http://x")
@@ -59,7 +59,7 @@ async def test_list_loaded_models_empty_on_failure() -> None:
     fake_client.get = AsyncMock(side_effect=RuntimeError("connection refused"))
 
     with patch(
-        "studio.ollama_unload.httpx.AsyncClient",
+        "studio._ollama_client.httpx.AsyncClient",
         return_value=fake_client,
     ):
         models = await list_loaded_models(ollama_url="http://x")
@@ -87,7 +87,7 @@ async def test_unload_model_sends_keep_alive_zero() -> None:
     fake_client.post = _fake_post
 
     with patch(
-        "studio.ollama_unload.httpx.AsyncClient",
+        "studio._ollama_client.httpx.AsyncClient",
         return_value=fake_client,
     ):
         ok = await unload_model("gemma4-un:latest", ollama_url="http://x")
@@ -110,7 +110,7 @@ async def test_unload_model_returns_false_on_failure() -> None:
     fake_client.post = AsyncMock(side_effect=RuntimeError("timeout"))
 
     with patch(
-        "studio.ollama_unload.httpx.AsyncClient",
+        "studio._ollama_client.httpx.AsyncClient",
         return_value=fake_client,
     ):
         ok = await unload_model("gemma4-un:latest", ollama_url="http://x")

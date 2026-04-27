@@ -26,9 +26,8 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-import httpx
-
 from ._json_utils import parse_strict_json as _parse_strict_json
+from ._ollama_client import call_chat_payload
 from .presets import DEFAULT_OLLAMA_ROLES
 from .prompt_pipeline import _DEFAULT_OLLAMA_URL, DEFAULT_TIMEOUT
 
@@ -467,11 +466,11 @@ async def _call_vision_pair(
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.post(f"{ollama_url}/api/chat", json=payload)
-            res.raise_for_status()
-            data = res.json()
-            return ((data.get("message") or {}).get("content") or "").strip()
+        return await call_chat_payload(
+            ollama_url=ollama_url,
+            payload=payload,
+            timeout=timeout,
+        )
     except Exception as e:
         log.warning("compare vision call failed (%s): %s", vision_model, e)
         return ""
@@ -591,11 +590,11 @@ async def _translate_comments_to_ko(
         "options": {"temperature": 0.4, "num_ctx": 4096, "num_predict": 800},
     }
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.post(f"{ollama_url}/api/chat", json=payload)
-            res.raise_for_status()
-            data = res.json()
-            raw = ((data.get("message") or {}).get("content") or "").strip()
+        raw = await call_chat_payload(
+            ollama_url=ollama_url,
+            payload=payload,
+            timeout=timeout,
+        )
         if not raw:
             return None
     except Exception as e:
@@ -895,11 +894,11 @@ async def _call_vision_pair_generic(
         "options": {"temperature": 0.3, "num_ctx": 8192},
     }
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.post(f"{ollama_url}/api/chat", json=payload)
-            res.raise_for_status()
-            data = res.json()
-            return ((data.get("message") or {}).get("content") or "").strip()
+        return await call_chat_payload(
+            ollama_url=ollama_url,
+            payload=payload,
+            timeout=timeout,
+        )
     except Exception as e:
         log.warning("compare-generic vision call failed (%s): %s", vision_model, e)
         return ""

@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-import httpx
+from ._ollama_client import call_chat_payload
 
 log = logging.getLogger(__name__)
 
@@ -753,16 +753,8 @@ async def _call_ollama_chat(
         "keep_alive": "0",
         "options": options,
     }
-    async with httpx.AsyncClient(timeout=timeout) as client:
-        res = await client.post(f"{ollama_url}/api/chat", json=payload)
-        res.raise_for_status()
-        data = res.json()
-        msg = data.get("message") or {}
-        content = msg.get("content", "") or ""
-        # 안전장치: content 가 비어있으면 thinking 으로 폴백 (Ollama 버전 차이 대응)
-        if not content.strip():
-            thinking = msg.get("thinking", "") or ""
-            if thinking.strip():
-                log.info("ollama: content empty, using thinking field as fallback")
-                content = thinking
-        return content
+    return await call_chat_payload(
+        ollama_url=ollama_url,
+        payload=payload,
+        timeout=timeout,
+    )

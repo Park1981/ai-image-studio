@@ -25,7 +25,7 @@ from __future__ import annotations
 import asyncio
 import logging
 
-import httpx
+from ._ollama_client import get_ps, request_unload
 
 log = logging.getLogger(__name__)
 
@@ -55,16 +55,13 @@ async def list_loaded_models(
     """
     url = ollama_url or _DEFAULT_OLLAMA_URL
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.get(f"{url}/api/ps")
-            res.raise_for_status()
-            data = res.json()
-            models = data.get("models") or []
-            return [
-                m.get("model") or m.get("name", "")
-                for m in models
-                if (m.get("model") or m.get("name"))
-            ]
+        data = await get_ps(ollama_url=url, timeout=timeout)
+        models = data.get("models") or []
+        return [
+            m.get("model") or m.get("name", "")
+            for m in models
+            if isinstance(m, dict) and (m.get("model") or m.get("name"))
+        ]
     except Exception as e:
         log.info("ollama list_loaded_models failed (non-fatal): %s", e)
         return []
@@ -88,13 +85,11 @@ async def unload_model(
         return False
     url = ollama_url or _DEFAULT_OLLAMA_URL
     try:
-        async with httpx.AsyncClient(timeout=timeout) as client:
-            res = await client.post(
-                f"{url}/api/generate",
-                json={"model": model, "keep_alive": 0},
-            )
-            res.raise_for_status()
-            return True
+        return await request_unload(
+            ollama_url=url,
+            model=model,
+            timeout=timeout,
+        )
     except Exception as e:
         log.info("ollama unload_model(%s) failed (non-fatal): %s", model, e)
         return False

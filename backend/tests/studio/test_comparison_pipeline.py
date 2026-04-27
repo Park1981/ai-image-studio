@@ -452,7 +452,7 @@ async def test_call_vision_pair_injects_format_json_and_refined_intent() -> None
             return _FakeResponse()
 
     with patch(
-        "studio.comparison_pipeline.httpx.AsyncClient",
+        "studio._ollama_client.httpx.AsyncClient",
         new=MagicMock(return_value=_FakeClient()),
     ):
         await _call_vision_pair(
@@ -1029,7 +1029,7 @@ async def test_translate_section_parsing_uppercase_headers() -> None:
         async def post(self, *a, **kw):
             return fake_response
 
-    with patch("studio.comparison_pipeline.httpx.AsyncClient", lambda **kw: FakeClient()):
+    with patch("studio._ollama_client.httpx.AsyncClient", lambda **kw: FakeClient()):
         result = await _translate_comments_to_ko(
             comments_en={"face_id": "x", "body_pose": "x", "attire": "", "background": "", "intent_fidelity": ""},
             summary_en="x",
