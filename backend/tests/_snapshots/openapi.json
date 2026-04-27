@@ -1,0 +1,1130 @@
+{
+  "paths": {
+    "/": {
+      "get": {
+        "description": "헬스 체크 엔드포인트",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Root"
+      }
+    },
+    "/api/health": {
+      "get": {
+        "description": "상세 헬스 체크 (프로세스 상태 포함)",
+        "operationId": "health_api_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health"
+      }
+    },
+    "/api/studio/compare-analyze": {
+      "post": {
+        "description": "Edit 결과(result) 와 원본(source) 을 qwen2.5vl 로 5축 비교 평가.\n\nmultipart:\n  source: 원본 이미지 파일\n  result: 수정 결과 이미지 파일\n  meta: JSON {editPrompt, historyItemId?, visionModel?, ollamaModel?}\n\nhistoryItemId 가 주어지면 분석 결과를 DB 에 영구 저장 (saved=True).\nHTTP 200 원칙 — 비전 실패해도 fallback 결과로 200 반환 (analysis.fallback=True).\n동시 호출 시 공용 GPU gate 로 직렬화 → 30s 대기 후 busy 면 503 (의도 설계).",
+        "operationId": "compare_analyze_api_studio_compare_analyze_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_compare_analyze_api_studio_compare_analyze_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compare Analyze",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/edit": {
+      "post": {
+        "description": "수정 요청 (multipart): image 파일 + meta JSON ({ prompt, lightning }).",
+        "operationId": "create_edit_task_api_studio_edit_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_edit_task_api_studio_edit_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Edit Task",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/edit/stream/{task_id}": {
+      "get": {
+        "operationId": "edit_stream_api_studio_edit_stream__task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Stream",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/generate": {
+      "post": {
+        "description": "생성 요청 받으면 백그라운드 파이프라인 spawn, task_id 반환.",
+        "operationId": "create_generate_task_api_studio_generate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GenerateBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Generate Task",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/generate/stream/{task_id}": {
+      "get": {
+        "operationId": "generate_stream_api_studio_generate_stream__task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Generate Stream",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/history": {
+      "delete": {
+        "operationId": "clear_history_api_studio_history_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Clear History",
+        "tags": [
+          "studio"
+        ]
+      },
+      "get": {
+        "description": "히스토리 조회 (최신순, mode 필터, cursor pagination).",
+        "operationId": "list_history_api_studio_history_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Mode"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 50,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List History",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/history/{item_id}": {
+      "delete": {
+        "operationId": "delete_history_api_studio_history__item_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete History",
+        "tags": [
+          "studio"
+        ]
+      },
+      "get": {
+        "operationId": "get_history_api_studio_history__item_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get History",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/interrupt": {
+      "post": {
+        "description": "현재 실행 중인 ComfyUI job 인터럽트 (전역). ComfyUI 는 client_id 관계없이 즉시 중단.",
+        "operationId": "interrupt_current_api_studio_interrupt_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Interrupt Current",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/models": {
+      "get": {
+        "description": "모델 프리셋 노출 — 프론트 model-presets.ts 와 snake_case 그대로 매핑.",
+        "operationId": "list_models_api_studio_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Models",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/ollama/models": {
+      "get": {
+        "description": "설치된 Ollama 모델 목록 (Settings drawer 드롭다운용).\n\nReturns:\n    [{name, size_gb, modified_at}, ...] — 이름순 정렬.",
+        "operationId": "list_ollama_models_api_studio_ollama_models_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Ollama Models",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/process/status": {
+      "get": {
+        "description": "실 process_manager + system_metrics 로부터 Ollama·ComfyUI 상태 + 통합 자원 메트릭 조회.\n\n응답 구조 (2026-04-26 헤더 통합 SystemMetrics 도입):\n  {\n    \"ollama\":  {\"running\": bool},\n    \"comfyui\": {\"running\": bool, \"vram_used_gb\": float?, \"vram_total_gb\": float?,\n                \"gpu_percent\": float?},\n    \"system\":  {\"cpu_percent\": float?, \"ram_used_gb\": float?, \"ram_total_gb\": float?},\n    \"vram_breakdown\": {\n      \"comfyui\": {\"vram_gb\": float, \"models\": [str], \"last_mode\": str?},\n      \"ollama\":  {\"vram_gb\": float, \"models\": [{\"name\", \"size_vram_gb\", \"expires_in_sec\"}]},\n      \"other_gb\": float\n    }\n  }\n각 메트릭 필드는 측정 실패 시 누락 가능 (프론트에서 누락 = 미표시 처리).\nvram_breakdown 은 항상 포함 (실패 시 0/빈 리스트) — 프론트에서 80% 임계 넘을 때만 표시.",
+        "operationId": "process_status_api_studio_process_status_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Process Status",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/process/{name}/{action}": {
+      "post": {
+        "operationId": "process_action_api_studio_process__name___action__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "action",
+            "required": true,
+            "schema": {
+              "title": "Action",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessAction"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Process Action",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/research": {
+      "post": {
+        "operationId": "research_api_studio_research_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResearchBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Research",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/upgrade-only": {
+      "post": {
+        "description": "프롬프트 업그레이드 전용 (ComfyUI 미호출).\n\nshowUpgradeStep 프리퍼런스 ON 일 때 프론트가 호출 → 모달에서 사용자 확인 →\n/generate 로 preUpgradedPrompt 와 함께 재요청.\n\nspec 19 후속 (Codex 추가 fix): aspect/width/height 도 SYSTEM_GENERATE 에\n전달 → /generate 본 호출과 동일한 size context 보장.",
+        "operationId": "upgrade_only_api_studio_upgrade_only_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpgradeOnlyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upgrade Only",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/video": {
+      "post": {
+        "description": "영상 생성 요청 (multipart: image 파일 + meta JSON).\n\nmeta = { prompt, adult?, ollamaModel?, visionModel? }",
+        "operationId": "create_video_task_api_studio_video_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_video_task_api_studio_video_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Video Task",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/video/stream/{task_id}": {
+      "get": {
+        "operationId": "video_stream_api_studio_video_stream__task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Video Stream",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/vision-analyze": {
+      "post": {
+        "description": "단일 이미지 → 상세 영문 설명 + 한글 번역 (동기 JSON).\n\nVision Analyzer 독립 페이지(/vision) 전용. Edit 파이프라인과 분리.\nHTTP 200 원칙 — Ollama 실패 시에도 provider=\"fallback\" 로 반환.",
+        "operationId": "vision_analyze_api_studio_vision_analyze_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_vision_analyze_api_studio_vision_analyze_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Vision Analyze",
+        "tags": [
+          "studio"
+        ]
+      }
+    }
+  },
+  "schemas": {
+    "Body_compare_analyze_api_studio_compare_analyze_post": {
+      "properties": {
+        "meta": {
+          "title": "Meta",
+          "type": "string"
+        },
+        "result": {
+          "contentMediaType": "application/octet-stream",
+          "title": "Result",
+          "type": "string"
+        },
+        "source": {
+          "contentMediaType": "application/octet-stream",
+          "title": "Source",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "result",
+        "meta"
+      ],
+      "title": "Body_compare_analyze_api_studio_compare_analyze_post",
+      "type": "object"
+    },
+    "Body_create_edit_task_api_studio_edit_post": {
+      "properties": {
+        "image": {
+          "contentMediaType": "application/octet-stream",
+          "title": "Image",
+          "type": "string"
+        },
+        "meta": {
+          "title": "Meta",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image",
+        "meta"
+      ],
+      "title": "Body_create_edit_task_api_studio_edit_post",
+      "type": "object"
+    },
+    "Body_create_video_task_api_studio_video_post": {
+      "properties": {
+        "image": {
+          "contentMediaType": "application/octet-stream",
+          "title": "Image",
+          "type": "string"
+        },
+        "meta": {
+          "title": "Meta",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image",
+        "meta"
+      ],
+      "title": "Body_create_video_task_api_studio_video_post",
+      "type": "object"
+    },
+    "Body_vision_analyze_api_studio_vision_analyze_post": {
+      "properties": {
+        "image": {
+          "contentMediaType": "application/octet-stream",
+          "title": "Image",
+          "type": "string"
+        },
+        "meta": {
+          "default": "{}",
+          "title": "Meta",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image"
+      ],
+      "title": "Body_vision_analyze_api_studio_vision_analyze_post",
+      "type": "object"
+    },
+    "GenerateBody": {
+      "properties": {
+        "aspect": {
+          "default": "1:1",
+          "title": "Aspect",
+          "type": "string"
+        },
+        "cfg": {
+          "default": 4.0,
+          "title": "Cfg",
+          "type": "number"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "maximum": 2048.0,
+              "minimum": 256.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Height"
+        },
+        "lightning": {
+          "default": false,
+          "title": "Lightning",
+          "type": "boolean"
+        },
+        "ollamaModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ollamamodel"
+        },
+        "preResearchHints": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Preresearchhints"
+        },
+        "preUpgradedPrompt": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Preupgradedprompt"
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "research": {
+          "default": false,
+          "title": "Research",
+          "type": "boolean"
+        },
+        "seed": {
+          "default": 464857551335368,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "steps": {
+          "default": 50,
+          "title": "Steps",
+          "type": "integer"
+        },
+        "styleId": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Styleid"
+        },
+        "visionModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Visionmodel"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "maximum": 2048.0,
+              "minimum": 256.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Width"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "GenerateBody",
+      "type": "object"
+    },
+    "HTTPValidationError": {
+      "properties": {
+        "detail": {
+          "items": {
+            "$ref": "#/components/schemas/ValidationError"
+          },
+          "title": "Detail",
+          "type": "array"
+        }
+      },
+      "title": "HTTPValidationError",
+      "type": "object"
+    },
+    "ProcessAction": {
+      "properties": {
+        "message": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Message"
+        },
+        "ok": {
+          "title": "Ok",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "ok"
+      ],
+      "title": "ProcessAction",
+      "type": "object"
+    },
+    "ResearchBody": {
+      "properties": {
+        "model": {
+          "default": "Qwen Image 2512",
+          "title": "Model",
+          "type": "string"
+        },
+        "prompt": {
+          "title": "Prompt",
+          "type": "string"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "ResearchBody",
+      "type": "object"
+    },
+    "TaskCreated": {
+      "properties": {
+        "stream_url": {
+          "title": "Stream Url",
+          "type": "string"
+        },
+        "task_id": {
+          "title": "Task Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task_id",
+        "stream_url"
+      ],
+      "title": "TaskCreated",
+      "type": "object"
+    },
+    "UpgradeOnlyBody": {
+      "description": "gemma4 업그레이드 + 선택적 조사만 수행 · ComfyUI 디스패치 없음.\n\nspec 19 후속 (Codex 추가 fix): aspect/width/height 도 받아서 SYSTEM_GENERATE\n의 [Output dimensions] 컨텍스트에 정확한 dim 주입.\nGenerateBody 와 동일 필드 (옵셔널 · 미전달 시 aspect preset 폴백).",
+      "properties": {
+        "aspect": {
+          "default": "1:1",
+          "title": "Aspect",
+          "type": "string"
+        },
+        "height": {
+          "anyOf": [
+            {
+              "maximum": 2048.0,
+              "minimum": 256.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Height"
+        },
+        "ollamaModel": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Ollamamodel"
+        },
+        "prompt": {
+          "minLength": 1,
+          "title": "Prompt",
+          "type": "string"
+        },
+        "research": {
+          "default": false,
+          "title": "Research",
+          "type": "boolean"
+        },
+        "width": {
+          "anyOf": [
+            {
+              "maximum": 2048.0,
+              "minimum": 256.0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Width"
+        }
+      },
+      "required": [
+        "prompt"
+      ],
+      "title": "UpgradeOnlyBody",
+      "type": "object"
+    },
+    "ValidationError": {
+      "properties": {
+        "ctx": {
+          "title": "Context",
+          "type": "object"
+        },
+        "input": {
+          "title": "Input"
+        },
+        "loc": {
+          "items": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              }
+            ]
+          },
+          "title": "Location",
+          "type": "array"
+        },
+        "msg": {
+          "title": "Message",
+          "type": "string"
+        },
+        "type": {
+          "title": "Error Type",
+          "type": "string"
+        }
+      },
+      "required": [
+        "loc",
+        "msg",
+        "type"
+      ],
+      "title": "ValidationError",
+      "type": "object"
+    }
+  }
+}
