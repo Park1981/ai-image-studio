@@ -801,7 +801,60 @@ Phase 0' 5건은 완료. 다음 라운드는 Phase 1 보강으로 이동.
 - frontend npm test **19 passed**
 
 ### 16.4 미해결 (차후 라운드)
-- **UI P0-1** viewport 정책 (데스크톱-only vs 반응형 — 사용자 결정 필요)
-- **N5/N7/N8** force_unload 함수명 / dispatch_state multi-worker / VRAM Other 분류 정밀화 (P2-P3)
-- **Claude F** LoRA 체인 통합 (`_apply_loras` 헬퍼)
-- **C2-P2-X** OpenAPI / CI 게이트 / SQLite 버전화 / startup script / visual regression / 디자인 시스템 문서
+- **C2-P2-5** UI visual regression (Playwright 도입 · 사용자가 이번 라운드 제외)
+- 기타 P3 정밀화 항목 (N3 routes.streams import / N4 router facade 수명 / 폰트·모션·spacing 토큰 v2)
+
+---
+
+## 17. Phase 2 정리 + CI + 잔여 P2 — 2026-04-27 후반 완료
+
+§16 Phase 1 보강 후 같은 날 추가 진행. 6 commits (`df57296` → `025c6ff`).
+
+### 17.1 백엔드 추가 정리 (5건)
+- **Claude F** `_apply_lora_chain` 헬퍼 — image (`_build_lora_chain`) + video (`_build_video_lora_chain`) 노드 체인 공유 (`comfy_api_builder.py:105`)
+- **N5** `force_unload_all_before_comfy → force_unload_all_loaded_models` (옛 이름 alias 유지)
+- **N7** `dispatch_state` 모듈 docstring 에 uvicorn workers=1 가정 + 마이그레이션 가이드 명시
+- **N8** VRAM Other 분류 정밀화 — ComfyUI dispatch 기록 없으면 unaccounted 갭을 ComfyUI 가 아닌 Other 로 분류
+- **C2-P2-3** SQLite migration 버전화 — `SCHEMA_VERSION = 6` + `PRAGMA user_version` 추적
+
+### 17.2 CI / 운영 (2건)
+- **C2-P2-2** `.github/workflows/quality-gate.yml` — backend (ruff+pytest) + frontend (tsc+lint+vitest+build) 자동 검증
+- **CI fix** `python -m pytest` (sys.path 자동 추가) + `requirements.txt` 에 `python-multipart` + `psutil` 누락 추가
+
+### 17.3 정책 / 문서 (4건)
+- **UI P0-1** `ViewportGuard` — 1024px 미만 시 안내 overlay (데스크톱 전용 정책 명시)
+- **C2-P2-4** `.env.example` 한국어 코멘트 + 필수/선택 분리 + `docs/setup.md` 신규 가이드
+- **C2-P2-1** OpenAPI 계약 snapshot 테스트 — `tests/_snapshots/openapi.json` (31KB) drift 차단
+- **C2-P2-6** `docs/design-system.md` — 토큰 7 그룹 + 공용 컴포넌트 인벤토리 + 가이드 (243줄)
+
+### 17.4 베이스라인 (Phase 2 후)
+- backend pytest **210 passed** (+1 contract test) · ruff **clean**
+- frontend tsc **clean** · lint **clean** · npm test **19 passed**
+
+### 17.5 누적 commit 19건 (2026-04-27)
+```
+025c6ff docs: design system 문서화 (C2-P2-6)
+ce4702c test: OpenAPI 계약 snapshot 테스트 도입 (C2-P2-1)
+6755736 docs(.env.example): 한국어 코멘트 + 필수/선택 분리 + 누락 키 추가 (C2-P2-4)
+f9169fc docs: .env.example + docs/setup.md 정리 (C2-P2-4)
+f2ac083 fix(deps): python-multipart + psutil 누락 추가
+2e450c2 fix(ci): python -m pytest + UI P0-1 viewport guard
+c384a68 ci: GitHub Actions quality gate 신설 (C2-P2-2)
+df57296 refactor(backend): phase 2 정리 묶음 (Claude F + N5/N7/N8 + C2-P2-3)
+dc6b38a docs: refactor review 2026-04-27 — phase 1 보강 완료 기록 (§16)
+ac40c5d refactor(frontend): 800줄대 컴포넌트 3개 분해 (C2-P1-2)
+d5d5c94 fix(api-client): block comment terminator `**/` 회피
+f29f74e refactor(frontend): api-client barrel 사용처 24곳 직접 import 전환 (C2-P1-3)
+02d8cf6 refactor(frontend): paste 중앙화 + compare page 분해 + 테스트 확장
+921cdc2 refactor: phase 1 보강 백엔드 DRY + frontend a11y 묶음
+244bbae refactor: centralize ollama http client
+712cb97 test: add model preset parity contract
+708ebc3 refactor: centralize studio image upload limit
+d4ac342 refactor: complete phase 0 backend and test baseline
+6f45c40 fix(frontend): complete UI P0 review fixes
+```
+
+### 17.6 Gap 검증 결과 (bkit:gap-detector · 2026-04-27 후반)
+- **일치율 100%** (19/19 commit 모두 명시 파일에 정확 적용)
+- 라인수 변화 100% 일치 (vision/compare 217 / VisionResultCard 68 / ImageLightbox 465 / ProgressModal 402)
+- 누락 / 오류 0건
