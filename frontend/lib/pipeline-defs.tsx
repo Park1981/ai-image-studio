@@ -209,7 +209,10 @@ export const PIPELINE_DEFS: Record<HistoryMode, StageDef[]> = {
       },
     },
     {
-      type: "workflow-build",
+      // 백엔드 video.py 가 emit 하는 stage type 과 1:1 매칭 — workflow-dispatch.
+      // (Phase 3 2026-04-27 fix: 옛 정의 "workflow-build" 는 백엔드 emit 과
+      // 매칭 안 돼서 row 가 안 보이는 잠재 버그였음.)
+      type: "workflow-dispatch",
       label: "워크플로우 구성",
       subLabel: "LTX i2v builder",
     },

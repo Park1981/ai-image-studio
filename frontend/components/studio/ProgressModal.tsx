@@ -25,12 +25,9 @@ import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useVideoStore } from "@/stores/useVideoStore";
 // 2026-04-27 (C2-P1-2): 3 mode 타임라인 + TimelineRow + DetailBox 분해.
-// 2026-04-27 (Phase 2): Edit 는 PipelineTimeline 으로 교체. Generate/Video 는 Phase 3 에서 통일.
+// 2026-04-27 (Phase 2/3): Edit/Video PipelineTimeline 으로 교체. Generate 는 GenerateTimeline 유지.
 import { PipelineTimeline } from "./progress/PipelineTimeline";
-import {
-  GenerateTimeline,
-  VideoTimeline,
-} from "./progress/Timelines";
+import { GenerateTimeline } from "./progress/Timelines";
 
 export default function ProgressModal({
   mode,
@@ -105,7 +102,7 @@ export default function ProgressModal({
           ) : mode === "edit" ? (
             <PipelineTimeline mode="edit" />
           ) : (
-            <VideoTimeline />
+            <PipelineTimeline mode="video" />
           )}
         </div>
       </section>
@@ -122,10 +119,12 @@ function useComfyInterruptAvailability(mode: HistoryMode): boolean {
   const editStageHistory = useEditStore((s) => s.stageHistory);
 
   const videoRunning = useVideoStore((s) => s.running);
-  const videoCurrentStep = useVideoStore((s) => s.currentStep);
+  // Phase 3 (2026-04-27): videoCurrentStep===4 → lastStage==="comfyui-sampling".
+  const videoStageHistory = useVideoStore((s) => s.stageHistory);
 
   const lastGenStage = genStageHistory[genStageHistory.length - 1]?.type;
   const lastEditStage = editStageHistory[editStageHistory.length - 1]?.type;
+  const lastVideoStage = videoStageHistory[videoStageHistory.length - 1]?.type;
 
   if (mode === "generate") {
     return genRunning && lastGenStage === "comfyui-sampling";
@@ -134,7 +133,7 @@ function useComfyInterruptAvailability(mode: HistoryMode): boolean {
     return editRunning && lastEditStage === "comfyui-sampling";
   }
   if (mode === "video") {
-    return videoRunning && videoCurrentStep === 4;
+    return videoRunning && lastVideoStage === "comfyui-sampling";
   }
   return false;
 }

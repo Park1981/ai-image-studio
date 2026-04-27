@@ -13,11 +13,11 @@
  * mode 별 store 구독:
  *   - generate: useGenerateStore (stageHistory + generating + research)
  *   - edit:    useEditStore     (stageHistory · Phase 2 (2026-04-27) 도입 완료)
- *   - video:   useVideoStore    (stageHistory · Phase 3 도입 예정 — 그 전엔 빈 배열 폴백)
+ *   - video:   useVideoStore    (stageHistory · Phase 3 (2026-04-27) 도입 완료)
  *
- * Phase 2 시점 사용:
- *   - Generate / Edit 는 PipelineTimeline 적용 완료
- *   - Video 는 옛 VideoTimeline 유지 (Phase 3 에서 교체)
+ * Phase 3 시점 사용:
+ *   - Edit / Video 는 PipelineTimeline 적용 완료
+ *   - Generate 는 옛 GenerateTimeline 유지 (Phase 4 에서 교체 또는 wrapper)
  */
 
 "use client";
@@ -110,13 +110,14 @@ interface PipelineRuntime {
 }
 
 /** mode 별 store 에서 stageHistory + running 가져오기.
- *  Phase 2 시점: Generate / Edit 진짜 stageHistory 보유. Video 는 빈 배열 폴백 (Phase 3).
+ *  Phase 3 시점: 3 mode 모두 진짜 stageHistory 보유.
  *  hook 규칙 위배 회피 — 모든 store 를 항상 구독하고 mode 로 분기. */
 function usePipelineRuntime(mode: HistoryMode): PipelineRuntime {
   const genStageHistory = useGenerateStore((s) => s.stageHistory);
   const genRunning = useGenerateStore((s) => s.generating);
   const editStageHistory = useEditStore((s) => s.stageHistory);
   const editRunning = useEditStore((s) => s.running);
+  const videoStageHistory = useVideoStore((s) => s.stageHistory);
   const videoRunning = useVideoStore((s) => s.running);
 
   if (mode === "generate") {
@@ -125,8 +126,7 @@ function usePipelineRuntime(mode: HistoryMode): PipelineRuntime {
   if (mode === "edit") {
     return { stageHistory: editStageHistory, running: editRunning };
   }
-  // video — Phase 3 까지 stageHistory 없음 — 빈 배열 폴백.
-  return { stageHistory: [], running: videoRunning };
+  return { stageHistory: videoStageHistory, running: videoRunning };
 }
 
 /** PipelineCtx 묶음 — mode 별로 필요한 ctx 만 채워 보냄 (다른 mode 의 값은 undefined). */

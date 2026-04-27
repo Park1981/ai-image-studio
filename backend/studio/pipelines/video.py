@@ -76,6 +76,12 @@ async def _run_video_pipeline_task(
       step 5 save-output       92  → 98
     """
     try:
+        # Phase 3 (2026-04-27 진행 모달 store 통일):
+        #   stage 완료 emit payload 안에 detail (description / finalPrompt /
+        #   finalPromptKo / provider) 흡수. step emit 은 transitional 유지
+        #   (Phase 4 정리). 진입 emit + 완료 emit 둘 다 유지 (PipelineTimeline 의
+        #   running row 표시 용). 완료 emit 에만 payload 풍부.
+
         # ── Step 1: vision ── (0 → 20)
         await task.emit(
             "stage",
@@ -100,9 +106,15 @@ async def _run_video_pipeline_task(
                 "description": video_res.image_description,
             },
         )
+        # Phase 3: stage 완료 payload 에 description 흡수.
         await task.emit(
             "stage",
-            {"type": "vision-analyze", "progress": 20, "stageLabel": "비전 분석 완료"},
+            {
+                "type": "vision-analyze",
+                "progress": 20,
+                "stageLabel": "비전 분석 완료",
+                "description": video_res.image_description,
+            },
         )
 
         # ── Step 2: prompt-merge ── (20 → 30)
@@ -121,9 +133,17 @@ async def _run_video_pipeline_task(
                 "provider": video_res.upgrade.provider,
             },
         )
+        # Phase 3: prompt-merge 완료 stage 에 finalPrompt/finalPromptKo/provider 흡수.
         await task.emit(
             "stage",
-            {"type": "prompt-merge", "progress": 30, "stageLabel": "프롬프트 병합 완료"},
+            {
+                "type": "prompt-merge",
+                "progress": 30,
+                "stageLabel": "프롬프트 병합 완료",
+                "finalPrompt": video_res.final_prompt,
+                "finalPromptKo": video_res.upgrade.translation,
+                "provider": video_res.upgrade.provider,
+            },
         )
 
         # ── Step 3: workflow-dispatch ── (30 → 35)

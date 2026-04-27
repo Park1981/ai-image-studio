@@ -2,14 +2,20 @@
  * useVideoStore — LTX-2.3 i2v 페이지(/video) 상태.
  * 2026-04-24 · V5.
  *
- * Edit 스토어와 구조가 거의 동일 (5-step 파이프라인).
  * persist 안 함 — mp4 파일 크고 히스토리는 서버 DB 담당.
+ *
+ * 2026-04-27 (Phase 3 진행 모달 store 통일):
+ *   stepDone/currentStep/stepHistory/VideoStepDetail 제거 → stageHistory: StageEvent[].
+ *   백엔드 stage emit payload (description / finalPrompt / provider 등) 를
+ *   pushStage 로 stageHistory 에 그대로 보관 — PipelineTimeline 의 StageDef.renderDetail 사용.
+ *   step emit 은 백엔드가 transitional 로 보내지만 store 에선 무시 (Phase 4 정리).
  */
 
 "use client";
 
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
+import type { StageEvent } from "@/stores/useGenerateStore";
 
 // ── 영상 해상도 슬라이더 범위 (backend presets.py 와 동기화) ──
 export const VIDEO_LONGER_EDGE_MIN = 512;
@@ -35,20 +41,6 @@ export function computeVideoResize(
   w = Math.max(8, Math.floor(w / 8) * 8);
   h = Math.max(8, Math.floor(h / 8) * 8);
   return { width: w, height: h };
-}
-
-export interface VideoStepDetail {
-  n: 1 | 2 | 3 | 4 | 5;
-  startedAt: number;
-  doneAt: number | null;
-  /** step 1 비전 설명 */
-  description?: string;
-  /** step 2 최종 LTX 프롬프트 (영문) */
-  finalPrompt?: string;
-  /** step 2 한국어 번역 */
-  finalPromptKo?: string | null;
-  /** step 2 provider (ollama/fallback) */
-  provider?: string;
 }
 
 export interface VideoState {
@@ -82,9 +74,10 @@ export interface VideoState {
 
   /* 파이프라인 상태 (세션 한정) */
   running: boolean;
-  currentStep: 1 | 2 | 3 | 4 | 5 | null;
-  stepDone: number; // 0=시작 전, 1~5 단계 완료
-  stepHistory: VideoStepDetail[];
+  /** 진행 모달용 stage 이벤트 타임라인 (Phase 3 통일).
+   *  백엔드 emit("stage", {...}) 가 도착할 때마다 push.
+   *  같은 type 진입 + 완료로 두 번 들어오면 byType Map 이 후자 (payload 풍부) 로 덮어씀. */
+  stageHistory: StageEvent[];
   startedAt: number | null;
   samplingStep: number | null;
   samplingTotal: number | null;
@@ -106,13 +99,10 @@ export interface VideoState {
   setLongerEdge: (v: number) => void;
   setLightning: (v: boolean) => void;
   setRunning: (running: boolean) => void;
-  setStep: (step: 1 | 2 | 3 | 4 | 5 | null, done: boolean) => void;
-  /** n 만 필수. 부분 업데이트 — 기존 startedAt 등은 머지에서 보존됨. */
-  recordStepDetail: (
-    detail: Partial<VideoStepDetail> & { n: VideoStepDetail["n"] },
-  ) => void;
   setSampling: (step: number | null, total: number | null) => void;
   setPipelineProgress: (progress: number, label?: string) => void;
+  /** Phase 3: stage 이벤트 도착 시 호출. arrivedAt 자동 부여. */
+  pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
   setLastVideoRef: (ref: string | null) => void;
   resetPipeline: () => void;
 }
@@ -129,9 +119,7 @@ export const useVideoStore = create<VideoState>((set) => ({
   lightning: true,
 
   running: false,
-  currentStep: null,
-  stepDone: 0,
-  stepHistory: [],
+  stageHistory: [],
   startedAt: null,
   samplingStep: null,
   samplingTotal: null,
@@ -168,9 +156,7 @@ export const useVideoStore = create<VideoState>((set) => ({
       running
         ? {
             running,
-            currentStep: 1,
-            stepDone: 0,
-            stepHistory: [],
+            stageHistory: [],
             startedAt: Date.now(),
             samplingStep: null,
             samplingTotal: null,
@@ -179,32 +165,6 @@ export const useVideoStore = create<VideoState>((set) => ({
           }
         : { running },
     ),
-
-  setStep: (step, done) =>
-    set({
-      currentStep: step,
-      stepDone: done ? (step ?? 0) : step ? step - 1 : 0,
-    }),
-
-  recordStepDetail: (detail) =>
-    set((s) => {
-      const existing = s.stepHistory.find((x) => x.n === detail.n);
-      if (existing) {
-        // 머지 시 startedAt 은 항상 기존값 보존 (elapsed 측정의 기준점).
-        return {
-          stepHistory: s.stepHistory.map((x) =>
-            x.n === detail.n ? { ...x, ...detail, startedAt: x.startedAt } : x,
-          ),
-        };
-      }
-      const fresh: VideoStepDetail = {
-        startedAt: Date.now(),
-        doneAt: null,
-        ...detail,
-        n: detail.n,
-      };
-      return { stepHistory: [...s.stepHistory, fresh] };
-    }),
 
   setSampling: (step, total) =>
     set({ samplingStep: step, samplingTotal: total }),
@@ -215,14 +175,17 @@ export const useVideoStore = create<VideoState>((set) => ({
       pipelineLabel: label ?? s.pipelineLabel,
     })),
 
+  pushStage: (evt) =>
+    set((s) => ({
+      stageHistory: [...s.stageHistory, { ...evt, arrivedAt: Date.now() }],
+    })),
+
   setLastVideoRef: (ref) => set({ lastVideoRef: ref }),
 
   resetPipeline: () =>
     set({
       running: false,
-      currentStep: null,
-      stepDone: 0,
-      stepHistory: [],
+      stageHistory: [],
       startedAt: null,
       samplingStep: null,
       samplingTotal: null,

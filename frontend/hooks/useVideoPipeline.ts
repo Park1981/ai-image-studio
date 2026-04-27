@@ -37,10 +37,9 @@ export function useVideoPipeline(
   // 실행 상태
   const running = useVideoStore((s) => s.running);
   const setRunning = useVideoStore((s) => s.setRunning);
-  const setStep = useVideoStore((s) => s.setStep);
-  const recordStepDetail = useVideoStore((s) => s.recordStepDetail);
   const setSampling = useVideoStore((s) => s.setSampling);
   const setPipelineProgress = useVideoStore((s) => s.setPipelineProgress);
+  const pushStage = useVideoStore((s) => s.pushStage);
   const setLastVideoRef = useVideoStore((s) => s.setLastVideoRef);
   const resetPipeline = useVideoStore((s) => s.resetPipeline);
   // 히스토리
@@ -83,26 +82,38 @@ export function useVideoPipeline(
         on: {
           sampling: (e) =>
             setSampling(e.samplingStep ?? null, e.samplingTotal ?? null),
-          step: (e) => {
-            setStep(e.step, e.done);
-            if (!e.done) {
-              recordStepDetail({
-                n: e.step,
-                startedAt: Date.now(),
-                doneAt: null,
-              });
-            } else {
-              recordStepDetail({
-                n: e.step,
-                doneAt: Date.now(),
-                description: e.description,
-                finalPrompt: e.finalPrompt,
-                finalPromptKo: e.finalPromptKo,
-                provider: e.provider,
-              });
-            }
+          // Phase 3 (2026-04-27 진행 모달 store 통일):
+          //   step 이벤트는 transitional 로 백엔드가 보내지만 store 에선 무시.
+          //   detail (description / finalPrompt / finalPromptKo / provider) 은
+          //   stage payload 에 흡수되어 stageHistory[].payload 로 들어가고
+          //   PipelineTimeline 이 사용.
+          step: () => {},
+          stage: (e) => {
+            setPipelineProgress(e.progress, e.stageLabel);
+            // 백엔드가 보낸 임의 payload 를 stageHistory 에 그대로 보관.
+            // e.type 은 discriminator ("stage") · 백엔드 raw type 은 e.stageType.
+            const {
+              type: _discriminator,
+              stageType,
+              progress: _progress,
+              stageLabel: _stageLabel,
+              samplingStep: _ss,
+              samplingTotal: _st,
+              ...payload
+            } = e;
+            void _discriminator;
+            void _progress;
+            void _stageLabel;
+            void _ss;
+            void _st;
+            const hasPayload = Object.keys(payload).length > 0;
+            pushStage({
+              type: stageType,
+              label: e.stageLabel ?? "",
+              progress: e.progress,
+              ...(hasPayload ? { payload } : {}),
+            });
           },
-          stage: (e) => setPipelineProgress(e.progress, e.stageLabel),
           done: (e) => {
             resetPipeline();
             addItem(e.item);

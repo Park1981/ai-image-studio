@@ -506,15 +506,22 @@ export type VideoStage =
       samplingStep?: number | null;
       samplingTotal?: number | null;
     }
-  | {
-      /** 백엔드 파이프라인 진행률 (0~100) + 단계 라벨 */
+  /**
+   * 백엔드 파이프라인 진행률 (0~100) + 단계 라벨.
+   *
+   * 2026-04-27 (Phase 3 진행 모달 store 통일):
+   *   백엔드 stage emit payload 의 임의 detail 필드 (description / finalPrompt /
+   *   finalPromptKo / provider 등) 를 그대로 통과시킴. PipelineTimeline 의
+   *   StageDef.renderDetail 이 stageHistory[].payload 에서 사용.
+   */
+  | ({
       type: "stage";
       stageType: string;
       progress: number;
       stageLabel: string;
       samplingStep?: number;
       samplingTotal?: number;
-    }
+    } & Record<string, unknown>)
   | { type: "done"; item: HistoryItem; savedToHistory: boolean };
 
 /* ──────────── Vision Analyzer ──────────── */

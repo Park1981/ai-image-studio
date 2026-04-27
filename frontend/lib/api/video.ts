@@ -122,7 +122,23 @@ async function* realVideoStream(
         stageLabel: string;
         samplingStep?: number | null;
         samplingTotal?: number | null;
-      };
+      } & Record<string, unknown>;
+      // Phase 3 (2026-04-27 진행 모달 store 통일):
+      //   백엔드 stage emit payload 의 모든 필드 (description / finalPrompt /
+      //   finalPromptKo / provider 등) 를 그대로 통과.
+      //   PipelineTimeline.StageDef.renderDetail 이 stageHistory[].payload 에서 사용.
+      const {
+        type: rawType,
+        progress: _p,
+        stageLabel: _sl,
+        samplingStep: _ss,
+        samplingTotal: _st,
+        ...extra
+      } = payload;
+      void _p;
+      void _sl;
+      void _ss;
+      void _st;
       yield {
         type: "stage",
         stageType: payload.type,
@@ -130,8 +146,9 @@ async function* realVideoStream(
         stageLabel: payload.stageLabel,
         samplingStep: payload.samplingStep ?? undefined,
         samplingTotal: payload.samplingTotal ?? undefined,
+        ...extra,
       };
-      if (payload.type === "comfyui-sampling") {
+      if (rawType === "comfyui-sampling") {
         yield {
           type: "sampling",
           progress: payload.progress ?? 0,
