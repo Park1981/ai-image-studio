@@ -17,6 +17,7 @@ import { useProcessStore, type ProcStatus } from "@/stores/useProcessStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { toast } from "@/stores/useToastStore";
+import { setProcessStatus } from "@/lib/api/process";
 import { USE_MOCK } from "@/lib/api/client";
 import { clearHistory as apiClearHistory } from "@/lib/api/history";
 import { useSettings } from "./SettingsContext";
@@ -81,7 +82,10 @@ export default function SettingsDrawer() {
         >
           <ProcessSection />
           <ModelSection />
-          <TemplatesSection />
+          {/* 프롬프트 템플릿 — 사용 빈도 낮음으로 비노출 (오빠 피드백 2026-04-27).
+           *  TemplatesSection 함수와 store 의 templates/addTemplate/removeTemplate 은 보존 —
+           *  필요 시 이 한 줄만 다시 활성화. */}
+          {/* <TemplatesSection /> */}
           <PreferencesSection />
           <HistorySection />
           <FooterInfo />
@@ -190,17 +194,48 @@ function Section({
    1. Process Status (read-only · 2026-04-27)
    ───────────────────────────────── */
 
-/** 프로세스 상태 표시만 — 시작/정지 제어 제거 (오빠 피드백 2026-04-27).
- *  start.ps1 이 라이프사이클 관리하니까 사용자가 드로어에서 켜고 끌 일 없음.
- *  ProcessStatusPoller (5초) 가 실 상태 동기화. */
+/** 프로세스 상태 + 수동 시작/정지 (2026-04-27 복원).
+ *  ProcessStatusPoller (5초) 가 실 상태 동기화. start.ps1 이 라이프사이클 관리하지만
+ *  디버깅 / VRAM 정리 위해 수동 컨트롤 필요. */
 function ProcessSection() {
   const ollama = useProcessStore((s) => s.ollama);
   const comfyui = useProcessStore((s) => s.comfyui);
+  const setOllama = useProcessStore((s) => s.setOllama);
+  const setComfyui = useProcessStore((s) => s.setComfyui);
+
+  const toggle = async (key: "ollama" | "comfyui", current: ProcStatus) => {
+    const next: ProcStatus = current === "running" ? "stopped" : "running";
+    const action = next === "running" ? "start" : "stop";
+    const displayName = key === "ollama" ? "Ollama" : "ComfyUI";
+    const res = await setProcessStatus(key, action);
+    if (!res.ok) {
+      toast.error(
+        `${displayName} ${action === "start" ? "시작" : "정지"} 실패`,
+        res.message,
+      );
+      return;
+    }
+    if (key === "ollama") setOllama(next);
+    else setComfyui(next);
+    toast.success(
+      `${displayName} ${action === "start" ? "시작됨" : "정지됨"}`,
+    );
+  };
 
   return (
     <Section title="프로세스" desc="로컬 AI 런타임 상태">
-      <StatusLine name="Ollama" port={11434} status={ollama} />
-      <StatusLine name="ComfyUI" port={8188} status={comfyui} />
+      <StatusLine
+        name="Ollama"
+        port={11434}
+        status={ollama}
+        onToggle={() => toggle("ollama", ollama)}
+      />
+      <StatusLine
+        name="ComfyUI"
+        port={8188}
+        status={comfyui}
+        onToggle={() => toggle("comfyui", comfyui)}
+      />
       {/* Mock 모드 안내 — start.ps1 정상 실행 시 USE_MOCK=false 라 숨김. */}
       {USE_MOCK && (
         <div
@@ -217,16 +252,19 @@ function ProcessSection() {
   );
 }
 
-/** 프로세스 한 줄 — 카드 박스 (옛 디자인 복원) + dot + name + 포트 + 상태 칩.
- *  하단 desc (gemma4 / Qwen Image …) 와 시작/정지 버튼은 제거 — 라이프사이클은 start.ps1. */
+/** 프로세스 한 줄 — 카드 + dot + name + 포트 + 상태 칩 + 토글 버튼.
+ *  하단 desc 는 제거 (gemma4 / Qwen Image 등 — 사용자 의미 ↓).
+ *  토글 버튼은 chip 옆 작은 아이콘 — 디버깅/VRAM 정리 시점 사용. */
 function StatusLine({
   name,
   port,
   status,
+  onToggle,
 }: {
   name: string;
   port: number;
   status: ProcStatus;
+  onToggle: () => void;
 }) {
   const running = status === "running";
   return (
@@ -279,6 +317,27 @@ function StatusLine({
       >
         {running ? "실행 중" : "정지"}
       </span>
+      <button
+        type="button"
+        onClick={onToggle}
+        title={running ? `${name} 정지` : `${name} 시작`}
+        aria-label={running ? `${name} 정지` : `${name} 시작`}
+        style={{
+          all: "unset",
+          cursor: "pointer",
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "4px 10px",
+          borderRadius: "var(--radius-sm)",
+          border: `1px solid ${running ? "var(--line)" : "var(--accent)"}`,
+          background: running ? "var(--bg)" : "var(--accent)",
+          color: running ? "var(--ink-2)" : "#fff",
+          transition: "all .15s",
+          flexShrink: 0,
+        }}
+      >
+        {running ? "정지" : "시작"}
+      </button>
     </div>
   );
 }
@@ -382,8 +441,9 @@ function ModelRow({
 }
 
 /* ─────────────────────────────────
-   3. Prompt Templates
+   3. Prompt Templates (현재 비노출 — 2026-04-27 호출만 주석 처리)
    ───────────────────────────────── */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function TemplatesSection() {
   const templates = useSettingsStore((s) => s.templates);
   const removeTemplate = useSettingsStore((s) => s.removeTemplate);
