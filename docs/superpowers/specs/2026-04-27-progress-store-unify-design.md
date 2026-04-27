@@ -455,6 +455,35 @@ async def _ensure_comfyui_ready(task: Task, progress_at: int) -> None:
 - [ ] 실 동작 확인 — 백엔드 idle 11분 + 생성 호출
 - [ ] **Master merge**
 
+### Phase 6 — Vision/Compare 통일 검토 (~2h, 옵션)
+**상태**: 우선순위 낮음 · 미래 재검토 신호 발생 시만 진행
+
+**현재 상태**:
+- `/vision` (Vision Analyzer) 와 `/vision/compare` 는 별도 `AnalysisProgressModal` 사용
+- 단일 LLM 호출 (qwen2.5vl) + 단일 HTTP POST (SSE 아님)
+- indeterminate bar (왕복 30% 폭) — "작업 중" 만 표현
+- step indicator 도 정확한 진행률 못 보여줌 (백엔드가 stage event 안 보냄)
+
+**작업 범위 (통일 시)**:
+- [ ] 백엔드 `/api/studio/vision-analyze` + `/api/studio/compare-analyze` 를 SSE stream 으로 변환
+  - 단계별 stage emit (encoding / vision / scoring / translation)
+- [ ] PIPELINE_DEFS 에 `vision` / `compare` mode 추가 (StageDef 배열)
+- [ ] HistoryMode union 확장 또는 별도 PipelineMode union 도입 (vision 은 history 에 없음)
+- [ ] useVisionStore / useVisionCompareStore 에 stageHistory 추가
+- [ ] AnalysisProgressModal 제거 → ProgressModal 통합 (또는 PipelineTimeline 단독 사용)
+- [ ] 사용자 실 동작 확인 (Vision 1번 + Compare 1번)
+- [ ] master merge
+
+**왜 우선순위 낮은가**:
+- 작업 시간 짧음 (10~30초) · 비전 호출이 90% 차지 → stage 별 timing 정보 가치 낮음
+- 백엔드 SSE 인프라 추가 비용 vs 사용자 체감 개선 비대칭
+- 다른 종류 작업 (단일 LLM vs ComfyUI dispatch) → 다른 모달이 오히려 의도 명확
+
+**미래 재검토 신호**:
+1. Vision 에 ComfyUI 후처리 추가 시 (예: 결과 이미지 색상 정규화) → SSE stream 자연 도입
+2. Compare 에 multi-call 체이닝 추가 시 (예: vision 분석 → 자동 보정 추천 → 재분석) → 단계 4-5+ 개로 늘면 통일 가치 ↑
+3. 사용자가 "Vision 도 진행률 정확히 보고 싶다" 요청 시
+
 ---
 
 ## 7. 안전장치
