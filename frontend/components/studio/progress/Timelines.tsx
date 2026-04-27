@@ -9,12 +9,13 @@
 "use client";
 
 import EditVisionBlock from "@/components/studio/EditVisionBlock";
-import Icon from "@/components/ui/Icon";
-import { Spinner } from "@/components/ui/primitives";
 import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore, type StageEvent } from "@/stores/useGenerateStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useVideoStore } from "@/stores/useVideoStore";
+// 2026-04-27 (Phase 1): TimelineRow / DetailBox 별도 파일로 추출 — PipelineTimeline 도 공용 사용.
+import { DetailBox } from "./DetailBox";
+import { TimelineRow } from "./TimelineRow";
 
 const GEN_STAGE_ORDER = [
   { type: "prompt-parse", label: "프롬프트 해석" },
@@ -383,179 +384,5 @@ export function VideoTimeline() {
   );
 }
 
-/* ── 단일 타임라인 row ── */
-function TimelineRow({
-  n,
-  label,
-  subLabel,
-  state,
-  elapsed,
-}: {
-  n: number;
-  label: string;
-  subLabel?: string;
-  state: "pending" | "running" | "done" | "error";
-  elapsed: string | null;
-}) {
-  const bulletStyle = {
-    width: 22,
-    height: 22,
-    borderRadius: "50%",
-    display: "grid",
-    placeItems: "center",
-    flexShrink: 0,
-    border:
-      state === "done"
-        ? "1.5px solid var(--green)"
-        : state === "running"
-          ? "1.5px solid var(--accent)"
-          : "1.5px solid var(--line-2)",
-    background:
-      state === "done"
-        ? "var(--green)"
-        : state === "running"
-          ? "#fff"
-          : "#fff",
-    color: "#fff",
-  } as const;
-
-  return (
-    <li
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "6px 0",
-      }}
-    >
-      <span style={bulletStyle}>
-        {state === "done" ? (
-          <Icon name="check" size={12} stroke={2.5} />
-        ) : state === "running" ? (
-          <Spinner size={10} color="var(--accent)" />
-        ) : (
-          <span
-            style={{
-              fontSize: 10,
-              color: "var(--ink-4)",
-              fontWeight: 600,
-            }}
-          >
-            {n}
-          </span>
-        )}
-      </span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 500,
-            color: state === "pending" ? "var(--ink-4)" : "var(--ink)",
-            display: "flex",
-            alignItems: "baseline",
-            gap: 8,
-          }}
-        >
-          {label}
-          {subLabel && (
-            <span
-              className="mono"
-              style={{
-                fontSize: 10.5,
-                color: "var(--ink-4)",
-                letterSpacing: ".04em",
-              }}
-            >
-              {subLabel}
-            </span>
-          )}
-        </div>
-      </div>
-      {elapsed && (
-        <span
-          className="mono"
-          style={{
-            fontSize: 10.5,
-            color: "var(--ink-3)",
-            letterSpacing: ".04em",
-          }}
-        >
-          {elapsed}s
-        </span>
-      )}
-      {state === "running" && (
-        <span
-          className="mono"
-          style={{
-            fontSize: 10,
-            color: "var(--accent)",
-            letterSpacing: ".04em",
-            animation: "pulse 1.4s ease-in-out infinite",
-          }}
-        >
-          RUNNING
-        </span>
-      )}
-    </li>
-  );
-}
-
-/* ── 상세 정보 박스 (비전 설명 · 최종 프롬프트 · 번역) ── */
-function DetailBox({
-  kind,
-  title,
-  children,
-}: {
-  kind: "info" | "warn" | "muted";
-  title: string;
-  children: React.ReactNode;
-}) {
-  const bg =
-    kind === "warn"
-      ? "var(--amber-soft)"
-      : kind === "muted"
-        ? "var(--surface)"
-        : "var(--bg-2)";
-  const border =
-    kind === "warn"
-      ? "rgba(250,173,20,.35)"
-      : kind === "muted"
-        ? "var(--line)"
-        : "var(--line)";
-  return (
-    <div
-      style={{
-        marginLeft: 34,
-        marginTop: 4,
-        padding: "10px 12px",
-        background: bg,
-        border: `1px solid ${border}`,
-        borderRadius: "var(--radius-sm)",
-      }}
-    >
-      <div
-        style={{
-          fontSize: 10.5,
-          fontWeight: 600,
-          color: "var(--ink-3)",
-          textTransform: "uppercase",
-          letterSpacing: ".06em",
-          marginBottom: 4,
-        }}
-      >
-        {title}
-      </div>
-      <div
-        style={{
-          fontSize: 12,
-          color: "var(--ink-2)",
-          lineHeight: 1.55,
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
+/* TimelineRow / DetailBox 는 ./TimelineRow.tsx · ./DetailBox.tsx 로 추출됨
+ * (2026-04-27 Phase 1 — PipelineTimeline 공용). */
