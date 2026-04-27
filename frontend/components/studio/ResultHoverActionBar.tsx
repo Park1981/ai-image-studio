@@ -14,6 +14,12 @@
  *  - Tab 으로 결과 뷰어 진입 시 ActionBarButton 들이 화면에 나타나며 사용 가능.
  *  - pointerEvents: none 은 mouse 만 차단 + tab focus 는 영향 없음 (브라우저 표준).
  *
+ * 2026-04-27 (UX 폴리시 · 통통 튀는 액션 바):
+ *  - 바닥 그라디언트 → 글래스 pill 형태 (살짝 떠서 부유감)
+ *  - 등장 spring easing (back-out cubic-bezier 0.34 / 1.56 / 0.64 / 1) — 통통
+ *  - hover 시 살짝 작아진 상태(0.92)에서 normal scale + translateY 14 → 0
+ *  - summary 기본 비표시 (요약은 ImageLightbox 메타 패널 / InfoModal 에서 보면 됨)
+ *
  * 사용처: /generate, /edit, /video 결과 뷰어 공용.
  * 액션바 버튼은 ActionBarButton 서브컴포넌트 권장 (스타일 통일).
  */
@@ -26,7 +32,7 @@ import Icon, { type IconName } from "@/components/ui/Icon";
 interface Props {
   /** 부모 컨테이너의 호버 상태. 부모가 onMouseEnter/Leave 로 관리. */
   hovered: boolean;
-  /** 좌측 요약 영역 (예: 프롬프트 한 줄 ellipsis + 사이즈). 없으면 버튼만 우측 정렬. */
+  /** 좌측 요약 영역 (선택). 기본 비표시 — 호출처가 명시적으로 넘길 때만. */
   summary?: ReactNode;
   /** 우측 버튼 slot. ActionBarButton 권장. */
   children: ReactNode;
@@ -51,23 +57,25 @@ export default function ResultHoverActionBar({ hovered, summary, children }: Pro
       onBlurCapture={handleBlurCapture}
       style={{
         position: "absolute",
-        left: 0,
-        right: 0,
-        bottom: 0,
-        padding: "12px 14px",
-        // 하단 그라디언트 + backdrop-blur 로 글래스 느낌
-        background:
-          "linear-gradient(to top, rgba(0,0,0,.68) 0%, rgba(0,0,0,.38) 55%, rgba(0,0,0,0) 100%)",
-        opacity: visible ? 1 : 0,
-        transform: visible ? "translateY(0)" : "translateY(8px)",
-        // pointer-events 차단 → 숨겨진 상태에서 이미지 클릭/드래그 방해 X
-        // (focus 시 visible=true → auto 로 전환 → 키보드 사용자도 정상 클릭)
-        pointerEvents: visible ? "auto" : "none",
-        transition: "opacity .16s ease-out, transform .16s ease-out",
+        // 살짝 띄움 — 바닥에서 12px / 좌우 16px 안쪽 여백 → 부유감
+        left: 16,
+        right: 16,
+        bottom: 14,
         display: "flex",
         alignItems: "center",
-        justifyContent: summary ? "space-between" : "flex-end",
+        justifyContent: summary ? "space-between" : "center",
         gap: 12,
+        opacity: visible ? 1 : 0,
+        // 통통 튀는 spring (back-out): 약간 작아진 상태(0.92)에서 normal scale 로 + 아래에서 위로
+        transform: visible
+          ? "translateY(0) scale(1)"
+          : "translateY(14px) scale(0.92)",
+        // pointer-events 차단 → 숨겨진 상태에서 이미지 클릭/드래그 방해 X
+        pointerEvents: visible ? "auto" : "none",
+        // 등장: 240ms 백아웃 (overshoot 살짝) · 사라짐: 160ms ease-out
+        transition: visible
+          ? "opacity .22s ease-out, transform .26s cubic-bezier(0.34, 1.56, 0.64, 1)"
+          : "opacity .14s ease-out, transform .18s ease-out",
         color: "#fff",
       }}
     >
@@ -80,18 +88,43 @@ export default function ResultHoverActionBar({ hovered, summary, children }: Pro
             lineHeight: 1.4,
             color: "rgba(255,255,255,.92)",
             overflow: "hidden",
+            // 요약도 글래스 pill 안으로 들어갈 수 있게 padding
+            padding: "8px 12px",
+            background: "rgba(20,22,28,.62)",
+            backdropFilter: "blur(10px)",
+            WebkitBackdropFilter: "blur(10px)",
+            borderRadius: "var(--radius-full)",
+            border: "1px solid rgba(255,255,255,.14)",
           }}
         >
           {summary}
         </div>
       )}
-      <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>{children}</div>
+      {/* 버튼 그룹 = 글래스 pill — 부유감 강조 */}
+      <div
+        style={{
+          display: "flex",
+          gap: 4,
+          flexShrink: 0,
+          padding: 4,
+          background: "rgba(20,22,28,.62)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          borderRadius: "var(--radius-full)",
+          border: "1px solid rgba(255,255,255,.14)",
+          boxShadow:
+            "0 8px 24px rgba(0,0,0,.32), 0 2px 6px rgba(0,0,0,.18)",
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
 
 /* ─────────────────────────────────
    액션바 전용 아이콘 버튼 — 스타일 통일용
+   2026-04-27: pill 그룹 안에 들어가 있으므로 자체 배경 옅게 + outline 제거
    ───────────────────────────────── */
 
 export function ActionBarButton({
@@ -115,15 +148,15 @@ export function ActionBarButton({
   const [focusVisible, setFocusVisible] = useState(false);
   const palette = {
     neutral: {
-      bg: "rgba(255,255,255,.14)",
-      bgHov: "rgba(255,255,255,.24)",
+      bg: "transparent",
+      bgHov: "rgba(255,255,255,.16)",
     },
     primary: {
-      bg: "rgba(74,158,255,.85)",
+      bg: "rgba(74,158,255,.78)",
       bgHov: "rgba(74,158,255,1)",
     },
     danger: {
-      bg: "rgba(255,255,255,.14)",
+      bg: "transparent",
       bgHov: "rgba(192,57,43,.92)",
     },
   }[variant];
@@ -153,23 +186,20 @@ export function ActionBarButton({
         display: "inline-flex",
         alignItems: "center",
         gap: label ? 5 : 0,
-        padding: label ? "6px 10px" : "7px 9px",
+        padding: label ? "6px 12px" : "8px 9px",
         borderRadius: "var(--radius-full)",
         fontSize: 11.5,
         fontWeight: 600,
         letterSpacing: ".01em",
         color: "#fff",
         background: disabled ? "rgba(255,255,255,.06)" : active ? palette.bgHov : palette.bg,
-        backdropFilter: "blur(6px)",
-        WebkitBackdropFilter: "blur(6px)",
         // focus-visible 시 강조 outline (호버는 outline 없음 — 마우스 트래킹 방해 방지).
-        border: focusVisible
-          ? "1px solid rgba(255,255,255,.95)"
-          : "1px solid rgba(255,255,255,.18)",
         outline: focusVisible ? "2px solid rgba(74,158,255,.85)" : "none",
         outlineOffset: focusVisible ? 2 : 0,
-        transition: "background .15s, transform .12s, outline-color .15s",
-        transform: active ? "scale(1.04)" : "scale(1)",
+        transition:
+          "background .18s ease, transform .22s cubic-bezier(0.34, 1.56, 0.64, 1)",
+        // 버튼 자체도 살짝 통통 — hover 시 1.06x
+        transform: active ? "scale(1.08)" : "scale(1)",
         opacity: disabled ? 0.45 : 1,
       }}
     >

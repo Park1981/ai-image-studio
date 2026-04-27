@@ -2,6 +2,9 @@
  * GenerateResultViewer — Generate 페이지 결과 이미지 뷰어 + 호버 액션바.
  *
  * 2026-04-26 (task #5): generate/page.tsx 에서 별도 파일로 분리.
+ * 2026-04-27 (UX 폴리시):
+ *  - summary 제거 (프롬프트 요약 안 보임 — 버튼 그룹만 통통 튀듯 등장)
+ *  - 복사 버튼 → 프롬프트 복사 (이미지 복사 → 텍스트 클립보드)
  */
 
 "use client";
@@ -18,7 +21,8 @@ interface Props {
   onLeave: () => void;
   onExpand: () => void;
   onDownload: () => void;
-  onCopy: () => void;
+  /** 프롬프트 텍스트 클립보드 복사 (2026-04-27 변경 — 옛 이미지 복사 X) */
+  onCopyPrompt: () => void;
   onSendToEdit: () => void;
   onReuse: () => void;
 }
@@ -30,7 +34,7 @@ export default function GenerateResultViewer({
   onLeave,
   onExpand,
   onDownload,
-  onCopy,
+  onCopyPrompt,
   onSendToEdit,
   onReuse,
 }: Props) {
@@ -39,36 +43,6 @@ export default function GenerateResultViewer({
     item.width > 0 && item.height > 0
       ? `${item.width} / ${item.height}`
       : "1 / 1";
-
-  // 액션바 좌측 요약 — 프롬프트 한 줄 + 사이즈
-  const summary = (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <span
-        style={{
-          flex: 1,
-          minWidth: 0,
-          whiteSpace: "nowrap",
-          overflow: "hidden",
-          textOverflow: "ellipsis",
-          fontSize: 12,
-        }}
-        title={item.prompt}
-      >
-        {item.prompt}
-      </span>
-      <span
-        className="mono"
-        style={{
-          fontSize: 10.5,
-          color: "rgba(255,255,255,.72)",
-          letterSpacing: ".04em",
-          flexShrink: 0,
-        }}
-      >
-        {item.width}×{item.height}
-      </span>
-    </div>
-  );
 
   return (
     <div
@@ -108,9 +82,9 @@ export default function GenerateResultViewer({
         }}
       />
 
-      {/* 하단 호버 액션바 */}
+      {/* 하단 호버 액션바 — summary 없음 (버튼만) */}
       <div onClick={(e) => e.stopPropagation()}>
-        <ResultHoverActionBar hovered={hovered} summary={summary}>
+        <ResultHoverActionBar hovered={hovered}>
           <ActionBarButton
             icon="zoom-in"
             title="크게 보기"
@@ -123,8 +97,8 @@ export default function GenerateResultViewer({
           />
           <ActionBarButton
             icon="copy"
-            title="클립보드 복사"
-            onClick={onCopy}
+            title="프롬프트 복사"
+            onClick={onCopyPrompt}
           />
           <ActionBarButton
             icon="edit"

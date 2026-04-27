@@ -22,7 +22,7 @@ import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
 import {
   downloadImage,
-  copyImageToClipboard,
+  copyText,
   filenameFromRef,
   urlToDataUrl,
 } from "@/lib/image-actions";
@@ -61,6 +61,25 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
   const cycleGrid = () =>
     setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
+  /** 결과/히스토리 공용 — 이 이미지를 /edit 의 원본으로 보내고 라우팅. */
+  const sendToEdit = async (it: { id: string; imageRef: string; label: string }) => {
+    toast.info("수정으로 전송 중…");
+    const res = await urlToDataUrl(it.imageRef);
+    if (!res) {
+      toast.error("전송 실패", "이미지를 불러올 수 없음");
+      return;
+    }
+    useEditStore
+      .getState()
+      .setSource(
+        res.dataUrl,
+        `${it.label} · ${res.width}×${res.height}`,
+        res.width,
+        res.height,
+      );
+    router.push("/edit");
+  };
+
   return (
     <StudioRightPanel>
       <StudioResultHeader
@@ -86,24 +105,10 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
               ),
             )
           }
-          onCopy={() => copyImageToClipboard(selectedItem.imageRef)}
-          onSendToEdit={async () => {
-            toast.info("수정으로 전송 중…");
-            const res = await urlToDataUrl(selectedItem.imageRef);
-            if (!res) {
-              toast.error("전송 실패", "이미지를 불러올 수 없음");
-              return;
-            }
-            useEditStore
-              .getState()
-              .setSource(
-                res.dataUrl,
-                `${selectedItem.label} · ${res.width}×${res.height}`,
-                res.width,
-                res.height,
-              );
-            router.push("/edit");
-          }}
+          onCopyPrompt={() =>
+            copyText(selectedItem.prompt || "", "프롬프트")
+          }
+          onSendToEdit={() => sendToEdit(selectedItem)}
           onReuse={() => {
             // 재생성 = 프롬프트 + 사이즈 + Lightning 복원.
             // Seed/Step/CFG 는 UI 제거 + 매번 랜덤 정책이라 복원 안 함.
@@ -143,6 +148,7 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
         selectedId={selectedId ?? null}
         onTileClick={(it) => selectItem(it.id)}
         onTileExpand={(it) => onLightboxOpen(it.imageRef)}
+        onSendToEdit={(it) => sendToEdit(it)}
         emptyMessage={null}
       />
     </StudioRightPanel>

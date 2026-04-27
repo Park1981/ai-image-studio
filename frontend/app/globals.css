@@ -298,7 +298,7 @@ button {
   background: var(--bg-2);
 }
 
-/* Primary CTA 버튼 — sticky 하단 + progress bar overlay */
+/* Primary CTA 버튼 — sticky 하단 + progress bar overlay (edit/video 공용) */
 .ais-cta-sticky {
   position: sticky;
   bottom: 12px;
@@ -306,6 +306,19 @@ button {
   padding-top: 10px;
   z-index: 4;
   background: linear-gradient(to bottom, transparent, var(--bg) 45%);
+}
+
+/* Primary CTA — sticky 상단 (generate 전용 · 2026-04-27 오빠 피드백).
+ *  - top: 64px = AppHeader(52px) + 12px gap.
+ *  - StudioModeHeader 직후에 배치 → 폼 길어지면 sticky 로 따라옴.
+ *  - 그라디언트는 카드 아래쪽이 fade out → 그 아래 콘텐츠가 자연스럽게 카드 뒤로 스크롤.
+ */
+.ais-cta-sticky-top {
+  position: sticky;
+  top: 64px;
+  padding-bottom: 12px;
+  z-index: 4;
+  background: linear-gradient(to top, transparent, var(--bg) 35%);
 }
 .ais-cta-primary {
   all: unset;

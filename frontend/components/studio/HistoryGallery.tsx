@@ -34,6 +34,8 @@ interface Props {
   onTileExpand: (it: HistoryItem) => void;
   /** 있을 때만 hover 바에 [원본으로] 버튼 노출 (주로 edit/video) */
   onUseAsSource?: (it: HistoryItem) => void;
+  /** 있을 때만 hover 바에 [수정으로 이동] 버튼 노출 (주로 generate). */
+  onSendToEdit?: (it: HistoryItem) => void;
   /** 삭제 성공 후 부모 쪽 후처리 (예: afterId null 로) */
   onAfterDelete?: (it: HistoryItem) => void;
 
@@ -48,6 +50,7 @@ export default function HistoryGallery({
   onTileClick,
   onTileExpand,
   onUseAsSource,
+  onSendToEdit,
   onAfterDelete,
   emptyMessage = "아직 기록이 없습니다.",
 }: Props) {
@@ -123,6 +126,7 @@ export default function HistoryGallery({
                 onTileClick={onTileClick}
                 onTileExpand={onTileExpand}
                 onUseAsSource={onUseAsSource}
+                onSendToEdit={onSendToEdit}
                 onAfterDelete={onAfterDelete}
               />
             )}
@@ -149,6 +153,7 @@ function MasonryRow({
   onTileClick,
   onTileExpand,
   onUseAsSource,
+  onSendToEdit,
   onAfterDelete,
 }: {
   items: HistoryItem[];
@@ -157,6 +162,7 @@ function MasonryRow({
   onTileClick: (it: HistoryItem) => void;
   onTileExpand: (it: HistoryItem) => void;
   onUseAsSource?: (it: HistoryItem) => void;
+  onSendToEdit?: (it: HistoryItem) => void;
   onAfterDelete?: (it: HistoryItem) => void;
 }) {
   // 컬럼 분배 — height-aware greedy: 가장 짧은 컬럼에 다음 item 추가
@@ -215,6 +221,9 @@ function MasonryRow({
                 onExpand={() => onTileExpand(it)}
                 onUseAsSource={
                   onUseAsSource ? () => onUseAsSource(it) : undefined
+                }
+                onSendToEdit={
+                  onSendToEdit ? () => onSendToEdit(it) : undefined
                 }
                 onAfterDelete={
                   onAfterDelete ? () => onAfterDelete(it) : undefined

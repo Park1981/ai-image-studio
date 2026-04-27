@@ -12,6 +12,9 @@
  *
  * 2026-04-26 (task #5): generate/page.tsx 1,800+ 줄 분해 step 2.
  *  Store 직접 구독 (useGenerateInputs/useGenerateRunning) → page.tsx 의 prop drilling 차단.
+ *
+ * 2026-04-27 (UX 폴리시): Primary CTA 가 패널 하단 → 상단으로 이동 (오빠 피드백).
+ *  StudioModeHeader 직후 배치, sticky top:64px → 폼 길어져도 항상 시야 안.
  */
 
 "use client";
@@ -72,6 +75,41 @@ export default function GenerateLeftPanel({
         title="Image Generate"
         description="프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다."
       />
+
+      {/* Primary CTA — sticky 상단 (폼 길어지면 따라옴 · generate 전용 클래스) */}
+      <div className="ais-cta-sticky-top">
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={generating || !prompt.trim()}
+          className="ais-cta-primary"
+        >
+          {generating ? (
+            <>
+              <div
+                className="ais-cta-progress"
+                style={{ width: `${progress}%` }}
+              />
+              <span className="ais-cta-content">
+                <Spinner />
+                {stage} · {Math.round(progress)}%
+              </span>
+            </>
+          ) : (
+            <>
+              <Icon name="sparkle" size={15} />
+              생성
+              <span className="mono ais-cta-shortcut">⇧↵</span>
+            </>
+          )}
+        </button>
+
+        <div className="ais-cta-eta">
+          평균 소요{" "}
+          <span className="mono">~{research ? "42" : "28"}s</span> · 로컬
+          처리 · 데이터 전송 없음
+        </div>
+      </div>
 
       {/* ── 프롬프트 카드 ── */}
       <div>
@@ -164,41 +202,6 @@ export default function GenerateLeftPanel({
         onHeight={setHeight}
         onAspectLocked={setAspectLocked}
       />
-
-      {/* Primary CTA — sticky 하단 */}
-      <div className="ais-cta-sticky">
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={generating || !prompt.trim()}
-          className="ais-cta-primary"
-        >
-          {generating ? (
-            <>
-              <div
-                className="ais-cta-progress"
-                style={{ width: `${progress}%` }}
-              />
-              <span className="ais-cta-content">
-                <Spinner />
-                {stage} · {Math.round(progress)}%
-              </span>
-            </>
-          ) : (
-            <>
-              <Icon name="sparkle" size={15} />
-              생성
-              <span className="mono ais-cta-shortcut">⇧↵</span>
-            </>
-          )}
-        </button>
-
-        <div className="ais-cta-eta">
-          평균 소요{" "}
-          <span className="mono">~{research ? "42" : "28"}s</span> · 로컬
-          처리 · 데이터 전송 없음
-        </div>
-      </div>
     </StudioLeftPanel>
   );
 }

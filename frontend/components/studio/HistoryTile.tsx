@@ -36,6 +36,11 @@ interface Props {
    * 수정 모드 히스토리에서 연속 수정 플로우용.
    */
   onUseAsSource?: () => void;
+  /**
+   * "수정으로 이동" 콜백 — 있을 때만 hover 바 가운데 버튼 노출.
+   * 주로 generate 히스토리에서 결과 이미지를 /edit 의 원본으로 보내는 용도.
+   */
+  onSendToEdit?: () => void;
   aspect?: string;
   style?: CSSProperties;
 }
@@ -105,6 +110,7 @@ export default function HistoryTile({
   onExpand,
   onDoubleClick,
   onUseAsSource,
+  onSendToEdit,
   aspect = "1/1",
   style,
 }: Props) {
@@ -202,6 +208,17 @@ export default function HistoryTile({
                 onClick={(e) => {
                   e.stopPropagation();
                   onUseAsSource();
+                }}
+              />
+            )}
+            {onSendToEdit && (
+              <BarButton
+                icon="edit"
+                title="수정으로 이동"
+                variant="primary"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSendToEdit();
                 }}
               />
             )}
