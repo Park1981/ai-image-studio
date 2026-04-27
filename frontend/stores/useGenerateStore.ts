@@ -34,6 +34,10 @@ export interface StageEvent {
   progress: number;
   /** 도착 시점 (ms since epoch) */
   arrivedAt: number;
+  /** 백엔드가 보낸 추가 payload (description / finalPrompt / editVisionAnalysis 등 stage 별 detail).
+   *  PipelineTimeline 의 StageDef.renderDetail 콜백이 사용. 옵셔널 — 없으면 detail 박스 안 그림.
+   *  2026-04-27 (Phase 1): StageDef 시스템 도입 — Generate 는 현재 payload 안 보내지만 Edit/Video Phase 2/3 에서 활용. */
+  payload?: Record<string, unknown>;
 }
 
 /** 프리셋 중 어느 것과도 안 맞는 사용자 지정 사이즈 */

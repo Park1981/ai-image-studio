@@ -104,17 +104,9 @@ async function* realVideoStream(
       };
       return;
     }
-    if (evt.event === "step") {
-      const payload = evt.data as {
-        step: 1 | 2 | 3 | 4 | 5;
-        done: boolean;
-        description?: string;
-        finalPrompt?: string;
-        finalPromptKo?: string | null;
-        provider?: string;
-      };
-      yield { type: "step", ...payload };
-    }
+    // Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+    //   백엔드가 더 이상 "step" event 보내지 않음 (transitional 종료).
+    //   detail 정보는 모두 "stage" event 의 payload extra 필드로 도착.
     if (evt.event === "stage") {
       const payload = evt.data as {
         type: string;
@@ -122,7 +114,23 @@ async function* realVideoStream(
         stageLabel: string;
         samplingStep?: number | null;
         samplingTotal?: number | null;
-      };
+      } & Record<string, unknown>;
+      // Phase 3 (2026-04-27 진행 모달 store 통일):
+      //   백엔드 stage emit payload 의 모든 필드 (description / finalPrompt /
+      //   finalPromptKo / provider 등) 를 그대로 통과.
+      //   PipelineTimeline.StageDef.renderDetail 이 stageHistory[].payload 에서 사용.
+      const {
+        type: rawType,
+        progress: _p,
+        stageLabel: _sl,
+        samplingStep: _ss,
+        samplingTotal: _st,
+        ...extra
+      } = payload;
+      void _p;
+      void _sl;
+      void _ss;
+      void _st;
       yield {
         type: "stage",
         stageType: payload.type,
@@ -130,8 +138,9 @@ async function* realVideoStream(
         stageLabel: payload.stageLabel,
         samplingStep: payload.samplingStep ?? undefined,
         samplingTotal: payload.samplingTotal ?? undefined,
+        ...extra,
       };
-      if (payload.type === "comfyui-sampling") {
+      if (rawType === "comfyui-sampling") {
         yield {
           type: "sampling",
           progress: payload.progress ?? 0,
@@ -146,25 +155,38 @@ async function* realVideoStream(
 async function* mockVideoStream(
   req: VideoRequest,
 ): AsyncGenerator<VideoStage, void, unknown> {
-  // 5-step 시뮬레이션 (실 Ollama/ComfyUI 호출 없음)
-  const steps: (1 | 2 | 3 | 4 | 5)[] = [1, 2, 3, 4, 5];
-  for (const step of steps) {
-    yield { type: "step", step, done: false };
-    await sleep(400 + Math.random() * 500);
-    const doneExtras: Partial<VideoStage & { type: "step" }> = {};
-    if (step === 1) {
-      doneExtras.description =
-        "A person stands in warm window light with shallow depth of field.";
-    } else if (step === 2) {
-      doneExtras.finalPrompt =
-        "A cinematic slow dolly in on a subject standing in soft warm window light, shallow depth of field, gentle ambient room noise, film grain, filmic tones, contemplative mood.";
-      doneExtras.finalPromptKo =
-        "부드러운 창가 빛 속에 선 피사체에 느린 달리 인, 얕은 심도, 잔잔한 실내 앰비언스, 필름 그레인, 시네마틱 톤, 사색적인 분위기.";
-      doneExtras.provider = "mock";
-    }
-    yield { type: "step", step, done: true, ...doneExtras };
+  // Phase 4 (2026-04-27): mock 도 stage emit 으로 변환 — 진행 모달 정상 표시.
+  // 백엔드 5-stage (vision-analyze / prompt-merge / workflow-dispatch /
+  // comfyui-sampling / save-output) 와 동일 패턴 + detail payload 흡수.
+  const desc = "A person stands in warm window light with shallow depth of field.";
+  const fp =
+    "A cinematic slow dolly in on a subject standing in soft warm window light, shallow depth of field, gentle ambient room noise, film grain, filmic tones, contemplative mood.";
+  const fpKo =
+    "부드러운 창가 빛 속에 선 피사체에 느린 달리 인, 얕은 심도, 잔잔한 실내 앰비언스, 필름 그레인, 시네마틱 톤, 사색적인 분위기.";
+  const stages: {
+    stageType: string;
+    progress: number;
+    stageLabel: string;
+    extra?: Record<string, unknown>;
+  }[] = [
+    { stageType: "vision-analyze", progress: 5, stageLabel: "비전 분석" },
+    { stageType: "vision-analyze", progress: 20, stageLabel: "비전 분석 완료", extra: { description: desc } },
+    { stageType: "prompt-merge", progress: 25, stageLabel: "프롬프트 병합" },
+    {
+      stageType: "prompt-merge",
+      progress: 30,
+      stageLabel: "프롬프트 병합 완료",
+      extra: { finalPrompt: fp, finalPromptKo: fpKo, provider: "mock" },
+    },
+    { stageType: "workflow-dispatch", progress: 33, stageLabel: "워크플로우 전달" },
+    { stageType: "comfyui-sampling", progress: 35, stageLabel: "ComfyUI 샘플링 대기" },
+    { stageType: "comfyui-sampling", progress: 92, stageLabel: "ComfyUI 샘플링" },
+    { stageType: "save-output", progress: 95, stageLabel: "영상 저장" },
+  ];
+  for (const s of stages) {
+    yield { type: "stage", stageType: s.stageType, progress: s.progress, stageLabel: s.stageLabel, ...(s.extra ?? {}) };
+    await sleep(250 + Math.random() * 150);
   }
-  await sleep(300);
 
   const item: HistoryItem = {
     id: uid("vid"),

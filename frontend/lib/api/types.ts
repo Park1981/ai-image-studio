@@ -343,21 +343,10 @@ export type GenStage =
   | { type: "done"; item: HistoryItem; savedToHistory: boolean };
 
 export type EditStage =
-  | {
-      type: "step";
-      step: 1 | 2 | 3 | 4;
-      done: boolean;
-      /** step 1 done 에서 도착하는 비전 설명 */
-      description?: string;
-      /** step 1 done 에서 도착하는 구조 분석 (Phase 1 · 2026-04-25 · 휘발) */
-      editVisionAnalysis?: EditVisionAnalysis;
-      /** step 2 done 에서 도착하는 최종 프롬프트 (영문) */
-      finalPrompt?: string;
-      /** step 2 done 에서 도착하는 한국어 번역 (v2 · 2026-04-23) */
-      finalPromptKo?: string | null;
-      /** step 2 provider (ollama/fallback) */
-      provider?: string;
-    }
+  // Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+  //   "step" variant 제거 — 백엔드가 더 이상 step emit 안 함.
+  //   detail (description / finalPrompt / editVisionAnalysis) 은 stage event 의
+  //   payload extra 필드로 들어옴 (& Record<string, unknown>).
   | {
       /** ComfyUI 샘플링 중 진행률/스텝 업데이트 (step 4 내부) */
       type: "sampling";
@@ -368,15 +357,20 @@ export type EditStage =
   /**
    * 백엔드가 emit 하는 전체 파이프라인 진행률 (0~100) + 단계 라벨.
    * Generate 의 GenStage 와 동일한 의미로 통일 — ProgressModal 의 상단 진행바는 이 값만 사용.
+   *
+   * 2026-04-27 (Phase 2 진행 모달 store 통일):
+   *   백엔드 stage emit payload 의 임의 detail 필드 (description / finalPrompt /
+   *   finalPromptKo / provider / editVisionAnalysis 등) 을 그대로 통과시킴.
+   *   PipelineTimeline 의 StageDef.renderDetail 이 stageHistory[].payload 에서 사용.
    */
-  | {
+  | ({
       type: "stage";
       stageType: string;
       progress: number;
       stageLabel: string;
       samplingStep?: number;
       samplingTotal?: number;
-    }
+    } & Record<string, unknown>)
   | { type: "done"; item: HistoryItem; savedToHistory: boolean };
 
 export interface OllamaModel {
@@ -481,19 +475,9 @@ export interface VideoRequest {
 }
 
 export type VideoStage =
-  | {
-      type: "step";
-      step: 1 | 2 | 3 | 4 | 5;
-      done: boolean;
-      /** step 1 done 의 비전 설명 */
-      description?: string;
-      /** step 2 done 의 최종 LTX 프롬프트 (영문) */
-      finalPrompt?: string;
-      /** step 2 done 의 한글 번역 */
-      finalPromptKo?: string | null;
-      /** step 2 provider (ollama/fallback) */
-      provider?: string;
-    }
+  // Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+  //   "step" variant 제거 — 백엔드가 더 이상 step emit 안 함.
+  //   detail (description / finalPrompt 등) 은 stage event 의 payload extra 필드.
   | {
       /** ComfyUI 샘플링 상세 (step 4 내부) */
       type: "sampling";
@@ -501,15 +485,22 @@ export type VideoStage =
       samplingStep?: number | null;
       samplingTotal?: number | null;
     }
-  | {
-      /** 백엔드 파이프라인 진행률 (0~100) + 단계 라벨 */
+  /**
+   * 백엔드 파이프라인 진행률 (0~100) + 단계 라벨.
+   *
+   * 2026-04-27 (Phase 3 진행 모달 store 통일):
+   *   백엔드 stage emit payload 의 임의 detail 필드 (description / finalPrompt /
+   *   finalPromptKo / provider 등) 를 그대로 통과시킴. PipelineTimeline 의
+   *   StageDef.renderDetail 이 stageHistory[].payload 에서 사용.
+   */
+  | ({
       type: "stage";
       stageType: string;
       progress: number;
       stageLabel: string;
       samplingStep?: number;
       samplingTotal?: number;
-    }
+    } & Record<string, unknown>)
   | { type: "done"; item: HistoryItem; savedToHistory: boolean };
 
 /* ──────────── Vision Analyzer ──────────── */

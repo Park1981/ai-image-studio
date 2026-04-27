@@ -76,12 +76,17 @@ async def _run_video_pipeline_task(
       step 5 save-output       92  → 98
     """
     try:
+        # Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+        #   step emit 완전 제거 (Phase 3 transitional 종료).
+        #   stage 완료 emit payload 안에 detail (description / finalPrompt /
+        #   finalPromptKo / provider) 흡수. 진입 emit + 완료 emit 둘 다 유지
+        #   (PipelineTimeline 의 running row 표시 용). 완료 emit 에만 payload 풍부.
+
         # ── Step 1: vision ── (0 → 20)
         await task.emit(
             "stage",
             {"type": "vision-analyze", "progress": 5, "stageLabel": "비전 분석"},
         )
-        await task.emit("step", {"step": 1, "done": False})
 
         async with gpu_slot("video-vision"):
             video_res = await run_video_pipeline(
@@ -92,17 +97,15 @@ async def _run_video_pipeline_task(
                 adult=adult,
             )
 
-        await task.emit(
-            "step",
-            {
-                "step": 1,
-                "done": True,
-                "description": video_res.image_description,
-            },
-        )
+        # stage 완료 payload 에 description 흡수.
         await task.emit(
             "stage",
-            {"type": "vision-analyze", "progress": 20, "stageLabel": "비전 분석 완료"},
+            {
+                "type": "vision-analyze",
+                "progress": 20,
+                "stageLabel": "비전 분석 완료",
+                "description": video_res.image_description,
+            },
         )
 
         # ── Step 2: prompt-merge ── (20 → 30)
@@ -110,20 +113,17 @@ async def _run_video_pipeline_task(
             "stage",
             {"type": "prompt-merge", "progress": 25, "stageLabel": "프롬프트 병합"},
         )
-        await task.emit("step", {"step": 2, "done": False})
+        # prompt-merge 완료 stage 에 finalPrompt/finalPromptKo/provider 흡수.
         await task.emit(
-            "step",
+            "stage",
             {
-                "step": 2,
-                "done": True,
+                "type": "prompt-merge",
+                "progress": 30,
+                "stageLabel": "프롬프트 병합 완료",
                 "finalPrompt": video_res.final_prompt,
                 "finalPromptKo": video_res.upgrade.translation,
                 "provider": video_res.upgrade.provider,
             },
-        )
-        await task.emit(
-            "stage",
-            {"type": "prompt-merge", "progress": 30, "stageLabel": "프롬프트 병합 완료"},
         )
 
         # ── Step 3: workflow-dispatch ── (30 → 35)
@@ -135,7 +135,6 @@ async def _run_video_pipeline_task(
                 "stageLabel": "워크플로우 전달",
             },
         )
-        await task.emit("step", {"step": 3, "done": False})
 
         actual_seed = int(time.time() * 1000) & 0xFFFFFFFF  # uint32 범위
         # .env 의 LTX_UNET_NAME override (config.settings.ltx_unet_name)
@@ -156,8 +155,6 @@ async def _run_video_pipeline_task(
                 lightning=lightning,
             )
 
-        await task.emit("step", {"step": 3, "done": True})
-
         # ── Step 4: ComfyUI sampling ── (35 → 92)
         await task.emit(
             "stage",
@@ -167,7 +164,6 @@ async def _run_video_pipeline_task(
                 "stageLabel": "ComfyUI 샘플링 대기",
             },
         )
-        await task.emit("step", {"step": 4, "done": False})
 
         # Ollama unload + GPU gate 는 _dispatch_to_comfy 내부에서 공통 처리.
 
@@ -188,14 +184,11 @@ async def _run_video_pipeline_task(
         video_ref = dispatch.image_ref  # .mp4 URL
         comfy_err = dispatch.comfy_error
 
-        await task.emit("step", {"step": 4, "done": True})
-
         # ── Step 5: save-output ── (92 → 98)
         await task.emit(
             "stage",
             {"type": "save-output", "progress": 95, "stageLabel": "영상 저장"},
         )
-        await task.emit("step", {"step": 5, "done": True})
 
         # ── Done ──
         s = VIDEO_MODEL.sampling

@@ -15,7 +15,6 @@ import {
 import type {
   EditRequest,
   EditStage,
-  EditVisionAnalysis,
   HistoryItem,
 } from "./types";
 
@@ -117,19 +116,9 @@ async function* realEditStream(
       };
       return;
     }
-    if (evt.event === "step") {
-      const payload = evt.data as {
-        step: 1 | 2 | 3 | 4;
-        done: boolean;
-        description?: string;
-        /** Phase 1 (2026-04-25): step 1 done 에 구조 분석 JSON 포함 가능 (휘발) */
-        editVisionAnalysis?: EditVisionAnalysis;
-        finalPrompt?: string;
-        finalPromptKo?: string | null;
-        provider?: string;
-      };
-      yield { type: "step", ...payload };
-    }
+    // Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
+    //   백엔드가 더 이상 "step" event 보내지 않음 (transitional 종료).
+    //   detail 정보는 모두 "stage" event 의 payload extra 필드로 도착.
     if (evt.event === "stage") {
       const payload = evt.data as {
         type: string;
@@ -137,8 +126,24 @@ async function* realEditStream(
         stageLabel: string;
         samplingStep?: number | null;
         samplingTotal?: number | null;
-      };
-      // 전체 파이프라인 진행률 (ProgressModal 상단 바용)
+      } & Record<string, unknown>;
+      // Phase 2 (2026-04-27 진행 모달 store 통일):
+      //   백엔드 stage emit payload 의 모든 필드 (description / finalPrompt /
+      //   finalPromptKo / provider / editVisionAnalysis 등) 를 그대로 통과.
+      //   PipelineTimeline.StageDef.renderDetail 이 stageHistory[].payload 에서 사용.
+      const {
+        type: rawType,
+        progress: _p,
+        stageLabel: _sl,
+        samplingStep: _ss,
+        samplingTotal: _st,
+        ...extra
+      } = payload;
+      void _p;
+      void _sl;
+      void _ss;
+      void _st;
+      // 전체 파이프라인 진행률 (ProgressModal 상단 바용) + 임의 payload 흡수.
       yield {
         type: "stage",
         stageType: payload.type,
@@ -146,9 +151,10 @@ async function* realEditStream(
         stageLabel: payload.stageLabel,
         samplingStep: payload.samplingStep ?? undefined,
         samplingTotal: payload.samplingTotal ?? undefined,
+        ...extra,
       };
       // ComfyUI 샘플링일 때 추가로 샘플러 스텝 표시용 "sampling" 이벤트도 방출
-      if (payload.type === "comfyui-sampling") {
+      if (rawType === "comfyui-sampling") {
         yield {
           type: "sampling",
           progress: payload.progress ?? 0,
@@ -163,13 +169,24 @@ async function* realEditStream(
 async function* mockEditStream(
   req: EditRequest,
 ): AsyncGenerator<EditStage, void, unknown> {
-  const steps: (1 | 2 | 3 | 4)[] = [1, 2, 3, 4];
-  for (const step of steps) {
-    yield { type: "step", step, done: false };
-    await sleep(500 + Math.random() * 400);
-    yield { type: "step", step, done: true };
+  // Phase 4 (2026-04-27): mock 도 stage emit 으로 변환 — 진행 모달 정상 표시.
+  // 백엔드 4-stage (vision-analyze / prompt-merge / param-extract / comfyui-sampling)
+  // + save-output 패턴과 동일.
+  const stages: { stageType: string; progress: number; stageLabel: string }[] = [
+    { stageType: "vision-analyze", progress: 10, stageLabel: "비전 분석" },
+    { stageType: "vision-analyze", progress: 30, stageLabel: "비전 분석 완료" },
+    { stageType: "prompt-merge", progress: 40, stageLabel: "프롬프트 병합" },
+    { stageType: "prompt-merge", progress: 50, stageLabel: "프롬프트 병합 완료" },
+    { stageType: "param-extract", progress: 55, stageLabel: "파라미터 추출" },
+    { stageType: "param-extract", progress: 65, stageLabel: "파라미터 확정" },
+    { stageType: "comfyui-sampling", progress: 70, stageLabel: "ComfyUI 샘플링 대기" },
+    { stageType: "comfyui-sampling", progress: 95, stageLabel: "ComfyUI 샘플링" },
+    { stageType: "save-output", progress: 98, stageLabel: "결과 저장" },
+  ];
+  for (const s of stages) {
+    yield { type: "stage", ...s };
+    await sleep(250 + Math.random() * 150);
   }
-  await sleep(250);
 
   const item: HistoryItem = {
     id: uid("edit"),
