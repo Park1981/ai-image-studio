@@ -224,6 +224,46 @@ async def _save_comfy_output(
     return (f"{STUDIO_URL_PREFIX}/{url_rel}", width, height)
 
 
+async def _ensure_comfyui_ready(task: "Task", progress_at: int) -> None:
+    """ComfyUI 가 꺼져 있으면 깨우면서 진행 모달에 알린다 (Phase 5 자동 기동).
+
+    호출 흐름 (`_dispatch_to_comfy` 진입 직후):
+      1. `_proc_mgr` 가 None (테스트 환경) 이면 즉시 return — 호출자 무영향.
+      2. `check_comfyui` (HTTP 헬스체크) 가 True 면 이미 떠 있는 것 → return.
+      3. 꺼져 있으면 stage emit ("comfyui-warmup") + `start_comfyui` 호출.
+         프론트의 `PIPELINE_DEFS.<mode>.comfyui-warmup` row 가 `enabled` 콜백으로
+         이 stage 도착 시점부터 표시 (자동 기동 시에만 노출).
+      4. `start_comfyui` 가 False 반환하면 RuntimeError → 상위 `_dispatch_to_comfy`
+         의 except 블록이 mock_ref 폴백 또는 재-raise (기존 정책 유지).
+
+    Args:
+        task: stage emit 대상.
+        progress_at: warmup stage 의 progress 값. 보통 `progress_start - 2` 권장
+            (sampling stage 직전 살짝 앞 — 진행 바 역행 방지).
+    """
+    if _proc_mgr is None:
+        return  # 테스트 환경 — services.process_manager 미로드 시 폴백
+    try:
+        already_up = await _proc_mgr.check_comfyui()
+    except Exception as exc:  # pragma: no cover - 방어적
+        log.warning("ComfyUI 헬스체크 실패 (warmup skip): %s", exc)
+        return
+    if already_up:
+        return
+
+    await task.emit(
+        "stage",
+        {
+            "type": "comfyui-warmup",
+            "progress": progress_at,
+            "stageLabel": "ComfyUI 깨우는 중 (~30초)",
+        },
+    )
+    started = await _proc_mgr.start_comfyui()
+    if not started:
+        raise RuntimeError("ComfyUI 시작 실패")
+
+
 async def _dispatch_to_comfy(
     task: "Task",
     api_prompt_factory: Callable[[str | None], dict[str, Any]],
@@ -264,6 +304,10 @@ async def _dispatch_to_comfy(
     try:
         await acquire_gpu_slot(gpu_operation)
         gpu_acquired = True
+
+        # Phase 5: ComfyUI 자동 기동 — 꺼져 있으면 깨우면서 warmup stage emit.
+        # GPU slot 잡은 채로 호출 (다른 dispatch 와 직렬화 보장 · ComfyUI 시작 자체는 GPU 미사용).
+        await _ensure_comfyui_ready(task, progress_at=max(progress_start - 2, 0))
 
         # The unload must happen while holding the shared GPU slot; otherwise a
         # concurrent vision/upgrade call can load Ollama between unload and submit.

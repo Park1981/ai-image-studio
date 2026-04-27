@@ -148,6 +148,15 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **Phase 5 자동 기동 준비 완료**: PIPELINE_DEFS 의 `comfyui-warmup` stage 정의됨 (enabled: warmupArrived). Phase 5 에서 백엔드 `_dispatch.py::_ensure_comfyui_ready` 만 추가하면 자동 작동 (프론트 추가 코드 0).
 - 설계 문서: `docs/superpowers/specs/2026-04-27-progress-store-unify-design.md` (진실의 출처 — 다음 세션 인계용)
 
+**2026-04-27 Phase 5 — ComfyUI 자동 기동 (warmup stage)** — pytest 210→215 · tsc+lint clean.
+ComfyUI 가 idle shutdown / 사용자 수동 종료 등으로 꺼져 있는 상태에서 Generate/Edit/Video 호출 시,
+**파이프라인이 자동으로 ComfyUI 를 깨우면서 진행 모달에 "ComfyUI 깨우는 중 (~30초)" warmup row 노출**.
+- **신규 헬퍼 `_dispatch._ensure_comfyui_ready(task, progress_at)`**: `_proc_mgr` None (테스트 환경) 또는 헬스체크 True 면 즉시 return (무영향). 꺼져 있으면 stage emit (`type=comfyui-warmup`) + `start_comfyui()` 호출. 시작 실패 시 `RuntimeError("ComfyUI 시작 실패")` → 상위 `_dispatch_to_comfy` except 가 mock_ref 폴백 또는 재-raise (기존 정책 유지). 헬스체크 자체가 예외 던지면 graceful skip (warmup 이 dispatch 막으면 회귀 위험).
+- **호출 위치**: `_dispatch_to_comfy` 의 `acquire_gpu_slot` 직후 + `force_unload_all_loaded_models` 직전. GPU slot 잡은 채로 호출 (다른 dispatch 와 직렬화 보장 · ComfyUI 시작 자체는 GPU 미사용이라 영향 0).
+- **progress_at**: `max(progress_start - 2, 0)` — sampling stage 직전 살짝 앞 (진행 바 역행 방지). Generate/Edit/Video 모두 동일 패턴.
+- **프론트 추가 코드 0**: `PIPELINE_DEFS` 의 `comfyui-warmup` row 가 이미 정의돼 있음 (`enabled: (c) => c.warmupArrived === true`). `PipelineTimeline` 의 `usePipelineCtx` 가 `stageHistory` 에서 `type==="comfyui-warmup"` 도착 검사로 자동 표시 게이트.
+- **테스트 5 신규** (`test_dispatch_policy.py`): `_proc_mgr None` skip · 이미 떠 있을 때 skip · 꺼져 있으면 emit+start · start 실패 시 RuntimeError · 헬스체크 예외 graceful skip.
+
 **2026-04-26 router.py 풀 분해 + legacy quarantine** — pytest 201/201 · ruff F clean · main.py import OK.
 3 커밋 (`ba7e6e2 → df872e3 → 0c4b999`) 으로 `backend/studio/router.py` 1,769 → **118줄 (facade only · -93%)** 달성. 옛 라우터 + services + tests 15 파일 `backend/legacy/` 격리.
 - **Step 1 (`ba7e6e2`) — pipelines/ 추출**: `studio/pipelines/{_dispatch,generate,edit,video,__init__}.py` 신규 5 파일 (1,045줄). `_run_*_pipeline` + `_dispatch_to_comfy` + `ComfyDispatchResult` + `_save_comfy_output/_video` + `_cleanup_comfy_temp` + `_mark_generation_complete` + `COMFY_*` 상수 분리. **🔴 잠재 NameError fix 1건**: 옛 router.py 1213줄의 `getattr(settings, "ltx_unet_name", None)` 가 `settings` import 없이 참조됐었음 → pipelines/video.py 에 명시 import 추가 (Video 호출 시 NameError 터질 뻔).
