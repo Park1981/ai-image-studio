@@ -30,6 +30,10 @@ interface Props {
   onAspectLocked: (v: boolean) => void;
 }
 
+/** 카드 grid 에 노출할 비율 4종 (오빠 피드백 — 가장 흔한 비율 우선).
+ *  3:4 / 3:2 / 2:3 은 ASPECT_RATIOS 에 살아있어 직접 입력 / 비율잠금 OFF 로 접근 가능. */
+const ASPECT_CARD_OPTIONS: AspectRatioLabel[] = ["1:1", "16:9", "9:16", "4:3"];
+
 export default function SizeCard({
   aspect,
   sizeLabel,
@@ -163,39 +167,28 @@ export default function SizeCard({
           </div>
         </div>
 
-        {/* 프리셋 칩 — 원터치로 익숙한 비율 설정 */}
+        {/* 비율 카드 grid — 4개 (1:1, 16:9, 9:16, 4:3) · 미니 박스 시각화로 한눈에 비율 파악
+         *  2026-04-27 오빠 피드백: 칩 7개 → 카드 4개 + 그림. (3:4 / 3:2 / 2:3 은 비율잠금 OFF + 직접 입력) */}
         <div
           style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 4,
-            marginTop: 6,
+            display: "grid",
+            gridTemplateColumns: "repeat(4, 1fr)",
+            gap: 6,
+            marginTop: 8,
           }}
         >
-          {ASPECT_RATIOS.map((r) => {
-            const active = aspect === r.label;
+          {ASPECT_CARD_OPTIONS.map((label) => {
+            const ratio = ASPECT_RATIOS.find((r) => r.label === label)!;
+            const active = aspect === ratio.label;
             return (
-              <button
-                key={r.label}
-                type="button"
-                onClick={() => onAspect(r.label)}
-                style={{
-                  all: "unset",
-                  cursor: "pointer",
-                  fontSize: 10.5,
-                  fontWeight: 500,
-                  padding: "3px 8px",
-                  borderRadius: "var(--radius-full)",
-                  border: `1px solid ${
-                    active ? "var(--accent)" : "var(--line)"
-                  }`,
-                  background: active ? "var(--accent-soft)" : "transparent",
-                  color: active ? "var(--accent)" : "var(--ink-3)",
-                }}
-                title={`${r.width}×${r.height}`}
-              >
-                {r.label}
-              </button>
+              <AspectCard
+                key={ratio.label}
+                label={ratio.label}
+                width={ratio.width}
+                height={ratio.height}
+                active={active}
+                onClick={() => onAspect(ratio.label)}
+              />
             );
           })}
         </div>
@@ -267,5 +260,85 @@ function DimInput({
         title={disabled ? disabledTitle : undefined}
       />
     </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   AspectCard — 비율 시각화 카드 (그림 + 라벨)
+   2026-04-27 신설.
+   미니 박스: 가장 긴 변을 38px 로 정규화 → 비율 그대로 표현 (1:1=정사각, 16:9=가로 직사각, 9:16=세로 직사각, 4:3=살짝 가로).
+   ───────────────────────────────────────── */
+function AspectCard({
+  label,
+  width,
+  height,
+  active,
+  onClick,
+}: {
+  label: string;
+  width: number;
+  height: number;
+  active: boolean;
+  onClick: () => void;
+}) {
+  const [hov, setHov] = useState(false);
+  // 카드 안 미니 박스 — 가장 긴 변을 38px 로 정규화 후 비율 그대로 표현
+  const max = Math.max(width, height);
+  const boxW = (width / max) * 38;
+  const boxH = (height / max) * 38;
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      onMouseEnter={() => setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      title={`${width}×${height}`}
+      style={{
+        all: "unset",
+        cursor: "pointer",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        padding: "10px 4px 8px",
+        height: 70,
+        boxSizing: "border-box",
+        border: `1.5px solid ${
+          active ? "var(--accent)" : hov ? "var(--line-2)" : "var(--line)"
+        }`,
+        borderRadius: "var(--radius-md)",
+        background: active
+          ? "var(--accent-soft)"
+          : hov
+          ? "var(--bg-2)"
+          : "var(--surface)",
+        transition: "all .15s",
+      }}
+    >
+      <div
+        aria-hidden
+        style={{
+          width: boxW,
+          height: boxH,
+          border: `1.5px solid ${active ? "var(--accent)" : "var(--ink-3)"}`,
+          borderRadius: 2,
+          transition: "border-color .15s",
+        }}
+      />
+      <span
+        className="mono"
+        style={{
+          fontSize: 10.5,
+          fontWeight: 600,
+          letterSpacing: ".02em",
+          color: active ? "var(--accent)" : "var(--ink-2)",
+          transition: "color .15s",
+        }}
+      >
+        {label}
+      </span>
+    </button>
   );
 }

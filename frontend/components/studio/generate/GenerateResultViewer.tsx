@@ -59,11 +59,7 @@ export default function GenerateResultViewer({
         overflow: "hidden",
         border: "1px solid var(--line)",
         boxShadow: "var(--shadow-sm)",
-        cursor: "zoom-in",
-      }}
-      onClick={(e) => {
-        e.stopPropagation();
-        onExpand();
+        // 2026-04-27: 이미지 클릭 자세히 보기 제거 — 액션바 zoom-in 버튼이 동일 역할.
       }}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}

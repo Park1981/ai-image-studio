@@ -11,6 +11,10 @@
 "use client";
 
 import type { ReactNode } from "react";
+import {
+  SectionAccentBar,
+  type SectionAccent,
+} from "./StudioResultHeader";
 
 interface Props {
   title: string;
@@ -19,6 +23,8 @@ interface Props {
   countLabel?: string;
   /** 우측 액션 버튼 slot */
   actions?: ReactNode;
+  /** 좌측 accent bar 색 (기본 neutral · 보관 톤) */
+  accent?: SectionAccent;
 }
 
 export default function HistorySectionHeader({
@@ -26,6 +32,7 @@ export default function HistorySectionHeader({
   count,
   countLabel = "items",
   actions,
+  accent = "neutral",
 }: Props) {
   return (
     <div
@@ -42,10 +49,11 @@ export default function HistorySectionHeader({
         style={{
           display: "flex",
           alignItems: "baseline",
-          gap: 10,
+          gap: 8,
           marginTop: 10,
         }}
       >
+        <SectionAccentBar accent={accent} />
         <h3 style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
           {title}
         </h3>
@@ -55,6 +63,7 @@ export default function HistorySectionHeader({
             fontSize: 11,
             color: "var(--ink-4)",
             letterSpacing: ".04em",
+            marginLeft: 2,
           }}
         >
           {count} {countLabel}

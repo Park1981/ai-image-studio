@@ -22,6 +22,7 @@
 import type { RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import ResearchBanner from "@/components/studio/ResearchBanner";
+import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -114,7 +115,13 @@ export default function GenerateLeftPanel({
       {/* ── 프롬프트 카드 ── */}
       <div>
         <div className="ais-field-header">
-          <label className="ais-field-label">프롬프트</label>
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="blue" />
+            프롬프트
+          </label>
           <span className="mono ais-field-meta">
             {prompt.length} chars · KO
           </span>
