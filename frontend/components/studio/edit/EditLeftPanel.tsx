@@ -22,6 +22,7 @@ import type { RefObject } from "react";
 import { useState } from "react";
 import HistoryPicker from "@/components/studio/HistoryPicker";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import {
   StudioLeftPanel,
@@ -102,7 +103,13 @@ export default function EditLeftPanel({
       {/* ── 원본 이미지 ── */}
       <div>
         <div className="ais-field-header">
-          <label className="ais-field-label">원본 이미지</label>
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="blue" />
+            원본 이미지
+          </label>
           <button
             type="button"
             onClick={() => setHistoryPickerOpen((v) => !v)}
@@ -150,7 +157,13 @@ export default function EditLeftPanel({
       {/* ── 수정 지시 prompt ── */}
       <div>
         <div className="ais-field-header">
-          <label className="ais-field-label">수정 지시</label>
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="blue" />
+            수정 지시
+          </label>
           <span className="mono ais-field-meta">{prompt.length} chars</span>
         </div>
         <div className="ais-prompt-shell">

@@ -94,41 +94,9 @@ export default function EditResultViewer({
           setCompareX={setCompareX}
           aspectRatio={aspectRatio}
         />
-        {/* 호버 액션바 — 이벤트 버블 차단(드래그 핸들과 충돌 방지) */}
+        {/* 호버 액션바 — 이벤트 버블 차단(드래그 핸들과 충돌 방지) · 2026-04-27: summary 제거 (Generate 와 통일) */}
         <div onClick={(e) => e.stopPropagation()}>
-          <ResultHoverActionBar
-            hovered={hovered}
-            summary={
-              <div
-                style={{ display: "flex", alignItems: "center", gap: 10 }}
-              >
-                <span
-                  style={{
-                    flex: 1,
-                    minWidth: 0,
-                    whiteSpace: "nowrap",
-                    overflow: "hidden",
-                    textOverflow: "ellipsis",
-                    fontSize: 12,
-                  }}
-                  title={afterItem.prompt}
-                >
-                  {afterItem.prompt}
-                </span>
-                <span
-                  className="mono"
-                  style={{
-                    fontSize: 10.5,
-                    color: "rgba(255,255,255,.72)",
-                    letterSpacing: ".04em",
-                    flexShrink: 0,
-                  }}
-                >
-                  {afterItem.width}×{afterItem.height}
-                </span>
-              </div>
-            }
-          >
+          <ResultHoverActionBar hovered={hovered}>
             <ActionBarButton
               icon="zoom-in"
               title="크게 보기"
