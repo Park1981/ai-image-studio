@@ -110,18 +110,86 @@ export function SegControl({
   );
 }
 
-/* ── Toggle ── 체크박스 스타일 토글 스위치 (고급 설정용) */
+/* ── Toggle ── 체크박스 스타일 토글 스위치 (고급 설정용)
+ *  align="left" (기본): 좌측 토글 + 우측 라벨 (옛 호환)
+ *  align="right" (2026-04-27): 좌측 라벨 + 우측 토글 (Settings 패턴 — 디자인 통일용)
+ *  tone="neutral" (기본): 파란 accent (var(--accent))
+ *  tone="amber"  (2026-04-27): 앰버 톤 (Claude 조사 같은 별도 카테고리)
+ */
 export function Toggle({
   checked,
   onChange,
   label,
   desc,
+  align = "left",
+  tone = "neutral",
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
   label: string;
   desc?: string;
+  align?: "left" | "right";
+  tone?: "neutral" | "amber";
 }) {
+  // tone 별 색깔 매핑
+  const toneColors =
+    tone === "amber"
+      ? {
+          bg: "var(--amber-soft)",
+          border: "rgba(250,173,20,.35)",
+          switch: "var(--amber-ink)",
+        }
+      : {
+          bg: "var(--accent-soft)",
+          border: "rgba(74,158,255,.35)",
+          switch: "var(--accent)",
+        };
+  const toggleSwitch = (
+    <span
+      style={{
+        position: "relative",
+        width: 28,
+        height: 16,
+        borderRadius: "var(--radius-full)",
+        background: checked ? toneColors.switch : "var(--line-2)",
+        transition: "background .15s",
+        flexShrink: 0,
+      }}
+    >
+      <span
+        style={{
+          position: "absolute",
+          top: 2,
+          left: checked ? 14 : 2,
+          width: 12,
+          height: 12,
+          borderRadius: "50%",
+          background: "#fff",
+          transition: "left .15s",
+          boxShadow: "0 1px 2px rgba(0,0,0,.2)",
+        }}
+      />
+    </span>
+  );
+  const labelArea = (
+    <span
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 2,
+        // 우측 토글 정렬: 라벨 영역이 자유 확장 → 토글이 우측 끝에 붙음
+        flex: align === "right" ? 1 : undefined,
+        minWidth: 0,
+      }}
+    >
+      <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-2)" }}>
+        {label}
+      </span>
+      {desc && (
+        <span style={{ fontSize: 10.5, color: "var(--ink-4)" }}>{desc}</span>
+      )}
+    </span>
+  );
   return (
     <label
       style={{
@@ -134,41 +202,13 @@ export function Toggle({
         cursor: "pointer",
         padding: "8px 10px",
         borderRadius: "var(--radius-sm)",
-        background: checked ? "var(--accent-soft)" : "var(--bg-2)",
-        border: `1px solid ${checked ? "rgba(74,158,255,.35)" : "var(--line)"}`,
+        background: checked ? toneColors.bg : "var(--bg-2)",
+        border: `1px solid ${checked ? toneColors.border : "var(--line)"}`,
         transition: "all .15s",
       }}
     >
-      <span
-        style={{
-          position: "relative",
-          width: 28,
-          height: 16,
-          borderRadius: "var(--radius-full)",
-          background: checked ? "var(--accent)" : "var(--line-2)",
-          transition: "background .15s",
-          flexShrink: 0,
-        }}
-      >
-        <span
-          style={{
-            position: "absolute",
-            top: 2,
-            left: checked ? 14 : 2,
-            width: 12,
-            height: 12,
-            borderRadius: "50%",
-            background: "#fff",
-            transition: "left .15s",
-            boxShadow: "0 1px 2px rgba(0,0,0,.2)",
-          }}
-        />
-      </span>
       {/*
         visually-transparent 패턴 (2026-04-25 layout shift fix · Codex 진단).
-        기존 1x1 + clip:rect() 의 visually-hidden 이 overflow:auto 드로어 안에서
-        Chromium 의 focus/scroll-into-view 계산을 흔들어 토글 클릭 시 scroll
-        wrapper 의 scrollHeight 가 비정상 증가하는 layout shift 의 유력 원인.
         label 전체를 덮는 투명 input 으로 전환 — 접근성 (Tab 포커스 + 스크린리더)
         은 동일하게 유지되며 1x1 박스가 만드는 측정 잡음 제거.
       */}
@@ -188,14 +228,18 @@ export function Toggle({
           border: 0,
         }}
       />
-      <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-2)" }}>
-          {label}
-        </span>
-        {desc && (
-          <span style={{ fontSize: 10.5, color: "var(--ink-4)" }}>{desc}</span>
-        )}
-      </span>
+      {/* align 에 따라 토글/라벨 순서 결정 */}
+      {align === "left" ? (
+        <>
+          {toggleSwitch}
+          {labelArea}
+        </>
+      ) : (
+        <>
+          {labelArea}
+          {toggleSwitch}
+        </>
+      )}
     </label>
   );
 }

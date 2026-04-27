@@ -5,10 +5,17 @@
  * 2026-04-27 (UX 폴리시):
  *  - summary 제거 (프롬프트 요약 안 보임 — 버튼 그룹만 통통 튀듯 등장)
  *  - 복사 버튼 → 프롬프트 복사 (이미지 복사 → 텍스트 클립보드)
+ *  - 매트지 효과 (카드 padding 24 + 이미지 자체 그림자)
+ *  - dot grid 배경 (Figma 캔버스 톤)
+ *  - hover-only wheel zoom (1.0~4.0) + drag pan + 더블클릭 reset
+ *    · wheel native addEventListener (passive: false 로 preventDefault)
+ *    · drag 는 window mousemove/mouseup 에 attach (영역 밖 마우스 추적)
+ *    · scale 1 시 offset 자동 reset, item 바뀌면 zoom/pan 모두 reset
  */
 
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import type { HistoryItem } from "@/lib/api/types";
 import ResultHoverActionBar, {
   ActionBarButton,
@@ -27,6 +34,12 @@ interface Props {
   onReuse: () => void;
 }
 
+const SCALE_MIN = 1;
+const SCALE_MAX = 4;
+
+const clamp = (v: number, min: number, max: number) =>
+  Math.min(max, Math.max(min, v));
+
 export default function GenerateResultViewer({
   item,
   hovered,
@@ -44,23 +57,136 @@ export default function GenerateResultViewer({
       ? `${item.width} / ${item.height}`
       : "1 / 1";
 
+  /* ── zoom / pan state ── */
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const dragStartRef = useRef<{
+    clientX: number;
+    clientY: number;
+    offsetX: number;
+    offsetY: number;
+  } | null>(null);
+
+  /* ── item 바뀌면 zoom/pan reset (React 19 권장 — render 중 prev 비교) ── */
+  const [prevItemId, setPrevItemId] = useState(item.id);
+  if (prevItemId !== item.id) {
+    setPrevItemId(item.id);
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  }
+
+  /* ── hover-only wheel zoom (native addEventListener · passive:false) ── */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const handleWheel = (e: WheelEvent) => {
+      // hover 영역 안 wheel = zoom (페이지 스크롤 차단)
+      // 마우스가 영역 밖이면 native 페이지 스크롤 정상 동작
+      e.preventDefault();
+      // wheel up (deltaY < 0) → zoom in / wheel down → zoom out
+      // 비례 scale (현재값 × delta) → 어디서든 비슷한 체감 속도
+      const factor = 1 - e.deltaY * 0.0015;
+      setScale((prev) => {
+        const next = clamp(prev * factor, SCALE_MIN, SCALE_MAX);
+        // scale 1 로 돌아가면 offset 도 reset (다시 매트 가운데 정렬)
+        if (next <= SCALE_MIN + 0.001) {
+          setOffset({ x: 0, y: 0 });
+        }
+        return next;
+      });
+    };
+    el.addEventListener("wheel", handleWheel, { passive: false });
+    return () => el.removeEventListener("wheel", handleWheel);
+  }, []);
+
+  /* ── drag pan (window mousemove/mouseup) ── */
+  useEffect(() => {
+    if (!isDragging) return;
+    const onMove = (e: MouseEvent) => {
+      const start = dragStartRef.current;
+      if (!start) return;
+      setOffset({
+        x: start.offsetX + (e.clientX - start.clientX),
+        y: start.offsetY + (e.clientY - start.clientY),
+      });
+    };
+    const onUp = () => {
+      setIsDragging(false);
+      dragStartRef.current = null;
+    };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [isDragging]);
+
+  const onMouseDown = (e: React.MouseEvent) => {
+    // scale 1 일 때는 pan 의미 X → drag 안 시작
+    if (scale <= SCALE_MIN) return;
+    e.preventDefault();
+    setIsDragging(true);
+    dragStartRef.current = {
+      clientX: e.clientX,
+      clientY: e.clientY,
+      offsetX: offset.x,
+      offsetY: offset.y,
+    };
+  };
+
+  const onDoubleClick = () => {
+    setScale(1);
+    setOffset({ x: 0, y: 0 });
+  };
+
+  /* ── cursor 분기 ── */
+  const cursor =
+    scale > SCALE_MIN
+      ? isDragging
+        ? "grabbing"
+        : "grab"
+      : "default";
+
   return (
     <div
+      ref={containerRef}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}
+      onMouseDown={onMouseDown}
+      onDoubleClick={onDoubleClick}
       style={{
         position: "relative",
         width: "100%",
         // 결과 뷰어: 원본 비율 유지 + 최대 높이 65vh 제한. contain 으로 레터박스.
         aspectRatio,
         maxHeight: "65vh",
-        background: "var(--bg-2)",
+        // 2026-04-27: dot grid 배경 (Figma 캔버스 톤) + 흰색 매트 (오빠 피드백 — 더 깔끔)
+        backgroundColor: "var(--surface)",
+        backgroundImage:
+          "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
+        backgroundSize: "16px 16px",
         borderRadius: "var(--radius-card)",
         overflow: "hidden",
         border: "1px solid var(--line)",
         boxShadow: "var(--shadow-sm)",
-        // 2026-04-27: 이미지 클릭 자세히 보기 제거 — 액션바 zoom-in 버튼이 동일 역할.
+        // 매트지 효과: 카드 안 padding → 이미지가 떠있는 느낌 (미술관 액자).
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 24,
+        boxSizing: "border-box",
+        cursor,
+        // touchpad pinch zoom 등 native 제스처 차단 (wheel 만 사용)
+        touchAction: "none",
       }}
+      title={
+        scale > SCALE_MIN
+          ? "드래그로 이동 · 더블클릭으로 100% 복원"
+          : "휠로 확대/축소"
+      }
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
@@ -68,13 +194,26 @@ export default function GenerateResultViewer({
         alt={item.label}
         draggable={false}
         style={{
-          width: "100%",
-          height: "100%",
+          maxWidth: "100%",
+          maxHeight: "100%",
           objectFit: "contain",
           display: "block",
+          // 매트 위 떠있는 사진 효과 — 자체 그림자 + 옅은 테두리
+          borderRadius: "var(--radius-md)",
+          boxShadow:
+            "0 10px 32px rgba(0,0,0,.14), 0 3px 10px rgba(0,0,0,.08)",
+          border: "1px solid rgba(0,0,0,.06)",
+          // zoom + pan transform
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          transformOrigin: "center center",
+          // drag 중엔 transition 끔 (입력 즉각 반영) · 그 외엔 부드럽게
+          transition: isDragging
+            ? "none"
+            : "transform .18s ease-out",
           // @ts-expect-error — 비표준 Webkit
           WebkitUserDrag: "none",
           userSelect: "none",
+          pointerEvents: "none", // mousedown 은 부모 div 가 받음
         }}
       />
 

@@ -126,7 +126,6 @@ export default function GeneratePage() {
         <GenerateLeftPanel
           promptTextareaRef={promptTextareaRef}
           onGenerate={pipeline.generate}
-          researchPreview={pipeline.researchPreview}
         />
         <GenerateRightPanel onLightboxOpen={setLightboxSrc} />
       </StudioWorkspace>

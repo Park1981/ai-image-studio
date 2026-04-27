@@ -42,20 +42,11 @@ interface Props {
   promptTextareaRef: RefObject<HTMLTextAreaElement | null>;
   /** 생성 트리거 (useGeneratePipeline.generate) */
   onGenerate: () => void;
-  /** Claude 조사 미리받기 상태 (useGeneratePipeline.researchPreview).
-   *  hints null 은 "아직 미리받기 안 함" / [] 은 "받았으나 결과 0건" 의미. */
-  researchPreview: {
-    loading: boolean;
-    hints: string[] | null;
-    error: string | null;
-    run: () => void | Promise<void>;
-  };
 }
 
 export default function GenerateLeftPanel({
   promptTextareaRef,
   onGenerate,
-  researchPreview,
 }: Props) {
   const {
     prompt, setPrompt,
@@ -175,25 +166,22 @@ export default function GenerateLeftPanel({
         </div>
       </div>
 
-      {/* Claude 조사 배너 */}
-      <ResearchBanner
-        checked={research}
-        onChange={setResearch}
-        onPreview={researchPreview.run}
-        loading={researchPreview.loading}
-        hints={researchPreview.hints}
-        error={researchPreview.error}
-      />
+      {/* Claude 조사 토글 — Lightning 과 동일 패턴 (우측 토글 · amber 톤) */}
+      <ResearchBanner checked={research} onChange={setResearch} />
 
-      {/* Lightning toggle */}
+      {/* 고퀄 모드 토글 — 우측 토글 (settings 패턴 · ResearchBanner 와 통일).
+       *  의미 반전 (2026-04-27 오빠 피드백): OFF 가 기본 빠름 / ON 이 강화 옵션 (고퀄).
+       *  store 의 lightning 의미는 그대로 (true=Lightning LoRA ON=빠름) — UI 만 반전.
+       */}
       <Toggle
-        checked={lightning}
-        onChange={applyLightning}
-        label={lightning ? "⚡ Lightning 4-step" : "표준 (고퀄)"}
+        checked={!lightning}
+        onChange={(v) => applyLightning(!v)}
+        align="right"
+        label="💎 고퀄 모드"
         desc={
           lightning
-            ? "Lightning LoRA ON · 약 4배 빠름"
-            : "Lightning LoRA OFF · 풀 퀄리티"
+            ? "Lightning 4-step · 약 4배 빠름 (기본)"
+            : "Lightning OFF · 풀 퀄리티 · 약 4배 느림"
         }
       />
 
