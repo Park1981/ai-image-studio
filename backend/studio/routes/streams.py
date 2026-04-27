@@ -19,12 +19,10 @@ from PIL import Image, UnidentifiedImageError
 
 from .. import dispatch_state
 from ..pipelines import (
-    _EDIT_MAX_IMAGE_BYTES,
     _extract_image_dims,
     _run_edit_pipeline,
     _run_generate_pipeline,
     _run_video_pipeline_task,
-    _VIDEO_MAX_IMAGE_BYTES,
 )
 from ..presets import (
     EDIT_MODEL,
@@ -34,6 +32,7 @@ from ..presets import (
     VIDEO_MODEL,
 )
 from ..schemas import GenerateBody, TaskCreated
+from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..tasks import TASKS, _new_task
 from ._common import _spawn, _stream_task, log
 
@@ -103,11 +102,11 @@ async def create_edit_task(
 
     # P1-5 (2026-04-26): size + image 형식 검증 — Vision/Video 와 동일 정책.
     # 이전엔 빈 bytes 만 체크하고 손상/비-이미지 도 통과 → ComfyUI 단계 모호한 실패.
-    if len(image_bytes) > _EDIT_MAX_IMAGE_BYTES:
+    if len(image_bytes) > STUDIO_MAX_IMAGE_BYTES:
         raise HTTPException(
             413,
             f"image too large: {len(image_bytes)} bytes "
-            f"(max {_EDIT_MAX_IMAGE_BYTES})",
+            f"(max {STUDIO_MAX_IMAGE_BYTES})",
         )
 
     # spec 19 후속 (Codex P1 #1): SOURCE 이미지 dim 추출 → vision 분석에 전달.
@@ -210,11 +209,11 @@ async def create_video_task(
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(400, "empty image")
-    if len(image_bytes) > _VIDEO_MAX_IMAGE_BYTES:
+    if len(image_bytes) > STUDIO_MAX_IMAGE_BYTES:
         raise HTTPException(
             413,
             f"image too large: {len(image_bytes)} bytes "
-            f"(max {_VIDEO_MAX_IMAGE_BYTES})",
+            f"(max {STUDIO_MAX_IMAGE_BYTES})",
         )
 
     # PIL 로 원본 dims 추출 → 비율 유지 리사이즈 계산에 사용

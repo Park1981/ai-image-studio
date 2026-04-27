@@ -26,9 +26,10 @@ async def test_edit_rejects_oversized_image() -> None:
     from httpx import ASGITransport, AsyncClient
 
     from main import app  # type: ignore
+    from studio.storage import STUDIO_MAX_IMAGE_BYTES
 
     # 20MB + 1 byte (실제 이미지일 필요 없음 — size 체크가 PIL open 보다 먼저)
-    oversized = b"P" + b"\x00" * (20 * 1024 * 1024)
+    oversized = b"P" + b"\x00" * STUDIO_MAX_IMAGE_BYTES
 
     async with AsyncClient(
         transport=ASGITransport(app=app), base_url="http://test"
@@ -41,6 +42,15 @@ async def test_edit_rejects_oversized_image() -> None:
 
     assert resp.status_code == 413, resp.text
     assert "too large" in resp.text.lower()
+
+
+def test_upload_size_aliases_share_single_policy_value() -> None:
+    """라우트별 compatibility alias 가 공용 상수와 같은 값을 가리키는지 검증."""
+    from studio.pipelines import _EDIT_MAX_IMAGE_BYTES, _VIDEO_MAX_IMAGE_BYTES
+    from studio.storage import STUDIO_MAX_IMAGE_BYTES
+
+    assert _EDIT_MAX_IMAGE_BYTES == STUDIO_MAX_IMAGE_BYTES
+    assert _VIDEO_MAX_IMAGE_BYTES == STUDIO_MAX_IMAGE_BYTES
 
 
 @pytest.mark.asyncio

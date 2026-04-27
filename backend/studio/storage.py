@@ -38,6 +38,9 @@ except Exception:
     STUDIO_URL_PREFIX = "/images/studio"
 STUDIO_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
+# 모든 업로드 이미지 라우트(Edit/Video/Vision/Compare)의 동일 상한.
+STUDIO_MAX_IMAGE_BYTES = 20 * 1024 * 1024
+
 # Edit 비교 분석용 source 영구 저장
 EDIT_SOURCE_DIR = STUDIO_OUTPUT_DIR / "edit-source"
 EDIT_SOURCE_DIR.mkdir(parents=True, exist_ok=True)

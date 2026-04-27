@@ -28,7 +28,7 @@ from ..presets import (
     VIDEO_MODEL,
     compute_video_resize,
 )
-from ..storage import _persist_history
+from ..storage import STUDIO_MAX_IMAGE_BYTES, _persist_history
 from ..tasks import Task
 from ..video_pipeline import run_video_pipeline
 from ._dispatch import (
@@ -39,8 +39,8 @@ from ._dispatch import (
 
 log = logging.getLogger(__name__)
 
-# 20 MB — Edit 와 동일 상한 (영상 생성 input 이미지)
-_VIDEO_MAX_IMAGE_BYTES = 20 * 1024 * 1024
+# 하위 호환 re-export. 실제 정책값은 storage.STUDIO_MAX_IMAGE_BYTES 단일 소스.
+_VIDEO_MAX_IMAGE_BYTES = STUDIO_MAX_IMAGE_BYTES
 
 
 def _extract_image_dims(image_bytes: bytes) -> tuple[int, int]:

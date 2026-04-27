@@ -95,6 +95,7 @@ from .pipelines import (  # noqa: F401
     _run_video_pipeline_task,
     _save_comfy_output,
     _save_comfy_video,
+    STUDIO_MAX_IMAGE_BYTES,
     _VIDEO_MAX_IMAGE_BYTES,
 )
 

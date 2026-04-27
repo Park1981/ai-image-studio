@@ -21,13 +21,10 @@ from .. import history_db, ollama_unload
 from .._gpu_lock import GpuBusyError, gpu_slot
 from ..comparison_pipeline import analyze_pair, analyze_pair_generic
 from ..prompt_pipeline import clarify_edit_intent
-from ..storage import TASK_ID_RE
+from ..storage import STUDIO_MAX_IMAGE_BYTES, TASK_ID_RE
 from ._common import log
 
 router = APIRouter()
-
-_COMPARE_MAX_IMAGE_BYTES = 20 * 1024 * 1024  # 20 MB (vision/video 라우트 동일값)
-
 
 @router.post("/compare-analyze")
 async def compare_analyze(
@@ -64,8 +61,8 @@ async def compare_analyze(
     if not source_bytes or not result_bytes:
         raise HTTPException(400, "empty image (source or result)")
     if (
-        len(source_bytes) > _COMPARE_MAX_IMAGE_BYTES
-        or len(result_bytes) > _COMPARE_MAX_IMAGE_BYTES
+        len(source_bytes) > STUDIO_MAX_IMAGE_BYTES
+        or len(result_bytes) > STUDIO_MAX_IMAGE_BYTES
     ):
         raise HTTPException(413, "image too large")
 

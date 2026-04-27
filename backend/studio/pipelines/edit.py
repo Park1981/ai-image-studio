@@ -24,6 +24,7 @@ from ..presets import DEFAULT_OLLAMA_ROLES, EDIT_MODEL
 from ..storage import (
     EDIT_SOURCE_DIR,
     EDIT_SOURCE_URL_PREFIX,
+    STUDIO_MAX_IMAGE_BYTES,
     TASK_ID_RE,
     _persist_history,
 )
@@ -33,8 +34,8 @@ from ._dispatch import _dispatch_to_comfy, _mark_generation_complete
 
 log = logging.getLogger(__name__)
 
-# P1-5 (2026-04-26): Vision/Video 와 동일 정책 (20MB 상한).
-_EDIT_MAX_IMAGE_BYTES = 20 * 1024 * 1024
+# 하위 호환 re-export. 실제 정책값은 storage.STUDIO_MAX_IMAGE_BYTES 단일 소스.
+_EDIT_MAX_IMAGE_BYTES = STUDIO_MAX_IMAGE_BYTES
 
 
 async def _run_edit_pipeline(

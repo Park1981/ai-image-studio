@@ -58,7 +58,7 @@
 | P1-2 | legacy quarantine | **✅ 완료** | `backend/legacy/{routers,services,tests}/` 격리. main.py 등록 끊김. |
 | P1-3 | preset parity test | **❌ 미처리** | `find backend/tests -name "*preset*"` 결과 0. 백엔드/프론트 동기화 사고가 spec 누적 중 2회 발생 (Lightning 8/1.5 + extra LoRA 교체) → drift detection 자체 가치 큼. |
 | P1-4 | mock 정책 명시 | **✅ 처리** | `config.py` 의 `settings.comfy_mock_fallback` 으로 이동. 기본 False. `_dispatch.py` 는 설정값을 읽고, frontend header 는 `NEXT_PUBLIC_USE_MOCK` badge 표시. |
-| P1-5 | Edit upload validation | **⚠️ 부분 처리** | `_EDIT_MAX_IMAGE_BYTES = 20MB` 추가됨 (`pipelines/edit.py:37`). routes/streams.py 검증 라인 (106) 적용. **하지만 어제 Claude 보강했던 `_STUDIO_MAX_IMAGE_BYTES` 단일화는 미처리** — 현재 `_EDIT_/_VIDEO_/_VISION_/_COMPARE_MAX_IMAGE_BYTES` 4개 별도 상수 (모두 20MB). |
+| P1-5 | Edit upload validation | **✅ 처리** | size + image 형식 검증 적용. Phase 1에서 `storage.STUDIO_MAX_IMAGE_BYTES` 단일 상수로 Edit/Video/Vision/Compare 4곳 통합 완료. |
 | P1-6 | versioned migrations | **❌ 미처리** | `history_db.py` 여전히 ALTER TABLE 인라인 (line 144/159/177/191). `schema_version` 테이블 미도입. P2 강등 가능. |
 | P1-7 | active path tests (frontend) | **⚠️ 부분 처리** | 활성 테스트 3 파일 추가: `api-client.test.ts`, `pipeline-stream.test.ts`, `process-api.test.ts`. `npm test` 8 passed. hook 4개 직접 테스트는 Phase 1 보강으로 잔류. |
 
@@ -139,10 +139,10 @@
 **수정안**: `backend/studio/_proc_mgr.py` 단일 모듈 (`from services.process_manager import process_manager` + 폴백) → routes/pipelines 모두 import.
 **위험도**: 🟢 낮음 (DRY 개선).
 
-#### 🟡 N2. Image-bytes 상수 4 분기 (P1-5 단일화 미처리 강조)
+#### ✅ N2. Image-bytes 상수 4 분기 (P1-5 단일화 처리)
 **파일**: `pipelines/edit.py:37` + `pipelines/video.py:43` + `routes/vision.py:23` + `routes/compare.py:35`
 **문제**: 동일 값 `20 * 1024 * 1024` 가 4 곳 별도 상수 (`_EDIT_/_VIDEO_/_VISION_/_COMPARE_MAX_IMAGE_BYTES`). 모두 20MB. 하나만 바꾸면 일관성 깨짐.
-**수정안**: `backend/studio/storage.py` 에 `STUDIO_MAX_IMAGE_BYTES = 20 * 1024 * 1024` 상수 한 번 정의. 4 곳 import.
+**처리**: `backend/studio/storage.py` 에 `STUDIO_MAX_IMAGE_BYTES = 20 * 1024 * 1024` 상수 한 번 정의. Edit/Video/Vision/Compare 업로드 검증 경로가 공용 상수를 import.
 **위험도**: 🟡 중간 (미통일 시 차후 회귀 위험).
 
 #### 🟢 N3. `routes.streams` import 부담
@@ -290,8 +290,8 @@ Codex 가 같은 코드 베이스를 독립 리뷰. P0 3 개를 새로 잡았는
 
 **합의 항목 묶음** (둘 다 잡은 이슈 — 우선):
 ```text
-1. C2-P1-6 _STUDIO_MAX_IMAGE_BYTES 단일화 (30분 · N2)
-   → storage.py 상수 1개 + 4 곳 import 갱신
+1. C2-P1-6 STUDIO_MAX_IMAGE_BYTES 단일화 (30분 · N2) ✅ 완료
+   → `storage.py` 상수 1개 + Edit/Video/Vision/Compare import 갱신
 2. C2-P1-5 모델 프리셋 parity test (3-4h)
    → backend presets.py vs frontend model-presets.ts JSON export 후 비교
 3. C2-P1-7 paste listener 중앙화 (3-4h)
@@ -391,7 +391,7 @@ Codex 라운드 3 fact-check (2026-04-27 후반):
 
 Claude 새 발견 (오늘 1차):
   N1 _proc_mgr import 중복         🟢
-  N2 image-bytes 상수 4 분기        🟡 (Codex P1 합의)
+  N2 image-bytes 상수 4 분기        ✅ 처리 (Codex P1 합의)
   N3 routes.streams import 부담    🟢
   N4 router.py facade 수명          🟢
   N5 force_unload 함수명 어긋남     🟢
@@ -753,8 +753,8 @@ git commit -m "fix(ruff): active 6건 — E741 변수명 \`l\` → \`lora\`/\`in
 
 Phase 0' 5건은 완료. 다음 라운드는 Phase 1 보강으로 이동.
 
-1. **C2-P1-6 / N2 업로드 제한 상수 단일화**
-   - `_EDIT_/_VIDEO_/_VISION_/_COMPARE_MAX_IMAGE_BYTES` 4개 → `storage.py` 또는 별도 config 상수 1개.
+1. **C2-P1-6 / N2 업로드 제한 상수 단일화** ✅ 완료
+   - `storage.STUDIO_MAX_IMAGE_BYTES` 단일 소스.
 
 2. **C2-P1-5 모델 프리셋 parity test**
    - backend presets vs frontend model-presets drift 방지.

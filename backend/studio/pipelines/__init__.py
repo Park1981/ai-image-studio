@@ -32,6 +32,7 @@ from .video import (
     _extract_image_dims,
     _run_video_pipeline_task,
 )
+from ..storage import STUDIO_MAX_IMAGE_BYTES
 
 __all__ = [
     # _dispatch
@@ -53,5 +54,6 @@ __all__ = [
     # 사이즈/유틸 상수
     "_EDIT_MAX_IMAGE_BYTES",
     "_VIDEO_MAX_IMAGE_BYTES",
+    "STUDIO_MAX_IMAGE_BYTES",
     "_extract_image_dims",
 ]

@@ -15,14 +15,11 @@ from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from PIL import Image
 
 from .._gpu_lock import GpuBusyError, gpu_slot
+from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..vision_pipeline import analyze_image_detailed
 from ._common import log
 
 router = APIRouter()
-
-# 20 MB — 프론트 FileReader 에서 dataURL 저장 부담 감안
-_VISION_MAX_IMAGE_BYTES = 20 * 1024 * 1024
-
 
 @router.post("/vision-analyze")
 async def vision_analyze(
@@ -49,11 +46,11 @@ async def vision_analyze(
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(400, "empty image")
-    if len(image_bytes) > _VISION_MAX_IMAGE_BYTES:
+    if len(image_bytes) > STUDIO_MAX_IMAGE_BYTES:
         raise HTTPException(
             413,
             f"image too large: {len(image_bytes)} bytes "
-            f"(max {_VISION_MAX_IMAGE_BYTES})",
+            f"(max {STUDIO_MAX_IMAGE_BYTES})",
         )
 
     # 해상도 추출 — 실패해도 진행 (0 반환)
