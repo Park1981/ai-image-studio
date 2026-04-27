@@ -148,6 +148,22 @@ Generate Lightning steps 4→8, cfg 1.0→1.5. 사용자 비교 평가 (4/1.0 ·
 - **Phase 5 자동 기동 준비 완료**: PIPELINE_DEFS 의 `comfyui-warmup` stage 정의됨 (enabled: warmupArrived). Phase 5 에서 백엔드 `_dispatch.py::_ensure_comfyui_ready` 만 추가하면 자동 작동 (프론트 추가 코드 0).
 - 설계 문서: `docs/superpowers/specs/2026-04-27-progress-store-unify-design.md` (진실의 출처 — 다음 세션 인계용)
 
+**2026-04-27 Phase 6 — Vision/Compare 진행 모달 통일** — pytest 215/215 · tsc+lint clean.
+3 mode (Generate/Edit/Video) 의 진행 모달 통일에 이어 **Vision Analyzer + Compare 까지 단일 PipelineTimeline 으로 수렴**. `AnalysisProgressModal` 제거 → `<ProgressModal mode="vision|compare" />`.
+- **백엔드 task-based SSE 전환**: `/api/studio/vision-analyze` + `/api/studio/compare-analyze` 모두 동기 JSON 응답 → `{task_id, stream_url}` + SSE 패턴. POST → background spawn → GET stream/{id} → done event payload 추출.
+- **신규 모듈 2개**: `backend/studio/pipelines/vision_analyze.py::_run_vision_analyze_pipeline` + `pipelines/compare_analyze.py::_run_compare_analyze_pipeline`. routes/vision.py + routes/compare.py 는 validation + spawn 만 담당 (얇은 wrapper).
+- **`ProgressCallback` 시그니처**: `analyze_image_detailed` / `analyze_pair` / `analyze_pair_generic` 셋 모두 옵셔널 `progress_callback: Callable[[str], Awaitable[None]] | None` 인자 추가. 단계 transition 시점 ("vision-call" / "vision-pair" / "translation") 에 호출. None 이면 무영향. 함수 시그니처 호환 유지 (옛 호출자 X).
+- **stage emit 매핑**:
+  - vision: `vision-encoding (5%) → vision-call (20%) → translation (70%) → done`
+  - compare: `compare-encoding (5%) → intent-refine (10%, edit context 캐시 미스 시만) → vision-pair (25%) → translation (75%) → done`
+- **PIPELINE_DEFS 확장 (옵션 B 의 진가)**: `PipelineMode = HistoryMode | "vision" | "compare"` union 도입. PIPELINE_DEFS 에 vision (3 stage) + compare (4 stage) 추가. **gemma4 translation StageDef 에 `enabled: (c) => !c.gemma4Off` 명시** — 미래 토글 추가 시 한 줄로 자동 timeline 정리 (사용자 인사이트 — 통일의 진짜 가치).
+- **frontend store**: `useVisionStore` + `useVisionCompareStore` 에 `stageHistory: StageEvent[]` + `pushStage` + `resetStages` 추가. `useVisionPipeline` + `/vision/compare` 페이지가 `compareAnalyze({onStage})` / `analyzeImage({onStage})` 옵셔널 콜백으로 store 누적.
+- **ProgressModal 통합**: `mode: PipelineMode` 로 시그니처 확장. vision/compare 의 startedAt/progress 는 stageHistory 에서 추정 (첫 stage arrivedAt + 마지막 progress). ComfyUI interrupt 버튼은 vision/compare 에서 항상 false (ComfyUI 미사용).
+- **mock.patch 위치 갱신** (8건): `studio.routes.compare.{analyze_pair, clarify_edit_intent}` → `studio.pipelines.compare_analyze.{...}`. routes/compare.py 의 import 는 옛 호환 namespace 유지 (noqa: F401).
+- **OpenAPI snapshot 갱신**: `compare-analyze/stream/{task_id}` + `vision-analyze/stream/{task_id}` 추가. `Body_create_*_task_*` schema rename.
+- **삭제 1 파일**: `frontend/components/studio/AnalysisProgressModal.tsx` (337줄 · 통일 후 dead). vision/compare page 둘 다 ProgressModal 사용.
+- **테스트 변환** (5건): vision_analyze_route + compare_analyze_route_happy_path + persists_when_history_id_given + unknown_history_id_saved_false + skips_clarify_when_refined_intent_cached + runs_clarify_intent_outside_lock. SSE drain helper `_drain_sse_done(cli, stream_url)` 추가 — done event payload 추출 (옛 JSON 응답 shape 그대로).
+
 **2026-04-27 Phase 5 — ComfyUI 자동 기동 (warmup stage)** — pytest 210→215 · tsc+lint clean.
 ComfyUI 가 idle shutdown / 사용자 수동 종료 등으로 꺼져 있는 상태에서 Generate/Edit/Video 호출 시,
 **파이프라인이 자동으로 ComfyUI 를 깨우면서 진행 모달에 "ComfyUI 깨우는 중 (~30초)" warmup row 노출**.

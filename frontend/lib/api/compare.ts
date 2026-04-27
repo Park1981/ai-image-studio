@@ -2,10 +2,16 @@
  * lib/api/compare.ts — Edit 결과 ↔ 원본 비교 분석 호출.
  * 백엔드 POST /api/studio/compare-analyze 래퍼.
  *
- * USE_MOCK 모드에선 sleep 후 가짜 ComparisonAnalysis 반환 (UI 개발용).
+ * Phase 6 (2026-04-27): 동기 JSON → task-based SSE 로 전환.
+ *   - POST → {task_id, stream_url} 받음 → SSE drain → done event payload 추출
+ *   - opts.onStage 콜백으로 stage 이벤트 실시간 전달 (PipelineTimeline 연동)
+ *   - 옛 호출자 호환 — compareAnalyze() 시그니처 + 반환 타입 유지.
+ *
+ * USE_MOCK 모드에선 stage emit + sleep 후 가짜 결과 반환 (실 백엔드 패턴 모사).
  */
 
-import { STUDIO_BASE, USE_MOCK, sleep } from "./client";
+import { STUDIO_BASE, USE_MOCK, parseSSE, sleep } from "./client";
+import type { AnalyzeStageEvent } from "./vision";
 import type { ComparisonAnalysis, VisionCompareAnalysis } from "./types";
 
 export interface CompareAnalyzeRequest {
@@ -28,6 +34,8 @@ export interface CompareAnalyzeRequest {
   context?: "edit" | "compare";
   /** Vision Compare 메뉴 전용 힌트 (context="compare" 일 때만 사용). */
   compareHint?: string;
+  /** Phase 6 — stage 이벤트 도착 시 호출 (PipelineTimeline 의 stageHistory 갱신). */
+  onStage?: (e: AnalyzeStageEvent) => void;
 }
 
 export interface CompareAnalyzeResponse {
@@ -65,9 +73,32 @@ export async function compareAnalyze(
 ): Promise<CompareAnalyzeResponse> {
   const isCompare = req.context === "compare";
 
-  // Mock 분기: UI 개발 시 실 백엔드 없이 동작 확인용
+  // Mock 분기: UI 개발 시 실 백엔드 없이 동작 확인용 (stage emit 도 모사)
   if (USE_MOCK) {
-    await sleep(800 + Math.random() * 600);
+    if (req.onStage) {
+      req.onStage({
+        type: "compare-encoding",
+        progress: 5,
+        stageLabel: "이미지 A/B 인코딩",
+      });
+    }
+    await sleep(150);
+    if (req.onStage) {
+      req.onStage({
+        type: "vision-pair",
+        progress: 25,
+        stageLabel: "두 이미지 비교 분석 (qwen2.5vl)",
+      });
+    }
+    await sleep(500 + Math.random() * 400);
+    if (req.onStage) {
+      req.onStage({
+        type: "translation",
+        progress: 75,
+        stageLabel: "한국어 번역 (gemma4)",
+      });
+    }
+    await sleep(150);
     if (isCompare) {
       // Vision Compare 5축 mock (composition/color/subject/mood/quality)
       return {
@@ -159,22 +190,59 @@ export async function compareAnalyze(
   }
   form.append("meta", JSON.stringify(metaPayload));
 
-  // 백엔드 호출
-  const res = await fetch(`${STUDIO_BASE}/api/studio/compare-analyze`, {
+  // Phase 6: POST 가 task_id + stream_url 반환 (옛처럼 직접 결과 X)
+  const createRes = await fetch(`${STUDIO_BASE}/api/studio/compare-analyze`, {
     method: "POST",
     body: form,
   });
-  if (!res.ok) {
-    throw new Error(`compare-analyze failed: ${res.status}`);
+  if (!createRes.ok) {
+    throw new Error(`compare-analyze failed: ${createRes.status}`);
+  }
+  const { stream_url } = (await createRes.json()) as {
+    task_id: string;
+    stream_url: string;
+  };
+
+  // SSE drain — done event payload 추출. stage 이벤트는 onStage 콜백.
+  const streamRes = await fetch(`${STUDIO_BASE}${stream_url}`, {
+    headers: { accept: "text/event-stream" },
+  });
+  if (!streamRes.ok) {
+    throw new Error(`compare-analyze stream ${streamRes.status}`);
   }
 
-  // 응답 shape 최소 검증 — 백엔드 신뢰 X (codex 1차 리뷰 교훈)
-  const json = (await res.json()) as Partial<CompareAnalyzeResponse>;
-  if (!json.analysis || typeof json.analysis !== "object") {
-    throw new Error("compare-analyze: malformed response");
+  for await (const evt of parseSSE(streamRes)) {
+    if (evt.event === "error") {
+      const payload = evt.data as { message?: string };
+      throw new Error(payload.message || "compare-analyze error");
+    }
+    if (evt.event === "stage") {
+      if (req.onStage) {
+        const payload = evt.data as {
+          type: string;
+          progress: number;
+          stageLabel: string;
+        } & Record<string, unknown>;
+        const { type, progress, stageLabel, ...extra } = payload;
+        req.onStage({
+          type,
+          progress,
+          stageLabel,
+          extra: Object.keys(extra).length > 0 ? extra : undefined,
+        });
+      }
+      continue;
+    }
+    if (evt.event === "done") {
+      const json = evt.data as Partial<CompareAnalyzeResponse>;
+      if (!json.analysis || typeof json.analysis !== "object") {
+        throw new Error("compare-analyze: malformed done payload");
+      }
+      return {
+        analysis: json.analysis,
+        saved: !!json.saved,
+      };
+    }
   }
-  return {
-    analysis: json.analysis,
-    saved: !!json.saved,
-  };
+  throw new Error("compare-analyze: stream closed without done event");
 }

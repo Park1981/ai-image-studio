@@ -31,6 +31,7 @@ from ._json_utils import parse_strict_json as _parse_strict_json
 from ._ollama_client import call_chat_payload
 from .presets import DEFAULT_OLLAMA_ROLES
 from .prompt_pipeline import _DEFAULT_OLLAMA_URL, DEFAULT_TIMEOUT
+from .vision_pipeline import ProgressCallback  # Phase 6 (2026-04-27): 단일 source
 
 log = logging.getLogger(__name__)
 
@@ -682,6 +683,7 @@ async def analyze_pair(
     ollama_url: str | None = None,
     timeout: float = DEFAULT_TIMEOUT,
     refined_intent: str = "",
+    progress_callback: ProgressCallback | None = None,
 ) -> ComparisonAnalysisResult:
     """SOURCE + RESULT 비교 분석 v3.1 (spec 19 · rubric + transform/uncertain + refined_intent).
 
@@ -694,12 +696,24 @@ async def analyze_pair(
             비어있으면 SYSTEM 이 raw prompt 만 보고 판단 (옛 동작과 동일).
         vision_model: 기본 settings.visionModel (qwen2.5vl:7b)
         text_model: 번역용 (기본 gemma4-un:latest)
+        progress_callback: Phase 6 — 단계 transition 시점에 호출 ("vision-pair" / "translation").
+            None 이면 무영향. router (task-based SSE) 가 stage emit 으로 변환.
     """
     resolved_vision = vision_model or DEFAULT_OLLAMA_ROLES.vision
     resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
 
+    # Phase 6: callback 호출 헬퍼 — None 또는 예외 시 무영향
+    async def _signal(stage_type: str) -> None:
+        if progress_callback is None:
+            return
+        try:
+            await progress_callback(stage_type)
+        except Exception as cb_err:  # pragma: no cover - 방어적
+            log.info("progress_callback raised (non-fatal): %s", cb_err)
+
     # ── 1단계: 비전 호출 ──
+    await _signal("vision-pair")
     raw = await _call_vision_pair(
         source_bytes,
         result_bytes,
@@ -770,6 +784,7 @@ async def analyze_pair(
     )
 
     # ── 4단계: 한글 번역 (코멘트 + summary + transform/uncertain 한 호출) ──
+    await _signal("translation")
     comments_en_for_translate = {k: s.comment_en for k, s in slots.items()}
     translation = await _translate_comments_to_ko(
         comments_en_for_translate,
@@ -898,6 +913,7 @@ async def analyze_pair_generic(
     text_model: str | None = None,
     ollama_url: str | None = None,
     timeout: float = DEFAULT_TIMEOUT,
+    progress_callback: ProgressCallback | None = None,
 ) -> ComparisonAnalysisResult:
     """A + B 두 이미지의 일반 비교 분석 (Vision Compare 메뉴 전용).
 
@@ -909,6 +925,7 @@ async def analyze_pair_generic(
         compare_hint: 사용자 비교 지시 힌트 (선택 · 빈 문자열 OK)
         vision_model: 기본 settings.visionModel (qwen2.5vl:7b)
         text_model: 번역용 (기본 gemma4-un:latest)
+        progress_callback: Phase 6 — analyze_pair 와 동일 패턴 ("vision-pair" / "translation").
 
     Returns:
         ComparisonAnalysisResult — 모든 fallback 경로 동일 shape 보장.
@@ -917,7 +934,16 @@ async def analyze_pair_generic(
     resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
 
+    async def _signal(stage_type: str) -> None:
+        if progress_callback is None:
+            return
+        try:
+            await progress_callback(stage_type)
+        except Exception as cb_err:  # pragma: no cover - 방어적
+            log.info("progress_callback raised (non-fatal): %s", cb_err)
+
     # ── 1단계: 비전 호출 ──
+    await _signal("vision-pair")
     raw = await _call_vision_pair_generic(
         image_a_bytes,
         image_b_bytes,
@@ -974,6 +1000,7 @@ async def analyze_pair_generic(
 
     # ── 4단계: 한글 번역 (실패해도 en 으로 폴백) ──
     # transform/uncertain 도 같은 번역 묶음에 포함 (extra_sections 인자 도입)
+    await _signal("translation")
     translation = await _translate_comments_to_ko(
         comments_en,
         summary_en,

@@ -33,6 +33,32 @@ def _set_temp_db(monkeypatch, tmp_path: Path) -> Path:
     return db_path
 
 
+async def _drain_sse_done(cli, stream_url: str) -> dict:
+    """Phase 6 (2026-04-27): compare/vision SSE drain 헬퍼.
+
+    POST 가 task_id+stream_url 반환 → GET stream → done event payload 추출.
+    error event 도착하면 RuntimeError 로 변환 (옛 HTTP 503 케이스 호환 — 캐스트 후 처리).
+    """
+    pending_event: str | None = None
+    async with cli.stream("GET", stream_url) as sr:
+        async for line in sr.aiter_lines():
+            if line.startswith("event:"):
+                pending_event = line[6:].strip()
+                continue
+            if line.startswith("data:"):
+                try:
+                    payload = json.loads(line[5:].strip())
+                except json.JSONDecodeError:
+                    continue
+                if pending_event == "done":
+                    return payload
+                if pending_event == "error":
+                    raise RuntimeError(
+                        f"sse error: {payload.get('message', 'unknown')}"
+                    )
+    raise RuntimeError("sse closed without done event")
+
+
 @pytest.mark.asyncio
 async def test_init_db_adds_comparison_columns(monkeypatch, tmp_path: Path) -> None:
     """init_studio_history_db() 가 source_ref / comparison_analysis 컬럼 모두 추가."""
@@ -820,11 +846,11 @@ async def test_compare_analyze_skips_clarify_when_refined_intent_cached(
         )
 
     with (
-        patch("studio.routes.compare.clarify_edit_intent", new=_fake_clarify),
-        patch("studio.routes.compare.analyze_pair", new=_fake_analyze),
+        patch("studio.pipelines.compare_analyze.clarify_edit_intent", new=_fake_clarify),
+        patch("studio.pipelines.compare_analyze.analyze_pair", new=_fake_analyze),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as cli:
             res = await cli.post(
                 "/api/studio/compare-analyze",
                 files={
@@ -836,7 +862,8 @@ async def test_compare_analyze_skips_clarify_when_refined_intent_cached(
                     "historyItemId": "tsk-cacef00d1234",
                 })},
             )
-    assert res.status_code == 200
+            assert res.status_code == 200
+            await _drain_sse_done(cli, res.json()["stream_url"])
     # 캐시 히트 → clarify 호출 0회 (gemma4 cold start ~5초 절약 검증)
     assert clarify_calls == [], (
         f"clarify_edit_intent 가 캐시 히트 시 호출됨 (예상: 0회 / 실제: {len(clarify_calls)}회)"
@@ -893,11 +920,11 @@ async def test_compare_analyze_runs_clarify_intent_outside_lock(
         )
 
     with (
-        patch("studio.routes.compare.clarify_edit_intent", new=_fake_clarify),
-        patch("studio.routes.compare.analyze_pair", new=_fake_analyze),
+        patch("studio.pipelines.compare_analyze.clarify_edit_intent", new=_fake_clarify),
+        patch("studio.pipelines.compare_analyze.analyze_pair", new=_fake_analyze),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as cli:
             res = await cli.post(
                 "/api/studio/compare-analyze",
                 files={
@@ -906,7 +933,8 @@ async def test_compare_analyze_runs_clarify_intent_outside_lock(
                 },
                 data={"meta": json.dumps({"editPrompt": "옷 색깔 바꿔줘"})},
             )
-    assert res.status_code == 200
+            assert res.status_code == 200
+            await _drain_sse_done(cli, res.json()["stream_url"])
     # 호출 순서: clarify (lock 밖) → analyze (lock 안)
     assert call_order == ["clarify", "analyze"]
 
@@ -1156,12 +1184,14 @@ async def test_compare_analyze_route_happy_path(monkeypatch, tmp_path: Path) -> 
         vision_model="qwen2.5vl:7b",
     )
 
+    # Phase 6 (2026-04-27): 호출 site = pipelines/compare_analyze.py 로 이동.
+    # mock.patch 위치도 거기에 맞춰 갱신 — routes/compare.py 의 import 는 옛 호환용 namespace 만.
     with patch(
-        "studio.routes.compare.analyze_pair",
+        "studio.pipelines.compare_analyze.analyze_pair",
         new=AsyncMock(return_value=fake),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as cli:
             res = await cli.post(
                 "/api/studio/compare-analyze",
                 files={
@@ -1170,8 +1200,8 @@ async def test_compare_analyze_route_happy_path(monkeypatch, tmp_path: Path) -> 
                 },
                 data={"meta": json.dumps({"editPrompt": "add earrings"})},
             )
-    assert res.status_code == 200
-    body = res.json()
+            assert res.status_code == 200
+            body = await _drain_sse_done(cli, res.json()["stream_url"])
     assert body["analysis"]["overall"] == 80
     assert body["saved"] is False  # historyItemId 없음
 
@@ -1212,10 +1242,10 @@ async def test_compare_analyze_persists_when_history_id_given(
     )
 
     with patch(
-        "studio.routes.compare.analyze_pair", new=AsyncMock(return_value=fake),
+        "studio.pipelines.compare_analyze.analyze_pair", new=AsyncMock(return_value=fake),
     ):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as cli:
             res = await cli.post(
                 "/api/studio/compare-analyze",
                 files={
@@ -1227,8 +1257,8 @@ async def test_compare_analyze_persists_when_history_id_given(
                     "historyItemId": "tsk-aaaaaaaaaaaa",
                 })},
             )
-    assert res.status_code == 200
-    body = res.json()
+            assert res.status_code == 200
+            body = await _drain_sse_done(cli, res.json()["stream_url"])
     assert body["saved"] is True
 
     fetched = await history_db.get_item("tsk-aaaaaaaaaaaa")
@@ -1259,9 +1289,9 @@ async def test_compare_analyze_unknown_history_id_saved_false(
         analyzed_at=0, vision_model="qwen2.5vl:7b",
     )
 
-    with patch("studio.routes.compare.analyze_pair", new=AsyncMock(return_value=fake)):
+    with patch("studio.pipelines.compare_analyze.analyze_pair", new=AsyncMock(return_value=fake)):
         transport = ASGITransport(app=app)
-        async with AsyncClient(transport=transport, base_url="http://test") as cli:
+        async with AsyncClient(transport=transport, base_url="http://test", timeout=30.0) as cli:
             res = await cli.post(
                 "/api/studio/compare-analyze",
                 files={
@@ -1273,8 +1303,9 @@ async def test_compare_analyze_unknown_history_id_saved_false(
                     "historyItemId": "tsk-bbbbbbbbbbbb",  # 존재 안 함
                 })},
             )
-    assert res.status_code == 200
-    assert res.json()["saved"] is False
+            assert res.status_code == 200
+            body = await _drain_sse_done(cli, res.json()["stream_url"])
+    assert body["saved"] is False
 
 
 @pytest.mark.asyncio

@@ -12,6 +12,7 @@
 
 import { create } from "zustand";
 import type { VisionCompareAnalysis } from "@/lib/api/types";
+import type { StageEvent } from "@/stores/useGenerateStore";
 
 export type CompareViewerMode = "slider" | "sidebyside";
 
@@ -36,6 +37,8 @@ export interface VisionCompareState {
   analysis: VisionCompareAnalysis | null;
   /** 뷰어 모드 토글 */
   viewerMode: CompareViewerMode;
+  /** Phase 6 (2026-04-27): SSE stage 이벤트 누적 — PipelineTimeline mode="compare". */
+  stageHistory: StageEvent[];
 
   /* actions */
   setImageA: (img: VisionCompareImage | null) => void;
@@ -45,6 +48,10 @@ export interface VisionCompareState {
   setRunning: (v: boolean) => void;
   setAnalysis: (a: VisionCompareAnalysis | null) => void;
   setViewerMode: (m: CompareViewerMode) => void;
+  /** Phase 6: 백엔드 stage 이벤트 도착 시 호출. */
+  pushStage: (e: StageEvent) => void;
+  /** Phase 6: 새 분석 시작 시 stageHistory 초기화. */
+  resetStages: () => void;
   /** 페이지 진입/리셋 시 초기 상태 복원 */
   reset: () => void;
 }
@@ -56,6 +63,7 @@ export const useVisionCompareStore = create<VisionCompareState>()((set, get) => 
   running: false,
   analysis: null,
   viewerMode: "slider",
+  stageHistory: [],
 
   setImageA: (img) =>
     set({
@@ -80,6 +88,9 @@ export const useVisionCompareStore = create<VisionCompareState>()((set, get) => 
   setAnalysis: (a) => set({ analysis: a }),
   setViewerMode: (m) => set({ viewerMode: m }),
 
+  pushStage: (e) => set((s) => ({ stageHistory: [...s.stageHistory, e] })),
+  resetStages: () => set({ stageHistory: [] }),
+
   reset: () =>
     set({
       imageA: null,
@@ -88,5 +99,6 @@ export const useVisionCompareStore = create<VisionCompareState>()((set, get) => 
       running: false,
       analysis: null,
       viewerMode: "slider",
+      stageHistory: [],
     }),
 }));

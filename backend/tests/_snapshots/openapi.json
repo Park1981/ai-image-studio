@@ -36,18 +36,60 @@
     },
     "/api/studio/compare-analyze": {
       "post": {
-        "description": "Edit 결과(result) 와 원본(source) 을 qwen2.5vl 로 5축 비교 평가.\n\nmultipart:\n  source: 원본 이미지 파일\n  result: 수정 결과 이미지 파일\n  meta: JSON {editPrompt, historyItemId?, visionModel?, ollamaModel?}\n\nhistoryItemId 가 주어지면 분석 결과를 DB 에 영구 저장 (saved=True).\nHTTP 200 원칙 — 비전 실패해도 fallback 결과로 200 반환 (analysis.fallback=True).\n동시 호출 시 공용 GPU gate 로 직렬화 → 30s 대기 후 busy 면 503 (의도 설계).",
-        "operationId": "compare_analyze_api_studio_compare_analyze_post",
+        "description": "비교 분석 요청 (multipart). Phase 6 — task 생성 + SSE.\n\nmultipart:\n  source: 원본 이미지 파일 (Vision Compare 컨텍스트에선 IMAGE_A)\n  result: 결과 이미지 파일 (Vision Compare 컨텍스트에선 IMAGE_B)\n  meta: JSON {context?, editPrompt?, compareHint?, historyItemId?, visionModel?, ollamaModel?}\n\n응답: { task_id, stream_url } — 클라이언트가 stream_url 로 SSE 구독.",
+        "operationId": "create_compare_analyze_task_api_studio_compare_analyze_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_compare_analyze_api_studio_compare_analyze_post"
+                "$ref": "#/components/schemas/Body_create_compare_analyze_task_api_studio_compare_analyze_post"
               }
             }
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Compare Analyze Task",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/compare-analyze/stream/{task_id}": {
+      "get": {
+        "operationId": "compare_analyze_stream_api_studio_compare_analyze_stream__task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -68,7 +110,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Compare Analyze",
+        "summary": "Compare Analyze Stream",
         "tags": [
           "studio"
         ]
@@ -701,18 +743,60 @@
     },
     "/api/studio/vision-analyze": {
       "post": {
-        "description": "단일 이미지 → 상세 영문 설명 + 한글 번역 (동기 JSON).\n\nVision Analyzer 독립 페이지(/vision) 전용. Edit 파이프라인과 분리.\nHTTP 200 원칙 — Ollama 실패 시에도 provider=\"fallback\" 로 반환.",
-        "operationId": "vision_analyze_api_studio_vision_analyze_post",
+        "description": "단일 이미지 비전 분석 요청 (multipart). Phase 6 — task 생성 + SSE.\n\nmeta JSON: {visionModel?, ollamaModel?}\n응답: { task_id, stream_url } — 클라이언트가 stream_url 로 SSE 구독.\n\nHTTP 200 원칙은 done event payload 안에서 보장 (provider=\"fallback\" 폴백).",
+        "operationId": "create_vision_analyze_task_api_studio_vision_analyze_post",
         "requestBody": {
           "content": {
             "multipart/form-data": {
               "schema": {
-                "$ref": "#/components/schemas/Body_vision_analyze_api_studio_vision_analyze_post"
+                "$ref": "#/components/schemas/Body_create_vision_analyze_task_api_studio_vision_analyze_post"
               }
             }
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Vision Analyze Task",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/vision-analyze/stream/{task_id}": {
+      "get": {
+        "operationId": "vision_analyze_stream_api_studio_vision_analyze_stream__task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
@@ -733,7 +817,7 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Vision Analyze",
+        "summary": "Vision Analyze Stream",
         "tags": [
           "studio"
         ]
@@ -741,7 +825,7 @@
     }
   },
   "schemas": {
-    "Body_compare_analyze_api_studio_compare_analyze_post": {
+    "Body_create_compare_analyze_task_api_studio_compare_analyze_post": {
       "properties": {
         "meta": {
           "title": "Meta",
@@ -763,7 +847,7 @@
         "result",
         "meta"
       ],
-      "title": "Body_compare_analyze_api_studio_compare_analyze_post",
+      "title": "Body_create_compare_analyze_task_api_studio_compare_analyze_post",
       "type": "object"
     },
     "Body_create_edit_task_api_studio_edit_post": {
@@ -804,7 +888,7 @@
       "title": "Body_create_video_task_api_studio_video_post",
       "type": "object"
     },
-    "Body_vision_analyze_api_studio_vision_analyze_post": {
+    "Body_create_vision_analyze_task_api_studio_vision_analyze_post": {
       "properties": {
         "image": {
           "contentMediaType": "application/octet-stream",
@@ -820,7 +904,7 @@
       "required": [
         "image"
       ],
-      "title": "Body_vision_analyze_api_studio_vision_analyze_post",
+      "title": "Body_create_vision_analyze_task_api_studio_vision_analyze_post",
       "type": "object"
     },
     "GenerateBody": {

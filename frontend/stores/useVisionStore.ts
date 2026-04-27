@@ -11,6 +11,7 @@
 
 import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
+import type { StageEvent } from "@/stores/useGenerateStore";
 
 // 2026-04-24 G1: 20 → 100. entry 의 imageRef 를 256px JPEG 썸네일로 저장하므로
 // 용량 부담은 100건 × 약 50KB = 5MB (localStorage 10MB 한계 내 여유).
@@ -65,6 +66,9 @@ export interface VisionState {
   currentHeight: number | null;
   running: boolean;
   lastResult: VisionResult | null;
+  /** Phase 6 (2026-04-27): 진행 모달 통일 — SSE stage 이벤트 누적.
+   *  PipelineTimeline 이 PIPELINE_DEFS.vision 와 매칭해 row 자동 렌더. */
+  stageHistory: StageEvent[];
 
   /* 영속 */
   entries: VisionEntry[];
@@ -78,6 +82,10 @@ export interface VisionState {
   ) => void;
   clearSource: () => void;
   setRunning: (v: boolean) => void;
+  /** Phase 6: 백엔드 stage 이벤트 도착 시 호출 — 진행 모달 row 자동 업데이트. */
+  pushStage: (e: StageEvent) => void;
+  /** Phase 6: 새 분석 시작 시 stageHistory 초기화 (이전 결과 표시 제거). */
+  resetStages: () => void;
   /** v2 통합 — en/ko + 9 슬롯 동시 set. 옛 호출 호환 위해 slots 옵셔널. */
   setResult: (en: string, ko: string | null, slots?: VisionRecipeSlots) => void;
   addEntry: (entry: VisionEntry) => void;
@@ -96,6 +104,7 @@ export const useVisionStore = create<VisionState>()(
       currentHeight: null,
       running: false,
       lastResult: null,
+      stageHistory: [],
 
       entries: [],
 
@@ -119,6 +128,10 @@ export const useVisionStore = create<VisionState>()(
         }),
 
       setRunning: (v) => set({ running: v }),
+
+      pushStage: (e) =>
+        set((s) => ({ stageHistory: [...s.stageHistory, e] })),
+      resetStages: () => set({ stageHistory: [] }),
 
       setResult: (en, ko, slots) =>
         set({ lastResult: { en, ko, ...(slots ?? {}) } }),

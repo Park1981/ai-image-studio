@@ -10,7 +10,7 @@
 
 import { useState } from "react";
 import AppHeader from "@/components/chrome/AppHeader";
-import AnalysisProgressModal from "@/components/studio/AnalysisProgressModal";
+import ProgressModal from "@/components/studio/ProgressModal";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import {
@@ -75,11 +75,7 @@ export default function VisionPage() {
   return (
     <StudioPage>
       {progressOpen && (
-        <AnalysisProgressModal
-          mode="vision"
-          running={analyzing}
-          onClose={() => setProgressOpen(false)}
-        />
+        <ProgressModal mode="vision" onClose={() => setProgressOpen(false)} />
       )}
       <AppHeader />
 

@@ -19,30 +19,36 @@ import { useEffect, useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
 import { interruptCurrent } from "@/lib/api/process";
-import type { HistoryMode } from "@/lib/api/types";
+import type { PipelineMode } from "@/lib/pipeline-defs";
 import { toast } from "@/stores/useToastStore";
 import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useVideoStore } from "@/stores/useVideoStore";
+import { useVisionStore } from "@/stores/useVisionStore";
+import { useVisionCompareStore } from "@/stores/useVisionCompareStore";
 // 2026-04-27 (C2-P1-2): 3 mode 타임라인 + TimelineRow + DetailBox 분해.
 // 2026-04-27 (Phase 2/3): Edit/Video PipelineTimeline 으로 교체. Generate 는 GenerateTimeline 유지.
+// 2026-04-27 (Phase 6): vision/compare 도 PipelineTimeline 단일 컴포넌트로 통일.
 import { PipelineTimeline } from "./progress/PipelineTimeline";
 import { GenerateTimeline } from "./progress/Timelines";
+
+const MODE_TITLES: Record<PipelineMode, string> = {
+  generate: "이미지 생성 중",
+  edit: "이미지 수정 중",
+  video: "영상 생성 중",
+  vision: "비전 분석 중",
+  compare: "비교 분석 중",
+};
 
 export default function ProgressModal({
   mode,
   onClose,
 }: {
-  mode: HistoryMode;
+  mode: PipelineMode;
   onClose: () => void;
 }) {
   const canInterruptComfy = useComfyInterruptAvailability(mode);
-  const headerTitle =
-    mode === "generate"
-      ? "이미지 생성 중"
-      : mode === "edit"
-        ? "이미지 수정 중"
-        : "영상 생성 중";
+  const headerTitle = MODE_TITLES[mode];
   const handleCancel = async () => {
     if (!canInterruptComfy) return;
     const ok = await interruptCurrent();
@@ -99,10 +105,8 @@ export default function ProgressModal({
         >
           {mode === "generate" ? (
             <GenerateTimeline />
-          ) : mode === "edit" ? (
-            <PipelineTimeline mode="edit" />
           ) : (
-            <PipelineTimeline mode="video" />
+            <PipelineTimeline mode={mode} />
           )}
         </div>
       </section>
@@ -110,7 +114,7 @@ export default function ProgressModal({
   );
 }
 
-function useComfyInterruptAvailability(mode: HistoryMode): boolean {
+function useComfyInterruptAvailability(mode: PipelineMode): boolean {
   const genRunning = useGenerateStore((s) => s.generating);
   const genStageHistory = useGenerateStore((s) => s.stageHistory);
 
@@ -135,6 +139,7 @@ function useComfyInterruptAvailability(mode: HistoryMode): boolean {
   if (mode === "video") {
     return videoRunning && lastVideoStage === "comfyui-sampling";
   }
+  // Phase 6: vision/compare 는 ComfyUI 미사용 → interrupt 버튼 안 노출
   return false;
 }
 
@@ -144,7 +149,7 @@ function useComfyInterruptAvailability(mode: HistoryMode): boolean {
  *
  * 500ms 간격으로 tick — 경과 시간 즉시성 유지.
  */
-function StatusBar({ mode }: { mode: HistoryMode }) {
+function StatusBar({ mode }: { mode: PipelineMode }) {
   // mode 별 store 에서 startedAt / sampling 정보 pull
   const genStartedAt = useGenerateStore((s) => s.startedAt);
   const genSamplingStep = useGenerateStore((s) => s.samplingStep);
@@ -167,38 +172,68 @@ function StatusBar({ mode }: { mode: HistoryMode }) {
   const videoRunning = useVideoStore((s) => s.running);
   const videoProgress = useVideoStore((s) => s.pipelineProgress);
 
+  // Phase 6 (2026-04-27): vision/compare — startedAt/progress 는 stageHistory 기반 추정.
+  // 비전 분석은 ComfyUI 미사용 → samplingStep/Total 항상 null → "스텝 N/M" 칩 안 나옴.
+  const visionStageHistory = useVisionStore((s) => s.stageHistory);
+  const visionRunning = useVisionStore((s) => s.running);
+  const compareStageHistory = useVisionCompareStore((s) => s.stageHistory);
+  const compareRunning = useVisionCompareStore((s) => s.running);
+
+  const visionStartedAt = visionStageHistory[0]?.arrivedAt ?? null;
+  const visionProgress = visionStageHistory.length
+    ? visionStageHistory[visionStageHistory.length - 1].progress
+    : 0;
+  const compareStartedAt = compareStageHistory[0]?.arrivedAt ?? null;
+  const compareProgress = compareStageHistory.length
+    ? compareStageHistory[compareStageHistory.length - 1].progress
+    : 0;
+
   const startedAt =
     mode === "generate"
       ? genStartedAt
       : mode === "edit"
         ? editStartedAt
-        : videoStartedAt;
+        : mode === "video"
+          ? videoStartedAt
+          : mode === "vision"
+            ? visionStartedAt
+            : compareStartedAt;
   const samplingStep =
     mode === "generate"
       ? genSamplingStep
       : mode === "edit"
         ? editSamplingStep
-        : videoSamplingStep;
+        : mode === "video"
+          ? videoSamplingStep
+          : null; // vision/compare: ComfyUI 미사용
   const samplingTotal =
     mode === "generate"
       ? genSamplingTotal
       : mode === "edit"
         ? editSamplingTotal
-        : videoSamplingTotal;
+        : mode === "video"
+          ? videoSamplingTotal
+          : null;
   const running =
     mode === "generate"
       ? genRunning
       : mode === "edit"
         ? editRunning
-        : videoRunning;
-  // Generate/Edit/Video 모두 백엔드 stream 기반 progress (0~100) 사용.
-  // Edit 는 audit P1a 에서 stepDone/4 → pipelineProgress 로 통일.
+        : mode === "video"
+          ? videoRunning
+          : mode === "vision"
+            ? visionRunning
+            : compareRunning;
   const progress =
     mode === "generate"
       ? genProgress
       : mode === "edit"
         ? editProgress
-        : videoProgress;
+        : mode === "video"
+          ? videoProgress
+          : mode === "vision"
+            ? visionProgress
+            : compareProgress;
 
   // 경과 시간 500ms tick
   const [nowTick, setNowTick] = useState(() => Date.now());
