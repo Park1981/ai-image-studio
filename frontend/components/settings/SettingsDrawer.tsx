@@ -199,8 +199,8 @@ function ProcessSection() {
 
   return (
     <Section title="프로세스" desc="로컬 AI 런타임 상태">
-      <StatusLine name="Ollama" status={ollama} />
-      <StatusLine name="ComfyUI" status={comfyui} />
+      <StatusLine name="Ollama" port={11434} status={ollama} />
+      <StatusLine name="ComfyUI" port={8188} status={comfyui} />
       {/* Mock 모드 안내 — start.ps1 정상 실행 시 USE_MOCK=false 라 숨김. */}
       {USE_MOCK && (
         <div
@@ -217,15 +217,28 @@ function ProcessSection() {
   );
 }
 
-function StatusLine({ name, status }: { name: string; status: ProcStatus }) {
+/** 프로세스 한 줄 — 카드 박스 (옛 디자인 복원) + dot + name + 포트 + 상태 칩.
+ *  하단 desc (gemma4 / Qwen Image …) 와 시작/정지 버튼은 제거 — 라이프사이클은 start.ps1. */
+function StatusLine({
+  name,
+  port,
+  status,
+}: {
+  name: string;
+  port: number;
+  status: ProcStatus;
+}) {
   const running = status === "running";
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 10,
-        padding: "8px 12px",
+        gap: 12,
+        padding: "10px 12px",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
+        borderRadius: "var(--radius)",
       }}
     >
       <span
@@ -238,10 +251,32 @@ function StatusLine({ name, status }: { name: string; status: ProcStatus }) {
           flexShrink: 0,
         }}
       />
-      <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
-        {name}
-      </span>
-      <span style={{ fontSize: 12, color: "var(--ink-3)" }}>
+      <div style={{ flex: 1, display: "flex", alignItems: "baseline", gap: 8 }}>
+        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+          {name}
+        </span>
+        <span
+          className="mono"
+          style={{
+            fontSize: 10,
+            color: "var(--ink-4)",
+            letterSpacing: ".04em",
+          }}
+        >
+          :{port}
+        </span>
+      </div>
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "3px 9px",
+          borderRadius: "var(--radius-full)",
+          background: running ? "rgba(82,196,26,.12)" : "var(--bg-2)",
+          color: running ? "#15803d" : "var(--ink-3)",
+          border: `1px solid ${running ? "rgba(82,196,26,.32)" : "var(--line)"}`,
+        }}
+      >
         {running ? "실행 중" : "정지"}
       </span>
     </div>
@@ -249,36 +284,96 @@ function StatusLine({ name, status }: { name: string; status: ProcStatus }) {
 }
 
 /* ─────────────────────────────────
-   2. Model Info (inline · 2026-04-27)
+   2. Model Info (display · 2026-04-27)
    ───────────────────────────────── */
 
-/** 모델 정보 — inline 한 줄 표시 (오빠 피드백 2026-04-27).
- *  "생성 : qwen-image-2512" 식으로 라벨 + 모델명. 모델명만 진하게.
- *  텍스트/비전 LLM 은 사용자한테 의미 없는 정보라 제거. */
+/** 모델 정보 — 4개 라우트 (생성/수정/영상/비전) 표시 전용.
+ *  카드 한 개 안에 행 4개. 라벨 = 보통 톤 / 모델명 = 진하게 + mono.
+ *  좌측에 라벨별 accent dot 으로 분류. */
+const MODEL_ROWS: { label: string; accent: string; model: string }[] = [
+  { label: "이미지 생성", accent: "#3b82f6", model: GENERATE_MODEL.displayName }, // blue
+  { label: "이미지 수정", accent: "#8b5cf6", model: EDIT_MODEL.displayName },     // violet
+  { label: "영상 생성",   accent: "#f43f5e", model: "LTX Video 2.3" },           // rose
+  { label: "이미지 분석", accent: "#22c55e", model: "qwen2.5vl:7b" },            // green
+];
+
 function ModelSection() {
   return (
-    <Section title="모델">
-      <ModelLine label="생성" model={GENERATE_MODEL.displayName} />
-      <ModelLine label="수정" model={EDIT_MODEL.displayName} />
+    <Section title="모델" desc="각 작업에 사용 중인 로컬 모델">
+      <div
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          background: "var(--surface)",
+          border: "1px solid var(--line)",
+          borderRadius: "var(--radius)",
+          overflow: "hidden",
+        }}
+      >
+        {MODEL_ROWS.map((r, idx) => (
+          <ModelRow
+            key={r.label}
+            label={r.label}
+            accent={r.accent}
+            model={r.model}
+            divider={idx < MODEL_ROWS.length - 1}
+          />
+        ))}
+      </div>
     </Section>
   );
 }
 
-function ModelLine({ label, model }: { label: string; model: string }) {
+function ModelRow({
+  label,
+  accent,
+  model,
+  divider,
+}: {
+  label: string;
+  accent: string;
+  model: string;
+  divider: boolean;
+}) {
   return (
     <div
       style={{
         display: "flex",
-        alignItems: "baseline",
-        gap: 8,
-        padding: "6px 12px",
-        fontSize: 13,
+        alignItems: "center",
+        gap: 10,
+        padding: "10px 12px",
+        borderBottom: divider ? "1px solid var(--line)" : "none",
       }}
     >
-      <span style={{ color: "var(--ink-3)", minWidth: 40 }}>{label}</span>
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: "50%",
+          background: accent,
+          flexShrink: 0,
+        }}
+      />
+      <span
+        style={{
+          fontSize: 12,
+          color: "var(--ink-3)",
+          fontWeight: 500,
+          minWidth: 78,
+        }}
+      >
+        {label}
+      </span>
       <span
         className="mono"
-        style={{ color: "var(--ink)", fontWeight: 600, fontSize: 12.5 }}
+        style={{
+          fontSize: 12.5,
+          fontWeight: 700,
+          color: "var(--ink)",
+          letterSpacing: "-.005em",
+          flex: 1,
+          textAlign: "right",
+        }}
       >
         {model}
       </span>
