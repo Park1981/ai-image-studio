@@ -17,10 +17,9 @@ import { useProcessStore, type ProcStatus } from "@/stores/useProcessStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { toast } from "@/stores/useToastStore";
-import { setProcessStatus, listOllamaModels } from "@/lib/api/process";
+import { setProcessStatus } from "@/lib/api/process";
+import { USE_MOCK } from "@/lib/api/client";
 import { clearHistory as apiClearHistory } from "@/lib/api/history";
-import type { OllamaModel } from "@/lib/api/types";
-import { useEffect, useState } from "react";
 import { useSettings } from "./SettingsContext";
 
 /* ─────────────────────────────────
@@ -317,172 +316,67 @@ function ProcessSection() {
           </div>
         );
       })}
-      <div
-        style={{
-          fontSize: 10.5,
-          color: "var(--ink-4)",
-          paddingLeft: 4,
-        }}
-      >
-        ⓘ 현재 Mock 상태. 실제 프로세스 제어는 Phase 2 백엔드 연결 후.
-      </div>
+      {/* Mock 모드 안내 — start.ps1 정상 실행 시 USE_MOCK=false 라 숨김.
+       *  NEXT_PUBLIC_USE_MOCK 미설정 / true 인 별도 dev 환경에서만 노출. */}
+      {USE_MOCK && (
+        <div
+          style={{
+            fontSize: 10.5,
+            color: "var(--ink-4)",
+            paddingLeft: 4,
+          }}
+        >
+          ⓘ 현재 Mock 모드 (NEXT_PUBLIC_USE_MOCK=true). 백엔드 미연결 — 결과는 가짜.
+        </div>
+      )}
     </Section>
   );
 }
 
 /* ─────────────────────────────────
-   2. Model Selector
+   2. Model Info (read-only · 2026-04-27)
    ───────────────────────────────── */
 
-// 알려진 vision-capable 모델 prefix (name 에 포함되면 비전 후보로 간주)
-const VISION_HINTS = ["vision", "llava", "vl:", "qwen2.5vl", "bakllava", "moondream"];
-
+/** 사용자 노출 모델 정보 — 표시 전용.
+ *  이전엔 SelectRow + listOllamaModels 자동조회 + ensureIn 등 복잡했지만,
+ *  실제로는 프리셋 단일 모델만 사용해서 의미가 없었음 (오빠 피드백 2026-04-27).
+ *  store 의 setter (setOllamaModel/setVisionModel) 는 backwards compat 으로 보존 — 호출 안 함.
+ */
 function ModelSection() {
-  const {
-    generateModel,
-    editModel,
-    ollamaModel,
-    visionModel,
-    setGenerateModel,
-    setEditModel,
-    setOllamaModel,
-    setVisionModel,
-  } = useSettingsStore();
-
-  const [ollamaList, setOllamaList] = useState<OllamaModel[]>([]);
-
-  // 드로어가 마운트되면 한 번 Ollama 설치 모델 조회
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      const models = await listOllamaModels();
-      if (!cancelled) setOllamaList(models);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const allNames = ollamaList.length
-    ? ollamaList.map((m) => m.name)
-    : // 폴백 — API 실패 시 자주 쓰는 후보 고정 목록
-      ["gemma4-un:latest", "qwen2.5vl:7b", "llava:13b"];
-
-  const visionCandidates = allNames.filter((n) =>
-    VISION_HINTS.some((h) => n.toLowerCase().includes(h.toLowerCase())),
-  );
-  const textCandidates = allNames.filter(
-    (n) => !visionCandidates.includes(n),
-  );
-
-  // 선택된 게 목록에 없어도 상단에 유지 (사용자가 직접 설정한 값 존중)
-  const ensureIn = (list: string[], value: string) =>
-    list.includes(value) ? list : [value, ...list];
+  const { ollamaModel, visionModel } = useSettingsStore();
 
   return (
-    <Section title="모델" desc="각 역할에서 사용할 로컬 모델 선택">
-      <SelectRow
-        label="생성"
-        value={generateModel}
-        options={[GENERATE_MODEL.displayName]}
-        onChange={setGenerateModel}
-      />
-      <SelectRow
-        label="수정"
-        value={editModel}
-        options={[EDIT_MODEL.displayName]}
-        onChange={setEditModel}
-      />
-      <SelectRow
-        label="텍스트 LLM (프롬프트 업그레이드)"
-        value={ollamaModel}
-        options={ensureIn(
-          textCandidates.length ? textCandidates : allNames,
-          ollamaModel,
-        )}
-        onChange={setOllamaModel}
-      />
-      <SelectRow
-        label="비전 LLM (수정 모드 이미지 분석)"
-        value={visionModel}
-        options={ensureIn(
-          visionCandidates.length ? visionCandidates : allNames,
-          visionModel,
-        )}
-        onChange={setVisionModel}
-      />
-      {ollamaList.length === 0 && (
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--ink-4)",
-            background: "var(--bg-2)",
-            padding: "8px 10px",
-            borderRadius: "var(--radius-sm)",
-          }}
-        >
-          Ollama 모델 목록 조회 실패. 서버 상태 확인.
-        </div>
-      )}
-      {visionCandidates.length === 0 && (
-        <div
-          style={{
-            fontSize: 11,
-            color: "var(--amber-ink)",
-            background: "var(--amber-soft)",
-            padding: "8px 10px",
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid rgba(250,173,20,.35)",
-          }}
-        >
-          ⚠ 설치된 비전 모델이 없어. 추천: <code>ollama pull qwen2.5vl:7b</code> (5.5GB) 또는{" "}
-          <code>llama3.2-vision:11b</code> (7.8GB).
-        </div>
-      )}
+    <Section title="모델" desc="각 역할에서 사용 중인 로컬 모델 (표시 전용)">
+      <DisplayRow label="생성" value={GENERATE_MODEL.displayName} />
+      <DisplayRow label="수정" value={EDIT_MODEL.displayName} />
+      <DisplayRow label="텍스트 LLM (프롬프트 업그레이드)" value={ollamaModel} />
+      <DisplayRow label="비전 LLM (이미지 분석)" value={visionModel} />
     </Section>
   );
 }
 
-function SelectRow({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: string;
-  options: string[];
-  onChange: (v: string) => void;
-}) {
+function DisplayRow({ label, value }: { label: string; value: string }) {
   return (
-    <label style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
       <span style={{ fontSize: 11.5, color: "var(--ink-3)", fontWeight: 500 }}>
         {label}
       </span>
-      <select
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
+      <div
         className="mono"
         style={{
-          all: "unset",
-          display: "block",
           width: "100%",
-          cursor: "pointer",
           padding: "8px 10px",
           fontSize: 12,
           border: "1px solid var(--line)",
           borderRadius: "var(--radius-sm)",
-          background: "var(--surface)",
-          color: "var(--ink)",
+          background: "var(--bg-2)",
+          color: "var(--ink-2)",
+          userSelect: "text",
         }}
       >
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </label>
+        {value}
+      </div>
+    </div>
   );
 }
 
