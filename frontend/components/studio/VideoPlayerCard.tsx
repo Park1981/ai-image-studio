@@ -89,18 +89,28 @@ export default function VideoPlayerCard({
     );
   }
 
-  // ── Filled ── (audit R2-8: radius 토큰화)
+  // ── Filled ── 2026-04-27 매트 카드 + dot grid (Generate / Edit 와 통일)
   return (
     <div
       style={{
-        background: "var(--surface)",
+        // 카드 외관 = 매트 (var(--surface) + dot grid + border + shadow)
+        backgroundColor: "var(--surface)",
+        backgroundImage:
+          "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
+        backgroundSize: "16px 16px",
         border: "1px solid var(--line)",
         borderRadius: "var(--radius-card)",
         boxShadow: "var(--shadow-sm)",
         overflow: "hidden",
+        // 매트 padding — video 가 떠있는 느낌 (사진 갤러리 톤)
+        padding: 24,
+        boxSizing: "border-box",
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
       }}
     >
-      {/* video element — Next img 룰 적용 대상 아님 */}
+      {/* video element — 매트 위 떠있는 영상 (자체 그림자 + 옅은 테두리) */}
       <video
         src={src}
         controls
@@ -112,16 +122,19 @@ export default function VideoPlayerCard({
           display: "block",
           background: "#0a0a0a",
           maxHeight: "60vh",
+          borderRadius: "var(--radius-md)",
+          boxShadow:
+            "0 10px 32px rgba(0,0,0,.14), 0 3px 10px rgba(0,0,0,.08)",
+          border: "1px solid rgba(0,0,0,.06)",
         }}
       />
       <div
         style={{
-          padding: "10px 14px",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
           gap: 8,
-          borderTop: "1px solid var(--line)",
+          // padding/border 제거 — 매트 padding 안에서 footer 자연 정렬
         }}
       >
         <span

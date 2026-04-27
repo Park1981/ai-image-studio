@@ -19,6 +19,7 @@
 
 import type { RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import {
   StudioLeftPanel,
@@ -79,10 +80,42 @@ export default function VideoLeftPanel({
         description="원본 이미지와 영상 지시로 5초 MP4를 생성합니다."
       />
 
+      {/* Primary CTA — sticky 상단 (Generate / Edit 와 통일) */}
+      <div className="ais-cta-sticky-top">
+        <button
+          type="button"
+          onClick={onGenerate}
+          disabled={ctaDisabled}
+          className="ais-cta-primary"
+        >
+          {running ? (
+            <>
+              <Spinner /> 처리 중…
+            </>
+          ) : (
+            <>
+              <Icon name="sparkle" size={15} />
+              영상 생성
+            </>
+          )}
+        </button>
+        <div className="ais-cta-eta">
+          평균 소요{" "}
+          <span className="mono">{lightning ? "5~10분" : "25~40분"}</span> ·
+          5초 영상 · 로컬 처리
+        </div>
+      </div>
+
       {/* ── 원본 이미지 ── */}
       <div>
         <div className="ais-field-header">
-          <label className="ais-field-label">원본 이미지</label>
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="blue" />
+            원본 이미지
+          </label>
           <span className="mono ais-field-meta">
             {sourceWidth && sourceHeight
               ? `${sourceWidth}×${sourceHeight}`
@@ -103,7 +136,13 @@ export default function VideoLeftPanel({
       {/* ── 영상 지시 prompt ── */}
       <div>
         <div className="ais-field-header">
-          <label className="ais-field-label">영상 지시</label>
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="blue" />
+            영상 지시
+          </label>
           <span className="mono ais-field-meta">{prompt.length} chars</span>
         </div>
         <div className="ais-prompt-shell">
@@ -138,22 +177,28 @@ export default function VideoLeftPanel({
         sourceHeight={sourceHeight}
       />
 
-      {/* ── Lightning / Adult 토글 ── */}
+      {/* ── 고퀄 모드 토글 (Generate / Edit 와 통일 · 의미 반전)
+       *  OFF=Lightning 빠름 (기본) / ON=💎 고퀄 모드 (강화 옵션 · 얼굴 보존 우선)
+       *  store 의 lightning 의미는 그대로 (true=빠름) — UI 만 반전 (`!lightning`).
+       */}
       <Toggle
-        checked={lightning}
-        onChange={setLightning}
-        label={lightning ? "Lightning 4-step" : "고품질 30-step"}
+        checked={!lightning}
+        onChange={(v) => setLightning(!v)}
+        align="right"
+        label="💎 고퀄 모드"
         desc={
           lightning
-            ? "빠른 생성 · 약 5분 · 얼굴 변할 수 있음"
+            ? "Lightning 4-step · 약 5분 · 얼굴 변할 수 있음 (기본)"
             : "Full step · 약 20분+ · 얼굴 보존 우선"
         }
       />
 
+      {/* 성인 모드 — align="right" (의미는 그대로 ON=켜짐 자연스러움) */}
       <Toggle
         checked={adult}
         onChange={setAdult}
-        label={adult ? "성인 모드 켜짐" : "성인 모드 꺼짐"}
+        align="right"
+        label="🔞 성인 모드"
         desc={
           adult
             ? "에로틱 모션 + NSFW LoRA 적용"
@@ -190,33 +235,6 @@ export default function VideoLeftPanel({
         <code>LTX_UNET_NAME</code> 지정으로 경량 variant 교체.
       </div>
 
-      <div style={{ flex: 1 }} />
-
-      {/* ── Primary CTA (sticky 하단 + ETA) ── */}
-      <div className="ais-cta-sticky">
-        <button
-          type="button"
-          onClick={onGenerate}
-          disabled={ctaDisabled}
-          className="ais-cta-primary"
-        >
-          {running ? (
-            <>
-              <Spinner /> 처리 중…
-            </>
-          ) : (
-            <>
-              <Icon name="sparkle" size={15} />
-              영상 생성
-            </>
-          )}
-        </button>
-        <div className="ais-cta-eta">
-          평균 소요{" "}
-          <span className="mono">{lightning ? "5~10분" : "25~40분"}</span> ·
-          5초 영상 · 로컬 처리
-        </div>
-      </div>
     </StudioLeftPanel>
   );
 }
