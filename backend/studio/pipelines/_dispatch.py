@@ -266,7 +266,7 @@ async def _ensure_comfyui_ready(task: "Task", progress_at: int) -> None:
 
 async def _dispatch_to_comfy(
     task: "Task",
-    api_prompt_factory: Callable[[str | None], dict[str, Any]],
+    api_prompt_factory: Callable[..., dict[str, Any]],
     *,
     mode: str,
     progress_start: int,
@@ -274,6 +274,8 @@ async def _dispatch_to_comfy(
     client_prefix: str = "ais",
     upload_bytes: bytes | None = None,
     upload_filename: str | None = None,
+    # Multi-ref (2026-04-27): 추가 업로드 (현재는 1건만 — reference). 미래 확장 가능.
+    extra_uploads: list[tuple[bytes, str]] | None = None,
     save_output: SaveOutputFn | None = None,
     # 2026-04-26 idle 600→1200s, hard 1800→7200s — 16GB VRAM 풀 퀄리티 swap 케이스 안전망.
     idle_timeout: float = 1200.0,
@@ -319,7 +321,21 @@ async def _dispatch_to_comfy(
                 uploaded_name = await comfy.upload_image(
                     upload_bytes, upload_filename or "input.png"
                 )
-            api_prompt = api_prompt_factory(uploaded_name)
+            # Multi-ref: extra 업로드 (있으면 순차) — extra_uploads None 이면 옛 흐름.
+            # ⚠️ Codex 2차 리뷰 fix #2: factory 호출 시 keyword 는 extra_uploads 있을 때만.
+            # 옛 generate/video factory 는 positional 1개만 받음 — 영향 0 보장.
+            if extra_uploads:
+                extra_uploaded_names: list[str] = []
+                for extra_bytes, extra_filename in extra_uploads:
+                    extra_name = await comfy.upload_image(
+                        extra_bytes, extra_filename or "extra.png"
+                    )
+                    extra_uploaded_names.append(extra_name)
+                api_prompt = api_prompt_factory(
+                    uploaded_name, extra_uploaded_names=extra_uploaded_names,
+                )
+            else:
+                api_prompt = api_prompt_factory(uploaded_name)
             prompt_id = await comfy.submit(api_prompt, client_id)
             log.info("ComfyUI submitted prompt_id=%s", prompt_id)
 

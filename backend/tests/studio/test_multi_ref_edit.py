@@ -236,10 +236,53 @@ def test_no_reference_returns_single_path():
     assert load_count == 1
 
 
-def test_reference_filename_with_stub_returns_same_as_single():
-    """Phase 1: _build_edit_api_multi_ref 가 stub 폴백 → 단일 path 와 동일.
+# ─────────────────────────────────────────────
+# Phase 4 Task 12: build_reference_clause 단위 테스트
+# SYSTEM_EDIT 의 role 별 동적 clause 빌드 검증.
+# ─────────────────────────────────────────────
 
-    Phase 4 에서 진짜 multi-ref 노드 체인 작성 시 이 테스트는 갱신.
+
+def test_build_reference_clause_none_returns_empty():
+    """None 또는 빈 문자열 → 옛 흐름 (빈 문자열 — SYSTEM_EDIT 변화 0)."""
+    from studio.prompt_pipeline import build_reference_clause
+
+    assert build_reference_clause(None) == ""
+    assert build_reference_clause("") == ""
+
+
+def test_build_reference_clause_face_preset():
+    """face preset → ROLE_INSTRUCTIONS 의 정의된 instruction 주입."""
+    from studio.prompt_pipeline import build_reference_clause
+
+    out = build_reference_clause("face")
+    assert "MULTI-REFERENCE MODE" in out
+    assert "FACE IDENTITY" in out
+
+
+def test_build_reference_clause_custom_text():
+    """preset 외 자유 텍스트 → User-described role 로 그대로 주입 (한글도 OK)."""
+    from studio.prompt_pipeline import build_reference_clause
+
+    out = build_reference_clause("헤어스타일 참조")
+    assert "MULTI-REFERENCE MODE" in out
+    assert "헤어스타일 참조" in out
+
+
+def test_build_reference_clause_truncates_long_text():
+    """200자 cap 검증 — 악성 긴 토큰 주입 방지."""
+    from studio.prompt_pipeline import build_reference_clause
+
+    long_text = "x" * 500
+    out = build_reference_clause(long_text)
+    # 200자 cap 검증 — 결과 안에 200개의 x 포함되되, 500개는 안 됨
+    assert "x" * 200 in out
+    assert "x" * 201 not in out
+
+
+def test_reference_returns_extra_load_image_node():
+    """Phase 4 Task 15: multi-ref 케이스는 LoadImage 노드 2개 (image1 + image2).
+
+    옛 stub 테스트를 진짜 검증으로 교체 (Codex Phase 1-3 통합 리뷰 Important #2 fix).
     """
     from studio.comfy_api_builder import build_edit_api
 
@@ -249,5 +292,69 @@ def test_reference_filename_with_stub_returns_same_as_single():
     api_single = build_edit_api(inp_single)
     api_multi = build_edit_api(inp_multi)
 
-    # Phase 1 stub: multi-ref 도 단일 path 와 동일한 키 셋
-    assert set(api_single.keys()) == set(api_multi.keys())
+    # Single path: LoadImage 1개 (옛 흐름)
+    load_count_single = sum(
+        1 for n in api_single.values() if n["class_type"] == "LoadImage"
+    )
+    assert load_count_single == 1
+
+    # Multi-ref: LoadImage 2개 (image1 + image2)
+    load_count_multi = sum(
+        1 for n in api_multi.values() if n["class_type"] == "LoadImage"
+    )
+    assert load_count_multi == 2
+
+    # FluxKontextImageScale 도 2개 (각 image 별)
+    scale_count_multi = sum(
+        1 for n in api_multi.values() if n["class_type"] == "FluxKontextImageScale"
+    )
+    assert scale_count_multi == 2
+
+    # TextEncodeQwenImageEditPlus pos + neg 둘 다 image2 슬롯에도 연결됐는지
+    encode_nodes = [
+        n for n in api_multi.values()
+        if n["class_type"] == "TextEncodeQwenImageEditPlus"
+    ]
+    assert len(encode_nodes) == 2  # pos + neg
+    for enc in encode_nodes:
+        assert "image1" in enc["inputs"]
+        assert "image2" in enc["inputs"]
+
+
+def test_make_edit_prompt_passes_extra_upload_to_builder():
+    """edit pipeline 의 _make_edit_prompt factory 가 extra_uploaded_names[0] 을
+    build_edit_from_request 의 reference_image_filename 으로 정확히 전달."""
+    from studio.comfy_api_builder import build_edit_from_request
+
+    api = build_edit_from_request(
+        prompt="test",
+        source_filename="src.png",
+        seed=1,
+        lightning=False,
+        reference_image_filename="ref.png",
+        reference_role="face",
+    )
+
+    # multi-ref path 로 분기됐는지 — LoadImage 2개 (src + ref)
+    load_nodes = [n for n in api.values() if n["class_type"] == "LoadImage"]
+    assert len(load_nodes) == 2
+    image_inputs = [n["inputs"]["image"] for n in load_nodes]
+    assert "src.png" in image_inputs
+    assert "ref.png" in image_inputs
+
+
+def test_make_edit_prompt_no_extra_returns_single_path():
+    """build_edit_from_request 의 reference_image_filename 이 None 이면 단일 path."""
+    from studio.comfy_api_builder import build_edit_from_request
+
+    api = build_edit_from_request(
+        prompt="test",
+        source_filename="src.png",
+        seed=1,
+        lightning=False,
+        reference_image_filename=None,
+        reference_role=None,
+    )
+
+    load_nodes = [n for n in api.values() if n["class_type"] == "LoadImage"]
+    assert len(load_nodes) == 1

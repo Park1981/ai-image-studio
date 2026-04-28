@@ -160,6 +160,59 @@ LANGUAGE
 - Output is English-only (no Korean characters in the final prompt).
 - Never repeat words or phrases."""
 
+
+# Multi-reference role 별 SYSTEM_EDIT 추가 instruction (2026-04-27).
+# 사용자가 명시한 reference_role 에 따라 동적 주입 — Qwen Edit 가
+# image2 의 어떤 측면을 참조로 사용할지 명확히.
+ROLE_INSTRUCTIONS: dict[str, str] = {
+    "face": (
+        "Reference image (image2) provides FACE IDENTITY. "
+        "Preserve facial structure, features, and expression from image2 "
+        "while applying user's edit to the rest. Do not transfer makeup or hair "
+        "unless user explicitly mentions."
+    ),
+    "outfit": (
+        "Reference image (image2) provides CLOTHING/ACCESSORIES reference. "
+        "Apply only the outfit, garments, or accessories from image2 onto the "
+        "subject in image1. Keep face, pose, and background of image1."
+    ),
+    "style": (
+        "Reference image (image2) provides STYLE REFERENCE — color palette, "
+        "lighting tone, and mood. Match these aesthetics on image1 without "
+        "altering the subject's identity or composition."
+    ),
+    "background": (
+        "Reference image (image2) provides BACKGROUND/ENVIRONMENT reference. "
+        "Replace or blend image1's background with the environment shown in "
+        "image2, keeping the subject's pose and identity intact."
+    ),
+}
+
+
+def build_reference_clause(reference_role: str | None) -> str:
+    """role 별 SYSTEM_EDIT 추가 clause 빌드 (2026-04-27 Multi-reference Phase 4).
+
+    - None / 빈 문자열: 빈 문자열 반환 (옛 동작 동일 — multi-ref 미사용 케이스)
+    - preset id 매칭 (face/outfit/style/background): ROLE_INSTRUCTIONS 의 정의된 instruction
+    - 알 수 없는 값 (자유 텍스트): "User-described role" 로 그대로 주입 (200자 cap · 악성 토큰 위험 낮춤)
+
+    반환값은 SYSTEM_EDIT 의 끝에 \\n\\n 으로 append 됨.
+    """
+    if not reference_role:
+        return ""
+    preset = ROLE_INSTRUCTIONS.get(reference_role)
+    if preset:
+        return f"\n\nMULTI-REFERENCE MODE:\n{preset}"
+    # 자유 텍스트 — 사용자 입력 그대로 전달 (악성 토큰 위험 낮음 · 길이 제한)
+    safe_text = reference_role.strip()[:200]
+    return (
+        "\n\nMULTI-REFERENCE MODE:\n"
+        f"Reference image (image2) provides: {safe_text}. "
+        "Use this reference as guidance for the edit, "
+        "applying to image1 the aspects implied by the user description."
+    )
+
+
 SYSTEM_VIDEO_BASE = """You are a cinematic prompt engineer for LTX-2.3 video generation.
 
 You receive:
@@ -626,6 +679,7 @@ async def upgrade_edit_prompt(
     include_translation: bool = True,
     *,
     analysis: Any = None,
+    reference_role: str | None = None,
 ) -> UpgradeResult:
     """수정용 프롬프트 업그레이드 (v3 + spec 16 매트릭스 directive 통합).
 
@@ -653,8 +707,12 @@ async def upgrade_edit_prompt(
     user_msg_parts.append(f"[Edit instruction]\n{edit_instruction.strip()}")
     user_msg = "\n\n".join(user_msg_parts)
 
+    # Multi-reference (2026-04-27): role 별 추가 clause 동적 주입.
+    # reference_role 이 None / 빈 문자열이면 옛 SYSTEM_EDIT 그대로 (회귀 위험 0).
+    system_with_ref = SYSTEM_EDIT + build_reference_clause(reference_role)
+
     return await _run_upgrade_call(
-        system=SYSTEM_EDIT,
+        system=system_with_ref,
         user_msg=user_msg,
         original=edit_instruction,
         model=model,

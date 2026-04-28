@@ -550,13 +550,147 @@ def _build_edit_api_single(v: EditApiInput) -> ApiPrompt:
 
 
 def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
-    """이미지 + 참조 이미지 (image1+image2) 다중 참조 흐름.
+    """Multi-reference 흐름 — image1 + image2 둘 다 LoadImage + FluxKontextImageScale.
 
-    Phase 4 에서 진짜 노드 체인 작성 (TextEncodeQwenImageEditPlus 의 image2 슬롯 추가).
-    Phase 1-3 단계에선 단일 흐름으로 폴백 (reference_image_filename 무시).
+    TextEncodeQwenImageEditPlus 의 image1/image2 슬롯 둘 다 채움.
+    KSampler latent 는 image1 (편집 대상) 만 별도 VAEEncode.
+    image2 는 TextEncodeQwenImageEditPlus 내부에서 vae 인자로 reference latent 자동 인코딩
+    (ComfyUI 의 Qwen Edit Plus 노드 동작 — Codex 리뷰 검증).
+
+    2026-04-27 Phase 4 Task 15: stub 폴백 → 진짜 노드 체인.
     """
-    # TEMP: Phase 1-3 검증용 폴백. Phase 4 에서 진짜 multi-ref 노드 체인 작성.
-    return _build_edit_api_single(v)
+    api: ApiPrompt = {}
+    nid = _make_id_gen()
+
+    # Loaders (공통 헬퍼)
+    unet_id, clip_id, vae_id = _build_loaders(
+        api, nid,
+        unet_name=v.unet_name, clip_name=v.clip_name, vae_name=v.vae_name,
+    )
+
+    # Image1 (편집 대상) — LoadImage + FluxKontextImageScale
+    load1_id = nid()
+    api[load1_id] = {
+        "class_type": "LoadImage",
+        "inputs": {"image": v.source_image_filename, "upload": "image"},
+    }
+    scale1_id = nid()
+    api[scale1_id] = {
+        "class_type": "FluxKontextImageScale",
+        "inputs": {"image": [load1_id, 0]},
+    }
+
+    # Image2 (참조) — 동일 패턴.
+    # reference_image_filename 은 None 이 아닌 게 보장됨 (build_edit_api 분기에서).
+    assert v.reference_image_filename is not None
+    load2_id = nid()
+    api[load2_id] = {
+        "class_type": "LoadImage",
+        "inputs": {"image": v.reference_image_filename, "upload": "image"},
+    }
+    scale2_id = nid()
+    api[scale2_id] = {
+        "class_type": "FluxKontextImageScale",
+        "inputs": {"image": [load2_id, 0]},
+    }
+
+    # Model chain (단일 path 와 동일)
+    model_ref = _build_lora_chain(
+        api, nid,
+        base_model=[unet_id, 0],
+        lightning=v.lightning,
+        lightning_lora_name=v.lightning_lora_name,
+        extra_loras=v.extra_loras,
+    )
+    model_ref = _apply_model_sampling(api, nid, model_ref=model_ref, shift=v.shift)
+    cfgnorm_id = nid()
+    api[cfgnorm_id] = {
+        "class_type": "CFGNorm",
+        "inputs": {"model": model_ref, "strength": 1.0},
+    }
+    model_ref = [cfgnorm_id, 0]
+
+    # TextEncodeQwenImageEditPlus × 2 (pos+neg) — image1 + image2 둘 다 슬롯에 연결.
+    pos_enc_id = nid()
+    api[pos_enc_id] = {
+        "class_type": "TextEncodeQwenImageEditPlus",
+        "_meta": {"title": "Positive"},
+        "inputs": {
+            "clip": [clip_id, 0],
+            "vae": [vae_id, 0],
+            "image1": [scale1_id, 0],
+            "image2": [scale2_id, 0],
+            "prompt": v.prompt,
+        },
+    }
+    neg_enc_id = nid()
+    api[neg_enc_id] = {
+        "class_type": "TextEncodeQwenImageEditPlus",
+        "_meta": {"title": "Negative"},
+        "inputs": {
+            "clip": [clip_id, 0],
+            "vae": [vae_id, 0],
+            "image1": [scale1_id, 0],
+            "image2": [scale2_id, 0],
+            "prompt": "",
+        },
+    }
+
+    # FluxKontextMultiReferenceLatentMethod × 2 (단일 path 와 동일)
+    pos_ref_id = nid()
+    api[pos_ref_id] = {
+        "class_type": "FluxKontextMultiReferenceLatentMethod",
+        "inputs": {
+            "conditioning": [pos_enc_id, 0],
+            "reference_latents_method": "index_timestep_zero",
+        },
+    }
+    neg_ref_id = nid()
+    api[neg_ref_id] = {
+        "class_type": "FluxKontextMultiReferenceLatentMethod",
+        "inputs": {
+            "conditioning": [neg_enc_id, 0],
+            "reference_latents_method": "index_timestep_zero",
+        },
+    }
+
+    # VAEEncode — KSampler latent 는 image1 만.
+    # (image2 는 TextEncodeQwenImageEditPlus 내부에서 reference 인코딩 — Qwen Edit Plus 노드 동작)
+    encode_id = nid()
+    api[encode_id] = {
+        "class_type": "VAEEncode",
+        "inputs": {"pixels": [scale1_id, 0], "vae": [vae_id, 0]},
+    }
+
+    # KSampler + VAEDecode + SaveImage (단일 path 와 동일)
+    ksam_id = nid()
+    api[ksam_id] = {
+        "class_type": "KSampler",
+        "inputs": {
+            "seed": int(v.seed),
+            "steps": int(v.steps),
+            "cfg": float(v.cfg),
+            "sampler_name": v.sampler,
+            "scheduler": v.scheduler,
+            "denoise": 1.0,
+            "model": model_ref,
+            "positive": [pos_ref_id, 0],
+            "negative": [neg_ref_id, 0],
+            "latent_image": [encode_id, 0],
+        },
+    }
+
+    decode_id = nid()
+    api[decode_id] = {
+        "class_type": "VAEDecode",
+        "inputs": {"samples": [ksam_id, 0], "vae": [vae_id, 0]},
+    }
+
+    _save_image_node(
+        api, nid, decoded_ref=[decode_id, 0], filename_prefix=v.filename_prefix
+    )
+
+    return api
 
 
 def build_edit_from_request(
@@ -565,6 +699,8 @@ def build_edit_from_request(
     source_filename: str,
     seed: int,
     lightning: bool,
+    reference_image_filename: str | None = None,
+    reference_role: str | None = None,
 ) -> ApiPrompt:
     d = EDIT_MODEL.defaults
     lightning_lora = next(
@@ -591,6 +727,8 @@ def build_edit_from_request(
         vae_name=EDIT_MODEL.files.vae,
         extra_loras=extras,
         lightning_lora_name=lightning_lora.name if lightning_lora else None,
+        reference_image_filename=reference_image_filename,
+        reference_role=reference_role,
     )
     return build_edit_api(inp)
 

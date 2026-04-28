@@ -72,10 +72,13 @@ export function useEditPipeline({
     }
 
     // Multi-reference (2026-04-27): role 최종 문자열 결정.
-    // "custom" 이면 사용자 자유 텍스트 (빈 값이면 "general" fallback), 아니면 preset id 그대로.
-    const effectiveRole =
+    // "custom" + 자유 텍스트 → 텍스트 그대로 / "custom" + 빈 값 → undefined (role 명시 없음).
+    // Codex Phase 1-3 통합 리뷰 Important #3 fix: 빈 custom 의 폴백을 의미 없는
+    // "general" 로 보내는 대신 undefined 로 처리 → backend 의 build_reference_clause 가
+    // 빈 문자열 반환 → SYSTEM_EDIT 옛 그대로 (multi-ref 효과 X · 일반 edit 흐름).
+    const effectiveRole: string | undefined =
       referenceRole === "custom"
-        ? referenceRoleCustom.trim() || "general"
+        ? referenceRoleCustom.trim() || undefined
         : referenceRole;
 
     setRunning(true);

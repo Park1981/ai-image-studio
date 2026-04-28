@@ -401,6 +401,9 @@ async def run_vision_pipeline(
     *,
     width: int = 0,
     height: int = 0,
+    # Multi-reference (2026-04-27 Phase 4): image2 자체는 비전 분석 X —
+    # 사용자 명시 role 만 upgrade 단계로 전달해 SYSTEM_EDIT 분기 반영.
+    reference_role: str | None = None,
 ) -> VisionPipelineResult:
     """Edit 모드 비전 파이프라인 (v2 · spec 15장 패러다임 전환).
 
@@ -518,6 +521,8 @@ async def run_vision_pipeline(
         timeout=timeout,
         ollama_url=resolved_url,
         analysis=analysis if analysis_ok else None,
+        # Multi-reference (2026-04-27 Phase 4): None 이면 옛 SYSTEM_EDIT 그대로.
+        reference_role=reference_role,
     )
     return VisionPipelineResult(
         image_description=description,

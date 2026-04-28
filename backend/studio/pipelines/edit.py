@@ -75,6 +75,8 @@ async def _run_edit_pipeline(
                 # dead code 였음. 이제 layout/composition 정확도 ↑.
                 width=source_width,
                 height=source_height,
+                # Multi-ref (2026-04-27 Phase 4 Task 13): reference role 을 upgrade 단계로 전달.
+                reference_role=reference_role,
             )
         # getattr 로 안전 접근 — 기존 테스트의 경량 mock (속성 없음) 호환.
         _analysis = getattr(vision, "edit_vision_analysis", None)
@@ -117,15 +119,33 @@ async def _run_edit_pipeline(
 
         # Ollama unload + GPU gate 는 _dispatch_to_comfy 내부에서 공통 처리.
 
-        def _make_edit_prompt(uploaded_name: str | None) -> dict[str, Any]:
+        # Multi-ref (2026-04-27 Phase 4 Task 14): reference 없으면 effective_role = None
+        # (zero-regression gate — reference_bytes 가 없으면 role 도 무시).
+        effective_role = reference_role if reference_bytes is not None else None
+        extra_uploads_list: list[tuple[bytes, str]] | None = (
+            [(reference_bytes, reference_filename or "reference.png")]
+            if reference_bytes is not None
+            else None
+        )
+
+        def _make_edit_prompt(
+            uploaded_name: str | None,
+            *,
+            extra_uploaded_names: list[str] | None = None,
+        ) -> dict[str, Any]:
             # Edit 는 업로드 이후에만 호출됨 → uploaded_name 반드시 있음
             if uploaded_name is None:
                 raise RuntimeError("Edit pipeline requires uploaded image")
+            ref_filename: str | None = None
+            if extra_uploaded_names:
+                ref_filename = extra_uploaded_names[0]
             return build_edit_from_request(
                 prompt=vision.final_prompt,
                 source_filename=uploaded_name,
                 seed=actual_seed,
                 lightning=lightning,
+                reference_image_filename=ref_filename,
+                reference_role=effective_role,
             )
 
         dispatch = await _dispatch_to_comfy(
@@ -137,6 +157,7 @@ async def _run_edit_pipeline(
             client_prefix="ais-e",
             upload_bytes=image_bytes,
             upload_filename=filename or "input.png",
+            extra_uploads=extra_uploads_list,
         )
         image_ref = dispatch.image_ref
         comfy_err = dispatch.comfy_error
