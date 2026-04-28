@@ -37,6 +37,11 @@ export function useEditPipeline({
   const sourceLabel = useEditStore((s) => s.sourceLabel);
   const prompt = useEditStore((s) => s.prompt);
   const lightning = useEditStore((s) => s.lightning);
+  // Multi-reference (2026-04-27): 토글 OFF 면 모두 무관 — generate 안에서 게이트.
+  const useReferenceImage = useEditStore((s) => s.useReferenceImage);
+  const referenceImage = useEditStore((s) => s.referenceImage);
+  const referenceRole = useEditStore((s) => s.referenceRole);
+  const referenceRoleCustom = useEditStore((s) => s.referenceRoleCustom);
   // 실행 상태 setter
   const running = useEditStore((s) => s.running);
   const setRunning = useEditStore((s) => s.setRunning);
@@ -66,6 +71,13 @@ export function useEditPipeline({
       return;
     }
 
+    // Multi-reference (2026-04-27): role 최종 문자열 결정.
+    // "custom" 이면 사용자 자유 텍스트 (빈 값이면 "general" fallback), 아니면 preset id 그대로.
+    const effectiveRole =
+      referenceRole === "custom"
+        ? referenceRoleCustom.trim() || "general"
+        : referenceRole;
+
     setRunning(true);
     await consumePipelineStream(
       editImageStream({
@@ -74,6 +86,10 @@ export function useEditPipeline({
         lightning,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
+        // Multi-ref: 토글 OFF 면 reference 필드 모두 undefined → 옛 흐름 100% 동일.
+        useReferenceImage,
+        referenceImage: useReferenceImage ? referenceImage : undefined,
+        referenceRole: useReferenceImage ? effectiveRole : undefined,
       }),
       {
         on: {

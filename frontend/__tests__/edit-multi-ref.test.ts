@@ -1,14 +1,24 @@
 /**
- * Edit Multi-Reference store + CTA 단위 테스트 (Phase 2 회귀 베이스라인).
+ * Edit Multi-Reference store + CTA + FormData 단위 테스트.
  *
- * 2026-04-27 (Edit Multi-Reference Phase 2).
- * 7 케이스: store 기본값 + setter (5) + EditLeftPanel CTA 비활성 derived (2).
- * FormData / API 통합 테스트는 Phase 3 (Task 10 / lib/api/edit.ts 의 multi-ref
- * 확장) 와 함께 별도 파일에서 추가됨.
+ * 2026-04-27 (Edit Multi-Reference Phase 2 + Phase 3 회수).
+ * 9 케이스:
+ *   - store 기본값 + setter (5)
+ *   - EditLeftPanel CTA 비활성 derived (2)
+ *   - editImageStream FormData 검증 — multi-ref OFF / ON (2)
  */
 
-import { describe, expect, it, beforeEach } from "vitest";
+import { describe, expect, it, beforeEach, vi } from "vitest";
 import { useEditStore } from "@/stores/useEditStore";
+
+// FormData 검증 테스트는 *real* 흐름 (mock 분기 X) 을 거쳐야 fetch 가 호출됨.
+// vitest 환경에선 USE_MOCK 기본 true 라 mockEditStream 분기로 빠지므로 강제 override.
+vi.mock("@/lib/api/client", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/api/client")>();
+  return { ...actual, USE_MOCK: false };
+});
+
+import { editImageStream } from "@/lib/api/edit";
 
 describe("useEditStore - reference fields", () => {
   beforeEach(() => {
@@ -88,5 +98,88 @@ describe("EditLeftPanel CTA disabled (Codex 2차 리뷰 fix #4)", () => {
     const s = useEditStore.getState();
     const blocked = s.useReferenceImage && !s.referenceImage;
     expect(blocked).toBe(false);
+  });
+});
+
+// ── FormData / API 통합 테스트 (Phase 3 Task 10 회수 · Codex 2차 fix #4) ──
+// editImageStream 이 multi-ref 토글에 따라 reference_image 와 meta 키를 정확히
+// 전송하는지 검증. fetch 를 mock 으로 가로채 multipart body 만 캡처.
+describe("editImageStream - FormData 검증 (Codex 2차 리뷰 fix #4)", () => {
+  beforeEach(() => {
+    // fetch mock — multipart body 만 캡처, 실 백엔드 무관.
+    globalThis.fetch = vi.fn(() =>
+      Promise.resolve(
+        new Response(
+          JSON.stringify({ task_id: "tsk-test", stream_url: "/x" }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" },
+          },
+        ),
+      ),
+    ) as unknown as typeof fetch;
+  });
+
+  it("multi-ref OFF: FormData 에 reference_image 없음", async () => {
+    const gen = editImageStream({
+      // Codex 3차 리뷰 fix: data URL 은 edit.ts 내부에서 먼저 fetch 되므로
+      // FormData 검증 테스트에서는 File 을 사용해 첫 fetch 가 /edit 생성 요청이 되게 함.
+      sourceImage: new File([new Uint8Array([1])], "src.png", {
+        type: "image/png",
+      }),
+      prompt: "test",
+      lightning: false,
+      useReferenceImage: false, // OFF
+    });
+    // 처음 yield 까지만 진행 — 실 SSE 무시
+    try {
+      await gen.next();
+    } catch {
+      /* SSE 스트림 mock 부재라 에러 OK */
+    }
+
+    // fetch 가 받은 FormData 검증
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    const [, init] = fetchMock.mock.calls[0];
+    const form = init?.body as FormData;
+    expect(form.has("reference_image")).toBe(false);
+
+    // meta JSON 의 useReferenceImage 도 false / 또는 미포함
+    const metaStr = form.get("meta") as string;
+    const meta = JSON.parse(metaStr);
+    expect(meta.useReferenceImage).toBeFalsy();
+    expect(meta.referenceRole).toBeUndefined();
+  });
+
+  it("multi-ref ON: FormData 에 reference_image + meta 포함", async () => {
+    const gen = editImageStream({
+      // Codex 3차 리뷰 fix: source/reference 모두 File 로 전달해 이미지 fetch call 과
+      // /edit 생성 fetch call 이 섞이지 않게 함.
+      sourceImage: new File([new Uint8Array([1])], "src.png", {
+        type: "image/png",
+      }),
+      prompt: "test",
+      lightning: false,
+      useReferenceImage: true,
+      referenceImage: new File([new Uint8Array([2])], "ref.png", {
+        type: "image/png",
+      }),
+      referenceRole: "face",
+    });
+    try {
+      await gen.next();
+    } catch {
+      /* SSE 스트림 mock 부재라 에러 OK */
+    }
+
+    const fetchMock = globalThis.fetch as ReturnType<typeof vi.fn>;
+    const [, init] = fetchMock.mock.calls[0];
+    const form = init?.body as FormData;
+
+    expect(form.has("reference_image")).toBe(true);
+    const metaStr = form.get("meta") as string;
+    const meta = JSON.parse(metaStr);
+    expect(meta.useReferenceImage).toBe(true);
+    expect(meta.referenceRole).toBe("face");
   });
 });

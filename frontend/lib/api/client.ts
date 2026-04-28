@@ -39,9 +39,10 @@ export function normalizeImageRef(ref: string): string {
   return ref;
 }
 
-/** HistoryItem 의 절대화 가능한 ref 필드 모두 정규화 (imageRef + sourceRef).
+/** HistoryItem 의 절대화 가능한 ref 필드 모두 정규화 (imageRef + sourceRef + referenceRef).
  *  sourceRef 는 Edit 비교 분석 (Task 5+) 에서 추가됨 — 누락 시 fetch 가
- *  frontend origin 에 404 보냄. */
+ *  frontend origin 에 404 보냄.
+ *  referenceRef 는 Edit multi-reference (2026-04-27) 라이브러리 픽 케이스에서 추가됨. */
 export function normalizeItem(item: HistoryItem): HistoryItem {
   return {
     ...item,
@@ -49,6 +50,9 @@ export function normalizeItem(item: HistoryItem): HistoryItem {
     sourceRef: item.sourceRef
       ? normalizeImageRef(item.sourceRef)
       : item.sourceRef,
+    referenceRef: item.referenceRef
+      ? normalizeImageRef(item.referenceRef)
+      : item.referenceRef,
   };
 }
 
