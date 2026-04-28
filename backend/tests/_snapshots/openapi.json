@@ -600,6 +600,146 @@
         ]
       }
     },
+    "/api/studio/reference-templates": {
+      "get": {
+        "description": "저장된 reference templates — last_used_at 내림차순.",
+        "operationId": "list_templates_api_studio_reference_templates_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Templates",
+        "tags": [
+          "studio"
+        ]
+      },
+      "post": {
+        "description": "신규 template 저장 — 이미지 + 메타 + 자동 vision 분석.\n\nmeta = { name: str, role?: str, userIntent?: str, visionModel?: str }\n\n실패 정책:\n  - 이미지 invalid: 400 (저장 X)\n  - PIL 재인코딩 실패: 400 (저장 X)\n  - DB insert 실패: 저장된 파일 unlink + 500 (orphan 방지)\n  - vision 분석 실패: graceful — visionDescription=None 으로 저장 계속",
+        "operationId": "create_template_api_studio_reference_templates_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_template_api_studio_reference_templates_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Template",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/reference-templates/{template_id}": {
+      "delete": {
+        "description": "삭제 — DB row + 이미지 파일 모두 정리.\n\nSoft 정책: 옛 history 의 reference_ref URL 은 보존 (이미지만 깨짐 표시).",
+        "operationId": "delete_template_api_studio_reference_templates__template_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Template",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/reference-templates/{template_id}/touch": {
+      "post": {
+        "description": "last_used_at 갱신 — 사용자가 이 템플릿으로 수정 실행 시.",
+        "operationId": "touch_template_api_studio_reference_templates__template_id__touch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "template_id",
+            "required": true,
+            "schema": {
+              "title": "Template Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Touch Template",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
     "/api/studio/research": {
       "post": {
         "operationId": "research_api_studio_research_post",
@@ -921,6 +1061,25 @@
         "meta"
       ],
       "title": "Body_create_edit_task_api_studio_edit_post",
+      "type": "object"
+    },
+    "Body_create_template_api_studio_reference_templates_post": {
+      "properties": {
+        "image": {
+          "contentMediaType": "application/octet-stream",
+          "title": "Image",
+          "type": "string"
+        },
+        "meta": {
+          "title": "Meta",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image",
+        "meta"
+      ],
+      "title": "Body_create_template_api_studio_reference_templates_post",
       "type": "object"
     },
     "Body_create_video_task_api_studio_video_post": {

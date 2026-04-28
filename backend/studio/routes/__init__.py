@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from . import compare, prompt, streams, system, vision
+from . import compare, prompt, reference_templates, streams, system, vision
 
 studio_router = APIRouter(prefix="/api/studio", tags=["studio"])
 
@@ -29,5 +29,7 @@ studio_router.include_router(prompt.router)
 studio_router.include_router(vision.router)
 studio_router.include_router(compare.router)
 studio_router.include_router(system.router)
+# v8 (2026-04-28 라이브러리 plan): reference templates CRUD.
+studio_router.include_router(reference_templates.router)
 
 __all__ = ["studio_router"]
