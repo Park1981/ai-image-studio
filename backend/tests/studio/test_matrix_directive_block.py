@@ -171,3 +171,90 @@ def test_system_edit_v2_domain_aware_identity_clauses() -> None:
     assert "neon lighting" in txt or "anime style" in txt
     # 길이 가드
     assert "60-200 words" in txt or "Never exceed 250 words" in txt
+
+
+# ───────── Multi-reference slot removal 회귀 (2026-04-28) ─────────
+
+
+def test_background_role_removes_background_slot_when_preserve() -> None:
+    """role=background + image1 매트릭스의 background.action=preserve →
+    background 슬롯 directive 가 *완전히 제거*.
+
+    핵심 회귀: 사용자가 image2 를 background 로 올렸는데 vision 이
+    "사용자가 background 안 건드림" 이라고 preserve 결정한 케이스.
+    Slot removal 전엔 [preserve] 지시가 박혀 reference clause 와 충돌.
+    """
+    analysis = _make_person_analysis()
+    # background.action=preserve (헬퍼 기본값)
+    directive = _build_matrix_directive_block(analysis, reference_role="background")
+
+    assert "[preserve] background / environment" not in directive
+    assert "background / environment" not in directive  # 라벨 자체가 안 나와야
+
+
+def test_outfit_role_removes_attire_slot_when_preserve() -> None:
+    """role=outfit + attire.action=preserve → attire 슬롯 directive 제거.
+
+    헬퍼 기본값 (attire.action=edit) 변경: preserve 케이스 별도 케이스.
+    """
+    analysis = _make_person_analysis()
+    # attire 를 preserve 로 변경
+    analysis.slots["attire"] = EditSlotEntry(
+        action="preserve", note="The woman wears a sweater."
+    )
+    directive = _build_matrix_directive_block(analysis, reference_role="outfit")
+
+    assert "[preserve] attire" not in directive
+    assert "[edit] attire" not in directive
+
+
+def test_role_does_NOT_remove_slot_when_action_is_edit() -> None:
+    """role 매핑 슬롯이라도 action=edit 이면 *제거하지 않음*.
+
+    핵심 우선순위 규칙: 사용자 instruction 이 해당 슬롯을 명시적으로
+    건드린 경우 (vision 이 [edit] 판정) → user instruction 우선,
+    role 무효화 (slot removal 미적용).
+    """
+    analysis = _make_person_analysis()
+    # background 를 edit 로 변경 (사용자가 명시적으로 건드림)
+    analysis.slots["background"] = EditSlotEntry(
+        action="edit", note="Make the background dark and stormy."
+    )
+    directive = _build_matrix_directive_block(analysis, reference_role="background")
+
+    # [edit] directive 가 그대로 살아있어야
+    assert "[edit] background" in directive
+    assert "Make the background dark and stormy." in directive
+
+
+def test_face_role_removes_face_expression_slot() -> None:
+    """기존 face-only 분기 (line 688-701) 를 일관된 slot removal 메커니즘으로 통일.
+
+    이전: face role → [reference] 로 변환되어 directive 안에 *남아있음*
+    이후: face role → face_expression 슬롯이 directive 에서 *제거*
+    """
+    analysis = _make_person_analysis()
+    directive = _build_matrix_directive_block(analysis, reference_role="face")
+
+    assert "[reference] face" not in directive  # 옛 [reference] 라벨 사라짐
+    assert "[preserve] face / expression" not in directive  # preserve 도 사라짐
+    assert "face / expression" not in directive
+
+
+def test_unknown_free_text_role_does_NOT_remove_any_slot() -> None:
+    """자유 텍스트 role → ROLE_TO_SLOTS 매칭 X → slot removal 미적용.
+
+    모든 슬롯이 정상적으로 directive 에 표시. 자유 텍스트는
+    reference_clause 의 fallback 으로만 처리.
+    """
+    analysis = _make_person_analysis()
+    directive = _build_matrix_directive_block(
+        analysis, reference_role="hand gesture only"
+    )
+
+    # 모든 슬롯이 directive 에 등장 (헬퍼 기본 5 슬롯)
+    assert "face / expression" in directive
+    assert "hair" in directive
+    assert "attire" in directive
+    assert "body / pose" in directive
+    assert "background / environment" in directive

@@ -707,23 +707,19 @@ def _build_matrix_directive_block(
     lines.append("For each slot, follow the directive EXACTLY:")
     lines.append("")
 
+    # 2026-04-28 Multi-reference slot removal:
+    # role 이 가리키는 슬롯이 매트릭스에서 [preserve] 면 directive 에서 *완전 제거*.
+    # action=edit 이면 사용자 instruction 우선 → role 무효화 (제거 X).
+    # 옛 face-only 분기 (line 688-701) 도 이 메커니즘으로 일관 처리.
+    target_slots = _role_target_slots(reference_role)
+
     for key, entry in slots.items():
         action = getattr(entry, "action", "preserve")
         note = (getattr(entry, "note", "") or "").strip()
         label = _slot_label(key)
-        if reference_role == "face" and key == "face_expression":
-            lines.append("[reference] face / expression — USE IMAGE2 FACE IDENTITY")
-            lines.append(
-                "  -> Use reference image (image2) as the face identity source."
-            )
-            lines.append(
-                "  -> Do NOT preserve image1/source face identity; replacing "
-                "the face is expected in this mode."
-            )
-            lines.append(
-                "  -> Preserve image1 body, pose, framing, and background unless "
-                "the user asked to edit them."
-            )
+        # role 매핑 슬롯이면서 action=preserve → 제거 (continue).
+        # action=edit 이면 user instruction 우선이라 정상 처리.
+        if key in target_slots and action != "edit":
             continue
         if action == "edit":
             # 변경 의도 — note 가 변경 지시 자체이므로 그대로 명시

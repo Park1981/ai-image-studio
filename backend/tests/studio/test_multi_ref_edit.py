@@ -424,7 +424,15 @@ def test_build_reference_clause_truncates_long_text():
 
 
 def test_face_reference_overrides_source_face_matrix_preserve():
-    """face role 에서는 matrix 의 face preserve 가 image2 identity 지시로 바뀌어야 함."""
+    """face role 에서 matrix 의 face preserve 가 *제거* 되어 reference_clause 와 충돌 없도록.
+
+    2026-04-28 Slot Removal 메커니즘 (Phase 1) 도입 후:
+      - 옛 동작: face role 시 face_expression 슬롯이 [reference] 라벨로 변환되어 directive 에 *남아있음*
+      - 새 동작: face_expression 슬롯이 directive 에서 *완전 제거* (더 강한 보장).
+        face identity 지시는 build_reference_clause("face") 의 ROLE_INSTRUCTIONS["face"] 가 SYSTEM 에 단독으로 주입.
+
+    테스트 의도는 동일 — face role 에서 image1 의 face preserve 지시가 SYSTEM directive 에 박히지 않도록 보장.
+    """
     from studio.prompt_pipeline import _build_matrix_directive_block
 
     analysis = SimpleNamespace(
@@ -442,10 +450,11 @@ def test_face_reference_overrides_source_face_matrix_preserve():
 
     out = _build_matrix_directive_block(analysis, reference_role="face")
 
-    assert "[reference] face / expression" in out
-    assert "Use reference image (image2) as the face identity source" in out
-    assert "Do NOT preserve image1/source face identity" in out
-    assert "[preserve] face / expression" not in out
+    # face_expression 슬롯이 directive 에서 *완전 제거* — 어떤 라벨도 등장 X
+    assert "[reference] face / expression" not in out  # 옛 메커니즘 흔적 부재
+    assert "[preserve] face / expression" not in out  # slot removal
+    assert "face / expression" not in out  # 라벨 자체 부재
+    # 다른 슬롯 (hair) 은 그대로 보존
     assert "[preserve] hair" in out
 
 
