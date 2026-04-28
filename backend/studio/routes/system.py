@@ -14,10 +14,12 @@ task #17 (2026-04-26): router.py 풀 분해 2탄.
 
 from __future__ import annotations
 
+import subprocess
 from dataclasses import asdict
+from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
 from .. import history_db
 from ..presets import ASPECT_RATIOS, EDIT_MODEL, GENERATE_MODEL
@@ -184,6 +186,49 @@ async def process_action(name: str, action: str):
         ok=bool(ok),
         message=f"{name} {action} {'OK' if ok else 'FAILED'}",
     )
+
+
+@router.post("/system/shutdown", response_model=ProcessAction)
+async def launcher_shutdown(request: Request):
+    """start_v2 로 띄운 로컬 스튜디오 프로세스 종료.
+
+    브라우저에서 누르는 종료 버튼용이라 localhost 요청만 허용한다.
+    실제 종료는 별도 PowerShell 프로세스가 단계별로 수행한다.
+    """
+    host = request.client.host if request.client else ""
+    if host not in ("127.0.0.1", "::1", "localhost"):
+        raise HTTPException(403, "local shutdown is only allowed from localhost")
+
+    root = Path(__file__).resolve().parents[3]
+    script = root / "stop_v2.ps1"
+    if not script.exists():
+        raise HTTPException(500, f"shutdown script missing: {script}")
+
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    try:
+        subprocess.Popen(
+            [
+                "powershell.exe",
+                "-NoProfile",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-WindowStyle",
+                "Hidden",
+                "-File",
+                str(script),
+                "-KillOllama",
+                "-CloseBrowser",
+            ],
+            cwd=str(root),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            creationflags=flags,
+        )
+    except Exception as exc:
+        log.exception("launcher shutdown failed")
+        raise HTTPException(500, f"shutdown failed: {exc}") from exc
+
+    return {"ok": True, "message": "shutdown scheduled"}
 
 
 # ─────────────────────────────────────────────

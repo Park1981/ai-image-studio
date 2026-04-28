@@ -353,6 +353,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/system/shutdown": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Launcher Shutdown
+         * @description start_v2 로 띄운 로컬 스튜디오 프로세스 종료.
+         *
+         *     브라우저에서 누르는 종료 버튼용이라 localhost 요청만 허용한다.
+         *     실제 종료는 별도 PowerShell 프로세스가 단계별로 수행한다.
+         */
+        post: operations["launcher_shutdown_api_studio_system_shutdown_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/upgrade-only": {
         parameters: {
             query?: never;
@@ -1135,6 +1158,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launcher_shutdown_api_studio_system_shutdown_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessAction"];
                 };
             };
         };

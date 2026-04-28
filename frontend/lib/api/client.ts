@@ -14,6 +14,11 @@ export const STUDIO_BASE =
   (typeof process !== "undefined" && process.env.NEXT_PUBLIC_STUDIO_API) ||
   "http://localhost:8001";
 
+export const ENABLE_LOCAL_SHUTDOWN =
+  typeof process !== "undefined"
+    ? process.env.NEXT_PUBLIC_ENABLE_LOCAL_SHUTDOWN === "true"
+    : false;
+
 /* ─────────────────────────────────
    내부 유틸 (Mock 생성기 공용)
    ───────────────────────────────── */

@@ -136,6 +136,26 @@ export async function interruptCurrent(): Promise<boolean> {
   }
 }
 
+/** start_v2 로 띄운 로컬 개발 프로세스 종료. */
+export async function shutdownStudio(): Promise<{
+  ok: boolean;
+  message?: string;
+}> {
+  if (USE_MOCK) return { ok: true };
+  try {
+    const res = await fetch(`${STUDIO_BASE}/api/studio/system/shutdown`, {
+      method: "POST",
+    });
+    if (!res.ok) return { ok: false, message: `${res.status}` };
+    return (await res.json()) as { ok: boolean; message?: string };
+  } catch (e) {
+    return {
+      ok: false,
+      message: e instanceof Error ? e.message : String(e),
+    };
+  }
+}
+
 export async function setProcessStatus(
   name: "ollama" | "comfyui",
   action: "start" | "stop",
