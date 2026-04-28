@@ -265,3 +265,46 @@ def test_upgrade_generate_prompt_isolates_research_hints_in_user_message() -> No
     assert "[External research hints" in user_msg
     # SYSTEM 에는 hint 본문이 절대 추가되지 않아야 함
     assert "soft key light" not in sys_msg
+
+
+# ───────── Slot removal 후 reference_clause directive 강화 (2026-04-28) ─────────
+
+
+def test_reference_clause_outfit_explicitly_blocks_image1_outfit_preserve() -> None:
+    """outfit role: image1 의 옷을 *보존하지 말라* 는 명시적 directive.
+
+    Slot removal 로 [preserve] attire 가 사라진 상태에서 gemma4 가
+    "preserve the original attire" 같은 환각 phrasing 을 생성하지
+    않도록 reference_clause 가 그것을 *명시적으로 차단*.
+    """
+    from studio.prompt_pipeline import build_reference_clause
+
+    clause = build_reference_clause("outfit")
+    lower = clause.lower()
+    # image2 의 옷을 적용한다는 지시
+    assert "image2" in clause.lower() or "IMAGE2" in clause
+    assert "outfit" in lower or "clothing" in lower or "attire" in lower
+    # image1 옷 보존 명시 차단
+    assert "do not preserve" in lower or "do not keep" in lower or "replace" in lower
+
+
+def test_reference_clause_background_explicitly_blocks_image1_background_preserve() -> None:
+    """background role: image1 의 배경을 *보존하지 말라* 는 명시적 directive."""
+    from studio.prompt_pipeline import build_reference_clause
+
+    clause = build_reference_clause("background")
+    lower = clause.lower()
+    assert "image2" in clause.lower() or "IMAGE2" in clause
+    assert "background" in lower or "environment" in lower
+    assert "do not preserve" in lower or "replace" in lower
+
+
+def test_reference_clause_style_explicitly_blocks_image1_style_preserve() -> None:
+    """style role: image1 의 톤/조명을 *보존하지 말라* 는 명시적 directive."""
+    from studio.prompt_pipeline import build_reference_clause
+
+    clause = build_reference_clause("style")
+    lower = clause.lower()
+    assert "image2" in clause.lower() or "IMAGE2" in clause
+    assert "style" in lower or "tone" in lower or "color" in lower or "lighting" in lower
+    assert "do not preserve" in lower or "replace" in lower or "match" in lower

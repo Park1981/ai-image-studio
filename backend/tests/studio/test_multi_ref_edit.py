@@ -424,7 +424,18 @@ def test_build_reference_clause_truncates_long_text():
 
 
 def test_face_reference_overrides_source_face_matrix_preserve():
-    """face role 에서는 matrix 의 face preserve 가 image2 identity 지시로 바뀌어야 함."""
+    """face role 에서 matrix 의 face preserve 가 [reference_from_image2] 명시 액션으로 *교체*.
+
+    2026-04-28 메커니즘 진화:
+      - 옛 동작 (Phase 0): face role 시 face_expression 이 [reference] 커스텀 phrasing 으로 변환
+      - Phase 1 (Slot Removal): face_expression 슬롯이 directive 에서 *제거* — 침묵 전략
+        → 사용자 검증 결과 LLM 이 default-preserve 로 환각 (실패)
+      - Phase 1' (Slot Replacement · codex 리뷰 반영): face_expression 슬롯이
+        [reference_from_image2] 명시 액션으로 *교체* — 매트릭스 안에 경쟁 권위 박힘
+
+    테스트 의도: face role 에서 image1 의 face preserve 지시가 매트릭스에 박히지 않고,
+    image2 face identity 적용 지시가 *명시적으로* 박혀야 함.
+    """
     from studio.prompt_pipeline import _build_matrix_directive_block
 
     analysis = SimpleNamespace(
@@ -442,10 +453,12 @@ def test_face_reference_overrides_source_face_matrix_preserve():
 
     out = _build_matrix_directive_block(analysis, reference_role="face")
 
-    assert "[reference] face / expression" in out
-    assert "Use reference image (image2) as the face identity source" in out
-    assert "Do NOT preserve image1/source face identity" in out
-    assert "[preserve] face / expression" not in out
+    # face_expression 슬롯이 [reference_from_image2] 명시 액션으로 교체
+    assert "[reference] face / expression" not in out  # 옛 커스텀 phrasing 부재
+    assert "[preserve] face / expression" not in out  # preserve 사라짐
+    assert "[reference_from_image2] face / expression" in out  # 새 명시 액션
+    assert "Apply image2's face / expression" in out
+    # 다른 슬롯 (hair) 은 그대로 보존
     assert "[preserve] hair" in out
 
 

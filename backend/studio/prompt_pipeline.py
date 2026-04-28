@@ -179,20 +179,76 @@ ROLE_INSTRUCTIONS: dict[str, str] = {
     ),
     "outfit": (
         "Reference image (image2) provides CLOTHING/ACCESSORIES reference. "
-        "Apply only the outfit, garments, or accessories from image2 onto the "
-        "subject in image1. Keep face, pose, and background of image1."
+        "Apply ONLY the outfit, garments, or accessories from image2 onto the "
+        "subject in image1. "
+        "Do NOT preserve image1's original clothing — replace it with image2's "
+        "outfit. "
+        "Keep image1's face, hair, body pose, and background unchanged."
     ),
     "style": (
         "Reference image (image2) provides STYLE REFERENCE — color palette, "
-        "lighting tone, and mood. Match these aesthetics on image1 without "
-        "altering the subject's identity or composition."
+        "lighting tone, and overall mood. "
+        "Match these aesthetics on image1 by replacing image1's color tone, "
+        "lighting, and atmosphere with image2's. "
+        "Do NOT preserve image1's original color grading or lighting; "
+        "the final result should adopt image2's visual style. "
+        "Keep image1's subject identity, pose, and composition intact."
     ),
     "background": (
         "Reference image (image2) provides BACKGROUND/ENVIRONMENT reference. "
-        "Replace or blend image1's background with the environment shown in "
-        "image2, keeping the subject's pose and identity intact."
+        "Replace image1's background with the environment shown in image2. "
+        "Do NOT preserve image1's original background — the final result must "
+        "depict the subject of image1 placed within image2's environment. "
+        "Keep image1's subject identity, pose, expression, and clothing intact."
     ),
 }
+
+
+# Multi-reference slot removal 매핑 (2026-04-28).
+# reference_role 매핑 슬롯은 image1 매트릭스 directive 에서 *제거* 되어야
+# [preserve] 지시와 reference_clause 의 "image2 로 교체" 지시 충돌이 회피된다.
+#
+# 인물/물체 도메인의 슬롯 이름이 다르므로 background/style 은 두 도메인의
+# 의미적으로 동등한 슬롯을 모두 포함 (한쪽만 매칭되어도 안전).
+ROLE_TO_SLOTS: dict[str, frozenset[str]] = {
+    "face": frozenset({"face_expression"}),
+    "outfit": frozenset({"attire"}),
+    "background": frozenset({"background", "background_setting"}),
+    "style": frozenset({"mood_style"}),
+}
+
+
+# Multi-reference Phase 1'' Layer 1 (2026-04-28).
+# 도메인별 *유효한* 슬롯 키 화이트리스트. vision 분석이 사용자 instruction 이
+# 명시적으로 건드린 슬롯만 dict 에 담는 케이스 (예: "머리 색만 변경" → attire 슬롯
+# 자체가 결과에 없음) 에 대비. role 매핑 슬롯이 매트릭스에 없어도 도메인 적합
+# 슬롯이면 [reference_from_image2] 로 *강제 추가*.
+DOMAIN_VALID_SLOTS: dict[str, frozenset[str]] = {
+    "person": frozenset(
+        {"face_expression", "hair", "attire", "body_pose", "background"}
+    ),
+    "object_scene": frozenset(
+        {
+            "subject",
+            "color_material",
+            "layout_composition",
+            "background_setting",
+            "mood_style",
+        }
+    ),
+}
+
+
+def _role_target_slots(reference_role: str | None) -> frozenset[str]:
+    """role 문자열 → 매트릭스에서 제거할 슬롯 키 집합.
+
+    - None / 빈 문자열 / 알 수 없는 자유 텍스트: 빈 frozenset
+      (자유 텍스트 role 은 어느 슬롯을 가리키는지 불명 → slot removal 미적용)
+    - known role (face/outfit/style/background): ROLE_TO_SLOTS 의 정의된 집합
+    """
+    if not reference_role:
+        return frozenset()
+    return ROLE_TO_SLOTS.get(reference_role, frozenset())
 
 
 def build_reference_clause(reference_role: str | None) -> str:
@@ -681,22 +737,32 @@ def _build_matrix_directive_block(
     lines.append("For each slot, follow the directive EXACTLY:")
     lines.append("")
 
+    # 2026-04-28 Multi-reference slot REPLACEMENT (Phase 1' · codex 리뷰 반영):
+    # role 이 가리키는 슬롯이 매트릭스에서 [preserve] 면 *명시적 [reference_from_image2]
+    # 액션*으로 교체. 침묵(제거) 전략은 LLM 의 default-preserve 환각을 못 막아서
+    # codex 권장대로 "implicit user instruction" 으로 승격. 매트릭스 안에 경쟁
+    # 권위가 박혀야 gemma4 가 reference clause 를 무시 못 함.
+    # action=edit 이면 사용자 instruction 우선 → role 무효화 (정상 [edit] 처리).
+    target_slots = _role_target_slots(reference_role)
+
     for key, entry in slots.items():
         action = getattr(entry, "action", "preserve")
         note = (getattr(entry, "note", "") or "").strip()
         label = _slot_label(key)
-        if reference_role == "face" and key == "face_expression":
-            lines.append("[reference] face / expression — USE IMAGE2 FACE IDENTITY")
+        # role 매핑 슬롯이면서 action=preserve/그 외 → 명시적 [reference_from_image2] 로 교체.
+        # action=edit 이면 user instruction 우선이라 정상 [edit] 처리.
+        if key in target_slots and action != "edit":
+            lines.append(f"[reference_from_image2] {label} — APPLY FROM IMAGE2")
             lines.append(
-                "  -> Use reference image (image2) as the face identity source."
+                f"  -> Apply image2's {label} to image1."
             )
             lines.append(
-                "  -> Do NOT preserve image1/source face identity; replacing "
-                "the face is expected in this mode."
+                f"  -> Do NOT preserve image1's original {label}; "
+                f"replace it with image2's."
             )
             lines.append(
-                "  -> Preserve image1 body, pose, framing, and background unless "
-                "the user asked to edit them."
+                "  -> The final output prompt MUST mention 'image2' "
+                f"when describing the {label}."
             )
             continue
         if action == "edit":
@@ -716,6 +782,28 @@ def _build_matrix_directive_block(
                 f"\"preserve the original {label} exactly as in the source, "
                 f"no change to {label}\"."
             )
+
+    # 2026-04-28 Phase 1'' Layer 1: vision 매트릭스에 *없는* target slot 도 강제 추가.
+    # 가설: vision 이 사용자 instruction 건드린 슬롯만 결과에 담을 때 role 매핑 슬롯이
+    # dict 에 없으면 위 for 루프가 iterate 못 함 → [reference_from_image2] 미박힘.
+    # 도메인 화이트리스트로 안전하게 추가 (잘못된 도메인 슬롯 침투 차단).
+    valid_for_domain = DOMAIN_VALID_SLOTS.get(domain, frozenset())
+    existing_keys = set(slots.keys())
+    missing_target_slots = (target_slots & valid_for_domain) - existing_keys
+    for missing_key in sorted(missing_target_slots):
+        label = _slot_label(missing_key)
+        lines.append(
+            f"[reference_from_image2] {label} — APPLY FROM IMAGE2 (force-added)"
+        )
+        lines.append(f"  -> Apply image2's {label} to image1.")
+        lines.append(
+            f"  -> Do NOT preserve image1's original {label}; "
+            f"replace it with image2's."
+        )
+        lines.append(
+            "  -> The final output prompt MUST mention 'image2' "
+            f"when describing the {label}."
+        )
 
     lines.append("=================================")
     return "\n".join(lines)
@@ -764,7 +852,7 @@ async def upgrade_edit_prompt(
     # reference_role 이 None / 빈 문자열이면 옛 SYSTEM_EDIT 그대로 (회귀 위험 0).
     system_with_ref = SYSTEM_EDIT + build_reference_clause(reference_role)
 
-    return await _run_upgrade_call(
+    result = await _run_upgrade_call(
         system=system_with_ref,
         user_msg=user_msg,
         original=edit_instruction,
@@ -774,6 +862,33 @@ async def upgrade_edit_prompt(
         include_translation=include_translation,
         log_label="Edit prompt upgrade",
     )
+
+    # 2026-04-28 Phase 1'' Layer 2: gemma4 결과 post-process — image2 phrase 강제 주입.
+    # 가설: gemma4 가 SYSTEM 의 [reference_from_image2] directive 를 무시하고 출력에
+    # image2 미언급 케이스. ComfyUI Qwen Edit 가 image2 conditioning 받아도 positive
+    # prompt 에 image2 명시 없으면 cross-attention 약함 (codex 리뷰).
+    # → role 매핑 + image2 미언급 시 결과 끝에 deterministic phrase 강제 주입.
+    if (
+        reference_role
+        and reference_role in ROLE_TO_SLOTS
+        and not result.fallback
+        and "image2" not in result.upgraded.lower()
+    ):
+        _ROLE_PHRASES = {
+            "face": "Apply image2's face identity to the subject in image1.",
+            "outfit": "Apply image2's outfit and accessories onto the subject in image1.",
+            "background": "Replace image1's background with the environment shown in image2.",
+            "style": "Adopt image2's color palette and lighting tone in image1.",
+        }
+        phrase = _ROLE_PHRASES.get(reference_role)
+        if phrase:
+            log.warning(
+                "Phase 1'' Layer 2: gemma4 가 image2 미언급 → role=%r phrase 강제 주입",
+                reference_role,
+            )
+            result.upgraded = f"{result.upgraded.rstrip()} {phrase}"
+
+    return result
 
 
 async def upgrade_video_prompt(
