@@ -99,7 +99,7 @@ export interface paths {
         put?: never;
         /**
          * Create Edit Task
-         * @description 수정 요청 (multipart): image 파일 + meta JSON ({ prompt, lightning }).
+         * @description 수정 요청 (multipart): image 파일 + meta JSON + 옵션 reference_image.
          */
         post: operations["create_edit_task_api_studio_edit_post"];
         delete?: never;
@@ -479,6 +479,8 @@ export interface components {
             image: string;
             /** Meta */
             meta: string;
+            /** Reference Image */
+            reference_image?: string | null;
         };
         /** Body_create_video_task_api_studio_video_post */
         Body_create_video_task_api_studio_video_post: {

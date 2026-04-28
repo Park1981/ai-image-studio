@@ -18,12 +18,21 @@
 
 "use client";
 
+import dynamic from "next/dynamic";
 import type { RefObject } from "react";
 import { useState } from "react";
 import HistoryPicker from "@/components/studio/HistoryPicker";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import ReferenceRoleSelect from "./ReferenceRoleSelect";
+
+// EditReferenceCrop 은 react-easy-crop (window 의존) 을 사용하므로 ssr:false 로 격리.
+// 2026-04-28 (Phase 1).
+const EditReferenceCrop = dynamic(
+  () => import("@/components/studio/EditReferenceCrop"),
+  { ssr: false },
+);
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -50,6 +59,12 @@ export default function EditLeftPanel({
     sourceImage, sourceLabel, sourceWidth, sourceHeight, setSource,
     prompt, setPrompt,
     lightning, setLightning,
+    useReferenceImage, setUseReferenceImage,
+    referenceImage, referenceLabel, referenceWidth, referenceHeight,
+    setReferenceImage,
+    referenceRole, setReferenceRole,
+    referenceRoleCustom, setReferenceRoleCustom,
+    setReferenceCropArea,
   } = useEditInputs();
   const { running } = useEditRunning();
   const items = useHistoryStore((s) => s.items);
@@ -76,7 +91,12 @@ export default function EditLeftPanel({
     toast.info("이미지 해제됨");
   };
 
-  const ctaDisabled = running || !sourceImage || !prompt.trim();
+  const ctaDisabled =
+    running ||
+    !sourceImage ||
+    !prompt.trim() ||
+    // Multi-ref ON 인데 reference 파일 없음 → 차단 (백엔드 400 미리 방지)
+    (useReferenceImage && !referenceImage);
 
   return (
     <StudioLeftPanel>
@@ -157,6 +177,7 @@ export default function EditLeftPanel({
           onChange={handleSourceChange}
           onClear={handleClearSource}
           onError={(msg) => toast.error(msg)}
+          pasteRequireHover={useReferenceImage}
         />
       </div>
 
@@ -222,6 +243,87 @@ export default function EditLeftPanel({
         label="🔍 수정 후 자동 비교 분석"
         desc="결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 자동 skip)"
       />
+
+      {/* Multi-reference (2026-04-27): 두번째 이미지 토글 + 조건부 슬롯 */}
+      <Toggle
+        checked={useReferenceImage}
+        onChange={setUseReferenceImage}
+        align="right"
+        label="🖼️ 참조 이미지 사용 (실험적)"
+        desc={
+          useReferenceImage
+            ? "두번째 이미지를 참조로 사용 — 역할 명시 필요"
+            : "OFF · 단일 이미지 수정 (기본)"
+        }
+      />
+
+      {useReferenceImage && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <div className="ais-field-header">
+            <label
+              className="ais-field-label"
+              style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+            >
+              <SectionAccentBar accent="violet" />
+              참조 이미지
+            </label>
+            <span className="mono ais-field-meta">
+              {referenceWidth && referenceHeight
+                ? `${referenceWidth}×${referenceHeight}`
+                : "—"}
+            </span>
+          </div>
+          <SourceImageCard
+            sourceImage={referenceImage}
+            sourceLabel={referenceLabel}
+            sourceWidth={referenceWidth}
+            sourceHeight={referenceHeight}
+            onChange={(image, label, w, h) => {
+              setReferenceImage(image, label, w, h);
+              toast.success("참조 이미지 업로드", label.split(" · ")[0]);
+            }}
+            onClear={() => {
+              setReferenceImage(null);
+              toast.info("참조 이미지 해제됨");
+            }}
+            onError={(msg) => toast.error(msg)}
+            pasteRequireHover
+          />
+          {/* 인라인 수동 crop UI — 참조 이미지가 있을 때만 노출 (Phase 1 · 2026-04-28).
+           *  onAreaChange → useEditStore.setReferenceCropArea 직결.
+           *  Phase 2 의 "수정 생성" 클릭 시점에 store 의 area 를 적용해 cropped Blob 전송.
+           */}
+          {referenceImage && (
+            <div>
+              <div className="ais-field-header">
+                <label
+                  className="ais-field-label"
+                  style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+                >
+                  <SectionAccentBar accent="violet" />
+                  사용 영역
+                </label>
+                <span className="mono ais-field-meta">manual crop</span>
+              </div>
+              {/* key={referenceImage} — 새 이미지 업로드 시 컴포넌트 local state
+               *  (crop/zoom/aspectMode) 강제 reset (Codex Phase 1 리뷰 결함 #1).
+               *  store 의 area 만 reset 되면 옛 cropper 가 새 이미지 위에 옛 좌표를
+               *  재 emit 해 area 가 다시 채워지는 버그 차단. */}
+              <EditReferenceCrop
+                key={referenceImage}
+                imageSrc={referenceImage}
+                onAreaChange={setReferenceCropArea}
+              />
+            </div>
+          )}
+          <ReferenceRoleSelect
+            selected={referenceRole}
+            onSelect={setReferenceRole}
+            customText={referenceRoleCustom}
+            onCustomTextChange={setReferenceRoleCustom}
+          />
+        </div>
+      )}
     </StudioLeftPanel>
   );
 }

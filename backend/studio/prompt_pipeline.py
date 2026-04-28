@@ -160,6 +160,90 @@ LANGUAGE
 - Output is English-only (no Korean characters in the final prompt).
 - Never repeat words or phrases."""
 
+
+# Multi-reference role 별 SYSTEM_EDIT 추가 instruction (2026-04-27).
+# 사용자가 명시한 reference_role 에 따라 동적 주입 — Qwen Edit 가
+# image2 의 어떤 측면을 참조로 사용할지 명확히.
+ROLE_INSTRUCTIONS: dict[str, str] = {
+    "face": (
+        "STRICT FACE-ONLY TRANSFER. "
+        "FROM IMAGE2: copy ONLY the face identity: facial structure, features, "
+        "and expression. "
+        "FROM IMAGE1: preserve hair length, hair color, hairstyle, body shape, "
+        "pose, composition, lighting, background, and environment exactly; "
+        "preserve clothing except for the user's explicit clothing edit. "
+        "Do NOT use image2 for hair, body, pose, outfit, jewelry, accessories, "
+        "background, lighting, or environment. "
+        "This OVERRIDES source-face identity preservation: replace only the "
+        "source face identity with image2's face identity."
+    ),
+    "outfit": (
+        "Reference image (image2) provides CLOTHING/ACCESSORIES reference. "
+        "Apply only the outfit, garments, or accessories from image2 onto the "
+        "subject in image1. Keep face, pose, and background of image1."
+    ),
+    "style": (
+        "Reference image (image2) provides STYLE REFERENCE — color palette, "
+        "lighting tone, and mood. Match these aesthetics on image1 without "
+        "altering the subject's identity or composition."
+    ),
+    "background": (
+        "Reference image (image2) provides BACKGROUND/ENVIRONMENT reference. "
+        "Replace or blend image1's background with the environment shown in "
+        "image2, keeping the subject's pose and identity intact."
+    ),
+}
+
+
+def build_reference_clause(reference_role: str | None) -> str:
+    """role 별 SYSTEM_EDIT 추가 clause 빌드 (2026-04-27 Multi-reference Phase 4).
+
+    - None / 빈 문자열: 빈 문자열 반환 (옛 동작 동일 — multi-ref 미사용 케이스)
+    - preset id 매칭 (face/outfit/style/background): ROLE_INSTRUCTIONS 의 정의된 instruction
+    - 알 수 없는 값 (자유 텍스트): "User-described role" 로 그대로 주입 (200자 cap · 악성 토큰 위험 낮춤)
+
+    반환값은 SYSTEM_EDIT 의 끝에 \\n\\n 으로 append 됨.
+    """
+    if not reference_role:
+        return ""
+    # 2026-04-28 후속 보강: 모든 role 공통 prefix — image1/image2 의미 명시.
+    # 모델이 두 슬롯의 역할을 *prompt 단계에서* 명확히 인식하도록.
+    # 2026-04-28 (manual crop 세션 후속) 추가: OUTPUT NAMING CONVENTION —
+    # gemma4 가 output 결과 표현에서도 image1/image2 만 사용하게 강제.
+    # 이전엔 정의만 했고 output 강제 directive 가 없어 gemma4 가 image2 는
+    # 그대로 쓰면서 image1 자리는 'the source image' / 'the original' 식으로
+    # 풀어쓰는 비대칭 결과가 발생 (사용자 검증 케이스).
+    image_roles_prefix = (
+        "\n\nMULTI-REFERENCE MODE:\n"
+        "IMAGE ROLES:\n"
+        "- IMAGE1 = the SOURCE/ORIGINAL image (editing canvas). "
+        "Preserve every aspect of IMAGE1 unless the user explicitly requests a change.\n"
+        "- IMAGE2 = the REFERENCE/DONOR image. "
+        "Only the specific aspect described below transfers from IMAGE2; "
+        "all other aspects of IMAGE2 must NOT appear in the output.\n\n"
+        "OUTPUT NAMING CONVENTION:\n"
+        "In your final output prompt, refer to the source/original strictly as "
+        "'image1' and the reference/donor strictly as 'image2'. "
+        "Do NOT use phrases like 'the source image', 'the original image', "
+        "'the original', 'the source', 'the reference image', 'the donor', "
+        "'the original photo', 'in the source' in the final output. "
+        "Only 'image1' and 'image2' are allowed for these two slots — "
+        "this keeps the prompt symmetric and unambiguous for the model.\n\n"
+    )
+    preset = ROLE_INSTRUCTIONS.get(reference_role)
+    if preset:
+        return f"{image_roles_prefix}{preset}"
+    # 자유 텍스트 — 사용자 입력 그대로 전달 (악성 토큰 위험 낮음 · 길이 제한)
+    safe_text = reference_role.strip()[:200]
+    return (
+        f"{image_roles_prefix}"
+        f"Reference image (IMAGE2) provides: {safe_text}. "
+        "Use IMAGE2 as guidance for the edit, "
+        "applying to IMAGE1 the aspects implied by the user description, "
+        "while preserving all other aspects of IMAGE1 exactly."
+    )
+
+
 SYSTEM_VIDEO_BASE = """You are a cinematic prompt engineer for LTX-2.3 video generation.
 
 You receive:
@@ -556,7 +640,10 @@ def _slot_label(key: str) -> str:
     return table.get(key, key.replace("_", " "))
 
 
-def _build_matrix_directive_block(analysis: Any) -> str:
+def _build_matrix_directive_block(
+    analysis: Any,
+    reference_role: str | None = None,
+) -> str:
     """EditVisionAnalysis 객체 → SYSTEM_EDIT 에 주입할 STRICT MATRIX directive.
 
     analysis 가 None / fallback=True / slots 비어있으면 빈 문자열 반환 (블록 미주입).
@@ -569,6 +656,9 @@ def _build_matrix_directive_block(analysis: Any) -> str:
     preservation phrasing 만 강제.
 
     [edit] 슬롯은 그대로 — note 가 변경 지시 자체이므로 명시 필수.
+
+    Multi-reference face 모드에서는 face_expression 의 source preserve 지시가
+    image2 face identity 지시와 정면 충돌하므로 reference 지시로 대체한다.
     """
     if analysis is None:
         return ""
@@ -595,6 +685,20 @@ def _build_matrix_directive_block(analysis: Any) -> str:
         action = getattr(entry, "action", "preserve")
         note = (getattr(entry, "note", "") or "").strip()
         label = _slot_label(key)
+        if reference_role == "face" and key == "face_expression":
+            lines.append("[reference] face / expression — USE IMAGE2 FACE IDENTITY")
+            lines.append(
+                "  -> Use reference image (image2) as the face identity source."
+            )
+            lines.append(
+                "  -> Do NOT preserve image1/source face identity; replacing "
+                "the face is expected in this mode."
+            )
+            lines.append(
+                "  -> Preserve image1 body, pose, framing, and background unless "
+                "the user asked to edit them."
+            )
+            continue
         if action == "edit":
             # 변경 의도 — note 가 변경 지시 자체이므로 그대로 명시
             lines.append(f"[edit] {label}")
@@ -626,6 +730,7 @@ async def upgrade_edit_prompt(
     include_translation: bool = True,
     *,
     analysis: Any = None,
+    reference_role: str | None = None,
 ) -> UpgradeResult:
     """수정용 프롬프트 업그레이드 (v3 + spec 16 매트릭스 directive 통합).
 
@@ -646,15 +751,21 @@ async def upgrade_edit_prompt(
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
 
     # 매트릭스 directive 동적 주입 (있을 때만)
-    matrix_block = _build_matrix_directive_block(analysis)
+    matrix_block = _build_matrix_directive_block(
+        analysis, reference_role=reference_role
+    )
     user_msg_parts = [f"[Image description]\n{image_description.strip()}"]
     if matrix_block:
         user_msg_parts.append(matrix_block)
     user_msg_parts.append(f"[Edit instruction]\n{edit_instruction.strip()}")
     user_msg = "\n\n".join(user_msg_parts)
 
+    # Multi-reference (2026-04-27): role 별 추가 clause 동적 주입.
+    # reference_role 이 None / 빈 문자열이면 옛 SYSTEM_EDIT 그대로 (회귀 위험 0).
+    system_with_ref = SYSTEM_EDIT + build_reference_clause(reference_role)
+
     return await _run_upgrade_call(
-        system=SYSTEM_EDIT,
+        system=system_with_ref,
         user_msg=user_msg,
         original=edit_instruction,
         model=model,

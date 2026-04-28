@@ -81,8 +81,9 @@ async def generate_stream(task_id: str, request: Request):
 async def create_edit_task(
     image: UploadFile = File(...),
     meta: str = Form(...),
+    reference_image: UploadFile | None = File(None),
 ):
-    """수정 요청 (multipart): image 파일 + meta JSON ({ prompt, lightning })."""
+    """수정 요청 (multipart): image 파일 + meta JSON + 옵션 reference_image."""
     try:
         meta_obj = json.loads(meta)
     except json.JSONDecodeError as e:
@@ -95,6 +96,16 @@ async def create_edit_task(
     # 설정에서 override (없으면 프리셋 기본값)
     ollama_model_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
     vision_model_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
+
+    # Multi-reference (2026-04-27): meta 의 토글 + role 파싱.
+    # 토글 OFF (기본) 면 옛 단일 이미지 흐름 100% 동일.
+    use_reference_image = bool(meta_obj.get("useReferenceImage", False))
+    reference_role_raw = meta_obj.get("referenceRole")
+    reference_role: str | None = (
+        reference_role_raw.strip()
+        if isinstance(reference_role_raw, str) and reference_role_raw.strip()
+        else None
+    )
 
     image_bytes = await image.read()
     if not image_bytes:
@@ -126,6 +137,52 @@ async def create_edit_task(
             "edit source dim extraction failed (non-fatal): %s", dim_err
         )
 
+    # Multi-reference (2026-04-27): reference 이미지 bytes 읽기 (조건부).
+    # 토글 OFF 또는 파일 미동봉이면 None — 옛 단일 흐름 100% 동일.
+    reference_bytes: bytes | None = None
+    reference_filename: str | None = None
+    # Codex Phase 1-3 통합 리뷰 fix (2026-04-28): useRef=false 인데 reference_image 가
+    # multipart 로 동봉된 silent-drop 케이스. 클라이언트 버그/오용 가능성을 가시화하기
+    # 위해 stream buffer 를 명시적으로 drain + log warning. 사용자 흐름은 그대로 (200).
+    if reference_image is not None and not use_reference_image:
+        await reference_image.read()  # drain — body 무시
+        log.warning(
+            "edit: reference_image multipart 동봉됐지만 useReferenceImage=false → 무시함",
+        )
+    if use_reference_image and reference_image is not None:
+        reference_bytes = await reference_image.read()
+        if reference_bytes:
+            if len(reference_bytes) > STUDIO_MAX_IMAGE_BYTES:
+                raise HTTPException(
+                    413,
+                    f"reference image too large: {len(reference_bytes)} bytes "
+                    f"(max {STUDIO_MAX_IMAGE_BYTES})",
+                )
+            try:
+                with Image.open(io.BytesIO(reference_bytes)) as ref_im:
+                    _ = ref_im.size  # 손상 검증만
+            except UnidentifiedImageError as e:
+                raise HTTPException(
+                    400, f"invalid reference image format: {e}"
+                ) from e
+            reference_filename = reference_image.filename or "reference.png"
+        else:
+            reference_bytes = None  # 빈 파일은 무시
+
+    # ⚠️ Backend 게이트 (Codex 리뷰 — zero-regression 보장):
+    # reference_bytes 가 None 이면 reference_role 도 None 강제.
+    # 옛 단일 흐름에서 role 누수로 SYSTEM_EDIT 에 multi-ref clause 가 들어가는 위험 차단.
+    if reference_bytes is None:
+        reference_role = None
+
+    # ⚠️ Codex 2차 리뷰 fix #4: useReferenceImage=true 인데 파일 없는 케이스 거부.
+    # 조용히 단일 흐름으로 폴백하면 사용자 의도/데이터 의미가 깨짐.
+    if use_reference_image and reference_bytes is None:
+        raise HTTPException(
+            400,
+            "참조 이미지 토글이 켜져 있는데 reference_image 파일이 없거나 비어있습니다.",
+        )
+
     task = await _new_task()
     # 헤더 VRAM breakdown 오버레이용 — ComfyUI 마지막 dispatch 모델 기록
     dispatch_state.record("edit", EDIT_MODEL.display_name)
@@ -140,6 +197,9 @@ async def create_edit_task(
             vision_model_override,
             source_width=source_w,
             source_height=source_h,
+            reference_bytes=reference_bytes,
+            reference_filename=reference_filename,
+            reference_role=reference_role,
         )
     )
     return TaskCreated(

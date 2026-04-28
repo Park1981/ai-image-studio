@@ -13,6 +13,7 @@
 "use client";
 
 import { editImageStream } from "@/lib/api/edit";
+import { cropBlobIfArea, dataUrlToBlob } from "@/lib/image-crop";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { useEditStore } from "@/stores/useEditStore";
@@ -37,6 +38,13 @@ export function useEditPipeline({
   const sourceLabel = useEditStore((s) => s.sourceLabel);
   const prompt = useEditStore((s) => s.prompt);
   const lightning = useEditStore((s) => s.lightning);
+  // Multi-reference (2026-04-27): 토글 OFF 면 모두 무관 — generate 안에서 게이트.
+  const useReferenceImage = useEditStore((s) => s.useReferenceImage);
+  const referenceImage = useEditStore((s) => s.referenceImage);
+  const referenceRole = useEditStore((s) => s.referenceRole);
+  const referenceRoleCustom = useEditStore((s) => s.referenceRoleCustom);
+  // Phase 2 (2026-04-28): 수동 crop 영역 (있으면 reference 를 미리 crop 해서 전송)
+  const referenceCropArea = useEditStore((s) => s.referenceCropArea);
   // 실행 상태 setter
   const running = useEditStore((s) => s.running);
   const setRunning = useEditStore((s) => s.setRunning);
@@ -66,6 +74,45 @@ export function useEditPipeline({
       return;
     }
 
+    // Multi-reference (2026-04-27): role 최종 문자열 결정.
+    // "custom" + 자유 텍스트 → 텍스트 그대로 / "custom" + 빈 값 → undefined (role 명시 없음).
+    // Codex Phase 1-3 통합 리뷰 Important #3 fix: 빈 custom 의 폴백을 의미 없는
+    // "general" 로 보내는 대신 undefined 로 처리 → backend 의 build_reference_clause 가
+    // 빈 문자열 반환 → SYSTEM_EDIT 옛 그대로 (multi-ref 효과 X · 일반 edit 흐름).
+    const effectiveRole: string | undefined =
+      referenceRole === "custom"
+        ? referenceRoleCustom.trim() || undefined
+        : referenceRole;
+
+    // Codex Phase 2 리뷰 결함 #3 fix: useReferenceImage=true 인데 referenceImage=null
+    // 이면 (race / 직접 호출 등 CTA 가드 우회 시) meta 만 ON 으로 가서 백엔드 400.
+    // → effectiveUseRef 로 한 곳에서 통일해 모든 reference 필드를 일관되게 OFF.
+    const effectiveUseRef = useReferenceImage && !!referenceImage;
+
+    // Phase 2 (2026-04-28): reference 가 있고 crop area 도 있으면 *클라이언트* 에서
+    // 미리 crop 해서 cropped File 로 전송. area 없으면 원본 data URL 그대로.
+    // crop 변환 실패 (canvas / toBlob) 시 사용자에게 toast + 진입 차단.
+    let resolvedReferenceImage: string | File | undefined;
+    if (effectiveUseRef && referenceImage) {
+      if (referenceCropArea) {
+        try {
+          const original = await dataUrlToBlob(referenceImage);
+          const cropped = await cropBlobIfArea(original, referenceCropArea);
+          resolvedReferenceImage = new File([cropped], "reference-crop.png", {
+            type: "image/png",
+          });
+        } catch (err) {
+          toast.error(
+            "참조 이미지 crop 실패",
+            err instanceof Error ? err.message : "알 수 없는 오류",
+          );
+          return;
+        }
+      } else {
+        resolvedReferenceImage = referenceImage;
+      }
+    }
+
     setRunning(true);
     await consumePipelineStream(
       editImageStream({
@@ -74,6 +121,10 @@ export function useEditPipeline({
         lightning,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
+        // effectiveUseRef 로 모든 reference 필드를 한꺼번에 게이트 — 백엔드 400 차단.
+        useReferenceImage: effectiveUseRef,
+        referenceImage: effectiveUseRef ? resolvedReferenceImage : undefined,
+        referenceRole: effectiveUseRef ? effectiveRole : undefined,
       }),
       {
         on: {

@@ -71,6 +71,30 @@ async function* realEditStream(
   } else {
     form.append("image", req.sourceImage);
   }
+
+  // Multi-reference (2026-04-27): reference_image 추가 (옵션)
+  // Codex 리뷰: res.ok 체크 누락 fix — edit.ts 의 source image fetch 패턴과 동일.
+  if (req.useReferenceImage && req.referenceImage) {
+    if (typeof req.referenceImage === "string") {
+      try {
+        const res = await fetch(req.referenceImage);
+        if (!res.ok) {
+          throw new Error(
+            `image fetch ${res.status}: ${req.referenceImage.slice(0, 80)}`,
+          );
+        }
+        const blob = await res.blob();
+        form.append("reference_image", blob, "reference.png");
+      } catch (err) {
+        throw new Error(
+          `참조 이미지 로드 실패: ${err instanceof Error ? err.message : String(err)}`,
+        );
+      }
+    } else {
+      form.append("reference_image", req.referenceImage);
+    }
+  }
+
   form.append(
     "meta",
     JSON.stringify({
@@ -78,6 +102,9 @@ async function* realEditStream(
       lightning: req.lightning,
       ollamaModel: req.ollamaModel,
       visionModel: req.visionModel,
+      // Multi-reference (Phase 3 신규)
+      useReferenceImage: req.useReferenceImage ?? false,
+      referenceRole: req.useReferenceImage ? req.referenceRole : undefined,
     }),
   );
 

@@ -118,7 +118,7 @@
     },
     "/api/studio/edit": {
       "post": {
-        "description": "수정 요청 (multipart): image 파일 + meta JSON ({ prompt, lightning }).",
+        "description": "수정 요청 (multipart): image 파일 + meta JSON + 옵션 reference_image.",
         "operationId": "create_edit_task_api_studio_edit_post",
         "requestBody": {
           "content": {
@@ -880,6 +880,18 @@
         "meta": {
           "title": "Meta",
           "type": "string"
+        },
+        "reference_image": {
+          "anyOf": [
+            {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Reference Image"
         }
       },
       "required": [

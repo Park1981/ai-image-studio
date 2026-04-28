@@ -3,6 +3,57 @@
 > 누적 변경 로그 — 완료된 작업의 역사적 기록.
 > 최신 변경 + 활성 정책은 `CLAUDE.md` 참조. 자세한 작업 내역은 git log + memory.
 
+## 2026-04-28
+
+### Edit Multi-Reference 수동 Crop UI (Phase 1-3 MVP · 현재 master)
+
+**브랜치**: `claude/edit-multi-ref` → master merge `--no-ff`
+**검증**: pytest 234 (231 → +3) · vitest 74 (61 → +13) · tsc / lint clean
+**Codex 리뷰**: 3회 의뢰 (Phase 1/2/3) + 결함 2건 fix
+
+#### 동기
+
+`edit-153d2c13` 검증 결과: gemma4 가 정확한 영문 prompt 를 만들어도 Qwen Edit 가 image2 를 broad reference 로 처리해 의상/배경이 결과에 누수. face geometric crop 도입 (`0d7ff57`) 했다가 얼굴 위치 다양성에 빗나가 제거. 사용자가 *직접* 영역을 자르는 매뉴얼 UI 가 가장 실용적 해결책으로 결정.
+
+#### Phase 1 — UI scaffolding (`16b75eb` + `6f56cc7` + `5754f8c`)
+
+- `react-easy-crop@^5.5.7` 도입 (`next/dynamic({ ssr:false })` 격리)
+- `frontend/components/studio/EditReferenceCrop.tsx` 신규 — 인라인 crop UI (모달 X)
+  · 자유/1:1/4:3/9:16 비율 lock 토글 (자유 = 이미지 자연 비율 사용 · `onMediaLoaded` 자동 계산)
+  · 256px 최소 가드 (미만 시 `onAreaChange(null)` 무효 처리)
+  · `bypassCrop` prop 자리만 (라이브러리 plan 진입 시 활성)
+  · 외부 dim 0.75 (기본 0.5 → 가독성 ↑)
+- `useEditStore.referenceCropArea: CropArea | null` + reset 트리거 3개 자동 적용
+  · 새 업로드 / 해제 / multi-ref 토글 OFF
+- `EditLeftPanel` 통합 — `key={referenceImage}` 로 새 이미지 시 컴포넌트 local state 강제 reset (Codex 리뷰 결함 #1 fix)
+- vitest 신규 6 케이스 (store 단위 + reset 트리거 검증)
+
+#### Phase 2 — 클라이언트 crop → cropped File 전송 (`76f29cf` + `e6ad93a`)
+
+- `frontend/lib/image-crop.ts` 신규 (3 헬퍼)
+  · `dataUrlToBlob(dataUrl)` / `cropBlobByArea(blob, area)` (canvas drawImage + toBlob) / `cropBlobIfArea(blob, area | null)` (no-crop path)
+- `useEditPipeline` submit 흐름 수정
+  · `referenceCropArea` 있으면 `dataUrlToBlob → cropBlobIfArea → new File('reference-crop.png', 'image/png')` → multipart 의 `reference_image` 필드
+  · area null 이면 원본 data URL 그대로 (옛 흐름 100% 동일)
+  · crop 변환 실패 시 `toast.error` + 진입 차단 (`setRunning` 호출 X)
+- `effectiveUseRef = useReferenceImage && !!referenceImage` 단일 게이트 (Codex 리뷰 결함 #3 fix · race 시 백엔드 400 차단)
+- vitest 신규 7 케이스 (jsdom canvas 미구현 우회 — `getContext("2d")` mock 으로 fake ctx)
+
+#### Phase 3 — 백엔드 회귀 테스트 (`3a04953` + `87ed7f1`)
+
+- 백엔드 코드 변경 0 — multipart 는 이미 image2 그대로 받고 있음
+- `test_multi_ref_edit.py` 에 cropped reference 흐름 회귀 2건 (256x256 + 64x64)
+  · 클라이언트 256px 가드 우회한 작은 사이즈도 백엔드는 거부 안 함 (UX/백엔드 책임 분리 신호)
+- `test_dispatch_extra_uploads.py` 에 dispatch 까지 도달 회귀 1건 (Codex 리뷰 의심 #2 보강)
+  · cropped bytes → `comfy.upload_image` → factory 의 `extra_uploaded_names=["reference-crop.png"]` 정확 전달
+
+#### 알려진 한계 (의도된 trade-off)
+
+- **얼굴 transfer 약함**: Qwen Edit 본질 한계 — manual crop 으로 image2 의 의상/배경 누수는 차단되나 face identity 전송은 약함. 별도 InstantID plan 후보.
+- **저장**: cropped Blob 은 영구 저장 X (메모리 → multipart → ComfyUI 임시 input). 영구 저장 + 라이브러리 재선택은 `docs/superpowers/plans/2026-04-27-edit-reference-library.md` 후속 plan 에서 다룸.
+- **mediaAspect 깜빡임**: onMediaLoaded 전 1:1 1ms 이내. trade-off 인정 (별도 image preload 비용 대비 효용 낮음).
+- **Phase 2 fake canvas false negative**: jsdom 한계로 drawImage 호출 인자만 검증, 실 픽셀은 manual / Playwright 도입 시 보강.
+
 ## 2026-04-27
 
 ### 진행 모달 통일 + Tier 2/3 (현재 master)

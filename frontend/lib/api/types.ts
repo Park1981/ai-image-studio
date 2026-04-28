@@ -280,6 +280,10 @@ export interface HistoryItem {
    *  비교 분석 (compare-analyze) 이 historyItemId 받으면 이 값을 재사용해
    *  gemma4 cold start 비용 ~5초 절약. mode === "edit" 만 채워짐. */
   refinedIntent?: string;
+  /** Edit multi-reference: 참조 이미지 영구 URL (라이브러리 픽 케이스만 — Phase 5 단계는 항상 null). */
+  referenceRef?: string | null;
+  /** Edit multi-reference: reference role preset/custom text. */
+  referenceRole?: string | null;
 }
 
 export interface GenerateRequest {
@@ -322,6 +326,12 @@ export interface EditRequest {
   lightning: boolean;
   ollamaModel?: string;
   visionModel?: string;
+  /** Multi-reference (2026-04-27): 두번째 이미지 토글 ON 시 사용 */
+  useReferenceImage?: boolean;
+  /** 두번째 이미지 — data URL 또는 File */
+  referenceImage?: string | File | null;
+  /** 사용자 명시 role — "face" | "outfit" | "style" | "background" | 자유 텍스트 */
+  referenceRole?: string;
 }
 
 export type GenStage =

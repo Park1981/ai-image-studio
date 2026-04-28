@@ -49,6 +49,10 @@ async def _run_edit_pipeline(
     *,
     source_width: int = 0,
     source_height: int = 0,
+    # Multi-ref (2026-04-27): Phase 1 은 받기만 · Phase 4 에서 실 dispatch.
+    reference_bytes: bytes | None = None,
+    reference_filename: str | None = None,
+    reference_role: str | None = None,
 ) -> None:
     try:
         # Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
@@ -71,6 +75,8 @@ async def _run_edit_pipeline(
                 # dead code 였음. 이제 layout/composition 정확도 ↑.
                 width=source_width,
                 height=source_height,
+                # Multi-ref (2026-04-27 Phase 4 Task 13): reference role 을 upgrade 단계로 전달.
+                reference_role=reference_role,
             )
         # getattr 로 안전 접근 — 기존 테스트의 경량 mock (속성 없음) 호환.
         _analysis = getattr(vision, "edit_vision_analysis", None)
@@ -113,15 +119,41 @@ async def _run_edit_pipeline(
 
         # Ollama unload + GPU gate 는 _dispatch_to_comfy 내부에서 공통 처리.
 
-        def _make_edit_prompt(uploaded_name: str | None) -> dict[str, Any]:
+        # Multi-ref (2026-04-27 Phase 4 Task 14): reference 없으면 effective_role = None
+        # (zero-regression gate — reference_bytes 가 없으면 role 도 무시).
+        effective_role = reference_role if reference_bytes is not None else None
+        extra_uploads_list: list[tuple[bytes, str]] | None = None
+        if reference_bytes is not None:
+            # 2026-04-28: face crop 제거. ComfyUI native 흐름과 동일하게 image2 원본
+            # 그대로 업로드 (geometric crop 은 얼굴 위치 다양 시 빗나가 역효과).
+            extra_uploads_list = [(reference_bytes, reference_filename or "reference.png")]
+        # Phase 4 multi-ref 분기 진입 가시화 (디버그용 — 사용자 환경 검증).
+        log.info(
+            "edit pipeline: reference_bytes=%s reference_role=%s effective_role=%s extra_uploads=%d",
+            "yes" if reference_bytes else "no",
+            reference_role,
+            effective_role,
+            len(extra_uploads_list) if extra_uploads_list else 0,
+        )
+
+        def _make_edit_prompt(
+            uploaded_name: str | None,
+            *,
+            extra_uploaded_names: list[str] | None = None,
+        ) -> dict[str, Any]:
             # Edit 는 업로드 이후에만 호출됨 → uploaded_name 반드시 있음
             if uploaded_name is None:
                 raise RuntimeError("Edit pipeline requires uploaded image")
+            ref_filename: str | None = None
+            if extra_uploaded_names:
+                ref_filename = extra_uploaded_names[0]
             return build_edit_from_request(
                 prompt=vision.final_prompt,
                 source_filename=uploaded_name,
                 seed=actual_seed,
                 lightning=lightning,
+                reference_image_filename=ref_filename,
+                reference_role=effective_role,
             )
 
         dispatch = await _dispatch_to_comfy(
@@ -133,6 +165,7 @@ async def _run_edit_pipeline(
             client_prefix="ais-e",
             upload_bytes=image_bytes,
             upload_filename=filename or "input.png",
+            extra_uploads=extra_uploads_list,
         )
         image_ref = dispatch.image_ref
         comfy_err = dispatch.comfy_error
@@ -180,6 +213,10 @@ async def _run_edit_pipeline(
             "comfyError": comfy_err,
             "sourceRef": source_ref,
         }
+        # Multi-reference (2026-04-27 Phase 4 Task 14 후속 fix): role 저장.
+        # referenceRef 는 Library plan 까지 None (영구 URL 정책).
+        if effective_role:
+            item["referenceRole"] = effective_role
         # Phase 1 (2026-04-25): 구조 분석은 item 에만 붙여 SSE done 으로 전달.
         # insert_item 이 알려진 컬럼만 INSERT 하므로 DB persist X (휘발 패턴 유지).
         if _analysis is not None:

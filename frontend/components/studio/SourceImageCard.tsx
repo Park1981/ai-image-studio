@@ -28,6 +28,9 @@ interface SourceImageCardProps {
   onClear: () => void;
   /** 업로드 실패 시 토스트 노출용 — 부모가 레벨(error/warn) 판단 */
   onError: (message: string) => void;
+  /** Multi-ref 등 멀티 슬롯 페이지에서 paste 충돌 방지 — 호버한 카드만 paste 수용.
+   *  default false (옛 동작 유지 — 단일 슬롯 페이지 호환). */
+  pasteRequireHover?: boolean;
 }
 
 export default function SourceImageCard({
@@ -38,6 +41,7 @@ export default function SourceImageCard({
   onChange,
   onClear,
   onError,
+  pasteRequireHover = false,
 }: SourceImageCardProps) {
   const [infoOpen, setInfoOpen] = useState(false);
   // StudioUploadSlot.onReady 로 받아둔 trigger — 변경 버튼 클릭 시 호출.
@@ -141,8 +145,11 @@ export default function SourceImageCard({
         onFiles={handleFiles}
         acceptDropWhenFilled
         // P-3: 단일 slot 페이지(edit/video/vision) 는 호버 무관 전역 paste 허용.
+        // Multi-ref ON 시 (Edit Phase 2) 두 카드가 같은 paste 이벤트를 잡으면
+        // 비결정적이라 부모가 pasteRequireHover=true 로 호버 카드만 받도록 강제.
         // textarea/input focus 시 자동 skip (StudioUploadSlot 내부 가드).
         pasteEnabled
+        pasteRequireHover={pasteRequireHover}
         onReady={(pick) => setPickFn(() => pick)}
         emptyContent={
           <>

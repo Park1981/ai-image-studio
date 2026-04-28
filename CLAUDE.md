@@ -218,3 +218,17 @@ cd frontend; npm run gen:types
 - 버튼: "힌트 미리 받기" · 체크박스: "Claude 프롬프트 조사"
 - `researchPreview` state 는 `useGeneratePipeline` 훅에서 관리
 - 힌트 전체 N개 노출 (slice 제한 없음)
+
+### Multi-reference + Manual Crop (/edit · 2026-04-28)
+
+- **토글 ON** (`🖼️ 참조 이미지 사용 (실험적)`) 후 image2 업로드 시 자동으로 인라인 crop UI ("사용 영역") 노출
+- Crop UI 구성: `react-easy-crop` 기반 · 자유/1:1/4:3/9:16 비율 lock + zoom slider + 외부 dim 0.75
+- **default = 박스 100%** (이미지 전체) — 사용자가 안 줄이면 옛 흐름 (원본 그대로)
+- "수정 생성" 클릭 시점에 `useEditPipeline` 이 캔버스 drawImage 로 cropped Blob 생성 → `reference-crop.png` File → multipart 의 `reference_image` 필드
+- **256px 미만 영역**은 `onAreaChange(null)` 로 silent fallback (도움말에 명시 · 백엔드 사이즈 검증은 *없음*)
+- **Reset 트리거 3개** (`useEditStore.referenceCropArea`): 새 image2 업로드 / 해제 (X) / multi-ref 토글 OFF
+- **`key={referenceImage}`** 로 새 업로드 시 컴포넌트 local state (crop/zoom/aspectMode) 강제 reset (Codex Phase 1 리뷰 결함 fix)
+- **`effectiveUseRef = useReferenceImage && !!referenceImage`** 단일 게이트 — race 시 백엔드 400 차단 (Codex Phase 2 리뷰 결함 fix)
+- **저장**: cropped Blob 은 영구 저장 안 함 (메모리 → multipart → ComfyUI 임시 input). 영구 저장 + 라이브러리 재선택은 `docs/superpowers/plans/2026-04-27-edit-reference-library.md` 후속 plan
+- **얼굴 transfer 한계**: Qwen Edit 본질로 face role 은 약함 — 의상/배경 role 위주 사용 권장. InstantID 별도 plan 후보
+- **`bypassCrop` prop**: 라이브러리 plan 진입 시 활성 (이미 crop 된 reference 재 crop 방지). 현재는 자리만
