@@ -5,7 +5,66 @@
 
 ## 2026-04-28
 
-### Edit Reference Template Library v8 — 현재 master
+### Multi-ref Phase 1+1'+1'' — image2 prompt 보장 (current master)
+
+**브랜치**: `claude/multi-ref-slot-removal` → master merge `--no-ff` (`fe8e387`)
+**검증**: pytest 267 → **293** (+26 신규) · vitest 91 · tsc / lint clean
+**진화**: Slot Removal (Phase 1) → Slot Replacement (Phase 1' · codex 리뷰 반영) → 2-Layer 안전망 (Phase 1'')
+
+#### 동기
+
+사용자 발견 케이스: `role=background` + `edit_instruction="Calvin Klein bra 제거"` 실행 시 결과 프롬프트에
+**image2 가 한번도 안 나오고 `preserve background` 가 박힘**. 매트릭스 [preserve] 지시와
+reference_clause 의 "image2 로 교체" 지시 충돌 → quote 강제력 더 센 [preserve] 가 우연히 이김.
+
+#### Phase 1 — Slot Removal (1 commit)
+
+- `ROLE_TO_SLOTS` 매핑 + `_role_target_slots()` 헬퍼
+- `_build_matrix_directive_block`: target slot 매트릭스에서 *제거 (continue)* — 침묵 전략
+- 옛 face-only 분기 (line 688-701) 제거 → 4 role 일관 메커니즘
+- 사용자 검증 결과 **실패** — gemma4 가 침묵을 default-preserve 로 환각
+
+#### Phase 1' — Slot Replacement (codex 리뷰 반영 · 1 commit)
+
+> codex: "role 은 보조 설명이 아닌 implicit user instruction. attire 슬롯은 침묵/삭제가 아니라 reference_from_image2 같은 명시적 action."
+
+- 슬롯 제거 → `[reference_from_image2]` 명시 액션으로 *교체*
+- "Apply image2's X to image1" + "Do NOT preserve image1's X" + "MUST mention 'image2'" 강제 directive
+- 매트릭스에 경쟁 권위 박혀 reference_clause 와 동등 강도
+
+#### Phase 1'' — 2-Layer 안전망 (1 commit · 7 신규 tests)
+
+> codex: "프롬프트에 image2 없으면 Qwen Edit 가 image2 conditioning 받아도 cross-attention 약함."
+
+- **Layer 1**: 도메인별 화이트리스트 (`DOMAIN_VALID_SLOTS`) + missing slot 강제 추가
+  - vision 이 슬롯 안 만들어도 (예: "머리만 변경" → attire 슬롯 부재) 강제 박음
+- **Layer 2**: gemma4 결과 post-process — image2 미언급 시 deterministic phrase 부착
+  - `_ROLE_PHRASES`: face/outfit/style/background 4종
+
+#### 사용자 실 테스트 결과
+
+| role | 결과 | 비고 |
+|---|---|---|
+| outfit | ✅ image2 옷 적용 (Calvin Klein 글자까지 transfer) | Layer 2 phrase 부착으로 동작 |
+| background | ✅ image2 환경 적용 | gemma4 직접 박음 |
+| face | ⚠️ 프롬프트는 OK, 결과 약함 | Qwen Edit 모델 한계 — InstantID 별도 plan 후보 |
+| style | ⚠️ 프롬프트는 OK, 결과 약함 | IP-Adapter 별도 plan 후보 |
+
+#### 신규 테스트 (26)
+
+- `test_role_slot_removal.py` (신규, 18 tests)
+- `test_matrix_directive_block.py` (+5)
+- `test_prompt_pipeline.py` (+3)
+- `test_multi_ref_edit.py` (face role assertion 갱신)
+
+#### 알려진 한계 (Phase 2 후보)
+
+- face/style: 모델 conditioning 한계 — InstantID / IP-Adapter Style 별도 통합
+- 자유 텍스트 role: ROLE_TO_SLOTS 매칭 X → reference_clause fallback 만 (충돌 가능성 잔존)
+
+---
+
+### Edit Reference Template Library v8
 
 **브랜치**: `claude/edit-reference-library` → master merge `--no-ff` (`da848aa`)
 **검증**: pytest 267 (244 → +23) · vitest 91 (74 → +17) · tsc / lint clean
