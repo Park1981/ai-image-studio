@@ -13,6 +13,7 @@
 "use client";
 
 import { editImageStream } from "@/lib/api/edit";
+import { cropBlobIfArea, dataUrlToBlob } from "@/lib/image-crop";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { useEditStore } from "@/stores/useEditStore";
@@ -42,6 +43,8 @@ export function useEditPipeline({
   const referenceImage = useEditStore((s) => s.referenceImage);
   const referenceRole = useEditStore((s) => s.referenceRole);
   const referenceRoleCustom = useEditStore((s) => s.referenceRoleCustom);
+  // Phase 2 (2026-04-28): 수동 crop 영역 (있으면 reference 를 미리 crop 해서 전송)
+  const referenceCropArea = useEditStore((s) => s.referenceCropArea);
   // 실행 상태 setter
   const running = useEditStore((s) => s.running);
   const setRunning = useEditStore((s) => s.setRunning);
@@ -81,6 +84,30 @@ export function useEditPipeline({
         ? referenceRoleCustom.trim() || undefined
         : referenceRole;
 
+    // Phase 2 (2026-04-28): reference 가 있고 crop area 도 있으면 *클라이언트* 에서
+    // 미리 crop 해서 cropped File 로 전송. area 없으면 원본 data URL 그대로.
+    // crop 변환 실패 (canvas / toBlob) 시 사용자에게 toast + 진입 차단.
+    let resolvedReferenceImage: string | File | undefined;
+    if (useReferenceImage && referenceImage) {
+      if (referenceCropArea) {
+        try {
+          const original = await dataUrlToBlob(referenceImage);
+          const cropped = await cropBlobIfArea(original, referenceCropArea);
+          resolvedReferenceImage = new File([cropped], "reference-crop.png", {
+            type: "image/png",
+          });
+        } catch (err) {
+          toast.error(
+            "참조 이미지 crop 실패",
+            err instanceof Error ? err.message : "알 수 없는 오류",
+          );
+          return;
+        }
+      } else {
+        resolvedReferenceImage = referenceImage;
+      }
+    }
+
     setRunning(true);
     await consumePipelineStream(
       editImageStream({
@@ -91,7 +118,7 @@ export function useEditPipeline({
         visionModel: visionModelSel,
         // Multi-ref: 토글 OFF 면 reference 필드 모두 undefined → 옛 흐름 100% 동일.
         useReferenceImage,
-        referenceImage: useReferenceImage ? referenceImage : undefined,
+        referenceImage: useReferenceImage ? resolvedReferenceImage : undefined,
         referenceRole: useReferenceImage ? effectiveRole : undefined,
       }),
       {
