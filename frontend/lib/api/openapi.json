@@ -1046,6 +1046,28 @@
         ]
       }
     },
+    "/api/studio/system/shutdown": {
+      "post": {
+        "description": "start_v2 로 띄운 로컬 스튜디오 프로세스 종료.\n\n브라우저에서 누르는 종료 버튼용이라 localhost 요청만 허용한다.\n실제 종료는 별도 PowerShell 프로세스가 단계별로 수행한다.",
+        "operationId": "launcher_shutdown_api_studio_system_shutdown_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProcessAction"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Launcher Shutdown",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
     "/api/studio/upgrade-only": {
       "post": {
         "description": "프롬프트 업그레이드 전용 (ComfyUI 미호출).\n\nshowUpgradeStep 프리퍼런스 ON 일 때 프론트가 호출 → 모달에서 사용자 확인 →\n/generate 로 preUpgradedPrompt 와 함께 재요청.\n\nspec 19 후속 (Codex 추가 fix): aspect/width/height 도 SYSTEM_GENERATE 에\n전달 → /generate 본 호출과 동일한 size context 보장.",
