@@ -208,6 +208,11 @@ def build_reference_clause(reference_role: str | None) -> str:
         return ""
     # 2026-04-28 후속 보강: 모든 role 공통 prefix — image1/image2 의미 명시.
     # 모델이 두 슬롯의 역할을 *prompt 단계에서* 명확히 인식하도록.
+    # 2026-04-28 (manual crop 세션 후속) 추가: OUTPUT NAMING CONVENTION —
+    # gemma4 가 output 결과 표현에서도 image1/image2 만 사용하게 강제.
+    # 이전엔 정의만 했고 output 강제 directive 가 없어 gemma4 가 image2 는
+    # 그대로 쓰면서 image1 자리는 'the source image' / 'the original' 식으로
+    # 풀어쓰는 비대칭 결과가 발생 (사용자 검증 케이스).
     image_roles_prefix = (
         "\n\nMULTI-REFERENCE MODE:\n"
         "IMAGE ROLES:\n"
@@ -216,6 +221,14 @@ def build_reference_clause(reference_role: str | None) -> str:
         "- IMAGE2 = the REFERENCE/DONOR image. "
         "Only the specific aspect described below transfers from IMAGE2; "
         "all other aspects of IMAGE2 must NOT appear in the output.\n\n"
+        "OUTPUT NAMING CONVENTION:\n"
+        "In your final output prompt, refer to the source/original strictly as "
+        "'image1' and the reference/donor strictly as 'image2'. "
+        "Do NOT use phrases like 'the source image', 'the original image', "
+        "'the original', 'the source', 'the reference image', 'the donor', "
+        "'the original photo', 'in the source' in the final output. "
+        "Only 'image1' and 'image2' are allowed for these two slots — "
+        "this keeps the prompt symmetric and unambiguous for the model.\n\n"
     )
     preset = ROLE_INSTRUCTIONS.get(reference_role)
     if preset:

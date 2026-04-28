@@ -381,6 +381,28 @@ def test_build_reference_clause_face_preset():
     assert "Do NOT use image2 for hair" in out
 
 
+def test_build_reference_clause_includes_output_naming_convention():
+    """모든 role 의 prefix 가 OUTPUT NAMING CONVENTION directive 를 포함 (2026-04-28).
+
+    gemma4 output 표현 강제 — 'the source image', 'the original' 등의 풀어쓰기
+    대신 image1/image2 만 사용. 이전엔 정의만 있고 output convention 이 없어
+    gemma4 가 image2 는 명시하면서 image1 자리는 풀어쓰는 비대칭 결과가
+    났던 회귀 (사용자 검증 케이스 · `Replace ... in the source image` ...).
+    """
+    from studio.prompt_pipeline import build_reference_clause
+
+    for role in ("face", "outfit", "style", "background", "헤어스타일 참조"):
+        out = build_reference_clause(role)
+        # 정의는 그대로 살아있고
+        assert "MULTI-REFERENCE MODE" in out, role
+        # output convention directive 도 항상 포함
+        assert "OUTPUT NAMING CONVENTION" in out, role
+        assert "Only 'image1' and 'image2' are allowed" in out, role
+        # 사용자 의도와 어긋나는 풀어쓰기 표현이 *금지 목록* 으로 명시됨
+        assert "'the source image'" in out, role
+        assert "'the original'" in out, role
+
+
 def test_build_reference_clause_custom_text():
     """preset 외 자유 텍스트 → User-described role 로 그대로 주입 (한글도 OK)."""
     from studio.prompt_pipeline import build_reference_clause
