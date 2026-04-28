@@ -195,6 +195,32 @@ ROLE_INSTRUCTIONS: dict[str, str] = {
 }
 
 
+# Multi-reference slot removal 매핑 (2026-04-28).
+# reference_role 매핑 슬롯은 image1 매트릭스 directive 에서 *제거* 되어야
+# [preserve] 지시와 reference_clause 의 "image2 로 교체" 지시 충돌이 회피된다.
+#
+# 인물/물체 도메인의 슬롯 이름이 다르므로 background/style 은 두 도메인의
+# 의미적으로 동등한 슬롯을 모두 포함 (한쪽만 매칭되어도 안전).
+ROLE_TO_SLOTS: dict[str, frozenset[str]] = {
+    "face": frozenset({"face_expression"}),
+    "outfit": frozenset({"attire"}),
+    "background": frozenset({"background", "background_setting"}),
+    "style": frozenset({"mood_style"}),
+}
+
+
+def _role_target_slots(reference_role: str | None) -> frozenset[str]:
+    """role 문자열 → 매트릭스에서 제거할 슬롯 키 집합.
+
+    - None / 빈 문자열 / 알 수 없는 자유 텍스트: 빈 frozenset
+      (자유 텍스트 role 은 어느 슬롯을 가리키는지 불명 → slot removal 미적용)
+    - known role (face/outfit/style/background): ROLE_TO_SLOTS 의 정의된 집합
+    """
+    if not reference_role:
+        return frozenset()
+    return ROLE_TO_SLOTS.get(reference_role, frozenset())
+
+
 def build_reference_clause(reference_role: str | None) -> str:
     """role 별 SYSTEM_EDIT 추가 clause 빌드 (2026-04-27 Multi-reference Phase 4).
 
