@@ -286,6 +286,27 @@ export interface HistoryItem {
   referenceRole?: string | null;
 }
 
+/** Edit reference template — 라이브러리 plan v8 (2026-04-28).
+ *  Backend `reference_templates` 테이블 row 와 1:1.
+ *  imageRef 는 클라이언트에서 STUDIO_BASE 기준 절대 URL 로 정규화됨 (Codex 2차 리뷰 fix #6).
+ */
+export interface ReferenceTemplate {
+  id: string;
+  /** 영구 URL (`/images/studio/reference-templates/<uuid32>.<ext>` → STUDIO_BASE prefix 정규화) */
+  imageRef: string;
+  /** 사용자 라벨 */
+  name: string;
+  /** 저장 시 1회 생성된 비전 description (영문) — graceful 실패 시 null */
+  visionDescription: string | null;
+  /** 사용자가 입력한 의도 메모 */
+  userIntent: string | null;
+  /** 기본 role (face/outfit/style/background/custom) — 픽 시 EditLeftPanel 의 role 채움 */
+  roleDefault: string | null;
+  createdAt: number;
+  /** 마지막 사용 시각 (ms) — 정렬 키. 한 번도 안 쓰면 null. */
+  lastUsedAt: number | null;
+}
+
 export interface GenerateRequest {
   prompt: string;
   aspect: string;
