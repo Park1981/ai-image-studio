@@ -5,7 +5,60 @@
 
 ## 2026-04-28
 
-### Launcher v2 (start_v2 / stop_v2 + ShutdownBtn + /loading) — 현재 master
+### Edit Reference Template Library v8 — 현재 master
+
+**브랜치**: `claude/edit-reference-library` → master merge `--no-ff` (`da848aa`)
+**검증**: pytest 267 (244 → +23) · vitest 91 (74 → +17) · tsc / lint clean
+**Codex 리뷰**: 2회 (Phase A 단독 + Phase B+C 통합) · 결함 7건 모두 fix (🔴 0 / 🟡 5 / 🟢 2)
+
+#### 동기
+
+Multi-reference + 수동 Crop 본 plan 의 후속. 같은 reference 이미지 (옷/배경/스타일) 를
+*2회 이상 재업로드* 하는 케이스 발견 시 라이브러리화 가치. cropping 영역까지 영구 저장.
+
+#### Phase A — Backend foundation (4 commit · v8 schema + CRUD + 라우트)
+
+- **v8 schema**: `reference_templates` 테이블 + `idx_reference_templates_lastused`
+- **CRUD**: `list / get / insert / delete / touch` (last_used_at DESC + created_at fallback)
+- **`reference_storage.py`** 신규 (140 줄): 영구 저장 + path traversal 보안 + PIL 재인코딩 + vision 분석 헬퍼
+- **`POST /api/studio/reference-templates`** (multipart) — 이미지 + meta JSON
+  - PIL 검증 → vision 분석 (graceful) → DB insert (실패 시 파일 unlink 롤백)
+- **DELETE / POST touch** — Soft 삭제 + last_used_at 갱신
+- **Codex 리뷰 fix**: meta JSON dict 가드 (`isinstance(parsed, dict)` 400) + URL query/hash 거부 + 테스트 nit
+
+#### Phase B — Frontend UI (2 commit · types + API + Drawer)
+
+- **`types.ts ReferenceTemplate`** (8 필드) + `EditRequest` 에 `referenceRef` + `referenceTemplateId` 추가
+- **`lib/api/reference-templates.ts`** 신규: `list / create / delete / touch` + `normalizeReferenceTemplate` URL 절대화 (Codex 2차 리뷰 fix #6)
+- **`ReferenceLibraryDrawer.tsx`** 신규 (333 줄): 우측 480px Drawer + 2열 grid TemplateCard + pick/delete + 빈 상태 안내
+- **단위 테스트 10건**: URL 정규화 + create/delete/touch graceful
+
+#### Phase C — Integration (3 commit · store + EditLeftPanel + meta + 자동 저장)
+
+- **`useEditStore`**: saveAsTemplate / templateName / pickedTemplateId / pickedTemplateRef + setReferenceImage 가 picked 두 값 자동 null
+- **`EditLeftPanel`**: "라이브러리에서 선택" 버튼 + saveAsTemplate Toggle + Drawer 마운트
+- **Codex 3차 리뷰 fix (핵심)** — 권위 신뢰 키 분리:
+  - 클라이언트 `referenceRef` 는 absolute URL 일 수 있어 백엔드 DB 저장 근거로 신뢰 X
+  - `referenceTemplateId` → `history_db.get_reference_template` 으로 권위 image_ref 결정
+  - 회귀 테스트: evil absolute URL 보내도 DB 의 상대 URL 이 pipeline 으로 전달
+- **`useEditPipeline` 자동 저장**: done 콜백에서 saveAsTemplate ON + 새 업로드 + 이름 입력 → `createReferenceTemplate`
+
+#### Codex Phase B+C 리뷰 fix (1 commit)
+
+- **자동 저장 closure stale fix**: 실행 시작 시 스냅샷 캡처 → 실행 중 토글/이름 변경 무관
+- **Drawer 접근성**: aria-modal + Esc 닫기 + focus 진입/복귀
+- **blob: URL preserve**: `normalizeReferenceTemplate` 보존 prefix 에 추가
+- **통합 회귀**: `edit-library-store.test.ts` (7 케이스 — 픽 후 새 업로드 reset / 토글 OFF picked 보존 / blob URL 등)
+
+#### 정책 결정
+
+- **저장 정책**: 명시적 ("템플릿으로 저장" 토글 ON 시만)
+- **비전 분석**: 저장 시 1회 (qwen2.5vl 동기 5-10초)
+- **삭제**: Soft (DB row + 이미지 파일 삭제, 옛 history.referenceRef 보존)
+- **history.referenceRef 채우기**: 옵션 A (첫 실행 = null / 라이브러리 픽 = 영구 URL)
+- **얼굴 transfer 한계**: Qwen Edit 본질 — InstantID 별도 plan 후보
+
+### Launcher v2 (start_v2 / stop_v2 + ShutdownBtn + /loading)
 
 **브랜치**: `claude/launcher-v2` → master merge `--no-ff` (`af0a9cf`)
 **검증**: pytest 235 / vitest 74 / tsc / lint clean (0 회귀)
