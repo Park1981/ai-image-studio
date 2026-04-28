@@ -25,7 +25,9 @@ import HistoryPicker from "@/components/studio/HistoryPicker";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import ReferenceLibraryDrawer from "./ReferenceLibraryDrawer";
 import ReferenceRoleSelect from "./ReferenceRoleSelect";
+import type { ReferenceRoleId } from "@/stores/useEditStore";
 
 // EditReferenceCrop 은 react-easy-crop (window 의존) 을 사용하므로 ssr:false 로 격리.
 // 2026-04-28 (Phase 1).
@@ -65,6 +67,10 @@ export default function EditLeftPanel({
     referenceRole, setReferenceRole,
     referenceRoleCustom, setReferenceRoleCustom,
     setReferenceCropArea,
+    // v8 라이브러리 plan
+    saveAsTemplate, templateName, pickedTemplateId,
+    setSaveAsTemplate, setTemplateName,
+    setPickedTemplateId, setPickedTemplateRef,
   } = useEditInputs();
   const { running } = useEditRunning();
   const items = useHistoryStore((s) => s.items);
@@ -75,6 +81,8 @@ export default function EditLeftPanel({
   );
 
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
+  // v8 라이브러리 plan: 라이브러리 Drawer open 토글.
+  const [libraryOpen, setLibraryOpen] = useState(false);
 
   const handleSourceChange = (
     image: string,
@@ -266,12 +274,34 @@ export default function EditLeftPanel({
             >
               <SectionAccentBar accent="violet" />
               참조 이미지
+              {referenceWidth && referenceHeight && (
+                <span
+                  className="mono"
+                  style={{
+                    fontSize: 11,
+                    color: "var(--ink-4)",
+                    fontWeight: 400,
+                  }}
+                >
+                  {referenceWidth}×{referenceHeight}
+                </span>
+              )}
             </label>
-            <span className="mono ais-field-meta">
-              {referenceWidth && referenceHeight
-                ? `${referenceWidth}×${referenceHeight}`
-                : "—"}
-            </span>
+            <button
+              type="button"
+              onClick={() => setLibraryOpen(true)}
+              style={{
+                all: "unset",
+                cursor: "pointer",
+                fontSize: 11,
+                color: "var(--ink-3)",
+                display: "flex",
+                alignItems: "center",
+                gap: 4,
+              }}
+            >
+              <Icon name="grid" size={11} /> 라이브러리에서 선택
+            </button>
           </div>
           <SourceImageCard
             sourceImage={referenceImage}
@@ -322,8 +352,75 @@ export default function EditLeftPanel({
             customText={referenceRoleCustom}
             onCustomTextChange={setReferenceRoleCustom}
           />
+
+          {/* v8 라이브러리 plan: 새 reference (라이브러리 픽이 아닌) 케이스만 저장 토글 노출.
+           *  pickedTemplateId !== null 이면 이미 라이브러리 항목이므로 재저장 의미 없음. */}
+          {referenceImage && pickedTemplateId === null && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <Toggle
+                checked={saveAsTemplate}
+                onChange={setSaveAsTemplate}
+                align="right"
+                label="📌 라이브러리에 저장"
+                desc={
+                  saveAsTemplate
+                    ? "수정 실행 시 템플릿으로 저장 + 비전 분석"
+                    : "이번만 사용 (저장 X)"
+                }
+              />
+              {saveAsTemplate && (
+                <input
+                  type="text"
+                  value={templateName}
+                  onChange={(e) => setTemplateName(e.target.value)}
+                  placeholder="템플릿 이름 (예: 검정 미니 드레스)"
+                  style={{
+                    all: "unset",
+                    display: "block",
+                    width: "100%",
+                    boxSizing: "border-box",
+                    padding: "8px 10px",
+                    fontSize: 12,
+                    border: "1px solid var(--line)",
+                    borderRadius: "var(--radius-sm)",
+                    background: "var(--surface)",
+                    color: "var(--ink)",
+                  }}
+                />
+              )}
+            </div>
+          )}
         </div>
       )}
+
+      {/* v8 라이브러리 plan: ReferenceLibraryDrawer (참조 이미지 사용 OFF 여도 미리 보기 가능) */}
+      <ReferenceLibraryDrawer
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        onPick={(t) => {
+          // 라이브러리에서 픽 — 두번째 카드 자동 채움 + 재저장 OFF.
+          // setReferenceImage 가 pickedTemplateId/Ref 둘 다 null 로 초기화하므로
+          // 그 *직후* picked 두 값을 다시 설정 (순서 중요).
+          setReferenceImage(
+            t.imageRef,
+            `${t.name} · 라이브러리`,
+            0,
+            0,
+          );
+          if (
+            t.roleDefault &&
+            ["face", "outfit", "style", "background", "custom"].includes(
+              t.roleDefault,
+            )
+          ) {
+            setReferenceRole(t.roleDefault as ReferenceRoleId);
+          }
+          setPickedTemplateId(t.id);
+          setPickedTemplateRef(t.imageRef);
+          setSaveAsTemplate(false);
+          toast.success("템플릿 적용", t.name);
+        }}
+      />
     </StudioLeftPanel>
   );
 }
