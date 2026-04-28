@@ -166,10 +166,16 @@ LANGUAGE
 # image2 의 어떤 측면을 참조로 사용할지 명확히.
 ROLE_INSTRUCTIONS: dict[str, str] = {
     "face": (
-        "Reference image (image2) provides FACE IDENTITY. "
-        "Preserve facial structure, features, and expression from image2 "
-        "while applying user's edit to the rest. Do not transfer makeup or hair "
-        "unless user explicitly mentions."
+        "STRICT FACE-ONLY TRANSFER. "
+        "FROM IMAGE2: copy ONLY the face identity: facial structure, features, "
+        "and expression. "
+        "FROM IMAGE1: preserve hair length, hair color, hairstyle, body shape, "
+        "pose, composition, lighting, background, and environment exactly; "
+        "preserve clothing except for the user's explicit clothing edit. "
+        "Do NOT use image2 for hair, body, pose, outfit, jewelry, accessories, "
+        "background, lighting, or environment. "
+        "This OVERRIDES source-face identity preservation: replace only the "
+        "source face identity with image2's face identity."
     ),
     "outfit": (
         "Reference image (image2) provides CLOTHING/ACCESSORIES reference. "
@@ -200,16 +206,28 @@ def build_reference_clause(reference_role: str | None) -> str:
     """
     if not reference_role:
         return ""
+    # 2026-04-28 후속 보강: 모든 role 공통 prefix — image1/image2 의미 명시.
+    # 모델이 두 슬롯의 역할을 *prompt 단계에서* 명확히 인식하도록.
+    image_roles_prefix = (
+        "\n\nMULTI-REFERENCE MODE:\n"
+        "IMAGE ROLES:\n"
+        "- IMAGE1 = the SOURCE/ORIGINAL image (editing canvas). "
+        "Preserve every aspect of IMAGE1 unless the user explicitly requests a change.\n"
+        "- IMAGE2 = the REFERENCE/DONOR image. "
+        "Only the specific aspect described below transfers from IMAGE2; "
+        "all other aspects of IMAGE2 must NOT appear in the output.\n\n"
+    )
     preset = ROLE_INSTRUCTIONS.get(reference_role)
     if preset:
-        return f"\n\nMULTI-REFERENCE MODE:\n{preset}"
+        return f"{image_roles_prefix}{preset}"
     # 자유 텍스트 — 사용자 입력 그대로 전달 (악성 토큰 위험 낮음 · 길이 제한)
     safe_text = reference_role.strip()[:200]
     return (
-        "\n\nMULTI-REFERENCE MODE:\n"
-        f"Reference image (image2) provides: {safe_text}. "
-        "Use this reference as guidance for the edit, "
-        "applying to image1 the aspects implied by the user description."
+        f"{image_roles_prefix}"
+        f"Reference image (IMAGE2) provides: {safe_text}. "
+        "Use IMAGE2 as guidance for the edit, "
+        "applying to IMAGE1 the aspects implied by the user description, "
+        "while preserving all other aspects of IMAGE1 exactly."
     )
 
 
@@ -609,7 +627,10 @@ def _slot_label(key: str) -> str:
     return table.get(key, key.replace("_", " "))
 
 
-def _build_matrix_directive_block(analysis: Any) -> str:
+def _build_matrix_directive_block(
+    analysis: Any,
+    reference_role: str | None = None,
+) -> str:
     """EditVisionAnalysis 객체 → SYSTEM_EDIT 에 주입할 STRICT MATRIX directive.
 
     analysis 가 None / fallback=True / slots 비어있으면 빈 문자열 반환 (블록 미주입).
@@ -622,6 +643,9 @@ def _build_matrix_directive_block(analysis: Any) -> str:
     preservation phrasing 만 강제.
 
     [edit] 슬롯은 그대로 — note 가 변경 지시 자체이므로 명시 필수.
+
+    Multi-reference face 모드에서는 face_expression 의 source preserve 지시가
+    image2 face identity 지시와 정면 충돌하므로 reference 지시로 대체한다.
     """
     if analysis is None:
         return ""
@@ -648,6 +672,20 @@ def _build_matrix_directive_block(analysis: Any) -> str:
         action = getattr(entry, "action", "preserve")
         note = (getattr(entry, "note", "") or "").strip()
         label = _slot_label(key)
+        if reference_role == "face" and key == "face_expression":
+            lines.append("[reference] face / expression — USE IMAGE2 FACE IDENTITY")
+            lines.append(
+                "  -> Use reference image (image2) as the face identity source."
+            )
+            lines.append(
+                "  -> Do NOT preserve image1/source face identity; replacing "
+                "the face is expected in this mode."
+            )
+            lines.append(
+                "  -> Preserve image1 body, pose, framing, and background unless "
+                "the user asked to edit them."
+            )
+            continue
         if action == "edit":
             # 변경 의도 — note 가 변경 지시 자체이므로 그대로 명시
             lines.append(f"[edit] {label}")
@@ -700,7 +738,9 @@ async def upgrade_edit_prompt(
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
 
     # 매트릭스 directive 동적 주입 (있을 때만)
-    matrix_block = _build_matrix_directive_block(analysis)
+    matrix_block = _build_matrix_directive_block(
+        analysis, reference_role=reference_role
+    )
     user_msg_parts = [f"[Image description]\n{image_description.strip()}"]
     if matrix_block:
         user_msg_parts.append(matrix_block)

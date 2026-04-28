@@ -25,6 +25,7 @@ ComfyUI `/prompt` 엔드포인트는 다음 형식의 dict 를 기대한다:
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from itertools import count
 from typing import Any, Callable, Iterable
@@ -45,6 +46,8 @@ from .presets import (
     resolve_video_unet_name,
 )
 
+
+log = logging.getLogger(__name__)
 
 ApiPrompt = dict[str, dict[str, Any]]
 NodeRef = list[Any]  # [node_id, output_slot] — ComfyUI API 형식
@@ -424,9 +427,43 @@ def build_edit_api(v: EditApiInput) -> ApiPrompt:
     Multi-ref 분기 (2026-04-27): reference 미사용이면 옛 단일 이미지 path 그대로.
     reference_image_filename 이 None 이면 옛 코드와 100% 동일한 결과 반환 → 회귀 위험 0.
     """
+    log.info(
+        "build_edit_api: reference_image_filename=%r reference_role=%r",
+        v.reference_image_filename,
+        v.reference_role,
+    )
     if v.reference_image_filename is None:
         return _build_edit_api_single(v)
     return _build_edit_api_multi_ref(v)
+
+
+def _multi_ref_negative_prompt(reference_role: str | None) -> str:
+    """Role-aware negative prompt for unwanted image2 transfer."""
+    if reference_role == "face":
+        return (
+            "image2 hair, image2 hairstyle, image2 hair color, image2 body, "
+            "image2 body shape, image2 pose, image2 clothing, image2 outfit, "
+            "image2 jewelry, image2 accessories, image2 background, "
+            "image2 environment, image2 lighting, changing image1 background, "
+            "changing image1 body pose, changing image1 hair"
+        )
+    if reference_role == "outfit":
+        return (
+            "image2 face, image2 facial identity, image2 hair, image2 pose, "
+            "image2 body shape, image2 background, image2 environment, "
+            "changing image1 face, changing image1 pose, changing image1 background"
+        )
+    if reference_role == "background":
+        return (
+            "image2 face, image2 body, image2 clothing, image2 pose, "
+            "changing image1 subject identity, changing image1 subject pose"
+        )
+    if reference_role == "style":
+        return (
+            "image2 subject identity, image2 face, image2 body, image2 pose, "
+            "image2 clothing, image2 background layout, changing image1 composition"
+        )
+    return ""
 
 
 def _build_edit_api_single(v: EditApiInput) -> ApiPrompt:
@@ -611,6 +648,7 @@ def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
     model_ref = [cfgnorm_id, 0]
 
     # TextEncodeQwenImageEditPlus × 2 (pos+neg) — image1 + image2 둘 다 슬롯에 연결.
+    neg_prompt_text = _multi_ref_negative_prompt(v.reference_role)
     pos_enc_id = nid()
     api[pos_enc_id] = {
         "class_type": "TextEncodeQwenImageEditPlus",
@@ -632,7 +670,7 @@ def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
             "vae": [vae_id, 0],
             "image1": [scale1_id, 0],
             "image2": [scale2_id, 0],
-            "prompt": "",
+            "prompt": neg_prompt_text,
         },
     }
 

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import io
 import json
+from types import SimpleNamespace
 
 import pytest
 from PIL import Image
@@ -256,7 +257,10 @@ def test_build_reference_clause_face_preset():
 
     out = build_reference_clause("face")
     assert "MULTI-REFERENCE MODE" in out
-    assert "FACE IDENTITY" in out
+    assert "STRICT FACE-ONLY TRANSFER" in out
+    assert "FROM IMAGE2: copy ONLY the face identity" in out
+    assert "FROM IMAGE1: preserve hair length" in out
+    assert "Do NOT use image2 for hair" in out
 
 
 def test_build_reference_clause_custom_text():
@@ -277,6 +281,67 @@ def test_build_reference_clause_truncates_long_text():
     # 200자 cap 검증 — 결과 안에 200개의 x 포함되되, 500개는 안 됨
     assert "x" * 200 in out
     assert "x" * 201 not in out
+
+
+def test_face_reference_overrides_source_face_matrix_preserve():
+    """face role 에서는 matrix 의 face preserve 가 image2 identity 지시로 바뀌어야 함."""
+    from studio.prompt_pipeline import _build_matrix_directive_block
+
+    analysis = SimpleNamespace(
+        fallback=False,
+        domain="person",
+        intent="Change the outfit to a swimsuit.",
+        slots={
+            "face_expression": SimpleNamespace(
+                action="preserve",
+                note="original face",
+            ),
+            "hair": SimpleNamespace(action="preserve", note="original hair"),
+        },
+    )
+
+    out = _build_matrix_directive_block(analysis, reference_role="face")
+
+    assert "[reference] face / expression" in out
+    assert "Use reference image (image2) as the face identity source" in out
+    assert "Do NOT preserve image1/source face identity" in out
+    assert "[preserve] face / expression" not in out
+    assert "[preserve] hair" in out
+
+
+def test_face_reference_upload_is_cropped_before_comfy_upload():
+    """face role 은 image2 전체가 아니라 상단 얼굴 영역만 ComfyUI 에 전달."""
+    from studio.pipelines.edit import _prepare_reference_upload
+
+    src = io.BytesIO()
+    Image.new("RGB", (1000, 800), color=(20, 40, 80)).save(src, format="PNG")
+
+    cropped_bytes, filename = _prepare_reference_upload(
+        src.getvalue(),
+        "portrait.png",
+        "face",
+    )
+
+    with Image.open(io.BytesIO(cropped_bytes)) as im:
+        assert im.size == (368, 368)
+    assert filename == "portrait-face.png"
+    assert len(cropped_bytes) < len(src.getvalue())
+
+
+def test_non_face_reference_upload_keeps_original_bytes_and_name():
+    """face 외 role 은 참조 이미지를 임의 crop 하지 않는다."""
+    from studio.pipelines.edit import _prepare_reference_upload
+
+    raw = b"not actually opened for outfit"
+
+    upload_bytes, filename = _prepare_reference_upload(
+        raw,
+        "reference.png",
+        "outfit",
+    )
+
+    assert upload_bytes == raw
+    assert filename == "reference.png"
 
 
 def test_reference_returns_extra_load_image_node():
@@ -319,6 +384,28 @@ def test_reference_returns_extra_load_image_node():
     for enc in encode_nodes:
         assert "image1" in enc["inputs"]
         assert "image2" in enc["inputs"]
+
+
+def test_multi_ref_face_uses_negative_prompt_to_block_image2_leakage():
+    """face role 은 image2 의 hair/background/outfit transfer 를 negative 로 막는다."""
+    from studio.comfy_api_builder import build_edit_api
+
+    api_multi = build_edit_api(
+        _make_edit_input(reference_filename="ref.png", reference_role="face")
+    )
+
+    negative_nodes = [
+        n for n in api_multi.values()
+        if n["class_type"] == "TextEncodeQwenImageEditPlus"
+        and n.get("_meta", {}).get("title") == "Negative"
+    ]
+
+    assert len(negative_nodes) == 1
+    neg_prompt = negative_nodes[0]["inputs"]["prompt"]
+    assert "image2 hair" in neg_prompt
+    assert "image2 background" in neg_prompt
+    assert "image2 clothing" in neg_prompt
+    assert "changing image1 body pose" in neg_prompt
 
 
 def test_make_edit_prompt_passes_extra_upload_to_builder():

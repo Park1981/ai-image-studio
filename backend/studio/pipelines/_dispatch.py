@@ -64,6 +64,26 @@ def _mark_generation_complete() -> None:
         log.warning("mark_generation_complete 호출 실패: %s", exc)
 
 
+def _summarize_api_prompt(api_prompt: dict[str, Any]) -> tuple[int, int]:
+    """Return (LoadImage count, TextEncodeQwenImageEditPlus nodes with image2)."""
+    load_image_count = 0
+    image2_encoder_count = 0
+    for node in api_prompt.values():
+        if not isinstance(node, dict):
+            continue
+        class_type = node.get("class_type")
+        inputs = node.get("inputs") or {}
+        if class_type == "LoadImage":
+            load_image_count += 1
+        if (
+            class_type == "TextEncodeQwenImageEditPlus"
+            and isinstance(inputs, dict)
+            and "image2" in inputs
+        ):
+            image2_encoder_count += 1
+    return load_image_count, image2_encoder_count
+
+
 class ComfyDispatchResult(BaseModel):
     """_dispatch_to_comfy 반환 — 이미지 참조 + 해상도 + 오류 메시지."""
 
@@ -321,6 +341,12 @@ async def _dispatch_to_comfy(
                 uploaded_name = await comfy.upload_image(
                     upload_bytes, upload_filename or "input.png"
                 )
+            log.info(
+                "_dispatch_to_comfy: mode=%s upload=%s extra_uploads=%d",
+                mode,
+                upload_filename,
+                len(extra_uploads) if extra_uploads else 0,
+            )
             # Multi-ref: extra 업로드 (있으면 순차) — extra_uploads None 이면 옛 흐름.
             # ⚠️ Codex 2차 리뷰 fix #2: factory 호출 시 keyword 는 extra_uploads 있을 때만.
             # 옛 generate/video factory 는 positional 1개만 받음 — 영향 0 보장.
@@ -336,6 +362,17 @@ async def _dispatch_to_comfy(
                 )
             else:
                 api_prompt = api_prompt_factory(uploaded_name)
+            load_image_count, image2_encoder_count = _summarize_api_prompt(
+                api_prompt
+            )
+            log.info(
+                "_dispatch_to_comfy api_prompt: mode=%s nodes=%d LoadImage=%d "
+                "TextEncodeQwenImageEditPlus.image2=%d",
+                mode,
+                len(api_prompt),
+                load_image_count,
+                image2_encoder_count,
+            )
             prompt_id = await comfy.submit(api_prompt, client_id)
             log.info("ComfyUI submitted prompt_id=%s", prompt_id)
 
