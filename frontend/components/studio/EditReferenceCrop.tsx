@@ -182,6 +182,14 @@ export default function EditReferenceCrop({
           minZoom={1}
           maxZoom={3}
           zoomSpeed={0.25}
+          // crop 영역 외부 dim 강화 (기본 0.5 → 0.75).
+          // box-shadow 가 currentColor 를 사용하므로 color 만 override 하면
+          // 외부 영역 전체가 한 번에 어두워짐. 사용자 가독성 ↑.
+          style={{
+            cropAreaStyle: {
+              color: "rgba(0, 0, 0, 0.75)",
+            },
+          }}
         />
       </div>
 
