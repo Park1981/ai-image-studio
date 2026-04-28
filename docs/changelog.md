@@ -5,7 +5,38 @@
 
 ## 2026-04-28
 
-### Edit Multi-Reference 수동 Crop UI (Phase 1-3 MVP · 현재 master)
+### Launcher v2 (start_v2 / stop_v2 + ShutdownBtn + /loading) — 현재 master
+
+**브랜치**: `claude/launcher-v2` → master merge `--no-ff` (`af0a9cf`)
+**검증**: pytest 235 / vitest 74 / tsc / lint clean (0 회귀)
+**작성**: codex 직접 작성 (이번 세션은 검토 + 분할 commit + master 머지)
+
+#### 동기
+
+옛 `start.bat` 콘솔 1개 + Hidden 흐름은 유지하되, 종료를 좀더 안전하게:
+1. PowerShell 단독 종료 스크립트 (단계별)
+2. 브라우저 앱 윈도우의 종료 버튼이 백엔드 endpoint 통해 종료 트리거
+3. Backend 부팅 전에는 정적 `loading.html`, Backend ready 시 Next.js `/loading` 으로 전환
+
+#### 구조
+
+- **`start_v2.bat` / `start_v2.ps1`** (`c034bdf`)
+  - 콘솔 1개만 + Backend/Frontend/Ollama Hidden + ComfyUI headless
+  - 브라우저 app window 가 `launcher/loading.html` 부터 띄우고 backend ready 후 `/loading` 으로 전환
+  - 로그: `logs/launcher-v2.log` / `logs/{backend,frontend}.{log,err.log}`
+- **`stop_v2.ps1`** — ComfyUI/Frontend/Backend 단계별 kill + (옵션) Ollama kill + 브라우저 창 닫기
+- **`launcher/loading.html`** — PowerShell 단계 정적 로딩 (Next.js 미가동 구간 대비)
+- **Backend `POST /api/studio/system/shutdown`** — localhost only + subprocess 로 `stop_v2.ps1 -KillOllama -CloseBrowser` 실행 (CREATE_NO_WINDOW)
+- **Frontend `ShutdownBtn`** (AppHeader) — `NEXT_PUBLIC_ENABLE_LOCAL_SHUTDOWN=true` 일 때만 노출. confirm 모달 → 5단계 진행 (ComfyUI/Ollama/Frontend/Backend/브라우저) → 실패 시 toast + failed phase 유지
+- **Frontend `/loading` 페이지** (`89a6f77`) — 부팅 대기 화면 (4 서비스 ready 표시 · 1.2s polling · backend ready 시 `/` redirect · "메인으로/종료" 액션)
+
+#### 안전망
+
+- **Localhost 게이트**: backend 가 client.host 검사로 `127.0.0.1`/`::1`/`localhost` 만 허용
+- **환경변수 게이트**: 프런트 종료 버튼은 `ENABLE_LOCAL_SHUTDOWN` 미설정 시 렌더 0
+- **subprocess `shell=False`** + 절대경로 + `creationflags=CREATE_NO_WINDOW`
+
+### Edit Multi-Reference 수동 Crop UI (Phase 1-3 MVP)
 
 **브랜치**: `claude/edit-multi-ref` → master merge `--no-ff`
 **검증**: pytest 234 (231 → +3) · vitest 74 (61 → +13) · tsc / lint clean
