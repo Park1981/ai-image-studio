@@ -18,6 +18,7 @@
 
 "use client";
 
+import dynamic from "next/dynamic";
 import type { RefObject } from "react";
 import { useState } from "react";
 import HistoryPicker from "@/components/studio/HistoryPicker";
@@ -25,6 +26,13 @@ import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import ReferenceRoleSelect from "./ReferenceRoleSelect";
+
+// EditReferenceCrop 은 react-easy-crop (window 의존) 을 사용하므로 ssr:false 로 격리.
+// 2026-04-28 (Phase 1).
+const EditReferenceCrop = dynamic(
+  () => import("@/components/studio/EditReferenceCrop"),
+  { ssr: false },
+);
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -56,6 +64,7 @@ export default function EditLeftPanel({
     setReferenceImage,
     referenceRole, setReferenceRole,
     referenceRoleCustom, setReferenceRoleCustom,
+    setReferenceCropArea,
   } = useEditInputs();
   const { running } = useEditRunning();
   const items = useHistoryStore((s) => s.items);
@@ -280,6 +289,28 @@ export default function EditLeftPanel({
             onError={(msg) => toast.error(msg)}
             pasteRequireHover
           />
+          {/* 인라인 수동 crop UI — 참조 이미지가 있을 때만 노출 (Phase 1 · 2026-04-28).
+           *  onAreaChange → useEditStore.setReferenceCropArea 직결.
+           *  Phase 2 의 "수정 생성" 클릭 시점에 store 의 area 를 적용해 cropped Blob 전송.
+           */}
+          {referenceImage && (
+            <div>
+              <div className="ais-field-header">
+                <label
+                  className="ais-field-label"
+                  style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+                >
+                  <SectionAccentBar accent="violet" />
+                  사용 영역
+                </label>
+                <span className="mono ais-field-meta">manual crop</span>
+              </div>
+              <EditReferenceCrop
+                imageSrc={referenceImage}
+                onAreaChange={setReferenceCropArea}
+              />
+            </div>
+          )}
           <ReferenceRoleSelect
             selected={referenceRole}
             onSelect={setReferenceRole}
