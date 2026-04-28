@@ -313,6 +313,122 @@ def test_delete_reference_file_round_trip(monkeypatch, tmp_path: Path):
 
 
 @pytest.mark.asyncio
+async def test_edit_route_reference_template_id_overrides_client_referenceref(
+    monkeypatch,
+) -> None:
+    """라이브러리 픽 케이스: referenceTemplateId 로 DB 조회 → image_ref 가 권위.
+
+    클라이언트가 absolute URL 의 referenceRef 를 보내도 backend 가 신뢰하지 않고
+    DB 의 상대 image_ref 를 _run_edit_pipeline 에 전달.
+    Codex 2차/3차 리뷰 fix 회귀 차단.
+    """
+    import json as _json
+    from unittest.mock import AsyncMock
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    # DB 조회 mock — DB image_ref 는 상대 영구 URL.
+    monkeypatch.setattr(
+        "studio.history_db.get_reference_template",
+        AsyncMock(
+            return_value={
+                "id": "tpl-test",
+                "imageRef": "/images/studio/reference-templates/db-relative.png",
+                "name": "db",
+            }
+        ),
+    )
+
+    captured_kwargs: dict[str, object] = {}
+
+    def _fake_run_edit(*_args: object, **kwargs: object):
+        captured_kwargs.update(kwargs)
+
+        async def _noop() -> None:
+            return None
+
+        return _noop()
+
+    monkeypatch.setattr(
+        "studio.routes.streams._run_edit_pipeline", _fake_run_edit
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        resp = await ac.post(
+            "/api/studio/edit",
+            files={
+                "image": ("src.png", _make_png_bytes(), "image/png"),
+                "reference_image": ("ref.png", _make_png_bytes(), "image/png"),
+            },
+            data={
+                "meta": _json.dumps(
+                    {
+                        "prompt": "test",
+                        "useReferenceImage": True,
+                        "referenceRole": "outfit",
+                        "referenceTemplateId": "tpl-test",
+                        # 클라이언트가 보낸 absolute (조작 가능) URL — 백엔드가 무시해야 함
+                        "referenceRef": (
+                            "http://evil.example/images/studio/"
+                            "reference-templates/wrong.png"
+                        ),
+                    }
+                )
+            },
+        )
+
+    assert resp.status_code == 200, resp.text
+    # 핵심 검증: DB 조회한 상대 URL 이 pipeline 으로 전달됐는지
+    assert (
+        captured_kwargs.get("reference_ref_url")
+        == "/images/studio/reference-templates/db-relative.png"
+    )
+    assert captured_kwargs.get("reference_template_id") == "tpl-test"
+
+
+@pytest.mark.asyncio
+async def test_edit_route_unknown_template_id_returns_404(monkeypatch) -> None:
+    """존재하지 않는 referenceTemplateId → 404 (조회 실패)."""
+    import json as _json
+    from unittest.mock import AsyncMock
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    monkeypatch.setattr(
+        "studio.history_db.get_reference_template",
+        AsyncMock(return_value=None),
+    )
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        resp = await ac.post(
+            "/api/studio/edit",
+            files={
+                "image": ("src.png", _make_png_bytes(), "image/png"),
+                "reference_image": ("ref.png", _make_png_bytes(), "image/png"),
+            },
+            data={
+                "meta": _json.dumps(
+                    {
+                        "prompt": "test",
+                        "useReferenceImage": True,
+                        "referenceRole": "outfit",
+                        "referenceTemplateId": "tpl-missing",
+                    }
+                )
+            },
+        )
+    assert resp.status_code == 404, resp.text
+
+
+@pytest.mark.asyncio
 @pytest.mark.parametrize(
     "non_dict_meta",
     ["null", "[]", '"name"', "42", "true"],

@@ -18,6 +18,7 @@ from typing import Any
 
 from PIL import Image
 
+from .. import history_db
 from .._gpu_lock import gpu_slot
 from ..comfy_api_builder import build_edit_from_request
 from ..presets import DEFAULT_OLLAMA_ROLES, EDIT_MODEL
@@ -49,10 +50,15 @@ async def _run_edit_pipeline(
     *,
     source_width: int = 0,
     source_height: int = 0,
-    # Multi-ref (2026-04-27): Phase 1 은 받기만 · Phase 4 에서 실 dispatch.
+    # Multi-ref (2026-04-27): Phase 4 dispatch 진입.
     reference_bytes: bytes | None = None,
     reference_filename: str | None = None,
     reference_role: str | None = None,
+    # v8 라이브러리 plan (2026-04-28): 라이브러리 픽 케이스의 영구 URL + template id.
+    # reference_ref_url = streams.py 가 DB 조회로 이미 결정한 *상대* 영구 URL (또는 None).
+    # reference_template_id = touch (last_used_at 갱신) 용.
+    reference_ref_url: str | None = None,
+    reference_template_id: str | None = None,
 ) -> None:
     try:
         # Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
@@ -214,9 +220,19 @@ async def _run_edit_pipeline(
             "sourceRef": source_ref,
         }
         # Multi-reference (2026-04-27 Phase 4 Task 14 후속 fix): role 저장.
-        # referenceRef 는 Library plan 까지 None (영구 URL 정책).
         if effective_role:
             item["referenceRole"] = effective_role
+        # v8 라이브러리 plan (2026-04-28) — Codex 2차 리뷰 fix #5:
+        # 라이브러리 픽 케이스만 영구 URL 저장 (옵션 A — 첫 실행 새 업로드는 None).
+        # reference_ref_url 은 streams.py 가 DB 조회로 결정한 권위 있는 값.
+        if reference_ref_url:
+            item["referenceRef"] = reference_ref_url
+        # 라이브러리 템플릿 사용 시 last_used_at 갱신 (실패 graceful — UX 영향 0).
+        if reference_template_id:
+            try:
+                await history_db.touch_reference_template(reference_template_id)
+            except Exception as e:
+                log.warning("touch_reference_template 실패 (graceful): %s", e)
         # Phase 1 (2026-04-25): 구조 분석은 item 에만 붙여 SSE done 으로 전달.
         # insert_item 이 알려진 컬럼만 INSERT 하므로 DB persist X (휘발 패턴 유지).
         if _analysis is not None:

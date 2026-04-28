@@ -17,7 +17,7 @@ from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image, UnidentifiedImageError
 
-from .. import dispatch_state
+from .. import dispatch_state, history_db
 from ..pipelines import (
     _extract_image_dims,
     _run_edit_pipeline,
@@ -183,6 +183,28 @@ async def create_edit_task(
             "참조 이미지 토글이 켜져 있는데 reference_image 파일이 없거나 비어있습니다.",
         )
 
+    # v8 라이브러리 plan (2026-04-28) — Codex 2차/3차 리뷰 fix.
+    # referenceTemplateId 가 있으면 DB 조회로 image_ref (영구 상대 URL) 결정 →
+    # history.referenceRef 권위 있는 값으로 사용. 클라이언트의 referenceRef 는
+    # absolute URL 일 수 있고 조작 가능하므로 신뢰하지 않음.
+    reference_template_id_meta = meta_obj.get("referenceTemplateId")
+    if isinstance(reference_template_id_meta, str):
+        reference_template_id_meta = reference_template_id_meta.strip() or None
+    else:
+        reference_template_id_meta = None
+
+    reference_ref_url: str | None = None
+    if use_reference_image and reference_template_id_meta:
+        tpl = await history_db.get_reference_template(reference_template_id_meta)
+        if tpl is None:
+            raise HTTPException(404, "reference template not found")
+        reference_ref_url = tpl["imageRef"]  # DB 의 상대 영구 URL
+
+    # 토글 OFF 또는 reference_bytes 없음이면 stale template/ref 메타도 무효화.
+    if not use_reference_image or reference_bytes is None:
+        reference_ref_url = None
+        reference_template_id_meta = None
+
     task = await _new_task()
     # 헤더 VRAM breakdown 오버레이용 — ComfyUI 마지막 dispatch 모델 기록
     dispatch_state.record("edit", EDIT_MODEL.display_name)
@@ -200,6 +222,9 @@ async def create_edit_task(
             reference_bytes=reference_bytes,
             reference_filename=reference_filename,
             reference_role=reference_role,
+            # v8 라이브러리 plan
+            reference_ref_url=reference_ref_url,
+            reference_template_id=reference_template_id_meta,
         )
     )
     return TaskCreated(

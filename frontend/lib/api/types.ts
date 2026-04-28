@@ -353,6 +353,12 @@ export interface EditRequest {
   referenceImage?: string | File | null;
   /** 사용자 명시 role — "face" | "outfit" | "style" | "background" | 자유 텍스트 */
   referenceRole?: string;
+  /** v8 라이브러리 plan (2026-04-28) — 라이브러리 픽 케이스의 영구 URL.
+   *  Codex 3차 리뷰 fix: 프론트 디버그/호환용. 백엔드는 이 값을 DB 저장 근거로
+   *  *신뢰하지 않고* referenceTemplateId 로 DB 조회한 image_ref 를 사용. */
+  referenceRef?: string;
+  /** v8 라이브러리 plan — template id. 백엔드가 image_ref 조회 + last_used_at touch */
+  referenceTemplateId?: string;
 }
 
 export type GenStage =
