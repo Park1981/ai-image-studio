@@ -1,35 +1,68 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { STUDIO_BASE } from "@/lib/api/client";
 import { fetchProcessStatus, shutdownStudio } from "@/lib/api/process";
 
 type ReadyState = {
-  backend: boolean;
   frontend: boolean;
-  ollama: boolean;
+  backend: boolean;
   comfyui: boolean;
+  ollama: boolean;
 };
 
 const initialReady: ReadyState = {
-  backend: false,
   frontend: true,
-  ollama: false,
+  backend: false,
   comfyui: false,
+  ollama: false,
+};
+
+const BOOT_STEPS: Array<keyof ReadyState> = [
+  "frontend",
+  "backend",
+  "comfyui",
+  "ollama",
+];
+
+const LABELS: Record<keyof ReadyState, string> = {
+  frontend: "Frontend",
+  backend: "Backend",
+  comfyui: "ComfyUI",
+  ollama: "Ollama",
+};
+
+const PORTS: Record<keyof ReadyState, string> = {
+  frontend: "127.0.0.1:3000",
+  backend: "127.0.0.1:8001",
+  comfyui: "127.0.0.1:8000",
+  ollama: "127.0.0.1:11434",
 };
 
 export default function LoadingPage() {
   const router = useRouter();
   const [ready, setReady] = useState<ReadyState>(initialReady);
-  const [message, setMessage] = useState("서비스 상태 확인 중");
+  const [message, setMessage] = useState("Backend 연결 대기 중");
   const [shuttingDown, setShuttingDown] = useState(false);
+  const [startedAt] = useState(() => Date.now());
+  const [elapsedMs, setElapsedMs] = useState(0);
 
   const readyCount = useMemo(
-    () => Object.values(ready).filter(Boolean).length,
+    () => BOOT_STEPS.filter((key) => ready[key]).length,
     [ready],
   );
-  const progress = Math.round((readyCount / 4) * 100);
+  const progress = Math.round((readyCount / BOOT_STEPS.length) * 100);
+  const activeKey =
+    BOOT_STEPS.find((key) => !ready[key]) ?? BOOT_STEPS[BOOT_STEPS.length - 1];
+
+  useEffect(() => {
+    const timer = window.setInterval(
+      () => setElapsedMs(Date.now() - startedAt),
+      250,
+    );
+    return () => window.clearInterval(timer);
+  }, [startedAt]);
 
   useEffect(() => {
     let cancelled = false;
@@ -50,17 +83,17 @@ export default function LoadingPage() {
       const nextReady = {
         frontend: true,
         backend: backendOk,
-        ollama: !!status?.ollamaRunning,
         comfyui: !!status?.comfyuiRunning,
+        ollama: !!status?.ollamaRunning,
       };
 
       if (cancelled) return;
       setReady(nextReady);
 
-      const nextCount = Object.values(nextReady).filter(Boolean).length;
-      if (nextCount === 4) {
+      const nextCount = BOOT_STEPS.filter((key) => nextReady[key]).length;
+      if (nextCount === BOOT_STEPS.length) {
         setMessage("준비 완료");
-        redirectTimer = setTimeout(() => router.replace("/"), 800);
+        redirectTimer = setTimeout(() => router.replace("/"), 1800);
       } else if (!nextReady.backend) {
         setMessage("Backend 연결 대기 중");
       } else if (!nextReady.comfyui) {
@@ -86,7 +119,9 @@ export default function LoadingPage() {
     setShuttingDown(true);
     setMessage("종료 요청 전송 중");
     const result = await shutdownStudio();
-    setMessage(result.ok ? "종료 중" : `종료 요청 실패: ${result.message ?? "unknown"}`);
+    setMessage(
+      result.ok ? "종료 중" : `종료 요청 실패: ${result.message ?? "unknown"}`,
+    );
     setShuttingDown(false);
   }
 
@@ -98,62 +133,53 @@ export default function LoadingPage() {
         placeItems: "center",
         padding: 24,
         background:
-          "linear-gradient(180deg, rgba(65,149,245,.08), transparent 42%), var(--bg)",
+          "repeating-linear-gradient(-45deg, rgba(31,31,31,.035) 0, rgba(31,31,31,.035) 8px, transparent 8px, transparent 18px), var(--bg)",
         color: "var(--ink)",
       }}
     >
       <section
         aria-live="polite"
         style={{
-          width: "min(460px, 100%)",
+          width: "min(560px, 100%)",
           border: "1px solid var(--line)",
-          borderRadius: "var(--radius)",
+          borderRadius: "var(--radius-card)",
           background: "var(--surface)",
           padding: 28,
           boxShadow: "var(--shadow-lg)",
         }}
       >
-        <h1
-          style={{
-            margin: "0 0 8px",
-            fontSize: 24,
-            lineHeight: 1.25,
-            letterSpacing: 0,
-          }}
-        >
-          AI Image Studio 시작 중
-        </h1>
-        <p
-          style={{
-            margin: 0,
-            color: "var(--ink-3)",
-            fontSize: 13,
-            lineHeight: 1.65,
-          }}
-        >
-          {message}
+        <Kicker>
+          BOOT · {String(Math.max(1, readyCount)).padStart(2, "0")} /{" "}
+          {String(BOOT_STEPS.length).padStart(2, "0")}
+        </Kicker>
+        <h1 style={titleStyle}>AI Image Studio 시작 중</h1>
+        <p style={descStyle}>
+          부팅 로그를 보여드릴게요. 이상 없으면 곧 메인이 열려요.
         </p>
+
+        <Terminal
+          ready={ready}
+          activeKey={activeKey}
+          elapsedMs={elapsedMs}
+          message={message}
+        />
+
+        <Progress value={progress} tone="boot" />
 
         <div
           style={{
-            margin: "24px 0 14px",
-            height: 10,
-            overflow: "hidden",
-            borderRadius: "var(--radius-full)",
-            border: "1px solid var(--line)",
-            background: "var(--bg-2)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            marginTop: 10,
+            color: "var(--ink-3)",
+            fontSize: 12.5,
+            fontWeight: 600,
           }}
         >
-          <div
-            style={{
-              width: `${progress}%`,
-              height: "100%",
-              borderRadius: "inherit",
-              background:
-                "linear-gradient(90deg, var(--accent), var(--green))",
-              transition: "width .25s ease",
-            }}
-          />
+          <span>{message}</span>
+          <span>{progress}%</span>
         </div>
 
         <div
@@ -161,16 +187,21 @@ export default function LoadingPage() {
             display: "grid",
             gridTemplateColumns: "1fr 1fr",
             gap: 8,
-            marginBottom: 20,
+            marginTop: 18,
           }}
         >
-          <Status label="Frontend" ok={ready.frontend} />
-          <Status label="Backend" ok={ready.backend} />
-          <Status label="ComfyUI" ok={ready.comfyui} />
-          <Status label="Ollama" ok={ready.ollama} />
+          {BOOT_STEPS.map((key) => (
+            <Status
+              key={key}
+              label={LABELS[key]}
+              detail={PORTS[key]}
+              ok={ready[key]}
+              current={key === activeKey && !ready[key]}
+            />
+          ))}
         </div>
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+        <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
           <button
             type="button"
             onClick={() => router.replace("/")}
@@ -193,26 +224,166 @@ export default function LoadingPage() {
   );
 }
 
-function Status({ label, ok }: { label: string; ok: boolean }) {
+function Terminal({
+  ready,
+  activeKey,
+  elapsedMs,
+  message,
+}: {
+  ready: ReadyState;
+  activeKey: keyof ReadyState;
+  elapsedMs: number;
+  message: string;
+}) {
   return (
     <div
       style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        gap: 10,
-        minHeight: 34,
-        padding: "0 10px",
-        borderRadius: "var(--radius-sm)",
-        border: "1px solid var(--line)",
-        background: ok ? "rgba(16,185,129,.08)" : "var(--bg-2)",
-        color: ok ? "var(--green)" : "var(--ink-3)",
-        fontSize: 12,
-        fontWeight: 700,
+        marginTop: 22,
+        padding: 18,
+        minHeight: 154,
+        borderRadius: 10,
+        background: "#1f1e1b",
+        color: "#dedbd2",
+        fontFamily: "Consolas, SFMono-Regular, monospace",
+        fontSize: 13,
+        lineHeight: 1.7,
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,.05)",
       }}
     >
-      <span>{label}</span>
-      <span>{ok ? "OK" : "WAIT"}</span>
+      <LogLine time="00:00.00" kind="run" text="[boot] Chrome app window mounted" />
+      <LogLine time="00:00.18" kind="ok" text="[ok] Frontend ready" />
+      <LogLine
+        time="00:00.42"
+        kind={ready.backend ? "ok" : "run"}
+        text={`${ready.backend ? "[ok]" : "[run]"} Backend -> http://127.0.0.1:8001`}
+      />
+      <LogLine
+        time={formatElapsed(elapsedMs)}
+        kind={ready[activeKey] ? "ok" : "run"}
+        text={`${ready[activeKey] ? "[ok]" : "[run]"} ${message}`}
+      />
+      <div>
+        <span style={{ color: "#8f8b84", marginRight: 8 }}>
+          {formatElapsed(elapsedMs)}
+        </span>
+        $ <span style={cursorStyle} />
+      </div>
+    </div>
+  );
+}
+
+function LogLine({
+  time,
+  kind,
+  text,
+}: {
+  time: string;
+  kind: "ok" | "run";
+  text: string;
+}) {
+  return (
+    <div style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span style={{ color: "#8f8b84", marginRight: 8 }}>{time}</span>
+      <span style={{ color: kind === "ok" ? "#9bcf9a" : "#f1eee7", fontWeight: 700 }}>
+        {text}
+      </span>
+    </div>
+  );
+}
+
+function Kicker({ children }: { children: ReactNode }) {
+  return (
+    <div
+      style={{
+        marginBottom: 10,
+        color: "var(--ink-4)",
+        fontFamily: "Consolas, SFMono-Regular, monospace",
+        fontSize: 11,
+        fontWeight: 700,
+        letterSpacing: ".16em",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function Progress({ value, tone }: { value: number; tone: "boot" | "shutdown" }) {
+  return (
+    <div
+      style={{
+        height: 7,
+        marginTop: 18,
+        overflow: "hidden",
+        borderRadius: "var(--radius-full)",
+        background: "var(--bg-2)",
+      }}
+    >
+      <div
+        style={{
+          width: `${value}%`,
+          height: "100%",
+          borderRadius: "inherit",
+          background:
+            tone === "boot"
+              ? "linear-gradient(90deg, var(--ink), var(--accent))"
+              : "linear-gradient(90deg, var(--accent), rgba(239,68,68,.72))",
+          transition: "width .25s ease",
+        }}
+      />
+    </div>
+  );
+}
+
+function Status({
+  label,
+  detail,
+  ok,
+  current,
+}: {
+  label: string;
+  detail: string;
+  ok: boolean;
+  current: boolean;
+}) {
+  return (
+    <div
+      style={{
+        minHeight: 46,
+        padding: "8px 10px",
+        borderRadius: "var(--radius-sm)",
+        border: "1px solid var(--line)",
+        background: ok
+          ? "rgba(16,185,129,.08)"
+          : current
+            ? "rgba(74,158,255,.08)"
+            : "var(--bg-2)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 10,
+          color: ok ? "var(--green-ink)" : current ? "var(--accent-ink)" : "var(--ink-3)",
+          fontSize: 12,
+          fontWeight: 800,
+        }}
+      >
+        <span>{label}</span>
+        <span>{ok ? "OK" : current ? "RUN" : "WAIT"}</span>
+      </div>
+      <div
+        style={{
+          marginTop: 3,
+          color: "var(--ink-4)",
+          fontFamily: "Consolas, SFMono-Regular, monospace",
+          fontSize: 10.5,
+        }}
+      >
+        {detail}
+      </div>
     </div>
   );
 }
@@ -235,3 +406,32 @@ function buttonStyle(kind: "neutral" | "danger", disabled: boolean) {
     opacity: disabled ? 0.55 : 1,
   } as const;
 }
+
+function formatElapsed(ms: number) {
+  const s = Math.floor(ms / 1000);
+  const cs = Math.floor((ms % 1000) / 10);
+  return `00:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
+}
+
+const titleStyle: CSSProperties = {
+  margin: "0 0 8px",
+  fontSize: 27,
+  lineHeight: 1.2,
+  letterSpacing: 0,
+};
+
+const descStyle: CSSProperties = {
+  margin: 0,
+  color: "var(--ink-3)",
+  fontSize: 14,
+  lineHeight: 1.6,
+};
+
+const cursorStyle: CSSProperties = {
+  display: "inline-block",
+  width: 7,
+  height: 14,
+  marginLeft: 5,
+  background: "#f1eee7",
+  verticalAlign: -2,
+};

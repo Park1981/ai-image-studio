@@ -7,13 +7,14 @@
   <style>
     :root {
       color-scheme: light;
-      --bg: #f7f8fb;
+      --bg: #f5f4f1;
       --surface: #ffffff;
-      --ink: #172033;
-      --muted: #667085;
-      --line: #dde3ec;
-      --blue: #4195f5;
-      --green: #18a36b;
+      --ink: #1f1f1f;
+      --muted: #787878;
+      --line: #e6e2dc;
+      --accent: #4a9eff;
+      --green: #3e9912;
+      --terminal: #1f1e1b;
     }
 
     * { box-sizing: border-box; }
@@ -24,49 +25,94 @@
       display: grid;
       place-items: center;
       background:
-        linear-gradient(180deg, rgba(65, 149, 245, .08), transparent 42%),
+        repeating-linear-gradient(
+          -45deg,
+          rgba(31, 31, 31, .035) 0,
+          rgba(31, 31, 31, .035) 8px,
+          transparent 8px,
+          transparent 18px
+        ),
         var(--bg);
       color: var(--ink);
       font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
     }
 
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: rgba(245, 244, 241, .62);
+      backdrop-filter: blur(5px);
+    }
+
     main {
-      width: min(420px, calc(100vw - 40px));
+      position: relative;
+      z-index: 1;
+      width: min(560px, calc(100vw - 40px));
       border: 1px solid var(--line);
-      border-radius: 8px;
+      border-radius: 14px;
       background: var(--surface);
-      padding: 26px;
-      box-shadow: 0 18px 48px rgba(23, 32, 51, .10);
+      padding: 28px;
+      box-shadow: 0 20px 56px rgba(23, 20, 14, .16);
+    }
+
+    .kicker {
+      margin-bottom: 10px;
+      color: #9a9690;
+      font-family: "Consolas", "SFMono-Regular", monospace;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .16em;
     }
 
     h1 {
       margin: 0 0 8px;
-      font-size: 22px;
-      line-height: 1.25;
+      font-size: 27px;
+      line-height: 1.2;
       letter-spacing: 0;
     }
 
     p {
       margin: 0;
       color: var(--muted);
-      font-size: 13px;
-      line-height: 1.65;
+      font-size: 14px;
+      line-height: 1.6;
     }
 
+    .terminal {
+      margin-top: 22px;
+      padding: 18px;
+      min-height: 154px;
+      border-radius: 10px;
+      background: var(--terminal);
+      color: #dedbd2;
+      font-family: "Consolas", "SFMono-Regular", monospace;
+      font-size: 13px;
+      line-height: 1.7;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .05);
+    }
+
+    .line { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .time { color: #8f8b84; margin-right: 8px; }
+    .ok { color: #9bcf9a; font-weight: 700; }
+    .run { color: #f1eee7; font-weight: 700; }
+    .cursor { display: inline-block; width: 7px; height: 14px; margin-left: 5px; background: #f1eee7; vertical-align: -2px; animation: blink 1s steps(2) infinite; }
+
+    @keyframes blink { 50% { opacity: 0; } }
+
     .bar {
-      height: 10px;
-      margin: 24px 0 12px;
+      height: 7px;
+      margin: 18px 0 10px;
       overflow: hidden;
       border-radius: 999px;
-      background: #edf1f6;
-      border: 1px solid #e2e7ef;
+      background: #eeece8;
     }
 
     .fill {
       width: 8%;
       height: 100%;
       border-radius: inherit;
-      background: linear-gradient(90deg, var(--blue), var(--green));
+      background: linear-gradient(90deg, var(--ink), var(--accent));
       transition: width .35s ease;
     }
 
@@ -76,108 +122,75 @@
       justify-content: space-between;
       gap: 14px;
       color: var(--muted);
-      font-size: 12px;
+      font-size: 12.5px;
       font-weight: 600;
-    }
-
-    .steps {
-      display: grid;
-      gap: 8px;
-      margin-top: 22px;
-    }
-
-    .step {
-      min-height: 36px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 14px;
-      padding: 0 11px;
-      border: 1px solid var(--line);
-      border-radius: 8px;
-      background: #f7f9fb;
-      color: var(--muted);
-      font-size: 12px;
-      font-weight: 700;
-    }
-
-    .step.done {
-      background: rgba(24, 163, 107, .08);
-      color: #11724d;
-    }
-
-    .step.active {
-      border-color: rgba(65, 149, 245, .36);
-      background: rgba(65, 149, 245, .08);
-      color: #216db8;
     }
   </style>
 </head>
 <body>
   <main>
+    <div class="kicker" id="kicker">BOOT · 01 / 04</div>
     <h1>AI Image Studio 시작 중</h1>
-    <p>전용 브라우저 창을 준비하고 필요한 서비스를 깨우고 있어.</p>
+    <p>부팅 로그를 보여드릴게요. 이상 없으면 곧 메인이 열려요.</p>
+
+    <div class="terminal" aria-label="부팅 로그">
+      <div class="line"><span class="time">00:00.00</span><span class="run">[boot]</span> Chrome app window mounted</div>
+      <div class="line"><span class="time">00:00.18</span><span class="ok">[ok]</span> launcher profile ready</div>
+      <div class="line" id="log-frontend"><span class="time">00:00.42</span><span class="run">[run]</span> frontend -> http://127.0.0.1:3000</div>
+      <div class="line" id="log-wait"><span class="time">00:00.64</span><span class="run">[run]</span> waiting for ready event...</div>
+      <div class="line"><span id="elapsed">00:00.00</span> $<span class="cursor"></span></div>
+    </div>
+
     <div class="bar" aria-label="시작 진행률">
       <div class="fill" id="fill"></div>
     </div>
     <div class="row">
-      <span id="status">서비스 확인 중</span>
+      <span id="status">Frontend 준비 중</span>
       <span id="percent">8%</span>
-    </div>
-    <div class="steps" aria-label="시작 단계">
-      <div class="step done">
-        <span>브라우저 창</span>
-        <span>OK</span>
-      </div>
-      <div class="step active" id="step-launcher">
-        <span>런처 연결</span>
-        <span>진행 중</span>
-      </div>
-      <div class="step" id="step-frontend">
-        <span>Frontend 연결</span>
-        <span>대기</span>
-      </div>
     </div>
   </main>
 
   <script>
     const target = "http://localhost:3000/loading";
     const probeUrl = "http://localhost:3000/favicon.ico";
+    const start = Date.now();
     const fill = document.getElementById("fill");
     const status = document.getElementById("status");
     const percent = document.getElementById("percent");
+    const elapsed = document.getElementById("elapsed");
+    const kicker = document.getElementById("kicker");
+    const logWait = document.getElementById("log-wait");
     let progress = 8;
 
-    function paint(next, text) {
+    function stamp() {
+      const ms = Date.now() - start;
+      const s = Math.floor(ms / 1000);
+      const cs = Math.floor((ms % 1000) / 10);
+      return `00:${String(s).padStart(2, "0")}.${String(cs).padStart(2, "0")}`;
+    }
+
+    function paint(next, text, bootStep) {
       progress = Math.max(progress, Math.min(next, 96));
       fill.style.width = progress + "%";
       percent.textContent = Math.round(progress) + "%";
       if (text) status.textContent = text;
-    }
-
-    function markStep(id, state, text) {
-      const el = document.getElementById(id);
-      if (!el) return;
-      el.className = "step " + state;
-      el.lastElementChild.textContent = text;
+      if (bootStep) kicker.textContent = `BOOT · ${bootStep} / 04`;
     }
 
     setInterval(() => {
-      if (progress < 88) paint(progress + Math.random() * 5, "Frontend 준비 중");
-    }, 800);
+      elapsed.textContent = stamp();
+      if (progress < 88) paint(progress + Math.random() * 4, "Frontend 준비 중", "02");
+    }, 600);
 
     function probe() {
       const img = new Image();
       img.onload = () => {
-        markStep("step-launcher", "done", "OK");
-        markStep("step-frontend", "done", "OK");
-        paint(100, "앱으로 이동 중");
-        setTimeout(() => window.location.replace(target), 250);
+        logWait.innerHTML = `<span class="time">${stamp()}</span><span class="ok">[ok]</span> frontend ready`;
+        paint(100, "앱 로딩 화면으로 이동 중", "04");
+        setTimeout(() => window.location.replace(target), 260);
       };
       img.onerror = () => {
-        markStep("step-launcher", "done", "OK");
-        markStep("step-frontend", "active", "진행 중");
-        paint(progress + 2, "서비스 확인 중");
+        paint(progress + 2, "Frontend 준비 중", "03");
         setTimeout(probe, 1000);
       };
       img.src = probeUrl + "?t=" + Date.now();
@@ -187,4 +200,3 @@
   </script>
 </body>
 </html>
-
