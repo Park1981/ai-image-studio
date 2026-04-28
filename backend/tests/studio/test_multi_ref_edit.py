@@ -135,6 +135,124 @@ async def test_edit_endpoint_drains_reference_when_useref_false(monkeypatch) -> 
 
 
 @pytest.mark.asyncio
+async def test_edit_endpoint_accepts_small_cropped_reference(monkeypatch) -> None:
+    """cropped reference (Phase 2 · 2026-04-28 클라이언트 수동 crop 산물) 통과 회귀.
+
+    Phase 2 에서 클라이언트가 보내는 reference_image 는 원본이 아니라
+    canvas 로 잘린 작은 PNG (`reference-crop.png` · 예: 256x256).
+    백엔드는 사이즈/파일명에 의존하지 않고 multipart 그대로 수용해야 함.
+
+    검증:
+      - 작은 cropped PNG (256x256) + 파일명 "reference-crop.png" → 200
+      - _run_edit_pipeline 호출 시 reference_bytes 가 cropped 길이 그대로
+      - reference_filename 이 클라이언트 파일명 보존
+      - reference_role 정확히 전달 ("face")
+    """
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    captured_kwargs: dict = {}
+
+    def _fake_run_edit(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+
+        async def _noop():
+            return None
+
+        return _noop()
+
+    monkeypatch.setattr("studio.routes.streams._run_edit_pipeline", _fake_run_edit)
+
+    src_bytes = _png_bytes()
+    # Phase 2 의 cropped 산물을 흉내 — 작은 사이즈 + 파일명 명시
+    cropped_bytes = _png_bytes(256, 256)
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.post(
+            "/api/studio/edit",
+            files={
+                "image": ("src.png", io.BytesIO(src_bytes), "image/png"),
+                "reference_image": (
+                    "reference-crop.png",
+                    io.BytesIO(cropped_bytes),
+                    "image/png",
+                ),
+            },
+            data={
+                "meta": json.dumps(
+                    {
+                        "prompt": "test",
+                        "useReferenceImage": True,
+                        "referenceRole": "face",
+                    }
+                ),
+            },
+        )
+
+    assert response.status_code == 200, response.text
+    # cropped bytes 가 그대로 파이프라인에 전달 (변형 없음)
+    assert captured_kwargs.get("reference_bytes") == cropped_bytes
+    assert len(captured_kwargs["reference_bytes"]) == len(cropped_bytes)
+    # 파일명 보존 — 클라이언트가 보낸 reference-crop.png 그대로
+    assert captured_kwargs.get("reference_filename") == "reference-crop.png"
+    # role 정확 전달
+    assert captured_kwargs.get("reference_role") == "face"
+
+
+@pytest.mark.asyncio
+async def test_edit_endpoint_accepts_tiny_cropped_reference(monkeypatch) -> None:
+    """클라이언트 256px 가드를 우회한 더 작은 reference 도 백엔드는 거부 안 함 (회귀).
+
+    클라이언트의 256px 최소 가드는 UX 차원 — 백엔드는 사이즈 검증 안 함.
+    이 분리가 유지되는지 회귀 (백엔드에 사이즈 검증을 *추가하지 말 것* 신호).
+    """
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    def _fake_run_edit(*args, **kwargs):
+        async def _noop():
+            return None
+
+        return _noop()
+
+    monkeypatch.setattr("studio.routes.streams._run_edit_pipeline", _fake_run_edit)
+
+    src_bytes = _png_bytes()
+    tiny_bytes = _png_bytes(64, 64)  # 클라이언트 가드(256) 보다 훨씬 작음
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.post(
+            "/api/studio/edit",
+            files={
+                "image": ("src.png", io.BytesIO(src_bytes), "image/png"),
+                "reference_image": (
+                    "reference-crop.png",
+                    io.BytesIO(tiny_bytes),
+                    "image/png",
+                ),
+            },
+            data={
+                "meta": json.dumps(
+                    {
+                        "prompt": "test",
+                        "useReferenceImage": True,
+                        "referenceRole": "face",
+                    }
+                ),
+            },
+        )
+
+    # 백엔드는 사이즈에 무관 — 클라이언트 정책 사항
+    assert response.status_code == 200, response.text
+
+
+@pytest.mark.asyncio
 async def test_edit_endpoint_role_ignored_when_useref_false(monkeypatch) -> None:
     """useReferenceImage=false 면 referenceRole 도 게이트로 None 강제 (누수 방지)."""
     from httpx import ASGITransport, AsyncClient
