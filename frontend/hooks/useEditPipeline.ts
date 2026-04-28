@@ -84,11 +84,16 @@ export function useEditPipeline({
         ? referenceRoleCustom.trim() || undefined
         : referenceRole;
 
+    // Codex Phase 2 리뷰 결함 #3 fix: useReferenceImage=true 인데 referenceImage=null
+    // 이면 (race / 직접 호출 등 CTA 가드 우회 시) meta 만 ON 으로 가서 백엔드 400.
+    // → effectiveUseRef 로 한 곳에서 통일해 모든 reference 필드를 일관되게 OFF.
+    const effectiveUseRef = useReferenceImage && !!referenceImage;
+
     // Phase 2 (2026-04-28): reference 가 있고 crop area 도 있으면 *클라이언트* 에서
     // 미리 crop 해서 cropped File 로 전송. area 없으면 원본 data URL 그대로.
     // crop 변환 실패 (canvas / toBlob) 시 사용자에게 toast + 진입 차단.
     let resolvedReferenceImage: string | File | undefined;
-    if (useReferenceImage && referenceImage) {
+    if (effectiveUseRef && referenceImage) {
       if (referenceCropArea) {
         try {
           const original = await dataUrlToBlob(referenceImage);
@@ -116,10 +121,10 @@ export function useEditPipeline({
         lightning,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
-        // Multi-ref: 토글 OFF 면 reference 필드 모두 undefined → 옛 흐름 100% 동일.
-        useReferenceImage,
-        referenceImage: useReferenceImage ? resolvedReferenceImage : undefined,
-        referenceRole: useReferenceImage ? effectiveRole : undefined,
+        // effectiveUseRef 로 모든 reference 필드를 한꺼번에 게이트 — 백엔드 400 차단.
+        useReferenceImage: effectiveUseRef,
+        referenceImage: effectiveUseRef ? resolvedReferenceImage : undefined,
+        referenceRole: effectiveUseRef ? effectiveRole : undefined,
       }),
       {
         on: {

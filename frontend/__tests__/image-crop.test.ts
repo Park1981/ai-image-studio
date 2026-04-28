@@ -9,6 +9,10 @@
  *   - cropBlobIfArea: area null 시 원본 그대로, area 있으면 crop 호출
  *
  * jsdom 한계로 canvas / HTMLImageElement 일부를 file-local 폴리필로 흉내냄.
+ *
+ * Codex Phase 2 리뷰 #5 (의심): fake canvas 라 실제 픽셀 / 디코드 / toBlob 실패를
+ * 못 잡음. drawImage 호출 인자만 검증 — false negative 가능. 실 canvas 픽셀
+ * 검증은 Playwright 도입 후 별도 plan 으로.
  */
 
 import {
