@@ -13,6 +13,7 @@
 "use client";
 
 import { editImageStream } from "@/lib/api/edit";
+import { createReferenceTemplate } from "@/lib/api/reference-templates";
 import { cropBlobIfArea, dataUrlToBlob } from "@/lib/image-crop";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
@@ -45,6 +46,12 @@ export function useEditPipeline({
   const referenceRoleCustom = useEditStore((s) => s.referenceRoleCustom);
   // Phase 2 (2026-04-28): 수동 crop 영역 (있으면 reference 를 미리 crop 해서 전송)
   const referenceCropArea = useEditStore((s) => s.referenceCropArea);
+  // v8 라이브러리 plan (2026-04-28): 라이브러리 픽 케이스 식별용.
+  const pickedTemplateId = useEditStore((s) => s.pickedTemplateId);
+  const pickedTemplateRef = useEditStore((s) => s.pickedTemplateRef);
+  // v8 라이브러리 plan: 자동 저장 토글 + 이름.
+  const saveAsTemplate = useEditStore((s) => s.saveAsTemplate);
+  const templateName = useEditStore((s) => s.templateName);
   // 실행 상태 setter
   const running = useEditStore((s) => s.running);
   const setRunning = useEditStore((s) => s.setRunning);
@@ -113,6 +120,24 @@ export function useEditPipeline({
       }
     }
 
+    // Codex Phase B+C 리뷰 fix #4: 자동 저장 조건을 *실행 시작 시점* 에 스냅샷.
+    // 그렇지 않으면 사용자가 실행 중 토글/이름을 바꿔 done 콜백 closure 가 stale 값
+    // 또는 의도 외 값을 사용하는 race 가능. running 중에는 UI 가 disabled 라도 store
+    // 자체는 변경 가능 (외부 API · 다른 컴포넌트) 이므로 명시 스냅샷이 안전.
+    const autoSaveSnapshot = {
+      enabled:
+        saveAsTemplate &&
+        effectiveUseRef &&
+        pickedTemplateId === null &&
+        !!templateName.trim() &&
+        resolvedReferenceImage !== undefined,
+      templateName: templateName.trim(),
+      imageFile: resolvedReferenceImage,
+      role: effectiveRole,
+      visionModel: visionModelSel,
+      userIntent: prompt,
+    };
+
     setRunning(true);
     await consumePipelineStream(
       editImageStream({
@@ -125,6 +150,15 @@ export function useEditPipeline({
         useReferenceImage: effectiveUseRef,
         referenceImage: effectiveUseRef ? resolvedReferenceImage : undefined,
         referenceRole: effectiveUseRef ? effectiveRole : undefined,
+        // v8 라이브러리 plan: 토글 OFF 면 stale picked 값 있어도 전송 X.
+        // referenceRef 는 absolute URL 일 수 있으므로 백엔드 DB 저장 근거로 신뢰 X
+        // (Codex 3차 리뷰 fix). referenceTemplateId 가 권위 있는 신뢰 키.
+        referenceRef: effectiveUseRef
+          ? (pickedTemplateRef ?? undefined)
+          : undefined,
+        referenceTemplateId: effectiveUseRef
+          ? (pickedTemplateId ?? undefined)
+          : undefined,
       }),
       {
         on: {
@@ -208,6 +242,30 @@ export function useEditPipeline({
               !isComparisonBusy(e.item.id)
             ) {
               void analyzeComparison(e.item, { silent: true });
+            }
+            // v8 라이브러리 plan (2026-04-28) — 자동 저장.
+            // Codex 리뷰 fix #4: *실행 시작 시점* 스냅샷 사용 (closure stale 차단).
+            // 실패 graceful (warn toast 만) — edit 결과 자체는 영향 0.
+            if (
+              autoSaveSnapshot.enabled &&
+              autoSaveSnapshot.imageFile !== undefined
+            ) {
+              void createReferenceTemplate({
+                imageFile: autoSaveSnapshot.imageFile,
+                name: autoSaveSnapshot.templateName,
+                role: autoSaveSnapshot.role,
+                userIntent: autoSaveSnapshot.userIntent,
+                visionModel: autoSaveSnapshot.visionModel,
+              })
+                .then((tpl) => {
+                  if (tpl) toast.success("템플릿 저장됨", tpl.name);
+                })
+                .catch((err) => {
+                  toast.warn(
+                    "템플릿 저장 실패",
+                    err instanceof Error ? err.message : "알 수 없는 오류",
+                  );
+                });
             }
           },
         },

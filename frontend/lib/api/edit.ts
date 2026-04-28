@@ -105,6 +105,12 @@ async function* realEditStream(
       // Multi-reference (Phase 3 신규)
       useReferenceImage: req.useReferenceImage ?? false,
       referenceRole: req.useReferenceImage ? req.referenceRole : undefined,
+      // v8 라이브러리 plan (2026-04-28) — Codex 2차/3차 리뷰 fix.
+      // referenceRef 는 프론트 디버그/호환용. backend DB 저장은 referenceTemplateId 조회가 권위.
+      referenceRef: req.useReferenceImage ? req.referenceRef : undefined,
+      referenceTemplateId: req.useReferenceImage
+        ? req.referenceTemplateId
+        : undefined,
     }),
   );
 

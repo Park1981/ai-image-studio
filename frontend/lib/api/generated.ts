@@ -336,6 +336,80 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/reference-templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Templates
+         * @description 저장된 reference templates — last_used_at 내림차순.
+         */
+        get: operations["list_templates_api_studio_reference_templates_get"];
+        put?: never;
+        /**
+         * Create Template
+         * @description 신규 template 저장 — 이미지 + 메타 + 자동 vision 분석.
+         *
+         *     meta = { name: str, role?: str, userIntent?: str, visionModel?: str }
+         *
+         *     실패 정책:
+         *       - 이미지 invalid: 400 (저장 X)
+         *       - PIL 재인코딩 실패: 400 (저장 X)
+         *       - DB insert 실패: 저장된 파일 unlink + 500 (orphan 방지)
+         *       - vision 분석 실패: graceful — visionDescription=None 으로 저장 계속
+         */
+        post: operations["create_template_api_studio_reference_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/reference-templates/{template_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Template
+         * @description 삭제 — DB row + 이미지 파일 모두 정리.
+         *
+         *     Soft 정책: 옛 history 의 reference_ref URL 은 보존 (이미지만 깨짐 표시).
+         */
+        delete: operations["delete_template_api_studio_reference_templates__template_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/reference-templates/{template_id}/touch": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Touch Template
+         * @description last_used_at 갱신 — 사용자가 이 템플릿으로 수정 실행 시.
+         */
+        post: operations["touch_template_api_studio_reference_templates__template_id__touch_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/research": {
         parameters: {
             query?: never;
@@ -504,6 +578,13 @@ export interface components {
             meta: string;
             /** Reference Image */
             reference_image?: string | null;
+        };
+        /** Body_create_template_api_studio_reference_templates_post */
+        Body_create_template_api_studio_reference_templates_post: {
+            /** Image */
+            image: string;
+            /** Meta */
+            meta: string;
         };
         /** Body_create_video_task_api_studio_video_post */
         Body_create_video_task_api_studio_video_post: {
@@ -1116,6 +1197,121 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessAction"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_templates_api_studio_reference_templates_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    create_template_api_studio_reference_templates_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": components["schemas"]["Body_create_template_api_studio_reference_templates_post"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_template_api_studio_reference_templates__template_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    touch_template_api_studio_reference_templates__template_id__touch_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                template_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */
