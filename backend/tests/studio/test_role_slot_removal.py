@@ -65,3 +65,92 @@ def test_role_target_slots_unknown_role_returns_empty() -> None:
     reference_clause 의 자유 텍스트 fallback 만 동작.
     """
     assert _role_target_slots("hand pose only") == frozenset()
+
+
+# ───────── 사용자 발견 케이스 회귀 (2026-04-28) ─────────
+# 사용자 케이스: role=background + edit_instruction="Calvin Klein bra 제거"
+# 결과 프롬프트에 image2 가 한 번도 안 나오고 "preserve background" 가 박힘.
+# Slot removal 후엔 background 슬롯이 매트릭스에서 사라지고 reference_clause 만 남음.
+
+
+def _make_user_case_analysis():
+    """사용자 케이스 재현용 매트릭스: bra 제거 instruction → attire 만 [edit]."""
+    from studio.vision_pipeline import EditSlotEntry, EditVisionAnalysis
+
+    return EditVisionAnalysis(
+        domain="person",
+        intent="Remove the Calvin Klein bra.",
+        summary="A woman wearing a Calvin Klein bra in a studio setting.",
+        slots={
+            "face_expression": EditSlotEntry(
+                action="preserve", note="The woman has a neutral expression."
+            ),
+            "hair": EditSlotEntry(
+                action="preserve", note="The woman has long brown hair."
+            ),
+            "attire": EditSlotEntry(
+                action="edit", note="Remove the Calvin Klein bra."
+            ),
+            "body_pose": EditSlotEntry(
+                action="preserve", note="The woman is standing facing the camera."
+            ),
+            "background": EditSlotEntry(
+                action="preserve", note="A plain studio backdrop."
+            ),
+        },
+        provider="ollama",
+        fallback=False,
+    )
+
+
+def test_user_case_background_role_removes_preserve_background_directive() -> None:
+    """사용자 발견 버그 회귀 — background slot 의 [preserve] directive 가 사라져야."""
+    from studio.prompt_pipeline import _build_matrix_directive_block
+
+    analysis = _make_user_case_analysis()
+    directive = _build_matrix_directive_block(analysis, reference_role="background")
+
+    # 사용자 보고 결과 프롬프트의 핵심 phrasing 이 매트릭스 directive 에서 사라졌는지
+    assert "[preserve] background" not in directive
+    assert "preserve the original background" not in directive.lower()
+    # attire [edit] 는 그대로 살아있어야 (사용자 instruction)
+    assert "[edit] attire" in directive
+    assert "Remove the Calvin Klein bra" in directive
+
+
+def test_user_case_background_role_keeps_other_preserve_slots() -> None:
+    """slot removal 은 *role 매핑 슬롯만* 영향. 나머지 preserve 슬롯은 정상 유지."""
+    from studio.prompt_pipeline import _build_matrix_directive_block
+
+    analysis = _make_user_case_analysis()
+    directive = _build_matrix_directive_block(analysis, reference_role="background")
+
+    # 다른 preserve 슬롯 4개는 그대로 살아있어야
+    assert "[preserve] face / expression" in directive
+    assert "[preserve] hair" in directive
+    assert "[preserve] body / pose" in directive
+
+
+def test_user_case_full_system_edit_combines_directive_and_clause() -> None:
+    """SYSTEM_EDIT + matrix directive + build_reference_clause 합성 후
+    image2 reference 지시는 살아있고 background preserve 지시는 사라져야.
+    """
+    from studio.prompt_pipeline import (
+        SYSTEM_EDIT,
+        _build_matrix_directive_block,
+        build_reference_clause,
+    )
+
+    analysis = _make_user_case_analysis()
+    directive = _build_matrix_directive_block(analysis, reference_role="background")
+    clause = build_reference_clause("background")
+    full_system = f"{SYSTEM_EDIT}\n\n{directive}\n\n{clause}"
+    lower = full_system.lower()
+
+    # background preserve 지시 완전 부재
+    assert "preserve the original background" not in lower
+    assert "[preserve] background" not in full_system
+    # image2 reference 지시 명시
+    assert "image2" in full_system
+    assert "background" in lower  # reference_clause 의 background 키워드
+    assert "do not preserve" in lower or "replace" in lower
