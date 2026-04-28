@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Image Studio 시작 중</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f8fb;
+      --surface: #ffffff;
+      --ink: #172033;
+      --muted: #667085;
+      --line: #dde3ec;
+      --blue: #4195f5;
+      --green: #18a36b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      background:
+        linear-gradient(180deg, rgba(65, 149, 245, .08), transparent 42%),
+        var(--bg);
+      color: var(--ink);
+      font-family: "Segoe UI", system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    main {
+      width: min(420px, calc(100vw - 40px));
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      padding: 26px;
+      box-shadow: 0 18px 48px rgba(23, 32, 51, .10);
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      font-size: 22px;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+
+    p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .bar {
+      height: 10px;
+      margin: 24px 0 12px;
+      overflow: hidden;
+      border-radius: 999px;
+      background: #edf1f6;
+      border: 1px solid #e2e7ef;
+    }
+
+    .fill {
+      width: 8%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--blue), var(--green));
+      transition: width .35s ease;
+    }
+
+    .row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .steps {
+      display: grid;
+      gap: 8px;
+      margin-top: 22px;
+    }
+
+    .step {
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 14px;
+      padding: 0 11px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #f7f9fb;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .step.done {
+      background: rgba(24, 163, 107, .08);
+      color: #11724d;
+    }
+
+    .step.active {
+      border-color: rgba(65, 149, 245, .36);
+      background: rgba(65, 149, 245, .08);
+      color: #216db8;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>AI Image Studio 시작 중</h1>
+    <p>전용 브라우저 창을 준비하고 필요한 서비스를 깨우고 있어.</p>
+    <div class="bar" aria-label="시작 진행률">
+      <div class="fill" id="fill"></div>
+    </div>
+    <div class="row">
+      <span id="status">서비스 확인 중</span>
+      <span id="percent">8%</span>
+    </div>
+    <div class="steps" aria-label="시작 단계">
+      <div class="step done">
+        <span>브라우저 창</span>
+        <span>OK</span>
+      </div>
+      <div class="step active" id="step-launcher">
+        <span>런처 연결</span>
+        <span>진행 중</span>
+      </div>
+      <div class="step" id="step-frontend">
+        <span>Frontend 연결</span>
+        <span>대기</span>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    const target = "http://localhost:3000/loading";
+    const probeUrl = "http://localhost:3000/favicon.ico";
+    const fill = document.getElementById("fill");
+    const status = document.getElementById("status");
+    const percent = document.getElementById("percent");
+    let progress = 8;
+
+    function paint(next, text) {
+      progress = Math.max(progress, Math.min(next, 96));
+      fill.style.width = progress + "%";
+      percent.textContent = Math.round(progress) + "%";
+      if (text) status.textContent = text;
+    }
+
+    function markStep(id, state, text) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = "step " + state;
+      el.lastElementChild.textContent = text;
+    }
+
+    setInterval(() => {
+      if (progress < 88) paint(progress + Math.random() * 5, "Frontend 준비 중");
+    }, 800);
+
+    function probe() {
+      const img = new Image();
+      img.onload = () => {
+        markStep("step-launcher", "done", "OK");
+        markStep("step-frontend", "done", "OK");
+        paint(100, "앱으로 이동 중");
+        setTimeout(() => window.location.replace(target), 250);
+      };
+      img.onerror = () => {
+        markStep("step-launcher", "done", "OK");
+        markStep("step-frontend", "active", "진행 중");
+        paint(progress + 2, "서비스 확인 중");
+        setTimeout(probe, 1000);
+      };
+      img.src = probeUrl + "?t=" + Date.now();
+    }
+
+    probe();
+  </script>
+</body>
+</html>
+
