@@ -67,10 +67,14 @@ def reference_path_from_url(url: str) -> Path | None:
     """
     if not url:
         return None
+    # Codex Phase A 리뷰 fix: query/hash 가 있는 URL 자체를 거부.
+    # (옛 split 방식은 잘라낸 뒤 정규식만 검증해서 ?evil 같은 의심 입력 통과)
+    if "?" in url or "#" in url:
+        return None
     prefix = REFERENCE_URL_PREFIX + "/"
     if not url.startswith(prefix):
         return None
-    rel = url[len(prefix):].split("?", 1)[0].split("#", 1)[0]
+    rel = url[len(prefix):]
     # 슬래시 / 백슬래시 모두 거부 (하위 path 차단)
     if "\\" in rel or "/" in rel:
         return None

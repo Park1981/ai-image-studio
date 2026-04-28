@@ -57,6 +57,10 @@ async def create_template(
         meta_obj = json.loads(meta)
     except json.JSONDecodeError as e:
         raise HTTPException(400, f"meta JSON invalid: {e}") from e
+    # Codex Phase A 리뷰 fix: meta 가 object 가 아니면 (null / list / string)
+    # 이후 .get() 이 500 터짐 → 400 으로 친절하게 거부.
+    if not isinstance(meta_obj, dict):
+        raise HTTPException(400, "meta must be a JSON object")
 
     name = (meta_obj.get("name") or "").strip()
     if not name:

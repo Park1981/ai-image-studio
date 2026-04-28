@@ -255,8 +255,11 @@ def test_save_reference_image_rejects_invalid_bytes():
     [
         "../../etc/passwd",
         "/images/studio/reference-templates/../leak.png",
-        "/images/studio/reference-templates/file.png?query=1",
-        "/images/studio/reference-templates/file.png#hash",
+        # Codex Phase A 리뷰 fix: query/hash 거부를 *uuid32 기반* 으로 직접 검증.
+        "/images/studio/reference-templates/" + "0" * 32 + ".png?query=1",
+        "/images/studio/reference-templates/" + "0" * 32 + ".png#hash",
+        # query 만 단독, prefix 통과 후 query
+        "/images/studio/reference-templates/" + "0" * 32 + ".png?",
         "/images/studio/reference-templates/sub/file.png",
         "/images/studio/reference-templates/file.exe",
         "/images/studio/edit-source/file.png",  # 다른 prefix
@@ -266,7 +269,7 @@ def test_save_reference_image_rejects_invalid_bytes():
     ],
 )
 def test_reference_path_from_url_rejects_evil(evil_url):
-    """Path traversal 공격 벡터 모두 거부 → None."""
+    """Path traversal + query/hash 공격 벡터 모두 거부 → None."""
     from studio.reference_storage import reference_path_from_url
 
     assert reference_path_from_url(evil_url) is None
@@ -302,3 +305,46 @@ def test_delete_reference_file_round_trip(monkeypatch, tmp_path: Path):
 
     assert reference_storage.delete_reference_file(url) is True
     assert not list(tmp_path.glob("*.png"))
+
+
+# ─────────────────────────────────────────────
+# routes/reference_templates — meta 검증 (Codex Phase A 리뷰 fix)
+# ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "non_dict_meta",
+    ["null", "[]", '"name"', "42", "true"],
+)
+async def test_create_template_rejects_non_dict_meta(non_dict_meta: str) -> None:
+    """meta JSON 이 dict 가 아니면 400 (옛 .get() 500 폭발 방지)."""
+    import json as _json
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        resp = await ac.post(
+            "/api/studio/reference-templates",
+            files={"image": ("tiny.png", _make_png_bytes(), "image/png")},
+            data={"meta": non_dict_meta},
+        )
+
+    assert resp.status_code == 400, resp.text
+    assert "object" in resp.text.lower()
+    # 또 invalid JSON 도 400 (json.loads 실패 case 분리 회귀)
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        resp = await ac.post(
+            "/api/studio/reference-templates",
+            files={"image": ("tiny.png", _make_png_bytes(), "image/png")},
+            data={"meta": "{not json"},
+        )
+    assert resp.status_code == 400, resp.text
+    # JSONDecodeError 메시지는 정확한 token 포함 안 함 → 단순 status 만
+    _ = _json  # noqa: F841 (lint 호환)
