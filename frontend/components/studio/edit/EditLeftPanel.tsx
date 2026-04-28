@@ -305,7 +305,12 @@ export default function EditLeftPanel({
                 </label>
                 <span className="mono ais-field-meta">manual crop</span>
               </div>
+              {/* key={referenceImage} — 새 이미지 업로드 시 컴포넌트 local state
+               *  (crop/zoom/aspectMode) 강제 reset (Codex Phase 1 리뷰 결함 #1).
+               *  store 의 area 만 reset 되면 옛 cropper 가 새 이미지 위에 옛 좌표를
+               *  재 emit 해 area 가 다시 채워지는 버그 차단. */}
               <EditReferenceCrop
+                key={referenceImage}
                 imageSrc={referenceImage}
                 onAreaChange={setReferenceCropArea}
               />

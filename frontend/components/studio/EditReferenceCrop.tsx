@@ -217,9 +217,14 @@ export default function EditReferenceCrop({
         <span className="mono">{zoom.toFixed(2)}x</span>
       </div>
 
-      {/* 도움말 */}
+      {/* 도움말 — 256px 가드는 silent fallback 이라 명시 강조 (Codex Phase 1 리뷰 #2-b).
+       *  Phase 2 후 RTL + visual feedback (frame 색 변화 등) 보강 검토. */}
       <div style={{ fontSize: 10.5, color: "var(--ink-4)", lineHeight: 1.5 }}>
-        드래그로 영역 이동 · 휠/슬라이더로 확대 · {MIN_CROP_PX}px 미만은 무효 처리
+        드래그로 영역 이동 · 휠/슬라이더로 확대
+        <br />
+        <span style={{ color: "var(--warn, #c08400)" }}>
+          ⚠ {MIN_CROP_PX}px 미만 영역은 자동 무효 — 원본 이미지가 그대로 전송됩니다
+        </span>
       </div>
     </div>
   );
