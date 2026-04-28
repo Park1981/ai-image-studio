@@ -141,6 +141,14 @@ async def create_edit_task(
     # 토글 OFF 또는 파일 미동봉이면 None — 옛 단일 흐름 100% 동일.
     reference_bytes: bytes | None = None
     reference_filename: str | None = None
+    # Codex Phase 1-3 통합 리뷰 fix (2026-04-28): useRef=false 인데 reference_image 가
+    # multipart 로 동봉된 silent-drop 케이스. 클라이언트 버그/오용 가능성을 가시화하기
+    # 위해 stream buffer 를 명시적으로 drain + log warning. 사용자 흐름은 그대로 (200).
+    if reference_image is not None and not use_reference_image:
+        await reference_image.read()  # drain — body 무시
+        log.warning(
+            "edit: reference_image multipart 동봉됐지만 useReferenceImage=false → 무시함",
+        )
     if use_reference_image and reference_image is not None:
         reference_bytes = await reference_image.read()
         if reference_bytes:

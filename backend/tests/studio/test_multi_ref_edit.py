@@ -82,6 +82,58 @@ async def test_edit_endpoint_rejects_useref_true_with_empty_file() -> None:
 
 
 @pytest.mark.asyncio
+async def test_edit_endpoint_drains_reference_when_useref_false(monkeypatch) -> None:
+    """useRef=false + reference_image 동봉 → 200, 파일 drain 후 무시 (silent drop 회귀 방지).
+
+    Codex Phase 1-3 통합 리뷰 Important #1: 클라이언트가 토글 OFF 인데
+    multipart 에 reference_image 를 같이 보내면 옛 코드는 silent drop. 신규
+    코드는 명시적 drain + log warning. 파이프라인엔 reference_bytes None 전달.
+    """
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    captured_kwargs: dict = {}
+
+    def _fake_run_edit(*args, **kwargs):
+        captured_kwargs.update(kwargs)
+
+        async def _noop():
+            return None
+
+        return _noop()
+
+    monkeypatch.setattr("studio.routes.streams._run_edit_pipeline", _fake_run_edit)
+
+    src_bytes = _png_bytes()
+    ref_bytes = _png_bytes(32, 32)
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        response = await ac.post(
+            "/api/studio/edit",
+            files={
+                "image": ("src.png", io.BytesIO(src_bytes), "image/png"),
+                # reference_image 동봉했지만 토글 OFF — 무시되어야 함
+                "reference_image": ("ref.png", io.BytesIO(ref_bytes), "image/png"),
+            },
+            data={
+                "meta": json.dumps(
+                    {
+                        "prompt": "test",
+                        "useReferenceImage": False,  # OFF — 파일 무시
+                    }
+                ),
+            },
+        )
+    # task 생성 성공 (200) — 파일은 drain 후 무시
+    assert response.status_code == 200, response.text
+    assert captured_kwargs.get("reference_bytes") is None
+    assert captured_kwargs.get("reference_filename") is None
+    assert captured_kwargs.get("reference_role") is None
+
+
+@pytest.mark.asyncio
 async def test_edit_endpoint_role_ignored_when_useref_false(monkeypatch) -> None:
     """useReferenceImage=false 면 referenceRole 도 게이트로 None 강제 (누수 방지)."""
     from httpx import ASGITransport, AsyncClient
