@@ -179,18 +179,27 @@ ROLE_INSTRUCTIONS: dict[str, str] = {
     ),
     "outfit": (
         "Reference image (image2) provides CLOTHING/ACCESSORIES reference. "
-        "Apply only the outfit, garments, or accessories from image2 onto the "
-        "subject in image1. Keep face, pose, and background of image1."
+        "Apply ONLY the outfit, garments, or accessories from image2 onto the "
+        "subject in image1. "
+        "Do NOT preserve image1's original clothing — replace it with image2's "
+        "outfit. "
+        "Keep image1's face, hair, body pose, and background unchanged."
     ),
     "style": (
         "Reference image (image2) provides STYLE REFERENCE — color palette, "
-        "lighting tone, and mood. Match these aesthetics on image1 without "
-        "altering the subject's identity or composition."
+        "lighting tone, and overall mood. "
+        "Match these aesthetics on image1 by replacing image1's color tone, "
+        "lighting, and atmosphere with image2's. "
+        "Do NOT preserve image1's original color grading or lighting; "
+        "the final result should adopt image2's visual style. "
+        "Keep image1's subject identity, pose, and composition intact."
     ),
     "background": (
         "Reference image (image2) provides BACKGROUND/ENVIRONMENT reference. "
-        "Replace or blend image1's background with the environment shown in "
-        "image2, keeping the subject's pose and identity intact."
+        "Replace image1's background with the environment shown in image2. "
+        "Do NOT preserve image1's original background — the final result must "
+        "depict the subject of image1 placed within image2's environment. "
+        "Keep image1's subject identity, pose, expression, and clothing intact."
     ),
 }
 
