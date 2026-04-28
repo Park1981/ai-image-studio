@@ -309,41 +309,6 @@ def test_face_reference_overrides_source_face_matrix_preserve():
     assert "[preserve] hair" in out
 
 
-def test_face_reference_upload_is_cropped_before_comfy_upload():
-    """face role 은 image2 전체가 아니라 상단 얼굴 영역만 ComfyUI 에 전달."""
-    from studio.pipelines.edit import _prepare_reference_upload
-
-    src = io.BytesIO()
-    Image.new("RGB", (1000, 800), color=(20, 40, 80)).save(src, format="PNG")
-
-    cropped_bytes, filename = _prepare_reference_upload(
-        src.getvalue(),
-        "portrait.png",
-        "face",
-    )
-
-    with Image.open(io.BytesIO(cropped_bytes)) as im:
-        assert im.size == (368, 368)
-    assert filename == "portrait-face.png"
-    assert len(cropped_bytes) < len(src.getvalue())
-
-
-def test_non_face_reference_upload_keeps_original_bytes_and_name():
-    """face 외 role 은 참조 이미지를 임의 crop 하지 않는다."""
-    from studio.pipelines.edit import _prepare_reference_upload
-
-    raw = b"not actually opened for outfit"
-
-    upload_bytes, filename = _prepare_reference_upload(
-        raw,
-        "reference.png",
-        "outfit",
-    )
-
-    assert upload_bytes == raw
-    assert filename == "reference.png"
-
-
 def test_reference_returns_extra_load_image_node():
     """Phase 4 Task 15: multi-ref 케이스는 LoadImage 노드 2개 (image1 + image2).
 

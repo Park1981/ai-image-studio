@@ -16,7 +16,7 @@ import time
 import uuid
 from typing import Any
 
-from PIL import Image, ImageOps
+from PIL import Image
 
 from .._gpu_lock import gpu_slot
 from ..comfy_api_builder import build_edit_from_request
@@ -36,53 +36,6 @@ log = logging.getLogger(__name__)
 
 # 하위 호환 re-export. 실제 정책값은 storage.STUDIO_MAX_IMAGE_BYTES 단일 소스.
 _EDIT_MAX_IMAGE_BYTES = STUDIO_MAX_IMAGE_BYTES
-
-
-def _reference_face_filename(filename: str | None) -> str:
-    """Return a debug-friendly filename for the face-cropped reference upload."""
-    raw = (filename or "reference.png").strip() or "reference.png"
-    stem = raw.rsplit(".", 1)[0] if "." in raw else raw
-    return f"{stem or 'reference'}-face.png"
-
-
-def _prepare_reference_upload(
-    reference_bytes: bytes,
-    reference_filename: str | None,
-    reference_role: str | None,
-) -> tuple[bytes, str]:
-    """Prepare the image2 upload.
-
-    Qwen Edit's multi-reference node treats image2 as a broad visual reference.
-    For face identity, feeding the full portrait also leaks background, outfit,
-    hair, and pose. Crop image2 to an upper-center face reference before upload.
-    """
-    upload_name = reference_filename or "reference.png"
-    if reference_role != "face":
-        return reference_bytes, upload_name
-
-    try:
-        with Image.open(io.BytesIO(reference_bytes)) as im:
-            img = ImageOps.exif_transpose(im).convert("RGB")
-            width, height = img.size
-            side = max(1, int(min(width, height) * 0.46))
-            center_x = width / 2
-            center_y = height * 0.28
-            left = max(0, min(width - side, int(center_x - side / 2)))
-            top = max(0, min(height - side, int(center_y - side / 2)))
-            crop = img.crop((left, top, left + side, top + side))
-            buf = io.BytesIO()
-            crop.save(buf, format="PNG")
-            log.info(
-                "edit pipeline: face reference crop %sx%s -> %sx%s",
-                width,
-                height,
-                crop.size[0],
-                crop.size[1],
-            )
-            return buf.getvalue(), _reference_face_filename(reference_filename)
-    except Exception as exc:
-        log.warning("face reference crop failed; using original reference: %s", exc)
-        return reference_bytes, upload_name
 
 
 async def _run_edit_pipeline(
@@ -171,12 +124,9 @@ async def _run_edit_pipeline(
         effective_role = reference_role if reference_bytes is not None else None
         extra_uploads_list: list[tuple[bytes, str]] | None = None
         if reference_bytes is not None:
-            upload_ref_bytes, upload_ref_name = _prepare_reference_upload(
-                reference_bytes,
-                reference_filename,
-                effective_role,
-            )
-            extra_uploads_list = [(upload_ref_bytes, upload_ref_name)]
+            # 2026-04-28: face crop 제거. ComfyUI native 흐름과 동일하게 image2 원본
+            # 그대로 업로드 (geometric crop 은 얼굴 위치 다양 시 빗나가 역효과).
+            extra_uploads_list = [(reference_bytes, reference_filename or "reference.png")]
         # Phase 4 multi-ref 분기 진입 가시화 (디버그용 — 사용자 환경 검증).
         log.info(
             "edit pipeline: reference_bytes=%s reference_role=%s effective_role=%s extra_uploads=%d",
