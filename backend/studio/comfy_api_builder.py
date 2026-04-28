@@ -411,11 +411,26 @@ class EditApiInput:
     vae_name: str
     extra_loras: list[LoraEntry]
     lightning_lora_name: str | None = None
+    # Multi-reference (2026-04-27): image2 추가 입력 — 토글 OFF 면 None.
+    # ON 시 ComfyUI input/ 에 업로드된 두번째 파일명 + role 명시.
+    reference_image_filename: str | None = None
+    reference_role: str | None = None
     filename_prefix: str = "AIS-Edit"
 
 
 def build_edit_api(v: EditApiInput) -> ApiPrompt:
-    """Edit 워크플로우 API 포맷 조립 (Qwen Image Edit 2511)."""
+    """Edit 워크플로우 API 포맷 조립 (Qwen Image Edit 2511).
+
+    Multi-ref 분기 (2026-04-27): reference 미사용이면 옛 단일 이미지 path 그대로.
+    reference_image_filename 이 None 이면 옛 코드와 100% 동일한 결과 반환 → 회귀 위험 0.
+    """
+    if v.reference_image_filename is None:
+        return _build_edit_api_single(v)
+    return _build_edit_api_multi_ref(v)
+
+
+def _build_edit_api_single(v: EditApiInput) -> ApiPrompt:
+    """옛 단일 이미지 흐름 (image1 만). build_edit_api 본체 그대로."""
     api: ApiPrompt = {}
     nid = _make_id_gen()
 
@@ -532,6 +547,16 @@ def build_edit_api(v: EditApiInput) -> ApiPrompt:
     _save_image_node(api, nid, decoded_ref=[dec_id, 0], filename_prefix=v.filename_prefix)
 
     return api
+
+
+def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
+    """이미지 + 참조 이미지 (image1+image2) 다중 참조 흐름.
+
+    Phase 4 에서 진짜 노드 체인 작성 (TextEncodeQwenImageEditPlus 의 image2 슬롯 추가).
+    Phase 1-3 단계에선 단일 흐름으로 폴백 (reference_image_filename 무시).
+    """
+    # TEMP: Phase 1-3 검증용 폴백. Phase 4 에서 진짜 multi-ref 노드 체인 작성.
+    return _build_edit_api_single(v)
 
 
 def build_edit_from_request(

@@ -48,7 +48,7 @@ log = logging.getLogger(__name__)
 
 # Schema version — 2026-04-27 (C2-P2-3) 도입.
 # 신규 마이그레이션 추가 시 + 1 + init 함수에 idempotent 적용 함수 추가.
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 
 async def _get_schema_version(db: aiosqlite.Connection) -> int:
@@ -90,7 +90,10 @@ CREATE TABLE IF NOT EXISTS studio_history (
   adult INTEGER,
   duration_sec REAL,
   fps INTEGER,
-  frame_count INTEGER
+  frame_count INTEGER,
+  refined_intent TEXT,
+  reference_ref TEXT,
+  reference_role TEXT
 );
 """
 CREATE_IDX_CREATED = (
@@ -254,6 +257,20 @@ async def init_studio_history_db() -> None:
         except Exception:
             # 이미 존재하면 정상 (idempotent)
             pass
+        await db.commit()
+    # v7 (2026-04-27): Edit multi-reference — reference_ref + reference_role 두 컬럼.
+    # reference_ref = Library plan 의 영구 URL only (Phase 5 단계는 항상 NULL).
+    # reference_role = 사용자 명시 role (face / outfit / style / background / custom).
+    async with aiosqlite.connect(_DB_PATH) as db:
+        for col_name in ("reference_ref", "reference_role"):
+            try:
+                await db.execute(
+                    f"ALTER TABLE studio_history ADD COLUMN {col_name} TEXT"
+                )
+                log.info("Migrated studio_history: added %s column", col_name)
+            except Exception:
+                # 이미 존재하면 정상 (idempotent)
+                pass
         # 모든 마이그레이션 적용 후 schema version 마킹 (다음 부팅에서 skip).
         await _set_schema_version(db, SCHEMA_VERSION)
         await db.commit()
@@ -275,8 +292,9 @@ async def insert_item(item: dict[str, Any]) -> None:
              model, created_at, image_ref, upgraded_prompt, upgraded_prompt_ko,
              prompt_provider, research_hints, vision_description, comfy_error,
              source_ref, comparison_analysis,
-             adult, duration_sec, fps, frame_count, refined_intent)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             adult, duration_sec, fps, frame_count, refined_intent,
+             reference_ref, reference_role)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 item["id"],
                 item["mode"],
@@ -307,6 +325,10 @@ async def insert_item(item: dict[str, Any]) -> None:
                 item.get("frameCount"),
                 # v6 (spec 19 후속): refined_intent — Edit 만 채움, 나머지 None
                 item.get("refinedIntent"),
+                # v7 (2026-04-27): Edit multi-reference — 토글 OFF 면 둘 다 None.
+                # reference_ref = Library plan 의 영구 URL (Phase 5 단계는 항상 None).
+                item.get("referenceRef"),
+                item.get("referenceRole"),
             ),
         )
         await db.commit()
@@ -573,6 +595,9 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
     frame_count = _safe("frame_count")
     # v6 (spec 19 후속) — refined_intent (Edit 모드만 채워짐 · 옛 row 는 None)
     refined_intent = _safe("refined_intent")
+    # v7 (2026-04-27) — multi-reference (Edit 모드만 채워짐 · 옛 row + generate/video 는 None)
+    reference_ref = _safe("reference_ref")
+    reference_role = _safe("reference_role")
 
     item: dict[str, Any] = {
         "id": row["id"],
@@ -609,4 +634,10 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
     # v6 refined_intent — Edit 모드만 채움 (옛 row + generate/video 는 노출 안함)
     if refined_intent:
         item["refinedIntent"] = refined_intent
+    # v7 multi-reference — Edit 모드 multi-ref ON 케이스만 채움 (옛 row 는 노출 안함).
+    # camelCase 로 — frontend HistoryItem 타입과 일관.
+    if reference_ref is not None:
+        item["referenceRef"] = reference_ref
+    if reference_role is not None:
+        item["referenceRole"] = reference_role
     return item

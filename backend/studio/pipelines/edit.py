@@ -49,6 +49,10 @@ async def _run_edit_pipeline(
     *,
     source_width: int = 0,
     source_height: int = 0,
+    # Multi-ref (2026-04-27): Phase 1 은 받기만 · Phase 4 에서 실 dispatch.
+    reference_bytes: bytes | None = None,
+    reference_filename: str | None = None,
+    reference_role: str | None = None,
 ) -> None:
     try:
         # Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
