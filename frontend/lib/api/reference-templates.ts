@@ -9,7 +9,11 @@
 import { STUDIO_BASE, USE_MOCK } from "./client";
 import type { ReferenceTemplate } from "./types";
 
-/** ReferenceTemplate.imageRef 를 STUDIO_BASE 기준 절대 URL 로 정규화. */
+/** ReferenceTemplate.imageRef 를 STUDIO_BASE 기준 절대 URL 로 정규화.
+ *  보존 prefix: http:// / https:// / data: / blob: / mock-seed://.
+ *  나머지는 상대 path 로 간주해 STUDIO_BASE prefix 추가.
+ *  Codex Phase B+C 리뷰 fix #5: blob: 분기 누락 fix.
+ */
 function normalizeReferenceTemplate(t: ReferenceTemplate): ReferenceTemplate {
   let ref = t.imageRef;
   if (
@@ -17,6 +21,7 @@ function normalizeReferenceTemplate(t: ReferenceTemplate): ReferenceTemplate {
     !ref.startsWith("http://") &&
     !ref.startsWith("https://") &&
     !ref.startsWith("data:") &&
+    !ref.startsWith("blob:") &&
     !ref.startsWith("mock-seed://")
   ) {
     // 상대 path → STUDIO_BASE prefix

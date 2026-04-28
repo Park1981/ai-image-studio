@@ -13,7 +13,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import {
   deleteReferenceTemplate,
@@ -36,6 +36,9 @@ export default function ReferenceLibraryDrawer({
 }: Props) {
   const [templates, setTemplates] = useState<ReferenceTemplate[]>([]);
   const [loading, setLoading] = useState(false);
+  // Codex 리뷰 fix #8: focus return 용 — open 직전 포커스를 기억.
+  const restoreFocusRef = useRef<HTMLElement | null>(null);
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -52,6 +55,32 @@ export default function ReferenceLibraryDrawer({
       cancelled = true;
     };
   }, [open]);
+
+  // Codex 리뷰 fix #8: open 시 focus 진입 + close 시 trigger 로 return + Esc 닫기.
+  useEffect(() => {
+    if (!open) return;
+    restoreFocusRef.current =
+      typeof document !== "undefined"
+        ? (document.activeElement as HTMLElement | null)
+        : null;
+    // 다음 frame 에 close 버튼으로 focus (Drawer 마운트 직후)
+    const timer = window.setTimeout(() => {
+      closeButtonRef.current?.focus();
+    }, 0);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("keydown", onKey);
+      // close 시 trigger 로 focus 복귀 (있으면)
+      restoreFocusRef.current?.focus?.();
+    };
+  }, [open, onClose]);
 
   const handlePick = (t: ReferenceTemplate) => {
     onPick(t);
@@ -90,9 +119,10 @@ export default function ReferenceLibraryDrawer({
           zIndex: 50,
         }}
       />
-      {/* Drawer 본체 */}
+      {/* Drawer 본체 — Codex 리뷰 fix #8: aria-modal + 키보드 접근성 */}
       <aside
         role="dialog"
+        aria-modal="true"
         aria-label="참조 템플릿 라이브러리"
         style={{
           position: "fixed",
@@ -130,6 +160,7 @@ export default function ReferenceLibraryDrawer({
             📂 참조 템플릿 라이브러리
           </h2>
           <button
+            ref={closeButtonRef}
             type="button"
             onClick={onClose}
             aria-label="닫기"

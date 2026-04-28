@@ -120,6 +120,24 @@ export function useEditPipeline({
       }
     }
 
+    // Codex Phase B+C 리뷰 fix #4: 자동 저장 조건을 *실행 시작 시점* 에 스냅샷.
+    // 그렇지 않으면 사용자가 실행 중 토글/이름을 바꿔 done 콜백 closure 가 stale 값
+    // 또는 의도 외 값을 사용하는 race 가능. running 중에는 UI 가 disabled 라도 store
+    // 자체는 변경 가능 (외부 API · 다른 컴포넌트) 이므로 명시 스냅샷이 안전.
+    const autoSaveSnapshot = {
+      enabled:
+        saveAsTemplate &&
+        effectiveUseRef &&
+        pickedTemplateId === null &&
+        !!templateName.trim() &&
+        resolvedReferenceImage !== undefined,
+      templateName: templateName.trim(),
+      imageFile: resolvedReferenceImage,
+      role: effectiveRole,
+      visionModel: visionModelSel,
+      userIntent: prompt,
+    };
+
     setRunning(true);
     await consumePipelineStream(
       editImageStream({
@@ -226,22 +244,18 @@ export function useEditPipeline({
               void analyzeComparison(e.item, { silent: true });
             }
             // v8 라이브러리 plan (2026-04-28) — 자동 저장.
-            // 조건: 토글 ON + 새 업로드 (라이브러리 픽 X) + 이름 입력됨 + reference 실제로 사용됨.
+            // Codex 리뷰 fix #4: *실행 시작 시점* 스냅샷 사용 (closure stale 차단).
             // 실패 graceful (warn toast 만) — edit 결과 자체는 영향 0.
             if (
-              saveAsTemplate &&
-              effectiveUseRef &&
-              pickedTemplateId === null &&
-              templateName.trim() &&
-              resolvedReferenceImage !== undefined
+              autoSaveSnapshot.enabled &&
+              autoSaveSnapshot.imageFile !== undefined
             ) {
-              const trimmedName = templateName.trim();
               void createReferenceTemplate({
-                imageFile: resolvedReferenceImage,
-                name: trimmedName,
-                role: effectiveRole,
-                userIntent: prompt,
-                visionModel: visionModelSel,
+                imageFile: autoSaveSnapshot.imageFile,
+                name: autoSaveSnapshot.templateName,
+                role: autoSaveSnapshot.role,
+                userIntent: autoSaveSnapshot.userIntent,
+                visionModel: autoSaveSnapshot.visionModel,
               })
                 .then((tpl) => {
                   if (tpl) toast.success("템플릿 저장됨", tpl.name);
