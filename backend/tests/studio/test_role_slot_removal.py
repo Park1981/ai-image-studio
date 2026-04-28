@@ -67,10 +67,11 @@ def test_role_target_slots_unknown_role_returns_empty() -> None:
     assert _role_target_slots("hand pose only") == frozenset()
 
 
-# ───────── 사용자 발견 케이스 회귀 (2026-04-28) ─────────
+# ───────── 사용자 발견 케이스 회귀 (2026-04-28 · Phase 1' Slot Replacement) ─────────
 # 사용자 케이스: role=background + edit_instruction="Calvin Klein bra 제거"
 # 결과 프롬프트에 image2 가 한 번도 안 나오고 "preserve background" 가 박힘.
-# Slot removal 후엔 background 슬롯이 매트릭스에서 사라지고 reference_clause 만 남음.
+# Phase 1' (codex 리뷰 반영): background 슬롯이 [reference_from_image2] 명시 액션으로 교체.
+# 침묵(제거) 전략은 LLM 의 default-preserve 환각을 못 막아서 명시 액션으로 전환.
 
 
 def _make_user_case_analysis():
@@ -103,29 +104,36 @@ def _make_user_case_analysis():
     )
 
 
-def test_user_case_background_role_removes_preserve_background_directive() -> None:
-    """사용자 발견 버그 회귀 — background slot 의 [preserve] directive 가 사라져야."""
+def test_user_case_background_role_replaces_with_reference_action() -> None:
+    """사용자 발견 버그 회귀 — background slot 이 [reference_from_image2] 명시 액션으로 교체.
+
+    Phase 1' 핵심: [preserve] 도 사라지고 [reference_from_image2] 가 박혀야.
+    매트릭스에 명시 액션이 박혀야 gemma4 가 default-preserve 환각 못함.
+    """
     from studio.prompt_pipeline import _build_matrix_directive_block
 
     analysis = _make_user_case_analysis()
     directive = _build_matrix_directive_block(analysis, reference_role="background")
 
-    # 사용자 보고 결과 프롬프트의 핵심 phrasing 이 매트릭스 directive 에서 사라졌는지
+    # [preserve] 라벨 부재 (제거 + 새 라벨로 교체)
     assert "[preserve] background" not in directive
-    assert "preserve the original background" not in directive.lower()
+    # 새 [reference_from_image2] 라벨 + image2 mention 강제 directive
+    assert "[reference_from_image2] background" in directive
+    assert "Apply image2's background" in directive
+    assert "MUST mention 'image2'" in directive
     # attire [edit] 는 그대로 살아있어야 (사용자 instruction)
     assert "[edit] attire" in directive
     assert "Remove the Calvin Klein bra" in directive
 
 
 def test_user_case_background_role_keeps_other_preserve_slots() -> None:
-    """slot removal 은 *role 매핑 슬롯만* 영향. 나머지 preserve 슬롯은 정상 유지."""
+    """slot replacement 는 *role 매핑 슬롯만* 영향. 나머지 preserve 슬롯은 정상 유지."""
     from studio.prompt_pipeline import _build_matrix_directive_block
 
     analysis = _make_user_case_analysis()
     directive = _build_matrix_directive_block(analysis, reference_role="background")
 
-    # 다른 preserve 슬롯 4개는 그대로 살아있어야
+    # 다른 preserve 슬롯 4개는 그대로 살아있어야 ([preserve] 그대로)
     assert "[preserve] face / expression" in directive
     assert "[preserve] hair" in directive
     assert "[preserve] body / pose" in directive
@@ -133,7 +141,7 @@ def test_user_case_background_role_keeps_other_preserve_slots() -> None:
 
 def test_user_case_full_system_edit_combines_directive_and_clause() -> None:
     """SYSTEM_EDIT + matrix directive + build_reference_clause 합성 후
-    image2 reference 지시는 살아있고 background preserve 지시는 사라져야.
+    매트릭스 안에 [reference_from_image2] 명시 액션 + reference_clause 가 동시에 살아있어야.
     """
     from studio.prompt_pipeline import (
         SYSTEM_EDIT,
@@ -150,7 +158,9 @@ def test_user_case_full_system_edit_combines_directive_and_clause() -> None:
     # background preserve 지시 완전 부재
     assert "preserve the original background" not in lower
     assert "[preserve] background" not in full_system
+    # 매트릭스 안에 명시 액션 박힘 (codex 권장 핵심)
+    assert "[reference_from_image2] background" in full_system
+    assert "MUST mention 'image2'" in full_system
     # image2 reference 지시 명시
     assert "image2" in full_system
-    assert "background" in lower  # reference_clause 의 background 키워드
     assert "do not preserve" in lower or "replace" in lower

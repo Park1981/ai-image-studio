@@ -716,19 +716,33 @@ def _build_matrix_directive_block(
     lines.append("For each slot, follow the directive EXACTLY:")
     lines.append("")
 
-    # 2026-04-28 Multi-reference slot removal:
-    # role 이 가리키는 슬롯이 매트릭스에서 [preserve] 면 directive 에서 *완전 제거*.
-    # action=edit 이면 사용자 instruction 우선 → role 무효화 (제거 X).
-    # 옛 face-only 분기 (line 688-701) 도 이 메커니즘으로 일관 처리.
+    # 2026-04-28 Multi-reference slot REPLACEMENT (Phase 1' · codex 리뷰 반영):
+    # role 이 가리키는 슬롯이 매트릭스에서 [preserve] 면 *명시적 [reference_from_image2]
+    # 액션*으로 교체. 침묵(제거) 전략은 LLM 의 default-preserve 환각을 못 막아서
+    # codex 권장대로 "implicit user instruction" 으로 승격. 매트릭스 안에 경쟁
+    # 권위가 박혀야 gemma4 가 reference clause 를 무시 못 함.
+    # action=edit 이면 사용자 instruction 우선 → role 무효화 (정상 [edit] 처리).
     target_slots = _role_target_slots(reference_role)
 
     for key, entry in slots.items():
         action = getattr(entry, "action", "preserve")
         note = (getattr(entry, "note", "") or "").strip()
         label = _slot_label(key)
-        # role 매핑 슬롯이면서 action=preserve → 제거 (continue).
-        # action=edit 이면 user instruction 우선이라 정상 처리.
+        # role 매핑 슬롯이면서 action=preserve/그 외 → 명시적 [reference_from_image2] 로 교체.
+        # action=edit 이면 user instruction 우선이라 정상 [edit] 처리.
         if key in target_slots and action != "edit":
+            lines.append(f"[reference_from_image2] {label} — APPLY FROM IMAGE2")
+            lines.append(
+                f"  -> Apply image2's {label} to image1."
+            )
+            lines.append(
+                f"  -> Do NOT preserve image1's original {label}; "
+                f"replace it with image2's."
+            )
+            lines.append(
+                "  -> The final output prompt MUST mention 'image2' "
+                f"when describing the {label}."
+            )
             continue
         if action == "edit":
             # 변경 의도 — note 가 변경 지시 자체이므로 그대로 명시

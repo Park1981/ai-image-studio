@@ -173,30 +173,33 @@ def test_system_edit_v2_domain_aware_identity_clauses() -> None:
     assert "60-200 words" in txt or "Never exceed 250 words" in txt
 
 
-# ───────── Multi-reference slot removal 회귀 (2026-04-28) ─────────
+# ───────── Multi-reference slot REPLACEMENT 회귀 (2026-04-28 · Phase 1') ─────────
+# codex 리뷰 반영: 슬롯 제거(침묵) → [reference_from_image2] 명시 액션으로 교체.
+# LLM 의 default-preserve 환각 차단 — 매트릭스 안에 경쟁 권위 박힘.
 
 
-def test_background_role_removes_background_slot_when_preserve() -> None:
+def test_background_role_replaces_background_with_reference_action() -> None:
     """role=background + image1 매트릭스의 background.action=preserve →
-    background 슬롯 directive 가 *완전히 제거*.
+    background 슬롯이 [reference_from_image2] 명시 액션으로 *교체*.
 
-    핵심 회귀: 사용자가 image2 를 background 로 올렸는데 vision 이
-    "사용자가 background 안 건드림" 이라고 preserve 결정한 케이스.
-    Slot removal 전엔 [preserve] 지시가 박혀 reference clause 와 충돌.
+    핵심 회귀: 슬롯 제거(침묵) 전략은 gemma4 가 default-preserve 로 환각 →
+    반드시 명시적 [reference_from_image2] 액션이 매트릭스에 박혀야 함.
     """
     analysis = _make_person_analysis()
     # background.action=preserve (헬퍼 기본값)
     directive = _build_matrix_directive_block(analysis, reference_role="background")
 
+    # [preserve] 도 [edit] 도 아닌 명시적 [reference_from_image2]
     assert "[preserve] background / environment" not in directive
-    assert "background / environment" not in directive  # 라벨 자체가 안 나와야
+    assert "[reference_from_image2] background / environment" in directive
+    assert "Apply image2's background / environment to image1" in directive
+    assert "Do NOT preserve image1's original background / environment" in directive
+    # 출력 프롬프트에 image2 명시 강제 directive
+    assert "MUST mention 'image2'" in directive
 
 
-def test_outfit_role_removes_attire_slot_when_preserve() -> None:
-    """role=outfit + attire.action=preserve → attire 슬롯 directive 제거.
-
-    헬퍼 기본값 (attire.action=edit) 변경: preserve 케이스 별도 케이스.
-    """
+def test_outfit_role_replaces_attire_with_reference_action() -> None:
+    """role=outfit + attire.action=preserve → attire 슬롯이 [reference_from_image2] 로 교체."""
     analysis = _make_person_analysis()
     # attire 를 preserve 로 변경
     analysis.slots["attire"] = EditSlotEntry(
@@ -206,14 +209,16 @@ def test_outfit_role_removes_attire_slot_when_preserve() -> None:
 
     assert "[preserve] attire" not in directive
     assert "[edit] attire" not in directive
+    assert "[reference_from_image2] attire" in directive
+    assert "Apply image2's attire" in directive
 
 
-def test_role_does_NOT_remove_slot_when_action_is_edit() -> None:
-    """role 매핑 슬롯이라도 action=edit 이면 *제거하지 않음*.
+def test_role_does_NOT_replace_slot_when_action_is_edit() -> None:
+    """role 매핑 슬롯이라도 action=edit 이면 *교체하지 않음*.
 
     핵심 우선순위 규칙: 사용자 instruction 이 해당 슬롯을 명시적으로
     건드린 경우 (vision 이 [edit] 판정) → user instruction 우선,
-    role 무효화 (slot removal 미적용).
+    role 무효화 ([reference_from_image2] 미적용).
     """
     analysis = _make_person_analysis()
     # background 를 edit 로 변경 (사용자가 명시적으로 건드림)
@@ -222,30 +227,36 @@ def test_role_does_NOT_remove_slot_when_action_is_edit() -> None:
     )
     directive = _build_matrix_directive_block(analysis, reference_role="background")
 
-    # [edit] directive 가 그대로 살아있어야
+    # [edit] directive 가 그대로 살아있어야 (user instruction 우선)
     assert "[edit] background" in directive
     assert "Make the background dark and stormy." in directive
+    # [reference_from_image2] 가 아닌 [edit] 채택
+    assert "[reference_from_image2] background" not in directive
 
 
-def test_face_role_removes_face_expression_slot() -> None:
-    """기존 face-only 분기 (line 688-701) 를 일관된 slot removal 메커니즘으로 통일.
+def test_face_role_replaces_face_expression_with_reference_action() -> None:
+    """기존 face-only 분기 (옛 line 688-701) 를 일관된 slot replacement 메커니즘으로 통일.
 
-    이전: face role → [reference] 로 변환되어 directive 안에 *남아있음*
-    이후: face role → face_expression 슬롯이 directive 에서 *제거*
+    이전 옛 동작: face role → [reference] 로 변환 (커스텀 phrasing).
+    Phase 1 (제거): face_expression 슬롯이 directive 에서 사라짐 → 환각 위험.
+    Phase 1' (대체): [reference_from_image2] face / expression 명시.
     """
     analysis = _make_person_analysis()
     directive = _build_matrix_directive_block(analysis, reference_role="face")
 
-    assert "[reference] face" not in directive  # 옛 [reference] 라벨 사라짐
-    assert "[preserve] face / expression" not in directive  # preserve 도 사라짐
-    assert "face / expression" not in directive
+    # 옛 [reference] 라벨 부재 (커스텀 phrasing 제거)
+    assert "[reference] face / expression" not in directive
+    assert "[preserve] face / expression" not in directive
+    # 새 [reference_from_image2] 라벨 명시
+    assert "[reference_from_image2] face / expression" in directive
+    assert "Apply image2's face / expression" in directive
 
 
-def test_unknown_free_text_role_does_NOT_remove_any_slot() -> None:
-    """자유 텍스트 role → ROLE_TO_SLOTS 매칭 X → slot removal 미적용.
+def test_unknown_free_text_role_does_NOT_replace_any_slot() -> None:
+    """자유 텍스트 role → ROLE_TO_SLOTS 매칭 X → slot replacement 미적용.
 
-    모든 슬롯이 정상적으로 directive 에 표시. 자유 텍스트는
-    reference_clause 의 fallback 으로만 처리.
+    모든 슬롯이 정상적으로 directive 에 표시 (preserve/edit 그대로).
+    자유 텍스트는 reference_clause 의 fallback 으로만 처리.
     """
     analysis = _make_person_analysis()
     directive = _build_matrix_directive_block(
@@ -258,3 +269,5 @@ def test_unknown_free_text_role_does_NOT_remove_any_slot() -> None:
     assert "attire" in directive
     assert "body / pose" in directive
     assert "background / environment" in directive
+    # [reference_from_image2] 라벨은 어디에도 없어야 (자유 텍스트는 매핑 X)
+    assert "[reference_from_image2]" not in directive
