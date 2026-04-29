@@ -54,8 +54,23 @@ export default function EditResultViewer({
   onExpand,
   onAfterIdReset,
 }: Props) {
+  // 슬라이더 정합 fix (2026-04-29): 컨테이너 비율 = After (수정본) 자연 비율.
+  //
+  // 옛 동작: 원본 (sourceWidth/Height) 비율 컨테이너 + 둘 다 contain
+  //   → ComfyUI FluxKontextImageScale 가 결과를 megapixel 정렬로 미세 리사이즈하면
+  //     After 가 letterbox 되고 인물이 컨테이너 가운데로 옮겨져 Before 와 좌표 어긋남.
+  //
+  // 새 동작: After 비율 컨테이너 + Before 만 cover (한 축 fit + 가운데 정렬)
+  //   → After 는 풀필 (자기 비율), Before 는 짧은 축 기준 fit + 긴 축 미세 잘림
+  //   → 인물/피사체가 같은 좌표계에 떨어져 슬라이더 핸들로 자연스럽게 변화 비교 가능.
+  //
+  // fallback chain: After → 원본 → 16/10 (옛 row 호환).
   const aspectRatio =
-    sourceWidth && sourceHeight ? `${sourceWidth} / ${sourceHeight}` : "16 / 10";
+    afterItem.width && afterItem.height
+      ? `${afterItem.width} / ${afterItem.height}`
+      : sourceWidth && sourceHeight
+        ? `${sourceWidth} / ${sourceHeight}`
+        : "16 / 10";
 
   // 비교 모드 — 슬라이더(기본) / 나란히. 세션 한정 (영속 X · 새로고침 시 slider 복귀).
   const [viewerMode, setViewerMode] = useState<EditViewerMode>("slider");
@@ -158,6 +173,7 @@ export default function EditResultViewer({
               compareX={compareX}
               setCompareX={setCompareX}
               aspectRatio={aspectRatio}
+              beforeFit="cover"
             />
             <div onClick={(e) => e.stopPropagation()}>
               <ResultHoverActionBar hovered={hovered}>
@@ -173,25 +189,30 @@ export default function EditResultViewer({
           aspectRatio={aspectRatio}
           hovered={hovered}
           actionBarChildren={actionBarChildren}
+          beforeFit="cover"
         />
       )}
     </div>
   );
 }
 
-/** 나란히 모드 — Before / After 두 그리드. 호버 액션바는 After 위에만. */
+/** 나란히 모드 — Before / After 두 그리드. 호버 액션바는 After 위에만.
+ *  2026-04-29: 슬라이더와 동일한 정합 fix — Before 만 cover (After 는 자기 비율 = 컨테이너 비율).
+ */
 function SideBySidePanel({
   beforeSrc,
   afterItem,
   aspectRatio,
   hovered,
   actionBarChildren,
+  beforeFit = "contain",
 }: {
   beforeSrc: string;
   afterItem: HistoryItem;
   aspectRatio: string;
   hovered: boolean;
   actionBarChildren: React.ReactNode;
+  beforeFit?: "contain" | "cover";
 }) {
   return (
     <div
@@ -202,7 +223,12 @@ function SideBySidePanel({
         maxHeight: "70vh",
       }}
     >
-      <SideThumb src={beforeSrc} label="Before" aspectRatio={aspectRatio} />
+      <SideThumb
+        src={beforeSrc}
+        label="Before"
+        aspectRatio={aspectRatio}
+        fit={beforeFit}
+      />
       <div style={{ position: "relative" }}>
         <SideThumb
           src={afterItem.imageRef}
@@ -223,10 +249,12 @@ function SideThumb({
   src,
   label,
   aspectRatio,
+  fit = "contain",
 }: {
   src: string;
   label: "Before" | "After";
   aspectRatio: string;
+  fit?: "contain" | "cover";
 }) {
   const isAfter = label === "After";
   return (
@@ -253,7 +281,8 @@ function SideThumb({
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "contain",
+          objectFit: fit,
+          objectPosition: "center",
           display: "block",
         }}
       />

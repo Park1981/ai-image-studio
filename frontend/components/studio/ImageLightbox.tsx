@@ -168,10 +168,8 @@ function LightboxInner({
       role="dialog"
       aria-modal="true"
       aria-label="이미지 뷰어"
-      onClick={(e) => {
-        // overlay 클릭은 닫기. 내부 img 클릭은 무시.
-        if (e.target === e.currentTarget) onClose();
-      }}
+      // 2026-04-29: backdrop (빈 곳) 클릭 닫힘 비활성화 — 명시적 닫기 (X 버튼) 또는 ESC 키만 닫힘.
+      // 옛 동작: overlay 클릭 시 onClose() — 슬라이더 드래그 중 실수로 빈 영역 놓치면 닫혀버리는 문제.
       onWheel={handleWheel}
       style={{
         position: "fixed",
@@ -349,6 +347,9 @@ function LightboxInner({
             afterSeed={src ?? item!.imageRef}
             aspectRatio={`${item!.width} / ${item!.height}`}
             maxHeight="90vh"
+            // 2026-04-29: Edit 메인 뷰어와 동일 정합 fix —
+            // 컨테이너 = After 비율, Before 는 cover 로 풀필 (좌우 인물 위치 일치)
+            beforeFit="cover"
           />
         </div>
       ) : (

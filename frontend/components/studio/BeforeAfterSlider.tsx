@@ -34,6 +34,13 @@ interface Props {
   /** 코너 라벨 커스터마이징 (기본 Before/After). */
   beforeLabel?: string;
   afterLabel?: string;
+  /**
+   * Before 이미지 fit 방식 (2026-04-29 슬라이더 정합 fix).
+   *  - "contain" (기본): 기존 동작 — 비율 유지하며 컨테이너 안에 내접 (letterbox 가능)
+   *  - "cover": 짧은 축 fit + 긴 축 가운데 잘림 — Before/After 비율 미세 차이 시 시각 매칭
+   * Lightbox 등 다른 호출자는 prop 안 주면 contain 유지 → 회귀 0.
+   */
+  beforeFit?: "contain" | "cover";
 }
 
 export default function BeforeAfterSlider({
@@ -46,6 +53,7 @@ export default function BeforeAfterSlider({
   maxHeight = "70vh",
   beforeLabel = "Before",
   afterLabel = "After",
+  beforeFit = "contain",
 }: Props) {
   // 비제어 fallback — 부모가 state 안 주면 내부에서 관리 (기본 50%).
   const [internalCompareX, setInternalCompareX] = useState(50);
@@ -77,8 +85,19 @@ export default function BeforeAfterSlider({
     window.addEventListener("mouseup", up);
   };
 
-  // before: data URL 이면 <img contain>, 아니면 seed 기반 ImageTile
-  const renderBefore = beforeSrc.startsWith("data:") ? (
+  // before: 실 이미지 ref (data: / blob: / http(s) / /images/) 면 <img> 직접 렌더 → beforeFit 적용
+  // 추상 placeholder seed 면 ImageTile (테스트/스토리북 케이스)
+  // 2026-04-29 수정: 옛 코드는 data: URL 만 처리 → 수정 완료 후 sourceImage 가
+  // http://localhost:8001/images/studio/edit-source/... 로 바뀌면 ImageTile 분기 → contain 고정 →
+  // beforeFit prop 무시되어 슬라이더 정합 안 됨. ImageTile.isImageRef 와 같은 조건으로 확장.
+  const beforeIsRealImage =
+    beforeSrc.startsWith("data:") ||
+    beforeSrc.startsWith("blob:") ||
+    beforeSrc.startsWith("http://") ||
+    beforeSrc.startsWith("https://") ||
+    beforeSrc.startsWith("/images/");
+
+  const renderBefore = beforeIsRealImage ? (
     // eslint-disable-next-line @next/next/no-img-element
     <img
       src={beforeSrc}
@@ -87,7 +106,9 @@ export default function BeforeAfterSlider({
       style={{
         width: "100%",
         height: "100%",
-        objectFit: "contain",
+        objectFit: beforeFit,
+        // cover 시 가운데 정렬 (대칭 잘림 — 위아래 또는 좌우)
+        objectPosition: "center",
         display: "block",
         // @ts-expect-error — 비표준 Webkit 속성
         WebkitUserDrag: "none",
