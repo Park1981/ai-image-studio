@@ -3,9 +3,110 @@
 > 누적 변경 로그 — 완료된 작업의 역사적 기록.
 > 최신 변경 + 활성 정책은 `CLAUDE.md` 참조. 자세한 작업 내역은 git log + memory.
 
-## 2026-04-29
+## 2026-04-30
 
-### Prompt Flow 도움말 페이지 redesign + Launcher 후속 (current master)
+### Edit Reference Library v9 — UI 통합 + 사후 저장 + 임시 풀 cascade cleanup (current master)
+
+**master HEAD**: `358783b` (push 완료)
+**검증**: backend pytest **349 PASS** · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
+
+#### 기획 의도 (사용자 명시 3가지만 — NOT IN SCOPE 박스 0건 침범)
+
+1. **UI 통합**: 참조 이미지 박스 + 사용 영역 crop UI → 단일 박스 (`ReferenceImageBox`)
+2. **사후 저장**: 라이브러리 저장 시점 *생성 전 토글* → *결과 ActionBar `📚` 버튼 + 모달*
+3. **임시 풀 cascade cleanup**: 디스크 임시 풀 + history cascade unlink + 설정 Drawer 수동 GC
+
+#### Codex iterative review 흐름
+
+- **1차 리뷰**: Critical 7 / Important 14 / Minor 4 (총 25 항목)
+- **2차 검증**: self-review 25/25 ✅ (mechanical grep)
+- 식별자 mismatch (예: `studio_history`/`_DB_PATH`/`insert_item`/`delete_item_with_refs`)
+  + ReferenceImageBox 의 옛 EditReferenceCrop 흡수 + race double-check + DB rollback +
+  vision 실패 silent + types 주석 갱신 등 모두 반영
+
+#### Phase 별 commit (5개)
+
+1. `c7daa4c` — plan 문서 (Codex iterative review 반영본)
+2. `4a32ee3` — Phase A backend (5 NEW + 4 modified · pytest 56 신규 · OpenAPI snapshot 갱신)
+3. `d08faba` — Phase B UI 통합 (ReferenceImageBox 신규 + 옛 saveAsTemplate/templateName 제거 + EditReferenceCrop 삭제)
+4. `2a94516` — Phase C 사후 저장 (PromoteModal + ActionBar 버튼 + updateReferenceRef store action)
+5. `ae38b80` — Phase D 설정 Drawer (ReferencePoolSection + reference-pool API client)
+6. `358783b` — master `--no-ff` merge
+
+#### 최종 동선 변경
+
+| 항목 | 옛 (v8) | 새 (v9) |
+|---|---|---|
+| 참조 이미지 박스 | SourceImageCard + 별도 EditReferenceCrop | ReferenceImageBox 단일 (드롭존↔crop↔bypass 3 모드) |
+| 라이브러리 저장 시점 | "수정 생성" *전* `saveAsTemplate` Toggle | "수정 생성" *후* ActionBar `📚` → 모달 |
+| `studio_history.reference_ref` (직접 업로드) | NULL | 임시 풀 URL (promote 후 영구 URL swap) |
+| 단건/전체 history 삭제 | 영구 라이브러리 ref 만 cascade | + 임시 풀 ref cascade unlink (호출자 영향 0) |
+| 수동 cleanup | 없음 | 설정 Drawer 의 "고아 ref 일괄 삭제" 버튼 |
+| `EditReferenceCrop.tsx` | 별도 컴포넌트 | **삭제** (ReferenceImageBox 흡수) |
+
+#### 신규 / 변경 / 삭제 (28 파일)
+
+**Backend NEW** (7 파일):
+- `studio/reference_pool.py` — POOL_URL_PREFIX trailing slash + pool_path_from_url 헬퍼 + PNG 통일
+- `studio/routes/reference_pool.py` — GET stats / GET orphans / DELETE orphans (race double-check)
+- `tests/studio/test_reference_pool_storage.py` (22)
+- `tests/studio/test_history_db_cascade.py` (13)
+- `tests/studio/test_edit_pipeline_pool_save.py` (3)
+- `tests/studio/test_reference_pool_routes.py` (6)
+- `tests/studio/test_reference_promote_route.py` (12)
+
+**Backend Modified** (5 파일):
+- `studio/history_db.py` — cascade + count_pool_refs / list_history_pool_refs
+- `studio/routes/__init__.py` — reference_pool 라우터 등록
+- `studio/routes/reference_templates.py` — POST /promote/{history_id} (history.referenceRef swap + DB rollback + visionFailed)
+- `studio/routes/streams.py` — multipart 후 save_to_pool() 분기
+- `tests/_snapshots/openapi.json` — 신규 endpoint 반영
+
+**Frontend NEW** (3 파일):
+- `components/studio/edit/ReferenceImageBox.tsx` — 옛 EditReferenceCrop + SourceImageCard 흡수
+- `components/studio/edit/ReferencePromoteModal.tsx` — 사후 저장 모달
+- `lib/api/reference-pool.ts` — getPoolStats / getPoolOrphans / deletePoolOrphans
+
+**Frontend Modified** (8 파일):
+- `stores/useEditStore.ts` — saveAsTemplate / templateName 4 항목 제거
+- `stores/useHistoryStore.ts` — `updateReferenceRef` action 추가
+- `components/studio/edit/EditLeftPanel.tsx` — ReferenceImageBox 1개로 교체
+- `components/studio/edit/EditResultViewer.tsx` — `📚` ActionBar 버튼 + canPromote 판정
+- `hooks/useEditPipeline.ts` — 옛 자동 promote 호출 제거
+- `lib/api/reference-templates.ts` — `promoteFromHistory()` 추가
+- `lib/api/types.ts` — `HistoryItem.referenceRef` 주석 v9 갱신
+- `__tests__/edit-library-store.test.ts` — saveAsTemplate / templateName 검증 부분 제거
+- `components/settings/SettingsDrawer.tsx` — `ReferencePoolSection` 추가
+
+**Frontend Deleted** (1 파일):
+- `components/studio/EditReferenceCrop.tsx` (ReferenceImageBox 흡수)
+
+**OpenAPI 자동 동기** (2 파일):
+- `frontend/lib/api/openapi.json` (29 paths · 13 schemas)
+- `frontend/lib/api/generated.ts`
+
+#### NOT IN SCOPE (사용자 명시 — 침범 0건)
+
+❌ image1 crop / InstantID / Multi-ref slot 알고리즘 / 라이브러리 검색·태그·정렬 /
+   자동 시간 기반 GC / vision 자동 호출 / Drawer 임시 풀 노출 / Generate-Video 라이브러리 도입 /
+   키보드 단축키 / 라이브러리 동기·공유
+
+#### 핵심 정책 박제
+
+- **POOL_URL_PREFIX trailing slash**: `/images/studio/reference-pool/` (collision 방어 — Codex C6)
+- **pool_path_from_url() 공용 헬퍼**: 모든 path 검증 한 곳으로 통일
+- **promote response shape**: `{ template: { id, name, imageRef, visionDescription, roleDefault, ... }, visionFailed }`
+- **canPromote 판정**: `history.referenceRef.includes("/images/studio/reference-pool/")` (절대 URL 화 후에도 매칭)
+- **promote 성공 → swap**: 백엔드가 `studio_history.reference_ref` 를 영구 URL 로 update + frontend `updateReferenceRef` store sync → ActionBar 의 `📚` 자동 사라짐 (중복 promote 방지)
+- **race condition**: orphan delete 시 history snapshot double-check (Codex I4)
+
+#### 사용자 검사 결과
+
+✅ 모든 동선 정상 (실 환경 통합 시나리오 8건 + Lightbox compare 회귀 검증)
+
+---
+
+### Prompt Flow 도움말 페이지 redesign + Launcher 후속 (옛 master)
 
 **master HEAD**: `bbab39f` (push 완료)
 **검증**: tsc / ESLint clean · vitest **91/91** (회귀 0)
