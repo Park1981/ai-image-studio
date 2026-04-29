@@ -1,6 +1,8 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import Link from "next/link";
+import Icon from "@/components/ui/Icon";
 
 /**
  * 반응형 정책 (P0-1 · 2026-04-26):
@@ -90,45 +92,87 @@ export function StudioLeftPanel({
 export function StudioModeHeader({
   title,
   description,
+  flowHref,
+  flowLabel = "프롬프트 흐름 보기",
 }: {
   title: string;
   description: string;
+  /** /prompt-flow/{mode} 같은 흐름 가이드 링크. 있으면 우측에 동그란 아이콘 버튼 렌더. */
+  flowHref?: string;
+  /** 동그란 버튼 hover/aria 라벨 텍스트. */
+  flowLabel?: string;
 }) {
   return (
     <div
       style={{
         display: "flex",
-        flexDirection: "column",
-        gap: 4,
+        alignItems: "flex-start",
+        justifyContent: "space-between",
+        gap: 12,
         padding: "2px 0 4px",
       }}
     >
-      <h1
-        className="display"
+      <div
         style={{
-          margin: 0,
-          fontSize: 21,
-          fontWeight: 650,
-          color: "var(--ink)",
-          letterSpacing: 0,
-          lineHeight: 1.05,
-          fontVariationSettings: '"opsz" 72, "SOFT" 42, "WONK" 0',
+          display: "flex",
+          flexDirection: "column",
+          gap: 4,
+          minWidth: 0,
+          flex: 1,
         }}
       >
-        {title}
-      </h1>
-      <p
-        style={{
-          margin: 0,
-          fontSize: 12,
-          fontWeight: 500,
-          color: "var(--ink-3)",
-          lineHeight: 1.45,
-          letterSpacing: 0,
-        }}
-      >
-        {description}
-      </p>
+        <h1
+          className="display"
+          style={{
+            margin: 0,
+            fontSize: 21,
+            fontWeight: 650,
+            color: "var(--ink)",
+            letterSpacing: 0,
+            lineHeight: 1.05,
+            fontVariationSettings: '"opsz" 72, "SOFT" 42, "WONK" 0',
+          }}
+        >
+          {title}
+        </h1>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            fontWeight: 500,
+            color: "var(--ink-3)",
+            lineHeight: 1.45,
+            letterSpacing: 0,
+          }}
+        >
+          {description}
+        </p>
+      </div>
+      {flowHref && (
+        <Link
+          href={flowHref}
+          title={flowLabel}
+          aria-label={flowLabel}
+          style={{
+            flexShrink: 0,
+            width: 34,
+            height: 34,
+            borderRadius: "50%",
+            border: "1px solid var(--line)",
+            background: "var(--surface)",
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            color: "var(--ink-2)",
+            textDecoration: "none",
+            transition: "all 0.15s ease",
+            marginTop: 2,
+          }}
+          className="ais-flow-link-btn"
+        >
+          <Icon name="grid" size={15} />
+        </Link>
+      )}
     </div>
   );
 }
