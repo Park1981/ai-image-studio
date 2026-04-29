@@ -189,25 +189,30 @@ export default function EditResultViewer({
           aspectRatio={aspectRatio}
           hovered={hovered}
           actionBarChildren={actionBarChildren}
+          beforeFit="cover"
         />
       )}
     </div>
   );
 }
 
-/** 나란히 모드 — Before / After 두 그리드. 호버 액션바는 After 위에만. */
+/** 나란히 모드 — Before / After 두 그리드. 호버 액션바는 After 위에만.
+ *  2026-04-29: 슬라이더와 동일한 정합 fix — Before 만 cover (After 는 자기 비율 = 컨테이너 비율).
+ */
 function SideBySidePanel({
   beforeSrc,
   afterItem,
   aspectRatio,
   hovered,
   actionBarChildren,
+  beforeFit = "contain",
 }: {
   beforeSrc: string;
   afterItem: HistoryItem;
   aspectRatio: string;
   hovered: boolean;
   actionBarChildren: React.ReactNode;
+  beforeFit?: "contain" | "cover";
 }) {
   return (
     <div
@@ -218,7 +223,12 @@ function SideBySidePanel({
         maxHeight: "70vh",
       }}
     >
-      <SideThumb src={beforeSrc} label="Before" aspectRatio={aspectRatio} />
+      <SideThumb
+        src={beforeSrc}
+        label="Before"
+        aspectRatio={aspectRatio}
+        fit={beforeFit}
+      />
       <div style={{ position: "relative" }}>
         <SideThumb
           src={afterItem.imageRef}
@@ -239,10 +249,12 @@ function SideThumb({
   src,
   label,
   aspectRatio,
+  fit = "contain",
 }: {
   src: string;
   label: "Before" | "After";
   aspectRatio: string;
+  fit?: "contain" | "cover";
 }) {
   const isAfter = label === "After";
   return (
@@ -269,7 +281,8 @@ function SideThumb({
         style={{
           width: "100%",
           height: "100%",
-          objectFit: "contain",
+          objectFit: fit,
+          objectPosition: "center",
           display: "block",
         }}
       />
