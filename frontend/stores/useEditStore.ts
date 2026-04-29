@@ -65,13 +65,10 @@ export interface EditState {
    */
   referenceCropArea: CropArea | null;
 
-  /* ── 라이브러리 plan v8 (2026-04-28) ──
-   * saveAsTemplate / templateName: 새 reference 업로드 시 라이브러리에 저장 토글.
-   * pickedTemplateId / pickedTemplateRef: 라이브러리에서 픽한 경우만 set
-   *   (Codex 2차 리뷰 fix #5 — DB 영구 URL 보관 + 픽/저장 둘 다 null 또는 둘 다 set).
+  /* ── 라이브러리 plan v9 (2026-04-29 · Phase B.2) ──
+   * 옛 v8 의 saveAsTemplate / templateName *제거* — 사후 저장으로 이전 (모달 입력).
+   * pickedTemplateId / pickedTemplateRef: 라이브러리에서 픽한 경우만 set (그대로 유지).
    * 새 업로드/해제 시 picked 두 값 자동 null. */
-  saveAsTemplate: boolean;
-  templateName: string;
   pickedTemplateId: string | null;
   pickedTemplateRef: string | null;
 
@@ -119,9 +116,7 @@ export interface EditState {
   setReferenceRoleCustom: (text: string) => void;
   /** Phase 1 (2026-04-28): crop 영역 직접 설정. EditReferenceCrop 의 onAreaChange 가 호출. */
   setReferenceCropArea: (area: CropArea | null) => void;
-  /* 라이브러리 plan v8 setters */
-  setSaveAsTemplate: (v: boolean) => void;
-  setTemplateName: (v: string) => void;
+  /* 라이브러리 plan v9 setters (옛 saveAsTemplate / templateName 제거 · Phase B.2) */
   setPickedTemplateId: (id: string | null) => void;
   setPickedTemplateRef: (ref: string | null) => void;
   setPrompt: (v: string) => void;
@@ -157,9 +152,7 @@ export const useEditStore = create<EditState>((set) => ({
   referenceRole: "face",
   referenceRoleCustom: "",
   referenceCropArea: null,
-  // 라이브러리 plan v8 (2026-04-28) — 기본값 모두 비활성/비픽 상태.
-  saveAsTemplate: false,
-  templateName: "",
+  // 라이브러리 plan v9 (2026-04-29 · Phase B.2) — 픽 상태만 유지, save 토글 제거.
   pickedTemplateId: null,
   pickedTemplateRef: null,
 
@@ -203,8 +196,6 @@ export const useEditStore = create<EditState>((set) => ({
   setReferenceRole: (role) => set({ referenceRole: role }),
   setReferenceRoleCustom: (text) => set({ referenceRoleCustom: text }),
   setReferenceCropArea: (area) => set({ referenceCropArea: area }),
-  setSaveAsTemplate: (v) => set({ saveAsTemplate: v }),
-  setTemplateName: (v) => set({ templateName: v }),
   setPickedTemplateId: (id) => set({ pickedTemplateId: id }),
   setPickedTemplateRef: (ref) => set({ pickedTemplateRef: ref }),
   setPrompt: (v) => set({ prompt: v }),
@@ -281,13 +272,9 @@ export const useEditInputs = () =>
       setReferenceRole: s.setReferenceRole,
       setReferenceRoleCustom: s.setReferenceRoleCustom,
       setReferenceCropArea: s.setReferenceCropArea,
-      // 라이브러리 plan v8
-      saveAsTemplate: s.saveAsTemplate,
-      templateName: s.templateName,
+      // 라이브러리 plan v9 (옛 saveAsTemplate / templateName 제거)
       pickedTemplateId: s.pickedTemplateId,
       pickedTemplateRef: s.pickedTemplateRef,
-      setSaveAsTemplate: s.setSaveAsTemplate,
-      setTemplateName: s.setTemplateName,
       setPickedTemplateId: s.setPickedTemplateId,
       setPickedTemplateRef: s.setPickedTemplateRef,
     })),

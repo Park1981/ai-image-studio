@@ -1,9 +1,12 @@
 /**
- * useEditStore — v8 라이브러리 plan 통합 회귀 (Codex Phase B+C 리뷰 fix #10).
+ * useEditStore — v9 라이브러리 plan 통합 회귀 (Phase B.5).
+ *
+ * v9 변경: 옛 saveAsTemplate / templateName / 2 setters 제거 — 사후 저장 ActionBar 로 이전.
+ * picked 흐름은 그대로 유지.
  *
  * 검증 시나리오:
- *  - saveAsTemplate / templateName / pickedTemplateId / pickedTemplateRef 기본값
- *  - setter 4개 동작
+ *  - pickedTemplateId / pickedTemplateRef 기본값
+ *  - setter 동작 (picked 만)
  *  - reset 트리거: 라이브러리 픽 후 새 업로드 → picked 두 값 자동 null
  *  - 라이브러리 픽 시퀀스: setReferenceImage → setPicked... 순서로 호출 시 picked 보존
  *  - reference image 해제 → picked 두 값 자동 null
@@ -23,7 +26,7 @@ afterEach(() => {
 });
 
 beforeEach(() => {
-  // 매 테스트 전 라이브러리 관련 상태 초기화
+  // 매 테스트 전 라이브러리 관련 상태 초기화 (v9 — saveAsTemplate / templateName 제거)
   useEditStore.setState({
     useReferenceImage: false,
     referenceImage: null,
@@ -31,31 +34,23 @@ beforeEach(() => {
     referenceWidth: null,
     referenceHeight: null,
     referenceCropArea: null,
-    saveAsTemplate: false,
-    templateName: "",
     pickedTemplateId: null,
     pickedTemplateRef: null,
   });
 });
 
-describe("useEditStore - 라이브러리 plan v8 필드", () => {
-  it("기본값: 모두 비활성/null", () => {
+describe("useEditStore - 라이브러리 plan v9 필드", () => {
+  it("기본값: picked 두 값 모두 null", () => {
     const s = useEditStore.getState();
-    expect(s.saveAsTemplate).toBe(false);
-    expect(s.templateName).toBe("");
     expect(s.pickedTemplateId).toBeNull();
     expect(s.pickedTemplateRef).toBeNull();
   });
 
-  it("setSaveAsTemplate / setTemplateName / setPickedTemplateId / setPickedTemplateRef setter 동작", () => {
+  it("setPickedTemplateId / setPickedTemplateRef setter 동작", () => {
     const s = useEditStore.getState();
-    s.setSaveAsTemplate(true);
-    s.setTemplateName("검정 드레스");
     s.setPickedTemplateId("tpl-abc");
     s.setPickedTemplateRef("/images/studio/reference-templates/x.png");
     const after = useEditStore.getState();
-    expect(after.saveAsTemplate).toBe(true);
-    expect(after.templateName).toBe("검정 드레스");
     expect(after.pickedTemplateId).toBe("tpl-abc");
     expect(after.pickedTemplateRef).toBe(
       "/images/studio/reference-templates/x.png",
@@ -73,7 +68,6 @@ describe("useEditStore - 라이브러리 plan v8 필드", () => {
     );
     s.setPickedTemplateId("tpl-abc");
     s.setPickedTemplateRef("/images/studio/reference-templates/abc.png");
-    s.setSaveAsTemplate(false);
 
     const after = useEditStore.getState();
     expect(after.pickedTemplateId).toBe("tpl-abc");
