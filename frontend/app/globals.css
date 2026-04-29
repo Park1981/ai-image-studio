@@ -329,6 +329,16 @@ button {
   z-index: 20;
   background: linear-gradient(to top, transparent, var(--bg) 25%);
 }
+/* StudioModeHeader 우측 동그란 흐름 가이드 링크 — generate/edit/video 공용 */
+.ais-flow-link-btn:hover {
+  border-color: var(--accent-ink) !important;
+  color: var(--accent-ink) !important;
+  background: var(--bg-2) !important;
+  transform: scale(1.05);
+}
+.ais-flow-link-btn:active {
+  transform: scale(0.95);
+}
 .ais-cta-primary {
   all: unset;
   cursor: pointer;

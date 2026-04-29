@@ -67,6 +67,8 @@ export default function GenerateLeftPanel({
       <StudioModeHeader
         title="Image Generate"
         description="프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다."
+        flowHref="/prompt-flow/generate"
+        flowLabel="이 모드의 프롬프트 흐름 보기 (분기 트리)"
       />
 
       {/* Primary CTA — sticky 상단 (폼 길어지면 따라옴 · generate 전용 클래스) */}

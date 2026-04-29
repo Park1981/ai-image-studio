@@ -111,6 +111,8 @@ export default function EditLeftPanel({
       <StudioModeHeader
         title="Image Edit"
         description="원본 이미지와 수정 지시로 새로운 결과 이미지를 만듭니다."
+        flowHref="/prompt-flow#edit-flow"
+        flowLabel="이미지 수정 프롬프트 흐름 보기"
       />
 
       {/* Primary CTA — sticky 상단 (Generate 와 통일 · 폼 길어져도 시야 안) */}

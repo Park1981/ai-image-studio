@@ -1,0 +1,1184 @@
+/* /prompt-flow/generate — 생성 모드 분기 트리 페이지
+ * 왼쪽: 단계 트리 (A~G), 우측: 단계별 디테일 카드 (system prompt 포함).
+ */
+
+.page {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 28px 32px 64px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.crumbBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.crumbBar a {
+  color: var(--ink-2);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.crumbBar a:hover {
+  color: var(--ink);
+}
+
+.crumbCurrent {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 6px 0 4px;
+}
+
+.kicker {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: 32px;
+  font-weight: 720;
+  color: var(--ink);
+  line-height: 1.1;
+}
+
+.hero p {
+  margin: 0;
+  color: var(--ink-2);
+  line-height: 1.7;
+  max-width: 760px;
+}
+
+/* ────── 토글 컨트롤 (분기 활성화) ────── */
+
+.toggleBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+.toggleLabel {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-right: 8px;
+  align-self: center;
+  font-weight: 600;
+}
+
+.toggleBtn {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 7px 12px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toggleBtn:hover {
+  border-color: var(--accent-ink);
+  color: var(--ink);
+}
+
+.toggleBtn.active {
+  background: var(--accent-ink);
+  color: #fff;
+  border-color: var(--accent-ink);
+}
+
+.toggleBtn .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+/* ────── 트리 컨테이너 ────── */
+
+.treeWrap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.section {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 22px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  position: relative;
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.section.dimmed {
+  opacity: 0.45;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bigIndex {
+  font-size: 28px;
+  font-weight: 720;
+  color: var(--accent-ink);
+  letter-spacing: 0.02em;
+  min-width: 38px;
+}
+
+.sectionTitle {
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+
+.sectionSub {
+  font-size: 13px;
+  color: var(--ink-3);
+  margin-left: auto;
+}
+
+/* 자식 분기 (A-1, A-2 ...) */
+
+.branchList {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.branch {
+  display: grid;
+  grid-template-columns: 56px 1fr;
+  gap: 14px;
+  padding: 14px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 12px;
+  transition: all 0.18s ease;
+  position: relative;
+}
+
+.branch.active {
+  border-left-color: var(--accent-ink);
+  background: var(--surface);
+}
+
+.branch.warn {
+  border-left-color: #d97706;
+}
+
+.branch.warn.active {
+  background: rgba(217, 119, 6, 0.05);
+}
+
+.branch.skip {
+  opacity: 0.6;
+}
+
+.branchIndex {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+  padding-top: 2px;
+}
+
+.branch.active .branchIndex {
+  color: var(--accent-ink);
+}
+
+.branchBody {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.branchTitle {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.branchDesc {
+  font-size: 13px;
+  color: var(--ink-2);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.branchTag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(31, 31, 31, 0.06);
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+  width: fit-content;
+}
+
+.branchTag.warnTag {
+  background: rgba(217, 119, 6, 0.12);
+  color: #b45309;
+}
+
+.branchTag.activeTag {
+  background: var(--accent-ink);
+  color: #fff;
+}
+
+/* 코드 블록 (system prompt 발췌) */
+
+.codeBlock {
+  background: #1e1e1e;
+  color: #e2e2e2;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", monospace;
+  font-size: 12px;
+  line-height: 1.65;
+  padding: 14px 16px;
+  border-radius: 10px;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin: 6px 0 0;
+}
+
+.codeLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-top: 4px;
+}
+
+.codeBlock .hl {
+  color: #f9d27a;
+  font-weight: 600;
+}
+
+.codeBlock .hlPink {
+  color: #f4a6c7;
+  font-weight: 600;
+}
+
+.codeBlock .hlBlue {
+  color: #8ecae6;
+  font-weight: 600;
+}
+
+/* 예시 변환 카드 */
+
+.exampleRow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 12px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.exampleBox {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.exampleBox .lbl {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.exampleBox .txt {
+  font-size: 13px;
+  color: var(--ink);
+  line-height: 1.55;
+  word-break: break-word;
+}
+
+.exampleArrow {
+  color: var(--ink-3);
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 파라미터 칩 (Lightning steps/cfg 등) */
+
+.paramRow {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 4px;
+}
+
+.paramChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  color: var(--ink-2);
+}
+
+.paramChip strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+/* 마지막 G 단계 (결과) 강조 */
+
+.section.final {
+  background: linear-gradient(
+    180deg,
+    var(--surface) 0%,
+    rgba(46, 93, 255, 0.04) 100%
+  );
+  border-color: var(--accent-ink);
+}
+
+/* 화살표 (단계 사이) */
+
+.flowArrow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 24px;
+  color: var(--ink-3);
+}
+
+@media (max-width: 760px) {
+  .page {
+    padding: 20px 16px 48px;
+  }
+
+  .branch {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .exampleRow {
+    grid-template-columns: 1fr;
+  }
+
+  .exampleArrow {
+    transform: rotate(90deg);
+  }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * 인포그래픽 — 프롬프트 변환 체인 (세로 흐름)
+ * ═══════════════════════════════════════════════════════ */
+
+.infographic {
+  background: linear-gradient(
+    180deg,
+    var(--surface) 0%,
+    var(--bg-2) 100%
+  );
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 28px 24px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.infographic h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+
+.infographicSub {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.flowChain {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  max-width: 660px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+/* 프롬프트 박스 — 단계별 텍스트 상태 */
+.promptBox {
+  width: 100%;
+  background: #ffffff;
+  border: 1.5px solid var(--accent-ink);
+  border-radius: 14px;
+  padding: 14px 18px;
+  box-shadow: 0 4px 14px rgba(46, 93, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  position: relative;
+  transition: all 0.25s ease;
+}
+
+.promptBox.dashed {
+  border-style: dashed;
+  background: rgba(255, 255, 255, 0.6);
+  box-shadow: none;
+}
+
+.promptBox.dim {
+  opacity: 0.35;
+  border-color: var(--line);
+}
+
+.promptBox.final {
+  background: linear-gradient(
+    135deg,
+    #ffffff 0%,
+    rgba(46, 93, 255, 0.06) 100%
+  );
+  border-width: 2px;
+}
+
+.promptBoxLabel {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.promptBoxText {
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", monospace;
+  font-size: 12.5px;
+  color: var(--ink);
+  line-height: 1.6;
+  word-break: break-word;
+  white-space: pre-wrap;
+  margin: 0;
+}
+
+.promptBoxText.korean {
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.promptBoxBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: rgba(46, 93, 255, 0.1);
+  color: var(--accent-ink);
+  letter-spacing: 0.04em;
+  margin-left: auto;
+}
+
+/* 단계 라벨 + 화살표 */
+.flowStep {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 0;
+  position: relative;
+  transition: opacity 0.2s ease;
+}
+
+.flowStep.muted {
+  opacity: 0.35;
+}
+
+.flowStepLine {
+  width: 2px;
+  height: 18px;
+  background: var(--accent-ink);
+  border-radius: 2px;
+}
+
+.flowStep.muted .flowStepLine {
+  background: var(--line);
+  background-image: repeating-linear-gradient(
+    180deg,
+    var(--ink-3) 0,
+    var(--ink-3) 3px,
+    transparent 3px,
+    transparent 6px
+  );
+}
+
+.flowStepLabel {
+  font-size: 11.5px;
+  font-style: italic;
+  color: var(--ink-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  margin: 4px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.flowStep.active .flowStepLabel {
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  font-style: normal;
+  font-weight: 600;
+}
+
+.flowStepArrow {
+  color: var(--accent-ink);
+  font-size: 14px;
+  margin-top: 2px;
+}
+
+.flowStep.muted .flowStepArrow {
+  color: var(--ink-3);
+}
+
+/* 결과 박스 (이미지 자리) */
+.resultBox {
+  width: 100%;
+  background: linear-gradient(
+    135deg,
+    rgba(46, 93, 255, 0.08) 0%,
+    rgba(46, 93, 255, 0.02) 100%
+  );
+  border: 2px solid var(--accent-ink);
+  border-radius: 14px;
+  padding: 22px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.resultEmoji {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.resultLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+
+.resultMeta {
+  font-size: 11.5px;
+  color: var(--ink-3);
+}
+
+/* ═══════════════════════════════════════════════════════
+ * Circular Branch Diagram (사용자 요청 인포그래픽 스타일)
+ * 가운데 결과 원 + 외곽 6개 단계 노드 + 점선 곡선 + 분기 미니 노드
+ * ═══════════════════════════════════════════════════════ */
+
+.diagramSection {
+  background: linear-gradient(180deg, #fafbff 0%, #f0f2fb 100%);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 24px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+}
+
+.diagramSection h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: center;
+}
+
+.diagramSection > p {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--ink-3);
+  text-align: center;
+  max-width: 540px;
+}
+
+.diagramWrap {
+  position: relative;
+  width: 100%;
+  max-width: 920px;
+  aspect-ratio: 920 / 720;
+  margin: 0 auto;
+}
+
+.diagramSvg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  overflow: visible;
+}
+
+/* 외곽 노드 — absolute 배치 */
+.diagramNode {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 점선 외곽 링 */
+.nodeRing {
+  position: absolute;
+  inset: -8px;
+  border: 2px dashed currentColor;
+  border-radius: 50%;
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+/* 흰 원 카드 */
+.nodeCard {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid currentColor;
+  box-shadow: 0 6px 20px rgba(31, 31, 31, 0.06);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 14px 18px;
+  text-align: center;
+  position: relative;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.nodeCard:hover {
+  transform: scale(1.05);
+  box-shadow: 0 10px 28px rgba(31, 31, 31, 0.12);
+}
+
+.nodeNumber {
+  font-size: 22px;
+  font-weight: 720;
+  color: currentColor;
+  line-height: 1;
+  letter-spacing: 0.02em;
+}
+
+.nodeLabel {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: currentColor;
+  color: #ffffff !important;
+  padding: 3px 10px;
+  border-radius: 4px;
+  margin: 6px 0 4px;
+}
+
+.nodeDesc {
+  font-size: 11px;
+  color: var(--ink-2);
+  line-height: 1.4;
+  margin: 0;
+  max-width: 130px;
+}
+
+/* 노드 색상 */
+.nodeColorA { color: #7f5af0; }
+.nodeColorB { color: #2cb67d; }
+.nodeColorC { color: #f5a623; }
+.nodeColorD { color: #1f1f1f; }
+.nodeColorF { color: #06b6d4; }
+.nodeColorG { color: #3b82f6; }
+
+/* 가운데 결과 원 */
+.diagramCenter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 2px solid var(--ink-3);
+  box-shadow: 0 8px 24px rgba(31, 31, 31, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 20px;
+  z-index: 2;
+}
+
+.diagramCenter .centerEmoji {
+  font-size: 38px;
+  line-height: 1;
+}
+
+.diagramCenter .centerTitle {
+  font-size: 18px;
+  font-weight: 720;
+  color: var(--ink);
+  margin: 6px 0 2px;
+  letter-spacing: -0.01em;
+}
+
+.diagramCenter .centerSub {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin: 0;
+  line-height: 1.45;
+}
+
+.centerDots {
+  display: flex;
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.centerDots span {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* E (seed) — D 노드 안 작은 pill */
+.subPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 9.5px;
+  font-weight: 700;
+  background: #ffffff;
+  color: currentColor;
+  border: 1.5px solid currentColor;
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+  letter-spacing: 0.03em;
+}
+
+/* 분기 미니 노드 (B 옆 ON/OFF, F 옆 3갈래) */
+.branchMini {
+  position: absolute;
+  background: #ffffff;
+  border: 2px solid currentColor;
+  border-radius: 999px;
+  padding: 4px 11px;
+  font-size: 11px;
+  font-weight: 700;
+  color: currentColor;
+  white-space: nowrap;
+  z-index: 3;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transform: translate(-50%, -50%);
+}
+
+.branchMini.dim {
+  opacity: 0.32;
+  border-style: dashed;
+}
+
+.branchMini .miniDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+/* 모바일 폴백 */
+@media (max-width: 760px) {
+  .diagramWrap {
+    aspect-ratio: 1;
+    max-width: 480px;
+  }
+  .diagramNode {
+    width: 130px;
+    height: 130px;
+  }
+  .nodeNumber { font-size: 18px; }
+  .nodeDesc { font-size: 10px; max-width: 100px; }
+  .diagramCenter {
+    width: 150px;
+    height: 150px;
+  }
+  .diagramCenter .centerTitle { font-size: 14px; }
+}
+
+/* ═══════════════════════════════════════════════════════
+ * UML Use Case 스타일 다이어그램
+ * 메인 흐름 (가로 시퀀스) + 위/아래 <<extend>> 분기
+ * + 시스템 프롬프트 라벨 + 외부 액터
+ * ═══════════════════════════════════════════════════════ */
+
+.ucBoundary {
+  width: 100%;
+  background: #ffffff;
+  border: 2px solid var(--ink-3);
+  border-radius: 12px;
+  padding: 32px 24px 28px;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ucBoundaryLabel {
+  position: absolute;
+  top: -1px;
+  left: 16px;
+  background: #ffffff;
+  border: 2px solid var(--ink-3);
+  border-bottom: none;
+  border-radius: 6px 6px 0 0;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink-2);
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", monospace;
+  transform: translateY(-100%);
+}
+
+.ucTitle {
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0 0 14px;
+  letter-spacing: 0.04em;
+}
+
+.ucDiagramWrap {
+  position: relative;
+  width: 100%;
+  min-height: 580px;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 18px;
+  padding: 8px;
+}
+
+/* SVG overlay (extend 점선 화살표) */
+.ucSvgOverlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 1;
+  overflow: visible;
+}
+
+/* Extend 분기 행 (위/아래) */
+.ucExtendRow {
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-start;
+  gap: 14px;
+  flex-wrap: wrap;
+  position: relative;
+  z-index: 2;
+}
+
+.ucExtendNode {
+  width: 150px;
+  min-height: 96px;
+  background: #ffffff;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  padding: 14px 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.ucExtendNode.dim {
+  opacity: 0.32;
+  border-style: dashed;
+}
+
+.ucExtendNode.active {
+  border-width: 2.5px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+}
+
+.ucExtendIcon {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.ucExtendLabel {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink);
+  line-height: 1.3;
+  margin-top: 5px;
+}
+
+.ucExtendCondition {
+  font-size: 10.5px;
+  color: var(--ink-3);
+  font-style: italic;
+  margin-top: 3px;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", monospace;
+}
+
+/* extend 라벨 (<<extend>> 텍스트) — 분기 위에 부유 */
+.ucExtendTagBadge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #ffffff;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  color: currentColor;
+  padding: 2px 7px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", monospace;
+}
+
+/* 시스템 프롬프트 코드박스 라벨 */
+.ucSysPrompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  font-weight: 700;
+  font-family: ui-monospace, SFMono-Regular, "JetBrains Mono", monospace;
+  background: #1e1e1e;
+  color: #f9d27a;
+  padding: 2px 7px;
+  border-radius: 3px;
+  margin-top: 6px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* 메인 시퀀스 행 — 큰 노드 가로 정렬 */
+.ucMainRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  position: relative;
+  z-index: 2;
+  padding: 12px 0;
+}
+
+.ucMainNode {
+  flex: 1;
+  min-width: 130px;
+  max-width: 180px;
+  aspect-ratio: 1.4 / 1;
+  background: #ffffff;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  position: relative;
+  box-shadow: 0 4px 14px rgba(31, 31, 31, 0.06);
+  transition: transform 0.2s ease;
+}
+
+.ucMainNode:hover {
+  transform: scale(1.04);
+}
+
+.ucMainNumber {
+  font-size: 18px;
+  font-weight: 720;
+  color: currentColor;
+  line-height: 1;
+}
+
+.ucMainLabel {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 5px 0 2px;
+}
+
+.ucMainDesc {
+  font-size: 10.5px;
+  color: var(--ink-2);
+  line-height: 1.35;
+  margin: 0;
+}
+
+.ucMainEmoji {
+  font-size: 28px;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+/* 메인 화살표 (실선 두꺼운) */
+.ucMainArrow {
+  flex: 0 0 auto;
+  font-size: 22px;
+  color: var(--ink-2);
+  font-weight: 700;
+}
+
+/* 액터 행 (외부) */
+.ucActorRow {
+  display: flex;
+  justify-content: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  position: relative;
+  z-index: 2;
+}
+
+.ucActor {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 11px;
+}
+
+.ucActorEmoji {
+  font-size: 14px;
+}
+
+.ucActorRoleLabel {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-3);
+  margin-right: 8px;
+  align-self: center;
+}
+
+/* 노드 색상 */
+.ucColorPurple { color: #7f5af0; }
+.ucColorGreen  { color: #2cb67d; }
+.ucColorAmber  { color: #f5a623; }
+.ucColorInk    { color: #1f1f1f; }
+.ucColorCyan   { color: #06b6d4; }
+.ucColorBlue   { color: #3b82f6; }
+.ucColorRose   { color: #ef476f; }
+
+/* 모바일 */
+@media (max-width: 900px) {
+  .ucMainRow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .ucMainNode {
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: auto;
+    min-height: 100px;
+  }
+  .ucMainArrow {
+    transform: rotate(90deg);
+    align-self: center;
+  }
+  .ucExtendRow {
+    flex-direction: column;
+    align-items: center;
+  }
+}
