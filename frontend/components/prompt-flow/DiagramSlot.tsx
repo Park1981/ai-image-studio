@@ -1,105 +1,80 @@
 /**
- * DiagramSlot — mode 별 다이어그램 자리.
+ * DiagramSlot — mode 별 다이어그램 자리 (PNG 자동 임베드 + override 가능).
  *
- * generate: GenerateUseCaseDiagram 컴포넌트가 children 으로 들어옴.
- * edit / video: 다이어그램 준비 중 placeholder 노출 (오빠가 별도 작업 중).
- *
- * 추후 PNG/SVG/React 어떤 형태든 이 슬롯의 children 으로 끼우면 됨.
+ * 동작:
+ *   - children 있음: children 우선 (예: React 컴포넌트 직접 임베드)
+ *   - children 없음: /prompt-flow/{mode}-flow.png 자동 임베드
+ *     (generate-flow.png / edit-flow.png / video-flow.png)
  */
 
 "use client";
 
 import type { ReactNode } from "react";
-import Icon from "@/components/ui/Icon";
+import Image from "next/image";
+
+const DIAGRAM_DIMENSIONS: Record<
+  "generate" | "edit" | "video",
+  { src: string; alt: string; width: number; height: number }
+> = {
+  generate: {
+    src: "/prompt-flow/generate-flow.png",
+    alt: "이미지 생성 흐름 다이어그램",
+    width: 1600,
+    height: 900,
+  },
+  edit: {
+    src: "/prompt-flow/edit-flow.png",
+    alt: "이미지 수정 흐름 다이어그램",
+    width: 1600,
+    height: 900,
+  },
+  video: {
+    src: "/prompt-flow/video-flow.png",
+    alt: "영상 생성 흐름 다이어그램",
+    width: 1600,
+    height: 900,
+  },
+};
 
 export default function DiagramSlot({
   mode,
   children,
 }: {
   mode: "generate" | "edit" | "video";
+  /** override — 있으면 이걸 그대로 렌더. 없으면 mode 별 PNG 자동 임베드. */
   children?: ReactNode;
 }) {
-  // children 이 있으면 (= generate 처럼 실 다이어그램이 들어오면) 그대로 렌더.
   if (children) {
     return <>{children}</>;
   }
 
-  // children 없을 때 (= edit / video) placeholder.
-  const modeLabel =
-    mode === "edit" ? "수정 모드" : mode === "video" ? "영상 모드" : "이 모드";
+  const d = DIAGRAM_DIMENSIONS[mode];
 
   return (
     <section
-      aria-label={`${modeLabel} 다이어그램 영역`}
+      aria-label={d.alt}
       style={{
         margin: "32px 0",
-        padding: "48px 32px",
-        border: "2px dashed var(--line)",
         borderRadius: "var(--radius-xl)",
-        background:
-          "repeating-linear-gradient(45deg, var(--surface), var(--surface) 12px, var(--bg-2) 12px, var(--bg-2) 24px)",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        gap: 14,
-        textAlign: "center",
-        minHeight: 280,
+        overflow: "hidden",
+        border: "1px solid var(--line)",
+        background: "var(--surface)",
+        boxShadow: "var(--shadow-sm)",
       }}
     >
-      <div
+      <Image
+        src={d.src}
+        alt={d.alt}
+        width={d.width}
+        height={d.height}
+        priority={mode === "generate"}
+        sizes="(min-width: 1280px) 1280px, 100vw"
         style={{
-          width: 56,
-          height: 56,
-          borderRadius: "50%",
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          color: "var(--ink-3)",
-          boxShadow: "var(--shadow-sm)",
+          width: "100%",
+          height: "auto",
+          display: "block",
         }}
-      >
-        <Icon name="grid" size={24} />
-      </div>
-      <div
-        style={{
-          fontSize: 11,
-          fontWeight: 800,
-          letterSpacing: ".18em",
-          color: "var(--ink-4)",
-          fontFamily: "Consolas, SFMono-Regular, monospace",
-        }}
-      >
-        DIAGRAM · COMING SOON
-      </div>
-      <h3
-        style={{
-          margin: 0,
-          fontSize: 18,
-          fontWeight: 660,
-          color: "var(--ink)",
-          letterSpacing: 0,
-          lineHeight: 1.3,
-        }}
-      >
-        {modeLabel} 다이어그램 준비 중입니다
-      </h3>
-      <p
-        style={{
-          margin: 0,
-          maxWidth: 460,
-          fontSize: 13,
-          lineHeight: 1.6,
-          color: "var(--ink-3)",
-          letterSpacing: 0,
-        }}
-      >
-        {modeLabel} 의 변환 흐름을 한눈에 보여 드리는 다이어그램을 준비하고
-        있습니다. 그 사이에는 아래 단계 설명을 통해 전체 흐름을 확인하실 수
-        있습니다.
-      </p>
+      />
     </section>
   );
 }
