@@ -339,6 +339,19 @@ button {
 .ais-flow-link-btn:active {
   transform: scale(0.95);
 }
+
+/* Prompt Flow 페이지 — TOC + 본문 grid 반응형 (2026-04-29 redesign) */
+.ais-prompt-flow-toc-wrap {
+  display: none;
+}
+@media (min-width: 1280px) {
+  .ais-prompt-flow-body {
+    grid-template-columns: 220px minmax(0, 1fr) !important;
+  }
+  .ais-prompt-flow-toc-wrap {
+    display: block;
+  }
+}
 .ais-cta-primary {
   all: unset;
   cursor: pointer;
