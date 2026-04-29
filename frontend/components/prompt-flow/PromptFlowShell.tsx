@@ -205,8 +205,8 @@ export default function PromptFlowShell({
             <h2 id="overview-title">세 흐름은 같은 원리로 움직입니다</h2>
             <p>
               사용자가 입력하신 문장이 바로 엔진으로 전달되는 것이 아니라,
-              목적에 맞게 정리되고 필요한 이미지 정보가 결합된 뒤 최종
-              프롬프트로 넘어갑니다.
+              목적에 맞게 정리되고 필요한 컨텍스트(해상도·이미지·스타일 등)가
+              결합된 뒤 최종 프롬프트로 넘어갑니다.
             </p>
           </div>
           <div className={styles.journey}>
