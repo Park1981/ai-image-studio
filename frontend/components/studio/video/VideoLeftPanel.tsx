@@ -79,7 +79,7 @@ export default function VideoLeftPanel({
       <StudioModeHeader
         title="Video Generate"
         description="원본 이미지와 영상 지시로 5초 MP4를 생성합니다."
-        flowHref="/prompt-flow/video"
+        flowHref="/prompt-flow#video-flow"
         flowLabel="영상 생성 프롬프트 흐름 보기"
       />
 

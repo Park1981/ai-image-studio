@@ -17,8 +17,6 @@ import Link from "next/link";
 import AppHeader from "@/components/chrome/AppHeader";
 import Icon from "@/components/ui/Icon";
 import { StudioPage } from "@/components/studio/StudioLayout";
-import Hero from "@/components/prompt-flow/Hero";
-import { PROMPT_FLOW_CONTENT } from "@/lib/prompt-flow-content";
 import styles from "./page.module.css";
 
 // ────── 토글 상태 타입 ──────
@@ -36,25 +34,27 @@ export default function GeneratePromptFlowPage() {
     <StudioPage>
       <AppHeader />
       <main className={styles.page}>
-        {/* 브레드크럼 — 메인 메뉴로 직행 */}
+        {/* 브레드크럼 */}
         <nav className={styles.crumbBar} aria-label="경로">
-          <Link href="/">
+          <Link href="/prompt-flow">
             <Icon name="arrow-left" size={14} />
-            메인 메뉴
+            프롬프트 흐름 인덱스
           </Link>
           <span>›</span>
-          <span className={styles.crumbCurrent}>이미지 생성 흐름</span>
+          <span className={styles.crumbCurrent}>이미지 생성</span>
         </nav>
 
-        {/* 히어로 — 메인 카드 톤 통일 (2026-04-29 redesign) */}
-        <Hero
-          meta={{
-            ...PROMPT_FLOW_CONTENT.generate.meta,
-            subtitle:
-              "사용자가 입력한 한 줄이 ComfyUI 가 받는 영어 프롬프트가 되기까지 단계별로 거치는 분기 트리입니다. 아래 토글로 조건별 활성 분기를 즉시 확인하실 수 있고, 각 단계의 실제 시스템 프롬프트도 함께 표시됩니다.",
-          }}
-          mode="generate"
-        />
+        {/* 히어로 */}
+        <header className={styles.hero}>
+          <span className={styles.kicker}>Generate · 분기 트리</span>
+          <h1>이미지 생성 프롬프트의 변환 흐름</h1>
+          <p>
+            사용자가 입력한 한 줄이 ComfyUI 가 받는 영어 프롬프트가 되기까지
+            7단계를 거칩니다. 아래 토글을 누르면 조건별로 어떤 분기가
+            활성화되는지 즉시 확인할 수 있으며, 각 단계의 실제 시스템 프롬프트도
+            함께 표시됩니다.
+          </p>
+        </header>
 
         {/* 토글 바 (분기 시뮬레이터) */}
         <div className={styles.toggleBar} role="group" aria-label="조건 시뮬레이터">
