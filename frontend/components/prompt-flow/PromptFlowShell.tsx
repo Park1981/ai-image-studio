@@ -53,33 +53,148 @@ export default function PromptFlowShell({
     <StudioPage>
       <AppHeader />
       <main id="top" className={styles.page}>
-        {/* ───── Hero ───── */}
-        <section className={styles.hero}>
-          <div className={styles.heroText}>
-            <div className={styles.kicker}>Prompt Flow Guide · {content.meta.eyebrow}</div>
-            <h1>{content.meta.title}</h1>
-            <p>{content.meta.subtitle}</p>
-          </div>
+        {/* ───── Hero (메인 카드 톤 — 배경이미지 + 그라디언트 + 텍스트 + 작은 mode 칩) ───── */}
+        <section
+          aria-labelledby="prompt-flow-hero-title"
+          style={{
+            position: "relative",
+            width: "100%",
+            minHeight: 360,
+            borderRadius: "var(--radius-xl)",
+            overflow: "hidden",
+            background: "#0c0c10",
+            boxShadow: "var(--shadow-md)",
+          }}
+        >
+          {/* 배경 이미지 — 메뉴 카드와 동일 자산 */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={content.meta.modeImage}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            style={{
+              position: "absolute",
+              inset: 0,
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              filter: "brightness(0.72) saturate(1.04)",
+            }}
+          />
+          {/* 좌→우 어둡게 그라디언트 (텍스트 가독성) */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(105deg, rgba(10,12,16,.78) 0%, rgba(10,12,16,.55) 48%, rgba(10,12,16,.18) 100%)",
+              pointerEvents: "none",
+            }}
+          />
 
-          {/* 다른 mode 도움말 진입점 (Hero 우측 칩 2개) */}
-          <div className={styles.heroPreview} aria-label="다른 모드 도움말로 이동">
-            {otherModes.map((m) => (
-              <Link
-                key={m}
-                href={`/prompt-flow/${m}`}
-                className={styles.heroFlowRow}
-                title={`${modeLabel(m)} 도움말로 이동`}
-                style={{
-                  backgroundImage: `linear-gradient(180deg, rgba(31,31,31,.05), rgba(31,31,31,.62)), url(/menu/${m}.png)`,
-                  textDecoration: "none",
-                }}
-              >
-                <div className={styles.heroFlowTitle}>
-                  <Icon name={modeIconName(m)} size={18} />
-                  <strong>{modeLabel(m)}</strong>
-                </div>
-              </Link>
-            ))}
+          {/* 텍스트 + 작은 mode 칩 */}
+          <div
+            style={{
+              position: "relative",
+              zIndex: 1,
+              padding: "44px 40px 32px",
+              display: "flex",
+              flexDirection: "column",
+              gap: 14,
+              minHeight: 360,
+              justifyContent: "flex-end",
+              color: "#FFFFFF",
+            }}
+          >
+            <div
+              style={{
+                display: "inline-flex",
+                alignSelf: "flex-start",
+                fontSize: 11,
+                fontWeight: 800,
+                letterSpacing: ".22em",
+                color: "rgba(255,255,255,.86)",
+                textTransform: "uppercase",
+              }}
+            >
+              Prompt Flow Guide · {content.meta.eyebrow}
+            </div>
+
+            <h1
+              id="prompt-flow-hero-title"
+              className="display"
+              style={{
+                margin: 0,
+                fontSize: 38,
+                fontWeight: 660,
+                lineHeight: 1.08,
+                letterSpacing: "-0.01em",
+                color: "#FFFFFF",
+                fontVariationSettings: '"opsz" 72, "SOFT" 42, "WONK" 0',
+              }}
+            >
+              {content.meta.title}
+            </h1>
+
+            <p
+              style={{
+                margin: 0,
+                maxWidth: 720,
+                fontSize: 14,
+                lineHeight: 1.55,
+                color: "rgba(255,255,255,.86)",
+                fontWeight: 500,
+              }}
+            >
+              {content.meta.subtitle}
+            </p>
+
+            {/* 다른 mode 도움말 진입점 — 작은 칩 */}
+            <nav
+              aria-label="다른 모드 도움말 빠른 이동"
+              style={{
+                marginTop: 10,
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
+              {otherModes.map((m) => (
+                <Link
+                  key={m}
+                  href={`/prompt-flow/${m}`}
+                  title={`${modeLabel(m)} 도움말로 이동`}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 6,
+                    padding: "7px 13px",
+                    borderRadius: "var(--radius-full)",
+                    background: "rgba(255,255,255,.16)",
+                    backdropFilter: "blur(8px)",
+                    border: "1px solid rgba(255,255,255,.32)",
+                    color: "#FFFFFF",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    letterSpacing: 0,
+                    textDecoration: "none",
+                    transition: "all .15s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,.26)";
+                    e.currentTarget.style.transform = "translateY(-1px)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "rgba(255,255,255,.16)";
+                    e.currentTarget.style.transform = "translateY(0)";
+                  }}
+                >
+                  <Icon name={modeIconName(m)} size={13} />
+                  {modeLabel(m)} 도움말
+                </Link>
+              ))}
+            </nav>
           </div>
         </section>
 
