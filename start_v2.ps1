@@ -17,7 +17,8 @@ $LogBackend = Join-Path $LogsDir "backend.log"
 $LogBackendErr = Join-Path $LogsDir "backend.err.log"
 $LogFrontend = Join-Path $LogsDir "frontend.log"
 $LogFrontendErr = Join-Path $LogsDir "frontend.err.log"
-$BrowserProfileDir = Join-Path $Root "data\launcher-browser"
+$BrowserProfileDir = Join-Path $Root "data\launcher-chrome"
+$LegacyBrowserProfileDir = Join-Path $Root "data\launcher-browser"
 $LoadingFile = Join-Path $Root "launcher\loading.html"
 
 if (-not (Test-Path $LogsDir)) {
@@ -60,7 +61,22 @@ function Resolve-ChromeExe {
   return $null
 }
 
+function Stop-LauncherBrowserByProfile([string]$ProfileDir) {
+  if (-not $ProfileDir) { return }
+  $profile = [System.IO.Path]::GetFullPath($ProfileDir).TrimEnd("\")
+  Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {
+    $cmd = $_.CommandLine
+    if ($cmd -and $cmd -like "*$profile*") {
+      Write-Log ("closing stale launcher browser PID {0}" -f $_.ProcessId)
+      & taskkill.exe /PID $_.ProcessId /T /F 2>$null | Out-Null
+    }
+  }
+}
+
 function Start-LauncherBrowser {
+  Stop-LauncherBrowserByProfile $LegacyBrowserProfileDir
+  Stop-LauncherBrowserByProfile $BrowserProfileDir
+
   if (-not (Test-Path $BrowserProfileDir)) {
     New-Item -ItemType Directory -Path $BrowserProfileDir | Out-Null
   }
