@@ -3,6 +3,68 @@
 > 누적 변경 로그 — 완료된 작업의 역사적 기록.
 > 최신 변경 + 활성 정책은 `CLAUDE.md` 참조. 자세한 작업 내역은 git log + memory.
 
+## 2026-04-29
+
+### Prompt Flow 도움말 페이지 redesign + Launcher 후속 (current master)
+
+**master HEAD**: `f92b06c` (push 완료)
+**검증**: tsc / ESLint clean · vitest **91/91** (회귀 0)
+
+#### 진행 흐름 (5 merge commit)
+
+1. **redesign 1차** (`79b6147`) — 동적 라우트 `/prompt-flow/[mode]` + 공용 컴포넌트 5종 + lib 데이터 + 메인 카드 톤 hero
+2. **사용자 결정으로 회귀** (`033ea75`) — "기존 디자인이 더 보기 좋다" → 옛 단일 페이지 복원 + 톤만 존댓말 변환
+3. **mode별 풀 페이지 분리** (`071d084`) — 옛 단일 페이지 + 인터랙티브 페이지(1202줄) → mode별 풀 페이지 3개 통합 + DiagramSlot
+4. **hero 메인 카드 톤 통일** (`ad2b316`) — `/menu/{mode}.png` 배경 + 그라디언트 + 작은 glass 칩
+5. **Journey subtitle 정확도 보강** (`c8fd7d1`) — "이미지 정보" → "컨텍스트(해상도·이미지·스타일 등)" (generate 모드 정확도)
+6. **Launcher v2 후속** (`f92b06c`) — Shutdown 모달 디자인 개선 + 톤 존댓말 + 새 앱 아이콘 (prompt-flow 와 별 작업)
+
+#### 최종 구조
+
+| 라우트 | 콘텐츠 |
+|---|---|
+| `/prompt-flow` | `/prompt-flow/generate` redirect |
+| `/prompt-flow/generate` | Hero(generate.png) + Journey + GenerateUseCaseDiagram + 6단계 + ruleBlock + Example |
+| `/prompt-flow/edit` | Hero(edit.png) + Journey + DiagramSlot placeholder + 7단계 + 매트릭스 + 참조 역할 + Example |
+| `/prompt-flow/video` | Hero(video.png) + Journey + DiagramSlot placeholder + 6단계 + ruleBlock + Example |
+
+각 페이지 hero = 메뉴 카드와 동일 배경이미지 + 어두운 그라디언트 + 흰색 텍스트 + 다른 mode 도움말 작은 glass 칩 2개.
+
+#### 신규 파일 (6종)
+
+- `lib/prompt-flow-content.tsx` — 3 mode 단일 출처 데이터 (메타 + 단계 + extras)
+- `components/prompt-flow/PromptFlowShell.tsx` — 풀 레이아웃 (Hero + Journey + DiagramSlot + Section + CTA)
+- `components/prompt-flow/StepCard.tsx` — 단계 카드
+- `components/prompt-flow/GenerateUseCaseDiagram.tsx` — 옛 UC 다이어그램 분리
+- `components/prompt-flow/DiagramSlot.tsx` — placeholder + children wrapper
+- `components/prompt-flow/prompt-flow.module.css` — 옛 page.module.css 이전
+
+#### 폐기
+
+- `app/prompt-flow/page.module.css` (921줄, 옛 통합 페이지 전용) — components 로 이전
+- `app/prompt-flow/generate/page.tsx` (1202줄, 옛 인터랙티브 분기 트리) — 콘텐츠 미사용 결정
+- `app/prompt-flow/generate/page.module.css` (옛 인터랙티브 전용)
+
+#### 수정
+
+- `StudioModeHeader` flowHref 통일: `edit→/prompt-flow/edit`, `video→/prompt-flow/video`
+- 사용자 노출 한국어 100% 존댓말 변환
+
+#### 톤 변환 (반말 → 존댓말)
+
+| 옛 | 새 |
+|---|---|
+| "오빠가 적은 말에서 시작해" | "사용자가 입력하신 문장에서 시작합니다" |
+| "원하는 장면을 말로 적는다" | "원하는 장면을 문장으로 입력합니다" |
+| "그래서 의도치 않은 재해석을 줄인다" | "그래서 의도치 않은 재해석을 줄여 줍니다" |
+
+#### 후속 작업 (사용자 작업 영역)
+
+- 오빠가 만드는 edit/video 다이어그램 → `DiagramSlot` children 으로 끼우면 자동 적용
+- 시각 검증 (Chrome 으로 3 mode 페이지 직접 확인)
+
+---
+
 ## 2026-04-28
 
 ### Multi-ref Phase 1+1'+1'' — image2 prompt 보장 (current master)
