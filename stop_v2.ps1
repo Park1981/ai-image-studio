@@ -15,7 +15,8 @@ $ErrorActionPreference = "Continue"
 $Root = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
 $LogsDir = Join-Path $Root "logs"
 $ShutdownLog = Join-Path $LogsDir "shutdown-v2.log"
-$BrowserProfileDir = Join-Path $Root "data\launcher-browser"
+$BrowserProfileDir = Join-Path $Root "data\launcher-chrome"
+$LegacyBrowserProfileDir = Join-Path $Root "data\launcher-browser"
 
 if (-not (Test-Path $LogsDir)) {
   New-Item -ItemType Directory -Path $LogsDir | Out-Null
@@ -74,11 +75,21 @@ function Close-LauncherBrowser {
     return
   }
 
-  $profile = [System.IO.Path]::GetFullPath($BrowserProfileDir).TrimEnd("\")
+  $profiles = @(
+    [System.IO.Path]::GetFullPath($BrowserProfileDir).TrimEnd("\"),
+    [System.IO.Path]::GetFullPath($LegacyBrowserProfileDir).TrimEnd("\")
+  )
   $closed = 0
   Get-CimInstance Win32_Process -ErrorAction SilentlyContinue | ForEach-Object {
     $cmd = $_.CommandLine
-    if ($cmd -and $cmd -like "*$profile*") {
+    $matchesProfile = $false
+    foreach ($profile in $profiles) {
+      if ($cmd -and $cmd -like "*$profile*") {
+        $matchesProfile = $true
+        break
+      }
+    }
+    if ($matchesProfile) {
       $closed++
       Write-Log ("closing launcher browser PID {0}" -f $_.ProcessId)
       & taskkill.exe /PID $_.ProcessId /T /F 2>$null | Out-Null
