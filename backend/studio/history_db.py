@@ -44,6 +44,11 @@ except Exception:
     _DB_PATH = "./data/history.db"
 
 
+# 임시 풀 URL prefix — reference_pool 모듈과 동기. 순환 import 회피 위해 *문자열 상수로 직접 박음*.
+# (reference_pool.POOL_URL_PREFIX 와 항상 동일해야 함 — Codex C6 정책)
+_POOL_URL_PREFIX = "/images/studio/reference-pool/"
+
+
 log = logging.getLogger(__name__)
 
 
@@ -428,13 +433,18 @@ async def delete_item_with_refs(
     source_ref 를 알아야 함. race condition 없이 DB 내부에서 원자적으로
     조회→삭제 수행 (같은 커넥션으로 순차 실행).
 
+    v9 (2026-04-29 · Codex I2): reference_ref 가 임시 풀 URL 이고 다른 row 가
+    참조하지 않으면 임시 풀 파일도 함께 unlink (cascade). 반환 시그니처는 그대로 —
+    호출자 (routes/system.py) 영향 0.
+
     Returns:
         (deleted, source_ref, image_ref). deleted=False 면 나머지는 None.
     """
+    pool_ref_to_unlink: str | None = None
     async with aiosqlite.connect(_DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
-            "SELECT source_ref, image_ref FROM studio_history WHERE id = ?",
+            "SELECT source_ref, image_ref, reference_ref FROM studio_history WHERE id = ?",
             (item_id,),
         )
         row = await cur.fetchone()
@@ -442,11 +452,32 @@ async def delete_item_with_refs(
             return (False, None, None)
         source_ref = row["source_ref"]
         image_ref = row["image_ref"]
+        reference_ref = row["reference_ref"]
         cur = await db.execute(
             "DELETE FROM studio_history WHERE id = ?", (item_id,)
         )
         await db.commit()
-        return (cur.rowcount > 0, source_ref, image_ref)
+        deleted = cur.rowcount > 0
+
+        # v9 cascade — 임시 풀 ref 면 마지막 참조 시 unlink 결정
+        if (
+            deleted
+            and reference_ref
+            and reference_ref.startswith(_POOL_URL_PREFIX)
+        ):
+            cur = await db.execute(
+                "SELECT 1 FROM studio_history WHERE reference_ref = ? LIMIT 1",
+                (reference_ref,),
+            )
+            shared = await cur.fetchone()
+            if shared is None:
+                pool_ref_to_unlink = reference_ref
+
+    # DB 트랜잭션 끝난 뒤 unlink (안에서 file IO 부담 안 주기 위해)
+    if pool_ref_to_unlink:
+        await _safe_pool_unlink(pool_ref_to_unlink)
+
+    return (deleted, source_ref, image_ref)
 
 
 async def clear_all() -> int:
@@ -460,20 +491,82 @@ async def clear_all_with_refs() -> tuple[int, list[str], list[str]]:
     """전체 삭제 + 삭제된 모든 row 의 (source_refs, image_refs) 반환.
 
     audit P1b: edit-source/*.png orphan 파일 일괄 정리용.
+
+    v9 (2026-04-29 · Codex I2): 삭제된 row 의 reference_ref 중 임시 풀 URL 인 것 모두
+    cascade unlink. 반환 시그니처는 그대로 — 호출자 (routes/system.py:291) 영향 0.
+
     Returns:
         (deleted_count, source_refs, image_refs). refs 리스트는 NULL 제외.
     """
+    pool_refs_to_unlink: list[str] = []
     async with aiosqlite.connect(_DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
-            "SELECT source_ref, image_ref FROM studio_history"
+            "SELECT source_ref, image_ref, reference_ref FROM studio_history"
         )
         rows = await cur.fetchall()
         source_refs = [r["source_ref"] for r in rows if r["source_ref"]]
         image_refs = [r["image_ref"] for r in rows if r["image_ref"]]
+        # v9 cascade — distinct 임시 풀 ref 만 (중복 unlink 방지)
+        pool_refs_to_unlink = list(
+            {
+                r["reference_ref"]
+                for r in rows
+                if r["reference_ref"]
+                and r["reference_ref"].startswith(_POOL_URL_PREFIX)
+            }
+        )
         cur = await db.execute("DELETE FROM studio_history")
         await db.commit()
-        return (cur.rowcount, source_refs, image_refs)
+        deleted_count = cur.rowcount
+
+    # DB 트랜잭션 끝난 뒤 unlink
+    for ref in pool_refs_to_unlink:
+        await _safe_pool_unlink(ref)
+
+    return (deleted_count, source_refs, image_refs)
+
+
+# ─────────────────────────────────────────────
+# v9 — 임시 풀 cascade helpers (Codex C3 + I2)
+# ─────────────────────────────────────────────
+
+
+async def _safe_pool_unlink(rel_url: str) -> None:
+    """임시 풀 ref 안전 unlink. 순환 import 회피 위해 lazy import.
+
+    실패 (path 검증 실패 / 파일 IO 에러) 는 silent — 로그만 남김.
+    """
+    try:
+        from .reference_pool import delete_pool_ref
+
+        await delete_pool_ref(rel_url)
+    except ValueError as e:
+        log.warning("pool cascade unlink unsafe path: %s — %s", rel_url, e)
+    except Exception as e:  # noqa: BLE001
+        log.warning("pool cascade unlink failed: %s — %s", rel_url, e)
+
+
+async def count_pool_refs() -> int:
+    """studio_history 중 임시 풀 prefix 로 시작하는 reference_ref 보유 row 개수."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT COUNT(*) FROM studio_history WHERE reference_ref LIKE ?",
+            (_POOL_URL_PREFIX + "%",),
+        )
+        row = await cur.fetchone()
+        return int(row[0]) if row else 0
+
+
+async def list_history_pool_refs() -> set[str]:
+    """studio_history 의 임시 풀 reference_ref 모두 set 반환 (orphan 검출용)."""
+    async with aiosqlite.connect(_DB_PATH) as db:
+        cur = await db.execute(
+            "SELECT DISTINCT reference_ref FROM studio_history WHERE reference_ref LIKE ?",
+            (_POOL_URL_PREFIX + "%",),
+        )
+        rows = await cur.fetchall()
+        return {r[0] for r in rows if r[0]}
 
 
 async def count_source_ref_usage(source_ref: str) -> int:

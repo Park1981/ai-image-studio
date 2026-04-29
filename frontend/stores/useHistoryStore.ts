@@ -22,6 +22,10 @@ export interface HistoryState {
   clear: () => void;
   replaceAll: (items: HistoryItem[]) => void;
   markHydrated: () => void;
+  /** v9 (2026-04-29 · Phase C.2): promote 성공 후 referenceRef swap 반영.
+   *  사용자 직접 업로드 후 사후 promote → 백엔드가 영구 URL 로 swap →
+   *  EditResultViewer 의 canPromote 가 자동 false 되도록 store 도 동기화. */
+  updateReferenceRef: (id: string, referenceRef: string) => void;
 
   /** 모드별 필터링 view */
   itemsByMode: (mode: HistoryItem["mode"]) => HistoryItem[];
@@ -53,6 +57,13 @@ export const useHistoryStore = create<HistoryState>()(
       replaceAll: (items) =>
         set({ items: items.slice(0, MAX_HISTORY), selectedId: null }),
       markHydrated: () => set({ hydrated: true }),
+      // v9 — promote 성공 시 해당 id row 의 referenceRef 만 swap (Phase C.2)
+      updateReferenceRef: (id, referenceRef) =>
+        set((s) => ({
+          items: s.items.map((it) =>
+            it.id === id ? { ...it, referenceRef } : it,
+          ),
+        })),
 
       itemsByMode: (mode) => get().items.filter((x) => x.mode === mode),
     }),

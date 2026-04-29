@@ -31,6 +31,7 @@ from ..presets import (
     VIDEO_LONGER_EDGE_MIN,
     VIDEO_MODEL,
 )
+from ..reference_pool import save_to_pool
 from ..schemas import GenerateBody, TaskCreated
 from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..tasks import TASKS, _new_task
@@ -199,6 +200,17 @@ async def create_edit_task(
         if tpl is None:
             raise HTTPException(404, "reference template not found")
         reference_ref_url = tpl["imageRef"]  # DB 의 상대 영구 URL
+    elif use_reference_image and reference_bytes is not None:
+        # v9 (2026-04-29 · Codex C4): 사용자 직접 업로드 → 임시 풀 저장.
+        # history.referenceRef 가 임시 풀 URL 로 기록 → 결과 후 사후 promote 가능.
+        try:
+            reference_ref_url = await save_to_pool(
+                reference_bytes,
+                (reference_image.content_type if reference_image else None)
+                or "image/png",
+            )
+        except ValueError as e:
+            raise HTTPException(400, f"invalid reference image: {e}") from e
 
     # 토글 OFF 또는 reference_bytes 없음이면 stale template/ref 메타도 무효화.
     if not use_reference_image or reference_bytes is None:

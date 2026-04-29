@@ -6,6 +6,7 @@ studio.routes.reference_templates — Edit reference template 라이브러리 CR
   - POST   /reference-templates                — 신규 저장 (multipart image + meta JSON)
   - DELETE /reference-templates/{template_id}  — DB row + 이미지 파일 삭제
   - POST   /reference-templates/{template_id}/touch — last_used_at 갱신
+  - POST   /reference-templates/promote/{history_id} — v9 사후 저장 (임시 풀 → 영구)
 
 DB insert 실패 시 방금 저장한 reference 파일 자동 unlink (orphan 방지).
 """
@@ -14,11 +15,15 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 
+import aiosqlite
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from PIL import UnidentifiedImageError
+from pydantic import BaseModel
 
 from .. import history_db
+from ..reference_pool import POOL_URL_PREFIX, pool_path_from_url
 from ..reference_storage import (
     analyze_reference,
     delete_reference_file,
@@ -135,3 +140,110 @@ async def touch_template(template_id: str):
     if not ok:
         raise HTTPException(404, "template not found")
     return {"ok": True}
+
+
+# ─────────────────────────────────────────────
+# v9 (2026-04-29) — 사후 저장 promote endpoint
+# ─────────────────────────────────────────────
+
+
+class _PromoteBody(BaseModel):
+    name: str
+    role: str | None = None  # promote 시 사용자가 role 변경 가능 (옵션 — 없으면 history 의 referenceRole)
+    userIntent: str | None = None  # promote 시 사용자가 의도 추가 가능 (옵션)
+
+
+# 1~64자 + alphanumeric/한글/공백/하이픈/언더스코어
+_NAME_PATTERN = re.compile(r"^[A-Za-z0-9가-힣\s_\-]{1,64}$")
+
+
+@router.post("/reference-templates/promote/{history_id}")
+async def promote_from_history(history_id: str, body: _PromoteBody) -> dict:
+    """v9 사후 저장 — 임시 풀 ref 를 영구 라이브러리로 promote.
+
+    흐름:
+      1. history.referenceRef 가 임시 풀 URL 인지 검증 (pool_path_from_url 활용)
+      2. 임시 풀 파일 read → save_reference_image() (영구 저장 + PIL 재인코딩)
+      3. analyze_reference() — 실패 시 visionFailed=True silent
+      4. insert_reference_template — 실패 시 dst unlink rollback
+      5. studio_history.reference_ref → 영구 URL 로 swap (canPromote 자동 false)
+
+    Plan: 2026-04-29-reference-library-v9.md (Phase A.5)
+    """
+    name = body.name.strip()
+    if not _NAME_PATTERN.match(name):
+        raise HTTPException(
+            400,
+            "invalid name (1~64자, alphanumeric/한글/공백/하이픈/언더스코어 only)",
+        )
+
+    # 1. history 조회
+    item = await history_db.get_item(history_id)
+    if item is None:
+        raise HTTPException(404, f"history not found: {history_id}")
+
+    pool_ref = item.get("referenceRef") or ""
+    if not pool_ref.startswith(POOL_URL_PREFIX):
+        raise HTTPException(
+            400,
+            "history has no pool reference (NULL or already a permanent ref)",
+        )
+
+    # 2. 임시 풀 파일 read (안전 검증 통과 후만)
+    try:
+        src_path = pool_path_from_url(pool_ref)
+    except ValueError as e:
+        raise HTTPException(400, f"unsafe pool ref: {e}") from e
+
+    if not src_path.exists():
+        raise HTTPException(404, "pool file missing on disk")
+
+    image_bytes = src_path.read_bytes()
+
+    # 3. 영구 저장 (PIL 재인코딩 + path 정규화 — save_reference_image 재사용)
+    try:
+        image_url = save_reference_image(image_bytes)
+    except UnidentifiedImageError as e:
+        raise HTTPException(400, f"invalid pool image format: {e}") from e
+
+    # 4. Vision 분석 (실패 silent — Codex I6)
+    role = (body.role or item.get("referenceRole") or "custom") or "custom"
+    user_intent = body.userIntent
+    vision_desc: str | None = None
+    vision_failed = False
+    try:
+        vision_desc = await analyze_reference(image_bytes, role, user_intent)
+    except Exception as e:
+        log.warning("promote vision 분석 실패 (graceful): %s", e)
+        vision_desc = None
+        vision_failed = True
+
+    # 5. DB row insert — 실패 시 영구 파일 rollback (Codex I5)
+    try:
+        new_id = await history_db.insert_reference_template(
+            {
+                "imageRef": image_url,
+                "name": name,
+                "visionDescription": vision_desc,
+                "userIntent": user_intent,
+                "roleDefault": role,
+            }
+        )
+    except Exception as e:
+        delete_reference_file(image_url)
+        log.exception("promote DB insert 실패 — 파일 롤백")
+        raise HTTPException(500, f"db insert failed: {e}") from e
+
+    # 6. studio_history.reference_ref swap (Codex I3 — canPromote 자동 false)
+    async with aiosqlite.connect(history_db._DB_PATH) as db:
+        await db.execute(
+            "UPDATE studio_history SET reference_ref = ? WHERE id = ?",
+            (image_url, history_id),
+        )
+        await db.commit()
+
+    saved = await history_db.get_reference_template(new_id)
+    return {
+        "template": saved,
+        "visionFailed": vision_failed,
+    }

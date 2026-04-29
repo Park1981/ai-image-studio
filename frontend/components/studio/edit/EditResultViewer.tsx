@@ -20,7 +20,14 @@ import { SegControl } from "@/components/ui/primitives";
 import type { HistoryItem } from "@/lib/api/types";
 import { downloadImage, filenameFromRef } from "@/lib/image-actions";
 import { useEditStore } from "@/stores/useEditStore";
+import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
+
+import ReferencePromoteModal from "./ReferencePromoteModal";
+
+// v9 (2026-04-29 · Phase C.2): 사용자 직접 업로드 reference 의 임시 풀 URL prefix.
+// canPromote 판정에 사용 — STUDIO_BASE 절대 URL 화 후에도 substring 매칭으로 검출.
+const POOL_URL_SUBSTRING = "/images/studio/reference-pool/";
 
 type EditViewerMode = "slider" | "sidebyside";
 
@@ -75,6 +82,19 @@ export default function EditResultViewer({
   // 비교 모드 — 슬라이더(기본) / 나란히. 세션 한정 (영속 X · 새로고침 시 slider 복귀).
   const [viewerMode, setViewerMode] = useState<EditViewerMode>("slider");
 
+  // v9 (2026-04-29 · Phase C.2): 사후 라이브러리 저장 모달 트리거.
+  // canPromote: history.referenceRef 가 *임시 풀 URL substring 매칭* 일 때만 노출.
+  //   - 사용자 직접 업로드 → 임시 풀 → canPromote=true
+  //   - 라이브러리 픽 → 영구 라이브러리 URL → canPromote=false
+  //   - promote 성공 후 백엔드가 영구 URL 로 swap → canPromote=false (자동 숨김)
+  //   - referenceRef NULL (옛 row OR multi-ref OFF) → canPromote=false
+  const [promoteOpen, setPromoteOpen] = useState(false);
+  const canPromote =
+    !!afterItem.referenceRef &&
+    afterItem.referenceRef.includes(POOL_URL_SUBSTRING);
+
+  const updateReferenceRef = useHistoryStore((s) => s.updateReferenceRef);
+
   // 액션바 — 두 모드 공통 (slider 는 슬라이더 위, sidebyside 는 결과 이미지 위에서만).
   const actionBarChildren = (
     <>
@@ -118,6 +138,13 @@ export default function EditResultViewer({
           toast.info("수정 설정 복원", "[수정 생성] 눌러");
         }}
       />
+      {canPromote && (
+        <ActionBarButton
+          icon="grid"
+          title="📚 참조 라이브러리에 저장"
+          onClick={() => setPromoteOpen(true)}
+        />
+      )}
     </>
   );
 
@@ -190,6 +217,19 @@ export default function EditResultViewer({
           hovered={hovered}
           actionBarChildren={actionBarChildren}
           beforeFit="cover"
+        />
+      )}
+      {/* v9 (2026-04-29 · Phase C.2): 사후 라이브러리 저장 모달 */}
+      {canPromote && (
+        <ReferencePromoteModal
+          historyId={afterItem.id}
+          open={promoteOpen}
+          onClose={() => setPromoteOpen(false)}
+          onSuccess={(newReferenceRef) => {
+            // promote 성공 시 store 의 referenceRef 를 영구 URL 로 swap →
+            // canPromote 자동 false → ActionBar 의 promote 버튼 사라짐 (Codex I3).
+            updateReferenceRef(afterItem.id, newReferenceRef);
+          }}
         />
       )}
     </div>

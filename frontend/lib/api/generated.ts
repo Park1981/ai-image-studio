@@ -336,6 +336,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/reference-pool/orphans": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pool Orphans
+         * @description history 에서 참조 안 된 임시 풀 ref 목록.
+         */
+        get: operations["get_pool_orphans_api_studio_reference_pool_orphans_get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Pool Orphans
+         * @description orphan 일괄 삭제. 영구 라이브러리는 손대지 않음.
+         *
+         *     Race 완화 (Codex I4): delete 직전에 history snapshot 다시 조회 (double-check).
+         */
+        delete: operations["delete_pool_orphans_api_studio_reference_pool_orphans_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/reference-pool/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Pool Stats
+         * @description 임시 풀 사용량 — count + total bytes.
+         */
+        get: operations["get_pool_stats_api_studio_reference_pool_stats_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/reference-templates": {
         parameters: {
             query?: never;
@@ -362,6 +408,35 @@ export interface paths {
          *       - vision 분석 실패: graceful — visionDescription=None 으로 저장 계속
          */
         post: operations["create_template_api_studio_reference_templates_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/reference-templates/promote/{history_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Promote From History
+         * @description v9 사후 저장 — 임시 풀 ref 를 영구 라이브러리로 promote.
+         *
+         *     흐름:
+         *       1. history.referenceRef 가 임시 풀 URL 인지 검증 (pool_path_from_url 활용)
+         *       2. 임시 풀 파일 read → save_reference_image() (영구 저장 + PIL 재인코딩)
+         *       3. analyze_reference() — 실패 시 visionFailed=True silent
+         *       4. insert_reference_template — 실패 시 dst unlink rollback
+         *       5. studio_history.reference_ref → 영구 URL 로 swap (canPromote 자동 false)
+         *
+         *     Plan: 2026-04-29-reference-library-v9.md (Phase A.5)
+         */
+        post: operations["promote_from_history_api_studio_reference_templates_promote__history_id__post"];
         delete?: never;
         options?: never;
         head?: never;
@@ -721,6 +796,15 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** _PromoteBody */
+        _PromoteBody: {
+            /** Name */
+            name: string;
+            /** Role */
+            role?: string | null;
+            /** Userintent */
+            userIntent?: string | null;
         };
     };
     responses: never;
@@ -1210,6 +1294,72 @@ export interface operations {
             };
         };
     };
+    get_pool_orphans_api_studio_reference_pool_orphans_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    delete_pool_orphans_api_studio_reference_pool_orphans_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    get_pool_stats_api_studio_reference_pool_stats_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     list_templates_api_studio_reference_templates_get: {
         parameters: {
             query?: never;
@@ -1250,6 +1400,43 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    promote_from_history_api_studio_reference_templates_promote__history_id__post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                history_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["_PromoteBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

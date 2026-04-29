@@ -29,10 +29,10 @@ import ReferenceLibraryDrawer from "./ReferenceLibraryDrawer";
 import ReferenceRoleSelect from "./ReferenceRoleSelect";
 import type { ReferenceRoleId } from "@/stores/useEditStore";
 
-// EditReferenceCrop 은 react-easy-crop (window 의존) 을 사용하므로 ssr:false 로 격리.
-// 2026-04-28 (Phase 1).
-const EditReferenceCrop = dynamic(
-  () => import("@/components/studio/EditReferenceCrop"),
+// ReferenceImageBox 는 react-easy-crop (window 의존) 을 사용하므로 ssr:false 로 격리.
+// v9 (2026-04-29 · Phase B.1+B.3): 옛 EditReferenceCrop + SourceImageCard 통합 컴포넌트.
+const ReferenceImageBox = dynamic(
+  () => import("./ReferenceImageBox"),
   { ssr: false },
 );
 import {
@@ -62,14 +62,13 @@ export default function EditLeftPanel({
     prompt, setPrompt,
     lightning, setLightning,
     useReferenceImage, setUseReferenceImage,
-    referenceImage, referenceLabel, referenceWidth, referenceHeight,
+    referenceImage, referenceWidth, referenceHeight,
     setReferenceImage,
     referenceRole, setReferenceRole,
     referenceRoleCustom, setReferenceRoleCustom,
     setReferenceCropArea,
-    // v8 라이브러리 plan
-    saveAsTemplate, templateName, pickedTemplateId,
-    setSaveAsTemplate, setTemplateName,
+    // v9 라이브러리 plan (옛 saveAsTemplate / templateName 제거 · Phase B.2)
+    pickedTemplateRef,
     setPickedTemplateId, setPickedTemplateRef,
   } = useEditInputs();
   const { running } = useEditRunning();
@@ -305,93 +304,40 @@ export default function EditLeftPanel({
               <Icon name="grid" size={11} /> 라이브러리에서 선택
             </button>
           </div>
-          <SourceImageCard
-            sourceImage={referenceImage}
-            sourceLabel={referenceLabel}
-            sourceWidth={referenceWidth}
-            sourceHeight={referenceHeight}
-            onChange={(image, label, w, h) => {
-              setReferenceImage(image, label, w, h);
-              toast.success("참조 이미지 업로드", label.split(" · ")[0]);
-            }}
-            onClear={() => {
-              setReferenceImage(null);
-              toast.info("참조 이미지 해제됨");
-            }}
-            onError={(msg) => toast.error(msg)}
-            pasteRequireHover
-          />
-          {/* 인라인 수동 crop UI — 참조 이미지가 있을 때만 노출 (Phase 1 · 2026-04-28).
-           *  onAreaChange → useEditStore.setReferenceCropArea 직결.
-           *  Phase 2 의 "수정 생성" 클릭 시점에 store 의 area 를 적용해 cropped Blob 전송.
+          {/* v9 (2026-04-29 · Phase B.1+B.3): 옛 SourceImageCard + EditReferenceCrop +
+           *  saveAsTemplate Toggle/Input 영역을 ReferenceImageBox 1개로 통합.
+           *  사후 저장 (📚 라이브러리 저장) 은 결과 ActionBar 로 이전됨 (Phase C).
+           *
+           *  key={referenceImage} — 새 이미지 업로드 시 컴포넌트 local state
+           *  (crop/zoom/aspectMode) 강제 reset (옛 EditReferenceCrop 의 Codex Phase 1 리뷰 결함 #1).
            */}
-          {referenceImage && (
-            <div>
-              <div className="ais-field-header">
-                <label
-                  className="ais-field-label"
-                  style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-                >
-                  <SectionAccentBar accent="violet" />
-                  사용 영역
-                </label>
-                <span className="mono ais-field-meta">manual crop</span>
-              </div>
-              {/* key={referenceImage} — 새 이미지 업로드 시 컴포넌트 local state
-               *  (crop/zoom/aspectMode) 강제 reset (Codex Phase 1 리뷰 결함 #1).
-               *  store 의 area 만 reset 되면 옛 cropper 가 새 이미지 위에 옛 좌표를
-               *  재 emit 해 area 가 다시 채워지는 버그 차단. */}
-              <EditReferenceCrop
-                key={referenceImage}
-                imageSrc={referenceImage}
-                onAreaChange={setReferenceCropArea}
-              />
-            </div>
-          )}
+          <ReferenceImageBox
+            key={referenceImage ?? "empty"}
+            image={referenceImage}
+            onImage={(image, label, w, h) => {
+              if (image === null) {
+                setReferenceImage(null);
+                toast.info("참조 이미지 해제됨");
+              } else {
+                setReferenceImage(image, label, w, h);
+                toast.success(
+                  "참조 이미지 업로드",
+                  (label ?? "").split(" · ")[0],
+                );
+              }
+            }}
+            onCropArea={setReferenceCropArea}
+            // 라이브러리 픽 (영구 URL) 일 때만 crop UI 비활성
+            bypassCrop={!!pickedTemplateRef}
+            pasteRequireHover
+            onError={(msg) => toast.error(msg)}
+          />
           <ReferenceRoleSelect
             selected={referenceRole}
             onSelect={setReferenceRole}
             customText={referenceRoleCustom}
             onCustomTextChange={setReferenceRoleCustom}
           />
-
-          {/* v8 라이브러리 plan: 새 reference (라이브러리 픽이 아닌) 케이스만 저장 토글 노출.
-           *  pickedTemplateId !== null 이면 이미 라이브러리 항목이므로 재저장 의미 없음. */}
-          {referenceImage && pickedTemplateId === null && (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              <Toggle
-                checked={saveAsTemplate}
-                onChange={setSaveAsTemplate}
-                align="right"
-                label="📌 라이브러리에 저장"
-                desc={
-                  saveAsTemplate
-                    ? "수정 실행 시 템플릿으로 저장 + 비전 분석"
-                    : "이번만 사용 (저장 X)"
-                }
-              />
-              {saveAsTemplate && (
-                <input
-                  type="text"
-                  value={templateName}
-                  onChange={(e) => setTemplateName(e.target.value)}
-                  placeholder="템플릿 이름 (예: 검정 미니 드레스)"
-                  style={{
-                    all: "unset",
-                    display: "block",
-                    width: "100%",
-                    boxSizing: "border-box",
-                    padding: "8px 10px",
-                    fontSize: 12,
-                    border: "1px solid var(--line)",
-                    borderRadius: "var(--radius-sm)",
-                    background: "var(--surface)",
-                    color: "var(--ink)",
-                  }}
-                />
-              )}
-            </div>
-          )}
         </div>
       )}
 
@@ -419,7 +365,7 @@ export default function EditLeftPanel({
           }
           setPickedTemplateId(t.id);
           setPickedTemplateRef(t.imageRef);
-          setSaveAsTemplate(false);
+          // v9 (Phase B.2): saveAsTemplate 제거 — 사후 저장 ActionBar 로 이전됨.
           toast.success("템플릿 적용", t.name);
         }}
       />

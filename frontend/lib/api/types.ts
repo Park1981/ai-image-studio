@@ -280,7 +280,12 @@ export interface HistoryItem {
    *  비교 분석 (compare-analyze) 이 historyItemId 받으면 이 값을 재사용해
    *  gemma4 cold start 비용 ~5초 절약. mode === "edit" 만 채워짐. */
   refinedIntent?: string;
-  /** Edit multi-reference: 참조 이미지 영구 URL (라이브러리 픽 케이스만 — Phase 5 단계는 항상 null). */
+  /** Edit multi-reference 참조 이미지 URL.
+   *  v9 (2026-04-29 · Phase B.5):
+   *    - 사용자 직접 업로드: 임시 풀 URL (`/images/studio/reference-pool/<uuid>.png`)
+   *    - 라이브러리 픽: 영구 라이브러리 URL (`/images/studio/reference-templates/<uuid>.<ext>`)
+   *    - promote 후: 영구 라이브러리 URL (swap)
+   *    - NULL: 옛 v8 row OR multi-ref 미사용 */
   referenceRef?: string | null;
   /** Edit multi-reference: reference role preset/custom text. */
   referenceRole?: string | null;

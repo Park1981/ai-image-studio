@@ -600,6 +600,79 @@
         ]
       }
     },
+    "/api/studio/reference-pool/orphans": {
+      "delete": {
+        "description": "orphan 일괄 삭제. 영구 라이브러리는 손대지 않음.\n\nRace 완화 (Codex I4): delete 직전에 history snapshot 다시 조회 (double-check).",
+        "operationId": "delete_pool_orphans_api_studio_reference_pool_orphans_delete",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Delete Pool Orphans Api Studio Reference Pool Orphans Delete",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Delete Pool Orphans",
+        "tags": [
+          "studio",
+          "reference-pool"
+        ]
+      },
+      "get": {
+        "description": "history 에서 참조 안 된 임시 풀 ref 목록.",
+        "operationId": "get_pool_orphans_api_studio_reference_pool_orphans_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Pool Orphans Api Studio Reference Pool Orphans Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Pool Orphans",
+        "tags": [
+          "studio",
+          "reference-pool"
+        ]
+      }
+    },
+    "/api/studio/reference-pool/stats": {
+      "get": {
+        "description": "임시 풀 사용량 — count + total bytes.",
+        "operationId": "get_pool_stats_api_studio_reference_pool_stats_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Pool Stats Api Studio Reference Pool Stats Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Pool Stats",
+        "tags": [
+          "studio",
+          "reference-pool"
+        ]
+      }
+    },
     "/api/studio/reference-templates": {
       "get": {
         "description": "저장된 reference templates — last_used_at 내림차순.",
@@ -653,6 +726,61 @@
           }
         },
         "summary": "Create Template",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/reference-templates/promote/{history_id}": {
+      "post": {
+        "description": "v9 사후 저장 — 임시 풀 ref 를 영구 라이브러리로 promote.\n\n흐름:\n  1. history.referenceRef 가 임시 풀 URL 인지 검증 (pool_path_from_url 활용)\n  2. 임시 풀 파일 read → save_reference_image() (영구 저장 + PIL 재인코딩)\n  3. analyze_reference() — 실패 시 visionFailed=True silent\n  4. insert_reference_template — 실패 시 dst unlink rollback\n  5. studio_history.reference_ref → 영구 URL 로 swap (canPromote 자동 false)\n\nPlan: 2026-04-29-reference-library-v9.md (Phase A.5)",
+        "operationId": "promote_from_history_api_studio_reference_templates_promote__history_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "history_id",
+            "required": true,
+            "schema": {
+              "title": "History Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/_PromoteBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Promote From History Api Studio Reference Templates Promote  History Id  Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Promote From History",
         "tags": [
           "studio"
         ]
@@ -1421,6 +1549,41 @@
         "type"
       ],
       "title": "ValidationError",
+      "type": "object"
+    },
+    "_PromoteBody": {
+      "properties": {
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "role": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Role"
+        },
+        "userIntent": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Userintent"
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "title": "_PromoteBody",
       "type": "object"
     }
   }
