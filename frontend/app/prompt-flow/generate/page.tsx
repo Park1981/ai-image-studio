@@ -1,12 +1,11 @@
 /**
  * /prompt-flow/generate — 이미지 생성 도움말 페이지.
  *
- * GenerateUseCaseDiagram (UC Generate Pipeline) + 옛 통합 페이지의 generate
- * 섹션 콘텐츠 (단계 카드 + ruleBlock + Example) 통합.
+ * 다이어그램은 DiagramSlot 가 자동으로 /prompt-flow/generate-flow.png 임베드.
+ * 옛 GenerateUseCaseDiagram React 컴포넌트는 보존 (cherry-pick 가능, git history).
  */
 
 import PromptFlowShell from "@/components/prompt-flow/PromptFlowShell";
-import GenerateUseCaseDiagram from "@/components/prompt-flow/GenerateUseCaseDiagram";
 import { PROMPT_FLOW_CONTENT } from "@/lib/prompt-flow-content";
 
 export const metadata = {
@@ -15,10 +14,5 @@ export const metadata = {
 };
 
 export default function GeneratePromptFlowPage() {
-  return (
-    <PromptFlowShell
-      content={PROMPT_FLOW_CONTENT.generate}
-      diagram={<GenerateUseCaseDiagram />}
-    />
-  );
+  return <PromptFlowShell content={PROMPT_FLOW_CONTENT.generate} />;
 }
