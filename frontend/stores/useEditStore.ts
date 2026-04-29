@@ -145,7 +145,9 @@ export const useEditStore = create<EditState>((set) => ({
   sourceHeight: null,
 
   prompt: "",
-  lightning: false,
+  // 2026-04-29: 기본 ON (= ⚡ 빠른 모드 · 퀄리티 모드 OFF). 옛 false 는 EditLeftPanel 주석/desc 의
+  // "(기본)" 표기와 mismatch 였음 — 토글 라벨 동작은 그대로, 초기값만 의도대로 정렬.
+  lightning: true,
 
   useReferenceImage: false,
   referenceImage: null,
