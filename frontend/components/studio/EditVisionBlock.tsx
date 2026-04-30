@@ -4,10 +4,9 @@
  * 도메인별 5 슬롯 × {action, note} 매트릭스.
  * 비교 분석 (ComparisonAnalysisCard) 5축 점수표와 시각적 쌍둥이.
  *
- * 3곳에서 재사용:
- *  - AiEnhanceCard (결과 카드 비전 섹션)
+ * 재사용:
  *  - ProgressModal (수정 중 step 1 detail)
- *  - ImageLightbox (Edit 이미지 상세)
+ *  - ImageLightbox / InfoPanel (Edit 이미지 상세)
  *
  * UI 구조:
  *   🎯 수정 의도 (intent · gemma4 정제 결과)

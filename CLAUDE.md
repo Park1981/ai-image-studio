@@ -74,9 +74,9 @@ cd frontend; npm run gen:types
 - **`components/studio/ProgressModal.tsx`** — 5 mode 통일 진행 모달 (`<PipelineTimeline mode={mode} />`)
 - **`components/studio/progress/{PipelineTimeline,TimelineRow,DetailBox}.tsx`** — 통일 timeline 컴포넌트
 - **`components/studio/EditVisionBlock.tsx`** — Edit 비전 매트릭스 행 UI 공용 (인물 5 / 물체·풍경 5 슬롯 · 🔵수정/🟢보존 배지)
-- **`components/studio/{HistoryGallery,SectionHeader,HistorySectionHeader,ResultHoverActionBar,ResultInfoModal,BeforeAfterSlider}.tsx`** — 4메뉴 통일 공용 컴포넌트
+- **`components/studio/{HistoryGallery,SectionHeader,HistorySectionHeader,ResultHoverActionBar,BeforeAfterSlider}.tsx`** — 4메뉴 통일 공용 컴포넌트 (ResultInfoModal 은 2026-04-30 dead code 청소 시 삭제 — InfoPanel 로 흡수됨)
 - **`components/studio/CompareExtraBoxes.tsx`** — TransformPromptBox + UncertainBox (Compare v2.2)
-- **`components/chrome/{AppHeader,SystemMetrics,SystemStatusChip,VramBadge}.tsx`** — 통합 헤더 (CPU/GPU/VRAM/RAM 4-bar · macOS 색상 매핑 · 80% 임계 시 VRAM breakdown 오버레이)
+- **`components/chrome/{AppHeader,SystemMetrics,SystemStatusChip}.tsx`** — 통합 헤더 (CPU/GPU/VRAM/RAM 4-bar · macOS 색상 매핑 · 80% 임계 시 VRAM breakdown 오버레이). 옛 VramBadge 는 2026-04-30 dead code 청소 시 삭제됨.
 - **`hooks/{useGeneratePipeline,useEditPipeline,useVideoPipeline,useVisionPipeline,useComparisonAnalysis}.ts`** — mode 별 파이프라인 훅
 - **`lib/api/`** — `client.ts` (parseSSE 등) · `{generate,edit,video,vision,compare}.ts` (SSE drain) · `types.ts` (한글 주석/narrow union 손편집) · `generated.ts` (자동 생성) · `generated-helpers.ts` (Schemas/Paths alias)
 - **`stores/use*Store.ts`** — Zustand 8개 (settings/process/history/generate/edit/video/visionCompare/toast). `useGenerateStore` 의 `StageEvent` 정의가 5 mode 공용.
