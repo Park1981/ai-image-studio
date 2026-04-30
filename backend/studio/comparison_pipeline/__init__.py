@@ -26,12 +26,12 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
-from ._json_utils import coerce_score as _coerce_score
-from ._json_utils import parse_strict_json as _parse_strict_json
-from ._ollama_client import call_chat_payload
-from .presets import DEFAULT_OLLAMA_ROLES
-from .prompt_pipeline import _DEFAULT_OLLAMA_URL, DEFAULT_TIMEOUT
-from .vision_pipeline import ProgressCallback  # Phase 6 (2026-04-27): 단일 source
+from .._json_utils import coerce_score as _coerce_score
+from .._json_utils import parse_strict_json as _parse_strict_json
+from .._ollama_client import call_chat_payload
+from ..presets import DEFAULT_OLLAMA_ROLES
+from ..prompt_pipeline import _DEFAULT_OLLAMA_URL, DEFAULT_TIMEOUT
+from ..vision_pipeline import ProgressCallback  # Phase 6 (2026-04-27): 단일 source
 
 log = logging.getLogger(__name__)
 
