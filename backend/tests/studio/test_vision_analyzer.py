@@ -73,15 +73,15 @@ def test_vision_fallback_when_describe_fails() -> None:
     translate_mock = AsyncMock(return_value="(should not be called)")
     with (
         patch(
-            "studio.vision_pipeline._call_vision_recipe_v2",
+            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.vision_pipeline.translate_to_korean",
+            "studio.vision_pipeline.image_detail.translate_to_korean",
             new=translate_mock,
         ),
     ):
@@ -101,15 +101,15 @@ def test_vision_success_with_translation() -> None:
     translate_mock = AsyncMock(return_value="황혼 무렵의 따뜻한 에디토리얼 사진.")
     with (
         patch(
-            "studio.vision_pipeline._call_vision_recipe_v2",
+            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=describe_mock,
         ),
         patch(
-            "studio.vision_pipeline.translate_to_korean",
+            "studio.vision_pipeline.image_detail.translate_to_korean",
             new=translate_mock,
         ),
     ):
@@ -126,15 +126,15 @@ def test_vision_success_translation_only_fails() -> None:
     translate_mock = AsyncMock(return_value=None)  # translate 실패 시 None 반환
     with (
         patch(
-            "studio.vision_pipeline._call_vision_recipe_v2",
+            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=describe_mock,
         ),
         patch(
-            "studio.vision_pipeline.translate_to_korean",
+            "studio.vision_pipeline.image_detail.translate_to_korean",
             new=translate_mock,
         ),
     ):
@@ -152,15 +152,15 @@ def test_vision_model_override_propagates() -> None:
     translate_mock = AsyncMock(return_value=None)
     with (
         patch(
-            "studio.vision_pipeline._call_vision_recipe_v2",
+            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
             new=recipe_mock,
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=describe_mock,
         ),
         patch(
-            "studio.vision_pipeline.translate_to_korean",
+            "studio.vision_pipeline.image_detail.translate_to_korean",
             new=translate_mock,
         ),
     ):
@@ -203,15 +203,15 @@ async def test_vision_analyze_route_happy_path() -> None:
     translate_mock = AsyncMock(return_value="분위기 있는 스튜디오 초상.")
     with (
         patch(
-            "studio.vision_pipeline._call_vision_recipe_v2",
+            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=describe_mock,
         ),
         patch(
-            "studio.vision_pipeline.translate_to_korean",
+            "studio.vision_pipeline.image_detail.translate_to_korean",
             new=translate_mock,
         ),
     ):
@@ -334,11 +334,11 @@ def test_vision_v2_json_path_populates_slots() -> None:
     translate_mock = AsyncMock(return_value="스튜디오 초상.")
     with (
         patch(
-            "studio.vision_pipeline._call_vision_recipe_v2",
+            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
             new=recipe_mock,
         ),
         patch(
-            "studio.vision_pipeline.translate_to_korean",
+            "studio.vision_pipeline.image_detail.translate_to_korean",
             new=translate_mock,
         ),
     ):
@@ -372,15 +372,15 @@ def test_vision_v2_parse_failure_falls_back_to_paragraph() -> None:
     translate_mock = AsyncMock(return_value="황혼 사진.")
     with (
         patch(
-            "studio.vision_pipeline._call_vision_recipe_v2",
+            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
             new=recipe_mock,
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=describe_mock,
         ),
         patch(
-            "studio.vision_pipeline.translate_to_korean",
+            "studio.vision_pipeline.image_detail.translate_to_korean",
             new=translate_mock,
         ),
     ):

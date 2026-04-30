@@ -5,7 +5,54 @@
 
 ## 2026-04-30
 
-### Phase 4.1 — backend `history_db.py` 886줄 7 파일 분할 (current master)
+### Phase 4.2 — backend `vision_pipeline.py` 1131줄 4 파일 분할 (current master)
+
+**검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
+
+선행 commit: master `a8bad41` (Phase 4.1.1 helper). plan v2 (사용자 codex 1차 리뷰 6 finding 반영) 따라 단계적 진행.
+
+**plan v2 핵심 결정 (codex C1+C2+C3+I1+I2+I3+R1 fix)**:
+- C1: facade `__init__.py` 의 internal import 7 site 모두 `..` 로 갱신 (lazy ollama_unload 1건 추가 발견)
+- C2: `_aspect_label` 위치 → `_common.py` (Edit + Vision Analyzer 둘 다 사용 · grep 실증)
+- C3: 옵션 D patch target 갱신 시점 = 단계 3~4 sub-module 분리 commit 안에서 즉시
+- I1: 옵션 D 확정 (sub-module 직접 import + 44 patch site 갱신)
+- I2: grep assertion `[A-Za-z_]+` 패턴 (private patch `_call_vision_*` 검출)
+- I3: SYSTEM_VISION_RECIPE_V2 / VisionPipelineResult / VisionAnalysisResult 그룹 매핑 명시
+- R1: production 6 + test 5 = 11 파일 (grep 실증)
+
+**6 commit 흐름**:
+1. `333dced` — docs(plan): Phase 4.2 plan v1
+2. `c738400` — docs(plan): Phase 4.2 plan v2 (codex 6 finding 반영)
+3. `4a7deb5` — 단계 1: file → package + internal import 7 site .. 갱신
+4. `90c74ef` — 단계 2: _common 그룹 분리 (ProgressCallback / VISION_SYSTEM / _describe_image / _to_base64 / _aspect_label)
+5. `310f85a` — 단계 3~6: edit_source + image_detail 분리 + facade 정리 + patch 44 site 갱신 + `__all__`
+
+**규모**:
+- 옛 `studio/vision_pipeline.py` 1131줄 → 4 파일 (총 1,225줄, +94줄 헤더/sub-module 보일러):
+  - facade `__init__.py` 96줄 (pure re-export + `__all__`)
+  - `_common.py` 128줄 (qwen2.5vl 호출 + 공용 헬퍼)
+  - `edit_source.py` 579줄 (Edit 9-slot 매트릭스 흐름)
+  - `image_detail.py` 422줄 (Vision Analyzer recipe v2)
+
+**효과**:
+- 두 독립 흐름 (Edit 매트릭스 vs Vision Analyzer recipe v2) 분리 → 단일 책임
+- monkeypatch 44 site 가 호출 site 의 lookup module 기준으로 갱신 (CLAUDE.md 🔴 정합)
+- Edit + Vision Analyzer 둘 다 쓰는 _aspect_label 등 공용 헬퍼 _common.py 응집
+
+### Phase 4.1.1 — `replace_reference_ref_if_current` helper 추출 (codex Open Question 반영)
+
+**검증**: pytest **361 PASS** · ruff clean · 회귀 0건
+
+Phase 4.1 후 codex Open Question:
+> `routes/reference_templates.py:242` 가 직접 `aiosqlite.connect(history_db._config._DB_PATH)` 사용 — route ↔ DB layer 경계 침범.
+
+→ `history_db.replace_reference_ref_if_current(history_id, current_ref, new_ref) -> bool` helper 흡수.
+- WHERE reference_ref = current_ref 조건부 UPDATE (race-safe)
+- race lost (rowcount==0) 시 caller 가 rollback (template + 영구 파일 + 409)
+- route 의 connect+SQL 6줄 → helper 호출 1줄
+- `aiosqlite` import 제거 (route 가 더 이상 DB 직접 접근 안 함)
+
+### Phase 4.1 — backend `history_db.py` 886줄 7 파일 분할
 
 **검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
 

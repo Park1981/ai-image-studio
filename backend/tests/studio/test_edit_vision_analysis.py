@@ -186,7 +186,7 @@ def test_analyze_edit_source_person_domain() -> None:
     """인물 모드 정상 응답 → domain=person, slots 5개 모두 채워짐."""
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
         # clarify_edit_intent 도 stub (외부 호출 막기)
@@ -219,7 +219,7 @@ def test_analyze_edit_source_object_scene_domain() -> None:
     """물체·풍경 모드 정상 응답 → domain=object_scene, 다른 슬롯 키 셋."""
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_object_scene_json()),
         ),
         patch(
@@ -246,7 +246,7 @@ def test_analyze_edit_source_uses_provided_refined_intent() -> None:
     clarify_mock = AsyncMock(return_value="should not be called")
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
         patch("studio.prompt_pipeline.clarify_edit_intent", new=clarify_mock),
@@ -269,7 +269,7 @@ def test_analyze_edit_source_vision_fail_fallback_shape() -> None:
     """비전 호출 빈 응답 → fallback=True, slots 5개 모두 preserve+빈 note."""
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=""),
         ),
         patch(
@@ -296,7 +296,7 @@ def test_analyze_edit_source_malformed_json_fallback() -> None:
     """JSON 깨진 응답 → fallback + 5 슬롯 빈 매트릭스."""
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value="{invalid not json"),
         ),
         patch(
@@ -327,7 +327,7 @@ def test_analyze_edit_source_unknown_domain_normalizes_to_object_scene() -> None
     })
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=payload),
         ),
         patch(
@@ -355,7 +355,7 @@ def test_analyze_edit_source_missing_slots_filled_with_preserve_default() -> Non
     })
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=payload),
         ),
         patch(
@@ -391,7 +391,7 @@ def test_analyze_edit_source_invalid_action_normalizes_to_preserve() -> None:
     })
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=payload),
         ),
         patch(
@@ -413,7 +413,7 @@ def test_to_dict_camelcase_for_frontend() -> None:
     """to_dict() 가 프론트 타입과 맞춘 형식 — slots 보존, analyzedAt camelCase."""
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
@@ -440,7 +440,7 @@ def test_compact_context_lists_all_slots_in_order() -> None:
     """compact_context() 가 도메인 슬롯 순서대로 5줄 + intent + summary 포함."""
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
@@ -473,7 +473,7 @@ def test_compact_context_skips_preserve_slot_notes_spec19() -> None:
     """
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
@@ -510,7 +510,7 @@ def test_human_summary_returns_summary_or_intent() -> None:
     """human_summary() 는 summary 우선, 없으면 intent."""
     with (
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
@@ -562,15 +562,15 @@ def test_run_vision_pipeline_passes_compact_context_when_matrix_ok() -> None:
             new=AsyncMock(return_value="Refined English intent."),
         ),
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
-            "studio.vision_pipeline.upgrade_edit_prompt",
+            "studio.vision_pipeline.edit_source.upgrade_edit_prompt",
             new=_fake_upgrade(captured),
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=AsyncMock(return_value="(should not be called)"),
         ) as describe_spy,
     ):
@@ -616,11 +616,11 @@ def test_run_vision_pipeline_unloads_models_between_stages_spec19() -> None:
             new=AsyncMock(return_value="intent"),
         ),
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
-            "studio.vision_pipeline.upgrade_edit_prompt",
+            "studio.vision_pipeline.edit_source.upgrade_edit_prompt",
             new=_fake_upgrade(captured),
         ),
         patch(
@@ -628,7 +628,7 @@ def test_run_vision_pipeline_unloads_models_between_stages_spec19() -> None:
             new=_spy_unload,
         ),
         patch(
-            "studio.vision_pipeline.asyncio.sleep",
+            "studio.vision_pipeline.edit_source.asyncio.sleep",
             new=_no_sleep,
         ),
     ):
@@ -656,15 +656,15 @@ def test_run_vision_pipeline_falls_back_to_caption_when_matrix_fails() -> None:
             new=AsyncMock(return_value="Refined."),
         ),
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=""),  # 매트릭스 실패
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=AsyncMock(return_value="A short caption."),
         ),
         patch(
-            "studio.vision_pipeline.upgrade_edit_prompt",
+            "studio.vision_pipeline.edit_source.upgrade_edit_prompt",
             new=_fake_upgrade(captured),
         ),
     ):
@@ -689,15 +689,15 @@ def test_run_vision_pipeline_unavailable_when_both_fail() -> None:
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.vision_pipeline._call_vision_edit_source",
+            "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.vision_pipeline._describe_image",
+            "studio.vision_pipeline._common._describe_image",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.vision_pipeline.upgrade_edit_prompt",
+            "studio.vision_pipeline.edit_source.upgrade_edit_prompt",
             new=_fake_upgrade(captured),
         ),
     ):
