@@ -14,7 +14,6 @@ from __future__ import annotations
 
 from typing import Any
 
-from .._ollama_client import call_chat_payload
 from ._common import (  # noqa: F401 — facade re-export (production import 호환)
     DEFAULT_TIMEOUT,
     UpgradeResult,
@@ -22,6 +21,8 @@ from ._common import (  # noqa: F401 — facade re-export (production import 호
     _strip_repeat_noise,
     log,
 )
+from . import _ollama as _o
+from ._ollama import _call_ollama_chat  # noqa: F401 — facade re-export
 
 # 시스템 프롬프트 — v3 (2026-04-23 후속):
 # gemma4-un 이 JSON 모드 + 긴 출력 결합 시 loop 에 빠지는 이슈 회피를 위해 2-call 전환.
@@ -432,7 +433,7 @@ async def clarify_edit_intent(
 
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
     try:
-        raw = await _call_ollama_chat(
+        raw = await _o._call_ollama_chat(
             ollama_url=resolved_url,
             model=model,
             system=SYSTEM_CLARIFY_INTENT,
@@ -466,7 +467,7 @@ async def translate_to_korean(
     if not text.strip():
         return None
     try:
-        raw = await _call_ollama_chat(
+        raw = await _o._call_ollama_chat(
             ollama_url=ollama_url or _DEFAULT_OLLAMA_URL,
             model=model,
             system=SYSTEM_TRANSLATE_KO,
@@ -510,7 +511,7 @@ async def _run_upgrade_call(
         log_label: 실패 로그 prefix (예: "gemma4 upgrade", "Edit prompt upgrade")
     """
     try:
-        upgraded_raw = await _call_ollama_chat(
+        upgraded_raw = await _o._call_ollama_chat(
             ollama_url=resolved_url,
             model=model,
             system=system,
@@ -868,41 +869,3 @@ async def upgrade_video_prompt(
     )
 
 
-async def _call_ollama_chat(
-    *,
-    ollama_url: str,
-    model: str,
-    system: str,
-    user: str,
-    timeout: float,
-) -> str:
-    """Ollama /api/chat 호출 (non-streaming)."""
-    # v3: plain text 에 repeat_penalty 적용 — gemma4-un 이 긴 출력에서 loop 빠지는 이슈 대응.
-    options: dict = {
-        "num_ctx": 8192,
-        "temperature": 0.6,
-        "top_p": 0.92,
-        "repeat_penalty": 1.18,
-        "num_predict": 800,
-    }
-
-    payload: dict = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "stream": False,
-        # v3.1 (2026-04-23): gemma4-un 이 thinking 모델로 동작해서 content 가 비는 이슈.
-        # Ollama 신규 필드 think=false 로 reasoning 억제.
-        "think": False,
-        # 2026-04-26: VRAM 즉시 반납 (CLAUDE.md "Ollama: 온디맨드 호출 + 즉시 반납" 의도)
-        # 기본 5분 keep_alive 가 16GB VRAM 환경 ComfyUI 와 충돌 → 응답 직후 unload.
-        "keep_alive": "0",
-        "options": options,
-    }
-    return await call_chat_payload(
-        ollama_url=ollama_url,
-        payload=payload,
-        timeout=timeout,
-    )

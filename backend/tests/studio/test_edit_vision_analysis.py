@@ -139,7 +139,7 @@ def test_clarify_intent_happy_path() -> None:
     """정상 호출 → gemma4 정제 결과 반환."""
     expected = "Remove top and bottom clothing entirely. Resize the bust to a natural sagging E-cup. Keep everything else unchanged."
     with patch(
-        "studio.prompt_pipeline._call_ollama_chat",
+        "studio.prompt_pipeline._ollama._call_ollama_chat",
         new=AsyncMock(return_value=expected),
     ):
         result = asyncio.run(
@@ -151,7 +151,7 @@ def test_clarify_intent_happy_path() -> None:
 def test_clarify_intent_empty_input_returns_empty() -> None:
     """빈 입력은 호출 없이 빈 문자열 반환."""
     call_mock = AsyncMock(return_value="should not be called")
-    with patch("studio.prompt_pipeline._call_ollama_chat", new=call_mock):
+    with patch("studio.prompt_pipeline._ollama._call_ollama_chat", new=call_mock):
         result = asyncio.run(clarify_edit_intent(""))
     assert result == ""
     call_mock.assert_not_called()
@@ -161,7 +161,7 @@ def test_clarify_intent_falls_back_on_exception() -> None:
     """ollama 호출 예외 시 원문 그대로 폴백."""
     raw_input = "make it nicer"
     with patch(
-        "studio.prompt_pipeline._call_ollama_chat",
+        "studio.prompt_pipeline._ollama._call_ollama_chat",
         new=AsyncMock(side_effect=RuntimeError("ollama down")),
     ):
         result = asyncio.run(clarify_edit_intent(raw_input))
@@ -172,7 +172,7 @@ def test_clarify_intent_falls_back_on_empty_response() -> None:
     """ollama 응답이 빈 문자열이면 원문 폴백."""
     raw_input = "change something"
     with patch(
-        "studio.prompt_pipeline._call_ollama_chat",
+        "studio.prompt_pipeline._ollama._call_ollama_chat",
         new=AsyncMock(return_value=""),
     ):
         result = asyncio.run(clarify_edit_intent(raw_input))
