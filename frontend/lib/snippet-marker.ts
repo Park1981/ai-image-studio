@@ -42,3 +42,23 @@ export function removeMarker(textarea: string, prompt: string): string {
 export function stripAllMarkers(text: string): string {
   return text.split(OPEN).join("").split(CLOSE).join("");
 }
+
+/**
+ * 2026-04-30 (단일 활성 정책 fix · 오빠 결정):
+ * 모든 `<lib>...</lib>` *블록* 통째로 제거 (마커 + 안 내용 둘 다).
+ * 빈 콤마/공백 정리까지 포함 — 라이브러리 카드 단일 활성 흐름에서 사용.
+ *
+ * stripAllMarkers 와 차이: 저건 *마커 토큰* 만 제거 + 안 내용 보존,
+ * 이건 *블록 전체* (안 내용 포함) 제거.
+ */
+export function stripAllLibBlocks(text: string): string {
+  let next = text.replace(/<lib>[\s\S]*?<\/lib>/g, "");
+  // 연속 콤마-공백 그룹 (", , ," 등) 을 하나의 ", " 로 압축 → lastIndex 함정 우회.
+  next = next
+    .replace(/(,\s*){2,}/g, ", ")
+    .replace(/^\s*,\s*/, "")
+    .replace(/\s*,\s*$/, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return next;
+}

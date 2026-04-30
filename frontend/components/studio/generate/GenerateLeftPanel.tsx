@@ -32,7 +32,7 @@ import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import {
   hasMarker,
-  removeMarker,
+  stripAllLibBlocks,
   wrapMarker,
 } from "@/lib/snippet-marker";
 import {
@@ -83,15 +83,16 @@ export default function GenerateLeftPanel({
     void usePromptSnippetsStore.getState().migrateLargeThumbnails();
   }, []);
 
-  // 카드 클릭 → textarea toggle + 모달 자동 닫기 + 커서 위치 삽입.
-  // 2026-04-30 (오빠 후속 피드백):
-  //   - 카드 선택 시 LibraryModal 자동 닫기
-  //   - 새 마커는 textarea 의 *현재 커서 위치* 에 삽입 (selection 영역 있으면 교체)
-  //   - 이미 마커 있으면 토글 제거 (그 자리에 모달 닫고 focus 만)
+  // 카드 클릭 → textarea 의 lib 블록 *단일 활성* 토글 + 모달 자동 닫기.
+  // 2026-04-30 (오빠 결정 — 단일 활성 정책):
+  //   어떤 lib 카드든 한 번에 1개만 적용. 다른 카드 클릭 시 기존 마커 통째로 교체.
+  //   - wasActive (= 같은 카드 다시 클릭): 마커 제거 → 0개 (토글 OFF)
+  //   - 아니면: 모든 기존 lib 블록 제거 + 새 마커 1개만 끝에 삽입 (단일 활성)
+  //
+  //   커서 위치 삽입은 단일 활성 정책에서 의미 약함 (어디 넣든 1개) → 끝 추가가 자연스러움.
   const handleToggleSnippet = (snip: PromptSnippet) => {
     const closeAndFocus = (newCursor?: number) => {
       setLibraryOpen(false);
-      // setPrompt 가 다음 렌더에서 textarea value 갱신하므로 rAF 로 cursor 복원.
       requestAnimationFrame(() => {
         const ta = promptTextareaRef.current;
         if (!ta) return;
@@ -102,43 +103,27 @@ export default function GenerateLeftPanel({
       });
     };
 
-    // 1. 이미 마커 있으면 제거 (전체 textarea 에서 첫 매치 1회)
-    if (hasMarker(prompt, snip.prompt)) {
-      setPrompt(removeMarker(prompt, snip.prompt));
-      closeAndFocus();
+    const wasActive = hasMarker(prompt, snip.prompt);
+    // 기존 lib 블록 모두 통째로 제거 (마커 + 안 내용 + 콤마 정리)
+    const stripped = stripAllLibBlocks(prompt);
+
+    // wasActive: 같은 카드 다시 클릭 → 0개 상태로 (토글 OFF)
+    if (wasActive) {
+      setPrompt(stripped);
+      closeAndFocus(stripped.length);
       return;
     }
 
-    // 2. 새 마커 삽입 — 커서 위치 우선
+    // 다른 카드 클릭 (또는 첫 활성) → stripped 끝에 새 마커 1개만
     const wrapped = wrapMarker(snip.prompt);
-    const ta = promptTextareaRef.current;
-
-    // ref 없거나 selection 정보 못 받으면 끝에 추가 (폴백)
-    if (!ta || ta.selectionStart == null) {
-      if (!prompt.trim()) {
-        setPrompt(wrapped);
-        closeAndFocus(wrapped.length);
-      } else {
-        const next = `${prompt.trimEnd()}, ${wrapped}`;
-        setPrompt(next);
-        closeAndFocus(next.length);
-      }
+    if (!stripped.trim()) {
+      setPrompt(wrapped);
+      closeAndFocus(wrapped.length);
       return;
     }
-
-    // 커서 위치 / selection 영역 삽입
-    const start = ta.selectionStart;
-    const end = ta.selectionEnd ?? start;
-    const before = prompt.slice(0, start);
-    const after = prompt.slice(end);
-
-    // 자연스러운 separator: before 끝이 콤마/공백 아니면 ", " 자동 삽입.
-    const beforeNeedsSep = before.length > 0 && !/[,\s]$/.test(before);
-    const afterNeedsSep = after.length > 0 && !/^[,\s]/.test(after);
-    const insert = `${beforeNeedsSep ? ", " : ""}${wrapped}${afterNeedsSep ? ", " : ""}`;
-
-    setPrompt(before + insert + after);
-    closeAndFocus(before.length + insert.length);
+    const next = `${stripped.trimEnd()}, ${wrapped}`;
+    setPrompt(next);
+    closeAndFocus(next.length);
   };
 
   const sizeLabel = `${width}×${height}`;

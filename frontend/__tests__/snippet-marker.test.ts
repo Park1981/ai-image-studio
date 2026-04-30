@@ -1,11 +1,12 @@
 /**
- * snippet-marker 헬퍼 단위 테스트 — 9 케이스.
- * 2026-04-30 (Phase 2B Task 5 · plan 2026-04-30-prompt-snippets-library.md).
+ * snippet-marker 헬퍼 단위 테스트.
+ * 2026-04-30 (Phase 2B Task 5 + 단일 활성 정책 fix).
  */
 import { describe, expect, it } from "vitest";
 import {
   hasMarker,
   removeMarker,
+  stripAllLibBlocks,
   stripAllMarkers,
   wrapMarker,
 } from "@/lib/snippet-marker";
@@ -51,5 +52,19 @@ describe("snippet-marker", () => {
     expect(
       stripAllMarkers("<lib>A</lib> mid <lib>B</lib> end <lib>C</lib>"),
     ).toBe("A mid B end C");
+  });
+
+  // 2026-04-30 단일 활성 정책 fix — stripAllLibBlocks (블록 통째로 제거)
+  it("stripAllLibBlocks — 단일 블록 통째로 제거", () => {
+    expect(stripAllLibBlocks("<lib>cinematic 35mm</lib>")).toBe("");
+  });
+
+  it("stripAllLibBlocks — 다중 블록 모두 제거 + 콤마 정리", () => {
+    const ta = "a girl, <lib>face A</lib>, <lib>outfit B</lib>, warm light";
+    expect(stripAllLibBlocks(ta)).toBe("a girl, warm light");
+  });
+
+  it("stripAllLibBlocks — 블록 없으면 원본 유지", () => {
+    expect(stripAllLibBlocks("plain text only")).toBe("plain text only");
   });
 });
