@@ -127,8 +127,8 @@ def test_upgrade_video_success() -> None:
     )
     translate_mock = AsyncMock(return_value="시네마틱 클로즈업이 피사체를 따라 천천히 팬...")
     with (
-        patch("studio.prompt_pipeline._call_ollama_chat", new=chat_mock),
-        patch("studio.prompt_pipeline.translate_to_korean", new=translate_mock),
+        patch("studio.prompt_pipeline._ollama._call_ollama_chat", new=chat_mock),
+        patch("studio.prompt_pipeline.translate.translate_to_korean", new=translate_mock),
     ):
         result: UpgradeResult = asyncio.run(
             upgrade_video_prompt(
@@ -147,8 +147,8 @@ def test_upgrade_video_fallback_on_ollama_fail() -> None:
     chat_mock = AsyncMock(side_effect=RuntimeError("ollama down"))
     translate_mock = AsyncMock(return_value="not called")
     with (
-        patch("studio.prompt_pipeline._call_ollama_chat", new=chat_mock),
-        patch("studio.prompt_pipeline.translate_to_korean", new=translate_mock),
+        patch("studio.prompt_pipeline._ollama._call_ollama_chat", new=chat_mock),
+        patch("studio.prompt_pipeline.translate.translate_to_korean", new=translate_mock),
     ):
         result = asyncio.run(
             upgrade_video_prompt(
@@ -175,8 +175,8 @@ def test_upgrade_video_uses_system_video_prompt() -> None:
     chat_mock = AsyncMock(return_value="out")
     translate_mock = AsyncMock(return_value=None)
     with (
-        patch("studio.prompt_pipeline._call_ollama_chat", new=chat_mock),
-        patch("studio.prompt_pipeline.translate_to_korean", new=translate_mock),
+        patch("studio.prompt_pipeline._ollama._call_ollama_chat", new=chat_mock),
+        patch("studio.prompt_pipeline.translate.translate_to_korean", new=translate_mock),
     ):
         asyncio.run(
             upgrade_video_prompt(
@@ -195,8 +195,8 @@ def test_upgrade_video_adult_injects_nsfw_clause() -> None:
     chat_mock = AsyncMock(return_value="out")
     translate_mock = AsyncMock(return_value=None)
     with (
-        patch("studio.prompt_pipeline._call_ollama_chat", new=chat_mock),
-        patch("studio.prompt_pipeline.translate_to_korean", new=translate_mock),
+        patch("studio.prompt_pipeline._ollama._call_ollama_chat", new=chat_mock),
+        patch("studio.prompt_pipeline.translate.translate_to_korean", new=translate_mock),
     ):
         asyncio.run(
             upgrade_video_prompt(

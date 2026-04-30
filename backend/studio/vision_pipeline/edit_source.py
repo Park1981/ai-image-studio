@@ -170,8 +170,10 @@ async def run_vision_pipeline(
         text_model: gemma4 정제 + upgrade 공통 모델 (gemma4-un)
         ollama_url: 미지정 시 settings.ollama_url
     """
-    # 지연 import — 순환 회피. clarify_edit_intent 는 prompt_pipeline 에 있음.
-    from ..prompt_pipeline import clarify_edit_intent  # noqa: WPS433
+    # 지연 import — 순환 회피. clarify_edit_intent 는 prompt_pipeline.translate 에 있음.
+    # Phase 4.3 단계 4 (codex C2 fix): facade 가 아니라 submodule 직접 import.
+    # facade re-export 의 함수 reference snapshot 함정 회피 + patch 일관 동작.
+    from ..prompt_pipeline.translate import clarify_edit_intent  # noqa: WPS433
     # 지연 import — 모델 단계별 unload 헬퍼 (옵션 B · 16GB VRAM swap 차단).
     from .. import ollama_unload  # noqa: WPS433
 
@@ -507,8 +509,9 @@ async def analyze_edit_source(
     Returns:
         EditVisionAnalysis — fallback=True 경로도 slots 5개 모두 preserve+빈 note.
     """
-    # text_model 은 lazy import 우회 — clarify_edit_intent 가 prompt_pipeline 에 있음
-    from ..prompt_pipeline import clarify_edit_intent  # noqa: WPS433 (지연 import 정당)
+    # text_model 은 lazy import 우회 — clarify_edit_intent 가 prompt_pipeline.translate 에 있음
+    # Phase 4.3 단계 4 (codex C2 fix): facade 가 아니라 submodule 직접 import.
+    from ..prompt_pipeline.translate import clarify_edit_intent  # noqa: WPS433
 
     resolved_vision = vision_model or DEFAULT_OLLAMA_ROLES.vision
     resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text

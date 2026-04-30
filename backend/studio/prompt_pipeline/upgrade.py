@@ -1,40 +1,32 @@
 """
-prompt_pipeline.py - gemma4 기반 프롬프트 업그레이드 (Ollama 연동).
+prompt_pipeline.upgrade — gemma4 프롬프트 업그레이드 (가장 큰 sub-module).
 
-흐름:
-1. 사용자가 자연어 프롬프트 입력 (한글 OK)
-2. gemma4-un 에 시스템 프롬프트 + 사용자 프롬프트 전달
-3. "업그레이드된 영어 프롬프트" 반환 (Qwen Image 2512 에 최적화)
-4. 실패/타임아웃 시 원본 프롬프트 + warn 플래그 반환 (폴백)
+흐름별 3 진입점:
+- upgrade_generate_prompt: 생성 프롬프트 (Qwen Image 2512)
+- upgrade_edit_prompt: 수정 프롬프트 (Qwen Image Edit 2511 + matrix directive + multi-ref clause)
+- upgrade_video_prompt: 영상 프롬프트 (LTX Video 2.3 i2v)
 
-조사(Claude CLI) 컨텍스트가 있으면 시스템 프롬프트에 참고자료로 주입한다.
+3 함수의 공통 보일러플레이트는 _run_upgrade_call 공용 헬퍼로 통합.
+모든 SYSTEM 프롬프트 + ROLE_INSTRUCTIONS / ROLE_TO_SLOTS / DOMAIN_VALID_SLOTS 등
+프롬프트 정책 정의 + matrix directive 빌더 (_build_matrix_directive_block) 도 본 모듈.
+
+Phase 4.3 단계 5 (2026-04-30) 분리.
 """
 
 from __future__ import annotations
 
-import logging
-import re
-from dataclasses import dataclass
 from typing import Any
 
-from ._ollama_client import call_chat_payload
+from . import _ollama as _o
+from . import translate as _t
+from ._common import (
+    DEFAULT_TIMEOUT,
+    UpgradeResult,
+    _DEFAULT_OLLAMA_URL,
+    _strip_repeat_noise,
+    log,
+)
 
-log = logging.getLogger(__name__)
-
-# Ollama URL 은 .env/config.py 에서만 읽는다 (하드코딩 금지 규칙).
-# 테스트 환경에서 config import 가 실패할 수 있으므로 try/except 폴백만 허용.
-try:
-    from config import settings  # type: ignore
-
-    _DEFAULT_OLLAMA_URL: str = settings.ollama_url
-except Exception:  # pragma: no cover - 테스트/독립 실행 환경
-    _DEFAULT_OLLAMA_URL = "http://127.0.0.1:11434"
-
-# 16GB VRAM 환경에서 gemma4-un(25.2B) 첫 로드 30~60s 여유 필요.
-# 이후 호출은 빠름. 환경에 따라 .env 로 조정 가능하도록 추후 이동.
-# 2026-04-24: 120 → 240 로 상향 — cold start + num_predict=800 조합에서
-# 간혹 ReadTimeout 으로 fallback 빠지는 이슈 대응.
-DEFAULT_TIMEOUT = 240.0
 
 # 시스템 프롬프트 — v3 (2026-04-23 후속):
 # gemma4-un 이 JSON 모드 + 긴 출력 결합 시 loop 에 빠지는 이슈 회피를 위해 2-call 전환.
@@ -380,173 +372,6 @@ def build_system_video(adult: bool = False) -> str:
 # 하위 호환: SYSTEM_VIDEO 레퍼런스 유지 (adult=False 기본값).
 SYSTEM_VIDEO = build_system_video(adult=False)
 
-SYSTEM_TRANSLATE_KO = """You are a professional Korean translator.
-Translate the given English image-generation prompt into natural, readable Korean.
-
-RULES:
-- Output ONLY the Korean translation — no preamble, no explanation, no quotes.
-- Keep the same meaning and detail level. Do NOT summarize.
-- Technical photography terms like "35mm film", "bokeh", "depth of field", "cinematic grading" can stay in English.
-- Never repeat phrases. Output a single clean translation."""
-
-
-@dataclass
-class UpgradeResult:
-    """프롬프트 업그레이드 결과."""
-
-    upgraded: str
-    """최종 영문 프롬프트."""
-
-    fallback: bool
-    """True 면 Ollama 실패로 원본을 그대로 반환한 상태."""
-
-    provider: str
-    """'ollama' | 'fallback'."""
-
-    original: str
-    """사용자 원본 프롬프트."""
-
-    translation: str | None = None
-    """업그레이드된 영문 프롬프트의 한국어 번역 (v2 · 2026-04-23).
-    JSON 파싱 실패 또는 fallback 시 None."""
-
-
-def _strip_repeat_noise(s: str) -> str:
-    """모델이 loop 에 빠져 내뱉는 반복 문자/토큰/구 제거.
-
-    탐지 케이스:
-      1. 같은 문자 12번+ 연속 (예: ||||||||||)
-      2. 같은 단어 8번+ 연속 (예: larger larger larger ...)
-      3. 짧은 구 3번+ 반복 (예: a park-like a park-like a park-like ...)
-    매치 시점부터 뒤를 전부 잘라낸다.
-    """
-    if not s:
-        return s
-    candidates: list[int] = []
-    # 1) 같은 문자 12번+ 연속
-    m = re.search(r"(.)\1{11,}", s)
-    if m:
-        candidates.append(m.start())
-    # 2) 같은 단어 8번+ 연속
-    m2 = re.search(r"\b(\w{2,20})(\s+\1){7,}", s)
-    if m2:
-        candidates.append(m2.start())
-    # 3) 2~5 단어 구가 3번+ 반복 (하이픈·특수문자도 포함해서 매치)
-    # 예: "a park-like a park-like a park-like" — 공백 기준 토큰이 2~5개 반복
-    m3 = re.search(
-        r"(\b[\w-]+(?:\s+[\w-]+){1,4})(?:\s+\1){2,}", s
-    )
-    if m3:
-        candidates.append(m3.start())
-
-    if candidates:
-        s = s[: min(candidates)]
-    return s.rstrip()
-
-
-# ═══════════════════════════════════════════════════════════════════════
-#  clarify_edit_intent — 사용자 자연어 → 영어 정제 intent (spec 15.7)
-#
-#  비전 분석 (analyze_edit_source) 직전에 호출. qwen2.5vl 비전 모델은 한국어
-#  + 띄어쓰기 + 이모티브 입력에 약하므로 gemma4-un 으로 의도 정제.
-# ═══════════════════════════════════════════════════════════════════════
-
-SYSTEM_CLARIFY_INTENT = """You are an image-edit intent clarifier.
-
-The user wrote an edit instruction in casual natural language (often Korean,
-with informal spacing, partial sentences, or shorthand).
-
-Your job: rewrite it into clean English in 1-2 sentences (max 60 words),
-preserving:
-1. EXACTLY which elements the user wants to CHANGE (target -> intended state).
-2. EXPLICIT preservation scope when the user mentions it (e.g. "그 외 유지").
-
-RULES:
-- Output ONLY the clarified English instruction — no preamble, no quotes,
-  no explanation, no bullet list.
-- Use imperative tense ("Remove the top.", "Resize the bust to E-cup.").
-- Keep proper nouns and numeric values exactly as the user provided.
-- Do NOT add elements the user did not mention.
-- Do NOT soften or moralize the request.
-- If the user mentions preservation explicitly, include "Keep everything else
-  unchanged." or similar at the end.
-- Never repeat phrases."""
-
-
-async def clarify_edit_intent(
-    user_instruction: str,
-    model: str = "gemma4-un:latest",
-    timeout: float = 60.0,
-    ollama_url: str | None = None,
-) -> str:
-    """사용자 자연어 수정 지시 → 영어 1-2 문장 정제 intent.
-
-    실패 / 빈 입력 / 모든 예외 경로에서 원문을 그대로 반환 (폴백). 비전 분석이
-    원문이라도 받게 해서 전체 파이프라인을 막지 않음.
-
-    Args:
-        user_instruction: 한/영 자연어 지시 (빈 문자열 허용)
-        model: gemma4-un (think:False 자동 적용 — _call_ollama_chat 내부)
-        timeout: 60s 권장 (cold start 여유)
-        ollama_url: 기본 settings.ollama_url
-
-    Returns:
-        정제된 영어 intent (1-2 문장) 또는 폴백 시 원문.
-    """
-    raw_input = (user_instruction or "").strip()
-    if not raw_input:
-        return ""
-
-    resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
-    try:
-        raw = await _call_ollama_chat(
-            ollama_url=resolved_url,
-            model=model,
-            system=SYSTEM_CLARIFY_INTENT,
-            user=raw_input,
-            timeout=timeout,
-        )
-        cleaned = _strip_repeat_noise(raw.strip()).strip()
-        if not cleaned:
-            log.info("clarify_edit_intent: empty response, falling back to raw")
-            return raw_input
-        # 너무 길면 600자 cap (비전 SYSTEM 프롬프트 보호)
-        if len(cleaned) > 600:
-            cleaned = cleaned[:600].rstrip()
-        return cleaned
-    except Exception as e:
-        log.info("clarify_edit_intent failed (non-fatal): %s", e)
-        return raw_input
-
-
-async def translate_to_korean(
-    text: str,
-    model: str = "gemma4-un:latest",
-    timeout: float = 45.0,
-    ollama_url: str | None = None,
-) -> str | None:
-    """영문 텍스트를 한국어로 번역 (짧은 단일 호출).
-
-    반환: 번역 문자열 / 실패 시 None.
-    업그레이드 이후 별도 호출로 사용 — 실패해도 en 은 영향 없음.
-    """
-    if not text.strip():
-        return None
-    try:
-        raw = await _call_ollama_chat(
-            ollama_url=ollama_url or _DEFAULT_OLLAMA_URL,
-            model=model,
-            system=SYSTEM_TRANSLATE_KO,
-            user=text.strip(),
-            timeout=timeout,
-        )
-        cleaned = _strip_repeat_noise(raw.strip())
-        return cleaned if cleaned else None
-    except Exception as e:
-        log.info("translation failed (non-fatal): %s", e)
-        return None
-
-
 async def _run_upgrade_call(
     *,
     system: str,
@@ -577,7 +402,7 @@ async def _run_upgrade_call(
         log_label: 실패 로그 prefix (예: "gemma4 upgrade", "Edit prompt upgrade")
     """
     try:
-        upgraded_raw = await _call_ollama_chat(
+        upgraded_raw = await _o._call_ollama_chat(
             ollama_url=resolved_url,
             model=model,
             system=system,
@@ -599,7 +424,7 @@ async def _run_upgrade_call(
 
     ko = None
     if include_translation:
-        ko = await translate_to_korean(
+        ko = await _t.translate_to_korean(
             en, model=model, timeout=60.0, ollama_url=resolved_url
         )
 
@@ -935,41 +760,3 @@ async def upgrade_video_prompt(
     )
 
 
-async def _call_ollama_chat(
-    *,
-    ollama_url: str,
-    model: str,
-    system: str,
-    user: str,
-    timeout: float,
-) -> str:
-    """Ollama /api/chat 호출 (non-streaming)."""
-    # v3: plain text 에 repeat_penalty 적용 — gemma4-un 이 긴 출력에서 loop 빠지는 이슈 대응.
-    options: dict = {
-        "num_ctx": 8192,
-        "temperature": 0.6,
-        "top_p": 0.92,
-        "repeat_penalty": 1.18,
-        "num_predict": 800,
-    }
-
-    payload: dict = {
-        "model": model,
-        "messages": [
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        "stream": False,
-        # v3.1 (2026-04-23): gemma4-un 이 thinking 모델로 동작해서 content 가 비는 이슈.
-        # Ollama 신규 필드 think=false 로 reasoning 억제.
-        "think": False,
-        # 2026-04-26: VRAM 즉시 반납 (CLAUDE.md "Ollama: 온디맨드 호출 + 즉시 반납" 의도)
-        # 기본 5분 keep_alive 가 16GB VRAM 환경 ComfyUI 와 충돌 → 응답 직후 unload.
-        "keep_alive": "0",
-        "options": options,
-    }
-    return await call_chat_payload(
-        ollama_url=ollama_url,
-        payload=payload,
-        timeout=timeout,
-    )
