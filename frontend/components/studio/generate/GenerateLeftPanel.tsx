@@ -19,9 +19,11 @@
 
 "use client";
 
-import type { RefObject } from "react";
+import { useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import ResearchBanner from "@/components/studio/ResearchBanner";
+import SnippetLibraryModal from "@/components/studio/SnippetLibraryModal";
+import SnippetRegisterModal from "@/components/studio/SnippetRegisterModal";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
@@ -30,9 +32,15 @@ import {
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import {
+  hasMarker,
+  removeMarker,
+  wrapMarker,
+} from "@/lib/snippet-marker";
+import {
   useGenerateInputs,
   useGenerateRunning,
 } from "@/stores/useGenerateStore";
+import type { PromptSnippet } from "@/stores/usePromptSnippetsStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import SizeCard from "./SizeCard";
@@ -59,6 +67,25 @@ export default function GenerateLeftPanel({
   } = useGenerateInputs();
   const { generating, progress, stage } = useGenerateRunning();
   const addTemplate = useSettingsStore((s) => s.addTemplate);
+
+  // 2026-04-30 (Phase 2B Task 7): 라이브러리 모달 / 신규 등록 모달 state.
+  const [libraryOpen, setLibraryOpen] = useState(false);
+  const [registerOpen, setRegisterOpen] = useState(false);
+
+  // 카드 클릭 → textarea toggle (이미 있으면 제거 · 없으면 끝에 ", <lib>...</lib>" 추가)
+  const handleToggleSnippet = (snip: PromptSnippet) => {
+    if (hasMarker(prompt, snip.prompt)) {
+      setPrompt(removeMarker(prompt, snip.prompt));
+      return;
+    }
+    const wrapped = wrapMarker(snip.prompt);
+    if (!prompt.trim()) {
+      setPrompt(wrapped);
+      return;
+    }
+    // 끝에 콤마 + 마커 (양쪽 공백 정리)
+    setPrompt(`${prompt.trimEnd()}, ${wrapped}`);
+  };
 
   const sizeLabel = `${width}×${height}`;
 
@@ -131,7 +158,25 @@ export default function GenerateLeftPanel({
             className="ais-prompt-textarea"
           />
           <div className="ais-prompt-footer">
-            <div />
+            <div style={{ display: "flex", gap: 8 }}>
+              {/* 2026-04-30 (Task 7): 라이브러리 진입점 [📚] · 신규 등록 [+] */}
+              <button
+                type="button"
+                onClick={() => setLibraryOpen(true)}
+                className="ais-prompt-link"
+                title="프롬프트 라이브러리"
+              >
+                📚 라이브러리
+              </button>
+              <button
+                type="button"
+                onClick={() => setRegisterOpen(true)}
+                className="ais-prompt-link"
+                title="현재 프롬프트를 라이브러리에 등록"
+              >
+                <Icon name="sparkle" size={11} /> 라이브러리에 등록
+              </button>
+            </div>
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 type="button"
@@ -168,6 +213,21 @@ export default function GenerateLeftPanel({
           </div>
         </div>
       </div>
+
+      {/* ── 라이브러리 모달 (Task 6/7) ── */}
+      <SnippetLibraryModal
+        open={libraryOpen}
+        onClose={() => setLibraryOpen(false)}
+        currentPrompt={prompt}
+        onToggleSnippet={handleToggleSnippet}
+      />
+
+      {/* ── 신규 등록 모달 ([+] 직접 진입) ── */}
+      <SnippetRegisterModal
+        open={registerOpen}
+        onClose={() => setRegisterOpen(false)}
+        defaultPrompt={prompt}
+      />
 
       {/* AI 프롬프트 보정 토글 (2026-04-27 오빠 피드백):
        *  사용자 직관 매칭 — 토글 ON=기능 ON / OFF=기능 OFF.
