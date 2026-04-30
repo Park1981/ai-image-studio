@@ -15,7 +15,13 @@
 
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
-import type { StageEvent } from "@/stores/useGenerateStore";
+import type { StageEvent } from "@/lib/stage";
+// Phase 3 stage slice 추출 (refactor doc 2026-04-30 §I3) — 3 store 공통.
+import {
+  STAGE_INITIAL_STATE,
+  createStageActions,
+  type StageSliceState,
+} from "@/stores/createStageSlice";
 
 // ── 영상 해상도 슬라이더 범위 (backend presets.py 와 동기화) ──
 export const VIDEO_LONGER_EDGE_MIN = 512;
@@ -43,7 +49,9 @@ export function computeVideoResize(
   return { width: w, height: h };
 }
 
-export interface VideoState {
+// stage slice 5 필드 (stageHistory / startedAt / samplingStep / samplingTotal) 는
+// StageSliceState 에서 inherit. createStageActions 가 pushStage / setSampling 제공.
+export interface VideoState extends StageSliceState {
   /** data URL (업로드) 또는 히스토리 imageRef */
   sourceImage: string | null;
   sourceLabel: string;
@@ -76,15 +84,8 @@ export interface VideoState {
    *  사용자가 이미 정제된 영문 프롬프트를 복사해서 붙여넣은 케이스용. default false. */
   skipUpgrade: boolean;
 
-  /* 파이프라인 상태 (세션 한정) */
+  /* 파이프라인 상태 (Video 만의 추가 — stage slice 5 필드는 위에서 inherit) */
   running: boolean;
-  /** 진행 모달용 stage 이벤트 타임라인 (Phase 3 통일).
-   *  백엔드 emit("stage", {...}) 가 도착할 때마다 push.
-   *  같은 type 진입 + 완료로 두 번 들어오면 byType Map 이 후자 (payload 풍부) 로 덮어씀. */
-  stageHistory: StageEvent[];
-  startedAt: number | null;
-  samplingStep: number | null;
-  samplingTotal: number | null;
   pipelineProgress: number; // 0~100
   pipelineLabel: string;
 
@@ -125,12 +126,12 @@ export const useVideoStore = create<VideoState>((set) => ({
   skipUpgrade: false,
 
   running: false,
-  stageHistory: [],
-  startedAt: null,
-  samplingStep: null,
-  samplingTotal: null,
   pipelineProgress: 0,
   pipelineLabel: "",
+
+  // stage slice 5 필드 + 2 액션 (lib/stage.ts + createStageSlice.ts) — 3 store 공통.
+  ...STAGE_INITIAL_STATE,
+  ...createStageActions<VideoState>(set),
 
   lastVideoRef: null,
 
@@ -174,18 +175,12 @@ export const useVideoStore = create<VideoState>((set) => ({
         : { running },
     ),
 
-  setSampling: (step, total) =>
-    set({ samplingStep: step, samplingTotal: total }),
+  // pushStage / setSampling 은 createStageActions 가 위에서 주입.
 
   setPipelineProgress: (progress, label) =>
     set((s) => ({
       pipelineProgress: progress,
       pipelineLabel: label ?? s.pipelineLabel,
-    })),
-
-  pushStage: (evt) =>
-    set((s) => ({
-      stageHistory: [...s.stageHistory, { ...evt, arrivedAt: Date.now() }],
     })),
 
   setLastVideoRef: (ref) => set({ lastVideoRef: ref }),
