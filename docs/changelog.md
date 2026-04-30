@@ -5,7 +5,46 @@
 
 ## 2026-04-30
 
-### Phase 4.2 — backend `vision_pipeline.py` 1131줄 4 파일 분할 (current master)
+### Phase 4.3 — backend `prompt_pipeline.py` 975줄 4 sub-module 분할 (current master)
+
+**검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
+
+선행 commit: master `e2546e0` (Phase 4.2 vision_pipeline 분할). plan v2.1 (사용자 codex 1차 리뷰 5 finding + 후속 stale 3건 반영) 따라 단계적 진행.
+
+**plan v2 핵심 결정 (codex C1+C2+I1+I2+M1 fix)**:
+- C1 Blocking: 단계 1 안에서 `from ._ollama_client` → `from .._ollama_client` 즉시 갱신 (Phase 4.2 C1 동일 함정)
+- C2 Blocking: `vision_pipeline/edit_source.py` lazy import 2 site (L174/L513) 도 `from ..prompt_pipeline.translate import clarify_edit_intent` 로 변경. facade re-export 가 함수 reference snapshot 이라 submodule patch 가 facade attribute 까지 갱신 못함 → 호출 site 자체를 submodule 직접 import 로 변경해야 patch 일관 동작
+- I1 Important: `_call_ollama_chat` patch 8건 → 실제 grep **10건** (test_edit_vision_analysis 4 + test_prompt_pipeline 2 backend prefix + test_video_pipeline 4)
+- I2 Important: `clarify_edit_intent` patch 17건 → 실제 grep **16건** (import 라인 제외)
+- M1 Minor: production import "8 site" → **11 site** 통일
+
+**5 commit 흐름** (단계별):
+1. `fb1d7e5` — 단계 1: file → package + `_ollama_client` import depth 갱신
+2. `8c4f4c7` — 단계 2: `_common` 그룹 분리 (UpgradeResult / _strip_repeat_noise / _DEFAULT_OLLAMA_URL / DEFAULT_TIMEOUT / log)
+3. `8cd260c` — 단계 3: `_ollama` 분리 + facade 호출자 `_o.X` lookup 변경 + patch 10 site 갱신
+4. `48a7647` — 단계 4: `translate` 분리 + edit_source.py lazy import 2 site 갱신 + patch 22 site 갱신
+5. `9835cbe` — 단계 5: `upgrade` 분리 + patch 4 site 갱신 + facade 정리 + `__all__` 29 항목
+
+**규모**:
+- 옛 `studio/prompt_pipeline.py` 975줄 → 5 파일 (총 1,124줄, +149줄 헤더/sub-module 보일러):
+  - facade `__init__.py` 99줄 (pure re-export + `__all__` 29 항목)
+  - `_common.py` 85줄 (UpgradeResult dataclass + 상수 + _strip_repeat_noise)
+  - `_ollama.py` 50줄 (`_call_ollama_chat` HTTP wire)
+  - `translate.py` 128줄 (clarify_edit_intent + translate_to_korean + 2 SYSTEM 프롬프트)
+  - `upgrade.py` 762줄 (모든 SYSTEM_GENERATE/EDIT/VIDEO_* + ROLE_* + DOMAIN_VALID_SLOTS + matrix directive + 3 upgrade 함수)
+
+**patch site 36건 모두 sub-module path 갱신** (flat patch 0건 · grep 실증):
+- `_ollama._call_ollama_chat`: 10 (8 + 2 backend prefix)
+- `translate.clarify_edit_intent`: 16
+- `translate.translate_to_korean`: 6 (4 + 2 backend prefix)
+- `upgrade._run_upgrade_call`: 4
+
+**효과**:
+- 4 그룹 (Ollama wire / 짧은 텍스트 변환 / 긴 프롬프트 업그레이드 + matrix / 공용 데이터) 분리 → 단일 책임
+- vision_pipeline/edit_source.py 의 lazy import 도 submodule 직접 → facade snapshot 함정 회피 + patch 일관성 보장
+- production import 11 site 무손상 (facade re-export 통과)
+
+### Phase 4.2 — backend `vision_pipeline.py` 1131줄 4 파일 분할
 
 **검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
 
