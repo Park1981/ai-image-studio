@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass
 from typing import Any
 
-from ._ollama_client import call_chat_payload
+from .._ollama_client import call_chat_payload
 
 log = logging.getLogger(__name__)
 
