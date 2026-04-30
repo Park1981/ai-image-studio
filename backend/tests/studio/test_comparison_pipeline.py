@@ -203,11 +203,11 @@ async def test_analyze_pair_happy_path() -> None:
 
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
-            "studio.comparison_pipeline._translate_comments_to_ko",
+            "studio.comparison_pipeline._common._translate_comments_to_ko",
             new=AsyncMock(return_value={
                 "comments_ko": {
                     "face_expression": "눈과 턱 보존됨.",
@@ -262,11 +262,11 @@ async def test_analyze_pair_object_scene_domain() -> None:
     })
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
-            "studio.comparison_pipeline._translate_comments_to_ko",
+            "studio.comparison_pipeline._common._translate_comments_to_ko",
             new=AsyncMock(return_value={
                 "comments_ko": {k: f"{k}_ko" for k in OBJECT_SCENE_AXES},
                 "summary_ko": "색상 변경 적용 · 나머지 보존.",
@@ -297,11 +297,11 @@ async def test_analyze_pair_vision_fail_fallback() -> None:
     translate_mock = AsyncMock(return_value={"comments_ko": {}, "summary_ko": ""})
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.comparison_pipeline._translate_comments_to_ko",
+            "studio.comparison_pipeline._common._translate_comments_to_ko",
             new=translate_mock,
         ),
     ):
@@ -331,11 +331,11 @@ async def test_analyze_pair_json_parse_fail_fallback() -> None:
 
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value="{invalid: not json"),
         ),
         patch(
-            "studio.comparison_pipeline._translate_comments_to_ko",
+            "studio.comparison_pipeline._common._translate_comments_to_ko",
             new=AsyncMock(),
         ),
     ):
@@ -366,11 +366,11 @@ async def test_analyze_pair_partial_slots_average_only_present() -> None:
     })
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
-            "studio.comparison_pipeline._translate_comments_to_ko",
+            "studio.comparison_pipeline._common._translate_comments_to_ko",
             new=AsyncMock(return_value={
                 "comments_ko": {"face_expression": "괜찮음", "hair": "괜찮음"},
                 "summary_ko": "부분 결과.",
@@ -412,11 +412,11 @@ async def test_analyze_pair_translation_fail_keeps_en() -> None:
     })
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
-            "studio.comparison_pipeline._translate_comments_to_ko",
+            "studio.comparison_pipeline._common._translate_comments_to_ko",
             new=AsyncMock(return_value=None),  # 번역 실패
         ),
     ):
@@ -526,11 +526,11 @@ async def test_analyze_pair_parses_transform_prompt_and_uncertain() -> None:
 
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
-            "studio.comparison_pipeline._translate_comments_to_ko",
+            "studio.comparison_pipeline._common._translate_comments_to_ko",
             new=AsyncMock(return_value={
                 "comments_ko": {
                     "face_expression": "표정 보존됨.",
@@ -583,7 +583,7 @@ async def test_analyze_pair_passes_refined_intent_to_vision_call() -> None:
         return ""
 
     with patch(
-        "studio.comparison_pipeline._call_vision_pair",
+        "studio.comparison_pipeline.v3._call_vision_pair",
         new=_fake_call,
     ):
         await analyze_pair(
