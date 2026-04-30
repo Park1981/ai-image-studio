@@ -5,7 +5,46 @@
 
 ## 2026-04-30
 
-### Phase 3.5 후속 fix — vision/compare mock 도 mocks/ 분리 (current master)
+### Phase 4.1 — backend `history_db.py` 886줄 7 파일 분할 (current master)
+
+**검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
+
+선행 commit: master `4460477` (Phase 3.5 후속 fix). plan v2 (codex 1차 리뷰 6 finding 반영) 따라 8 commit 으로 단계적 진행.
+
+**plan v2 핵심 결정 (codex C1+C2+C3 fix)**:
+- `_DB_PATH` lookup 정책 = A2 (`_config.py` 별도 + sub-module 의 `_cfg._DB_PATH` attribute lookup · monkeypatch 친화)
+- facade alias `_DB_PATH = _cfg._DB_PATH` re-export 안 함 (sync 함정 차단)
+- 11 access site 일괄 갱신 (단계 2 한 commit · monkeypatch 6 + 직접 read 5)
+- sub-module lazy import depth 갱신 (cascade.py / stats.py 의 `..reference_pool` / `..storage`)
+- facade `from .X import *` 금지 → 명시 import + `__all__` (codex I2 fix · ruff F403 차단)
+
+**8 commit 흐름**:
+1. `f2a1ac5` — docs(plan): Phase 4 backend split plan v2
+2. `58607ac` — 단계 1: facade rename + lazy import depth fix (file → package)
+3. `9f0967b` — 단계 2: `_config.py` 도입 + 11 access site 일괄 갱신 (grep assertion 0건 게이트)
+4. `7ab86da` — 단계 3.1: schema 그룹 분리 (DDL + migration + init)
+5. `bf11ea3` — 단계 3.2: items 그룹 분리 (insert/list/get/delete + update_comparison)
+6. `fc06956` — 단계 3.3: cascade 그룹 분리 (cascade 삭제 + 임시 풀 cleanup)
+7. `2a6112f` — 단계 3.4: stats 그룹 분리 (count + size 통계)
+8. `533edf2` — 단계 3.5: templates 그룹 분리 + facade 정리 + `__all__`
+
+**규모**:
+- 옛 `studio/history_db.py` 886줄 → 7 파일 (총 1,073줄, +187줄 헤더/facade 보일러플레이트):
+  - facade `__init__.py` 117줄 (pure re-export)
+  - `_config.py` 35줄
+  - `schema.py` 306줄
+  - `items.py` 215줄
+  - `cascade.py` 187줄
+  - `stats.py` 88줄
+  - `templates.py` 125줄
+
+**효과**:
+- 한 파일 단일 책임 (DDL / CRUD / cascade / stats / templates 분리)
+- 외부 9 import site 변경 0건 (facade 모든 public 항목 명시 re-export)
+- monkeypatch + 직접 read 11 site 모두 `studio.history_db._config._DB_PATH` 단일 target
+- mock.patch 위치 정책 (CLAUDE.md 🔴 Critical "lookup 모듈 기준") 정합
+
+### Phase 3.5 후속 fix — vision/compare mock 도 mocks/ 분리
 
 **검증**: tsc / ESLint clean · vitest **91 PASS** · 회귀 0건
 

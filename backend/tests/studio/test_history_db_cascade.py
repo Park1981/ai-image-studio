@@ -19,9 +19,9 @@ from PIL import Image
 
 
 def _set_temp_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """history_db._DB_PATH 를 임시 DB 로 강제 (기존 테스트 패턴 그대로)."""
+    """history_db._config._DB_PATH 를 임시 DB 로 강제 (기존 테스트 패턴 그대로)."""
     db_path = tmp_path / "test_history.db"
-    monkeypatch.setattr("studio.history_db._DB_PATH", str(db_path))
+    monkeypatch.setattr("studio.history_db._config._DB_PATH", str(db_path))
     return db_path
 
 

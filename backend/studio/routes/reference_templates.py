@@ -239,7 +239,7 @@ async def promote_from_history(history_id: str, body: _PromoteBody) -> dict:
     #    영구 파일 N개 생성 + 마지막 UPDATE 만 살아남아 orphan 발생.
     #    수정: WHERE reference_ref = pool_ref 조건부 → race 패자는 rowcount==0 →
     #    방금 만든 template row + 영구 파일 rollback + 409 응답.
-    async with aiosqlite.connect(history_db._DB_PATH) as db:
+    async with aiosqlite.connect(history_db._config._DB_PATH) as db:
         cur = await db.execute(
             "UPDATE studio_history SET reference_ref = ? "
             "WHERE id = ? AND reference_ref = ?",

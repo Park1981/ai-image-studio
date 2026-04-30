@@ -23,7 +23,7 @@ def _make_png_bytes() -> bytes:
 
 def _set_temp_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     db_path = tmp_path / "test_history.db"
-    monkeypatch.setattr("studio.history_db._DB_PATH", str(db_path))
+    monkeypatch.setattr("studio.history_db._config._DB_PATH", str(db_path))
     return db_path
 
 
@@ -377,7 +377,7 @@ async def test_promote_race_lost_409_and_rollback(
     async def _insert_then_simulate_race(item: dict) -> str:
         new_id = await real_insert(item)
         # 다른 promote 요청이 먼저 swap 한 상태를 만듦 — DB 직접 UPDATE.
-        async with aiosqlite.connect(history_db._DB_PATH) as db:
+        async with aiosqlite.connect(history_db._config._DB_PATH) as db:
             await db.execute(
                 "UPDATE studio_history SET reference_ref = ? WHERE id = ?",
                 ("/images/studio/reference-templates/winner.png", "h1"),
@@ -407,7 +407,7 @@ async def test_promote_race_lost_409_and_rollback(
     assert resp.status_code == 409, resp.text
 
     # 우리가 만든 template row 는 rollback 됐어야 — 'loser' 이름의 row 0건
-    async with aiosqlite.connect(history_db._DB_PATH) as db:
+    async with aiosqlite.connect(history_db._config._DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT COUNT(*) AS c FROM reference_templates WHERE name = ?",
