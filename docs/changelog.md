@@ -5,7 +5,41 @@
 
 ## 2026-04-30
 
-### Phase 4.3 — backend `prompt_pipeline.py` 975줄 4 sub-module 분할 (current master)
+### Phase 4.4 — backend `comparison_pipeline.py` 1046줄 3 sub-module 분할 (current master)
+
+**검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
+
+선행 commit: master `e44f483` (Phase 4.3 prompt_pipeline + fastapi/pydantic pin + WPS433 cleanup). plan v2 (사용자 codex 1차 리뷰 4 finding 반영) 따라 단계적 진행.
+
+**plan v2 핵심 결정 (codex C1+C2+M1+M2 fix)**:
+- C1 Blocking: `_translate_comments_to_ko` patch 7건 갱신 시점을 단계 4 → **단계 2** 로 이동 (단계 2 commit 안에 함수 이동 + facade `_c.X` lookup + patch 7건 모두 한 묶음)
+- C2 Blocking: `_COMPARE_HINT_DIRECTIVE` 분류 v3 → **v2_generic** (`_call_vision_pair_generic` L865 가 사용 — 실제 사용처 grep 실증)
+- M1 Minor: production import "4 site" → **3 site** 통일
+- M2 Minor: `__all__` stale fix (_COMPARE_HINT_DIRECTIVE 위치 + SYSTEM_COMPARE 중복 제거)
+
+**4 commit 흐름 (단계별)**:
+1. `4373386` — 단계 1: file → package + internal import 6 site `..` 갱신
+2. `acb6764` — 단계 2: `_common` 그룹 분리 (axes / dataclass / 5축 헬퍼 / 번역) + patch 7 site 즉시 갱신 (codex C1 fix)
+3. `158d8ee` — 단계 3: `v3` 분리 + patch 8 site 갱신
+4. `4e75a36` — 단계 4: `v2_generic` 분리 + `_COMPARE_HINT_DIRECTIVE` 재배치 (codex C2 fix) + facade 정리 + `__all__` 29 항목
+
+**규모**:
+- 옛 `studio/comparison_pipeline.py` 1046줄 → 4 파일 (총 1,194줄, +148줄 헤더/sub-module 보일러):
+  - facade `__init__.py` 95줄 (pure re-export + `__all__` 29 항목)
+  - `_common.py` 318줄 (axes 정의 + ComparisonSlotEntry/ComparisonAnalysisResult dataclass + _empty_*/_to_b64 + _coerce_*/_compute_overall + _TRANSLATE_SYSTEM/_translate_comments_to_ko + _coerce_score/_parse_strict_json alias)
+  - `v3.py` 405줄 (SYSTEM_COMPARE + _call_vision_pair + _coerce_intent/_coerce_v3_slots/_v3_overall + analyze_pair)
+  - `v2_generic.py` 376줄 (SYSTEM_COMPARE_GENERIC + _COMPARE_HINT_DIRECTIVE + _call_vision_pair_generic + analyze_pair_generic)
+
+**patch site 15건 모두 sub-module path 갱신** (flat patch 0건 · grep 실증):
+- `v3._call_vision_pair`: 8
+- `_common._translate_comments_to_ko`: 7
+
+**효과**:
+- v3 매트릭스 비교 (Edit context) 와 v2 generic 비교 (Vision Compare 메뉴) 분리 → 단일 책임
+- 공용 axes / dataclass / 헬퍼 / 번역 _common 응집 — 재사용성 명시
+- production import 3 site (router / routes/compare / pipelines/compare_analyze) 무손상
+
+### Phase 4.3 — backend `prompt_pipeline.py` 975줄 4 sub-module 분할
 
 **검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
 
