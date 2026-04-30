@@ -171,8 +171,9 @@ async def test_delete_orphans(
     await history_db.init_studio_history_db()
 
     referenced = await save_to_pool(_make_png_bytes(), "image/png")
-    orphan1 = await save_to_pool(_make_png_bytes(), "image/png")
-    orphan2 = await save_to_pool(_make_png_bytes(), "image/png")
+    # 디스크 풀에 orphan 2건 추가 (참조 안 됨) — DELETE 가 제거 대상으로 인식해야 함
+    await save_to_pool(_make_png_bytes(), "image/png")
+    await save_to_pool(_make_png_bytes(), "image/png")
 
     await history_db.insert_item(
         _make_history_item("h1", reference_ref=referenced)

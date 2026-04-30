@@ -21,8 +21,9 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(BACKEND_DIR))
 
-# main app 임포트 (lifespan 시작 안 함 — openapi() 만 호출)
-from main import app  # type: ignore
+# main app 임포트 (lifespan 시작 안 함 — openapi() 만 호출).
+# E402: sys.path 조작 후 임포트가 필수 — ruff 무시.
+from main import app  # type: ignore  # noqa: E402
 
 
 def main(output_path: str | None = None) -> None:
