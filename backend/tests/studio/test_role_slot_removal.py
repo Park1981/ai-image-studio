@@ -292,7 +292,7 @@ def test_layer2_phrase_injected_when_image2_missing() -> None:
         )
 
     with patch(
-        "studio.prompt_pipeline._run_upgrade_call",
+        "studio.prompt_pipeline.upgrade._run_upgrade_call",
         side_effect=fake_run_upgrade_call,
     ):
         result = asyncio.run(
@@ -325,7 +325,7 @@ def test_layer2_does_NOT_inject_when_gemma4_already_mentions_image2() -> None:
         )
 
     with patch(
-        "studio.prompt_pipeline._run_upgrade_call",
+        "studio.prompt_pipeline.upgrade._run_upgrade_call",
         side_effect=fake_run_upgrade_call,
     ):
         result = asyncio.run(
@@ -358,7 +358,7 @@ def test_layer2_does_NOT_inject_when_role_is_none() -> None:
         )
 
     with patch(
-        "studio.prompt_pipeline._run_upgrade_call",
+        "studio.prompt_pipeline.upgrade._run_upgrade_call",
         side_effect=fake_run_upgrade_call,
     ):
         result = asyncio.run(
@@ -390,7 +390,7 @@ def test_layer2_does_NOT_inject_when_fallback() -> None:
         )
 
     with patch(
-        "studio.prompt_pipeline._run_upgrade_call",
+        "studio.prompt_pipeline.upgrade._run_upgrade_call",
         side_effect=fake_run_upgrade_call,
     ):
         result = asyncio.run(
