@@ -30,7 +30,7 @@ from dataclasses import dataclass
 from itertools import count
 from typing import Any, Callable, Iterable
 
-from .presets import (
+from ..presets import (
     EDIT_MODEL,
     GENERATE_MODEL,
     LoraEntry,
