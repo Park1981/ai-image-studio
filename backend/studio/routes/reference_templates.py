@@ -234,13 +234,32 @@ async def promote_from_history(history_id: str, body: _PromoteBody) -> dict:
         log.exception("promote DB insert 실패 — 파일 롤백")
         raise HTTPException(500, f"db insert failed: {e}") from e
 
-    # 6. studio_history.reference_ref swap (Codex I3 — canPromote 자동 false)
+    # 6. studio_history.reference_ref swap — conditional (Codex C4 fix 2026-04-30).
+    #    옛 흐름: unconditional UPDATE → 동시 promote 시 서로 다른 template row +
+    #    영구 파일 N개 생성 + 마지막 UPDATE 만 살아남아 orphan 발생.
+    #    수정: WHERE reference_ref = pool_ref 조건부 → race 패자는 rowcount==0 →
+    #    방금 만든 template row + 영구 파일 rollback + 409 응답.
     async with aiosqlite.connect(history_db._DB_PATH) as db:
-        await db.execute(
-            "UPDATE studio_history SET reference_ref = ? WHERE id = ?",
-            (image_url, history_id),
+        cur = await db.execute(
+            "UPDATE studio_history SET reference_ref = ? "
+            "WHERE id = ? AND reference_ref = ?",
+            (image_url, history_id, pool_ref),
         )
         await db.commit()
+        race_lost = cur.rowcount == 0
+
+    if race_lost:
+        # 다른 promote 요청이 먼저 성공함 — 우리가 만든 row + 파일 모두 rollback
+        await history_db.delete_reference_template(new_id)
+        delete_reference_file(image_url)
+        log.warning(
+            "promote race lost (history_id=%s) — template + file rolled back",
+            history_id,
+        )
+        raise HTTPException(
+            409,
+            "concurrent promote detected — already promoted by another request",
+        )
 
     saved = await history_db.get_reference_template(new_id)
     return {
