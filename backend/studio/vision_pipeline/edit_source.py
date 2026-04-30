@@ -173,9 +173,9 @@ async def run_vision_pipeline(
     # 지연 import — 순환 회피. clarify_edit_intent 는 prompt_pipeline.translate 에 있음.
     # Phase 4.3 단계 4 (codex C2 fix): facade 가 아니라 submodule 직접 import.
     # facade re-export 의 함수 reference snapshot 함정 회피 + patch 일관 동작.
-    from ..prompt_pipeline.translate import clarify_edit_intent  # noqa: WPS433
+    from ..prompt_pipeline.translate import clarify_edit_intent
     # 지연 import — 모델 단계별 unload 헬퍼 (옵션 B · 16GB VRAM swap 차단).
-    from .. import ollama_unload  # noqa: WPS433
+    from .. import ollama_unload
 
     resolved_url = ollama_url or _c._DEFAULT_OLLAMA_URL
 
@@ -511,7 +511,7 @@ async def analyze_edit_source(
     """
     # text_model 은 lazy import 우회 — clarify_edit_intent 가 prompt_pipeline.translate 에 있음
     # Phase 4.3 단계 4 (codex C2 fix): facade 가 아니라 submodule 직접 import.
-    from ..prompt_pipeline.translate import clarify_edit_intent  # noqa: WPS433
+    from ..prompt_pipeline.translate import clarify_edit_intent
 
     resolved_vision = vision_model or DEFAULT_OLLAMA_ROLES.vision
     resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text

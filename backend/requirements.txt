@@ -1,5 +1,9 @@
 # FastAPI + 서버
-fastapi>=0.110.0
+# 2026-04-30: pin (Phase 4.3 codex 후속) — OpenAPI snapshot drift 차단.
+# fresh install/CI 에서 fastapi/pydantic 신버전이 contentMediaType ↔ format/binary
+# 또는 ValidationError ctx/input schema 를 흔들면 test_openapi_contract 가 fail.
+# 장기적으로는 constraints.txt / lock 파일로 확장 권장.
+fastapi==0.135.3
 uvicorn[standard]>=0.29.0
 
 # 비동기 HTTP 클라이언트
@@ -11,8 +15,9 @@ websockets>=12.0
 # 비동기 SQLite
 aiosqlite>=0.20.0
 
-# 설정 관리
-pydantic-settings>=2.2.0
+# 설정 관리 (pydantic 본체와 함께 pin — OpenAPI snapshot 안정)
+pydantic==2.12.5
+pydantic-settings==2.13.1
 
 # 이미지 처리 (PNG Info 임베딩, 썸네일)
 Pillow>=10.0.0
