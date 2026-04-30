@@ -19,12 +19,24 @@ const initialReady: ReadyState = {
   ollama: false,
 };
 
+// 2026-04-30: ComfyUI 를 마지막으로 이동 (실제 가장 오래 걸리는 부팅 + 2-col grid 의 오른쪽 아래 슬롯).
+// 부팅 순서: Frontend → Backend → Ollama → ComfyUI (가장 무거운 거 마지막).
 const BOOT_STEPS: Array<keyof ReadyState> = [
   "frontend",
   "backend",
-  "comfyui",
   "ollama",
+  "comfyui",
 ];
+
+/** 터미널 로그 표시 여부 — localStorage 에 사용자 선택 기억. */
+const TERMINAL_VISIBLE_KEY = "loading.terminalVisible";
+
+/** 부팅이 비정상적으로 오래 걸리는 임계 (ms).
+ *  - 정상 부팅: 보통 30~60초
+ *  - 백엔드 _STARTUP_TIMEOUT (process_manager.py): 120초 (2분) — 이때 프로세스 강제 종료
+ *  - 우리 경고 임계: 180초 (3분) — 백엔드 timeout 직후 status 가 영원히 not running 으로
+ *    유지되는 시나리오에서 사용자가 종료 후 재시도 결정할 수 있게 알림 표시. */
+const STARTUP_WARN_MS = 180_000;
 
 const LABELS: Record<keyof ReadyState, string> = {
   frontend: "Frontend",
@@ -47,6 +59,34 @@ export default function LoadingPage() {
   const [shuttingDown, setShuttingDown] = useState(false);
   const [startedAt] = useState(() => Date.now());
   const [elapsedMs, setElapsedMs] = useState(0);
+  // 2026-04-30: 터미널 로그 토글 — 기본 표시, localStorage 로 사용자 선택 기억.
+  const [showTerminal, setShowTerminal] = useState(true);
+
+  // 마운트 시 localStorage 에서 마지막 토글 상태 복원.
+  // SSR / hydration 안전: 초기 state 는 기본값 true → 클라 마운트 후 effect 에서 다른 값이면 update.
+  // (lazy init 으로 처리하면 Next.js 의 SSR 결과 와 hydration 결과 mismatch 위험 → effect 패턴이 안전.)
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(TERMINAL_VISIBLE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage 동기화는 effect 외엔 SSR-safe 하게 못 함
+      if (saved !== null) setShowTerminal(saved === "1");
+    } catch {
+      // localStorage 비활성/시크릿 모드 — 기본값 유지
+    }
+  }, []);
+
+  // 토글 변경 시 localStorage 에 저장.
+  function toggleTerminal() {
+    setShowTerminal((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(TERMINAL_VISIBLE_KEY, next ? "1" : "0");
+      } catch {
+        // 저장 실패 무시 (UX 영향 없음)
+      }
+      return next;
+    });
+  }
 
   const readyCount = useMemo(
     () => BOOT_STEPS.filter((key) => ready[key]).length,
@@ -96,10 +136,10 @@ export default function LoadingPage() {
         redirectTimer = setTimeout(() => router.replace("/"), 1800);
       } else if (!nextReady.backend) {
         setMessage("Backend 연결 대기 중");
-      } else if (!nextReady.comfyui) {
-        setMessage("ComfyUI 준비 중");
       } else if (!nextReady.ollama) {
         setMessage("Ollama 준비 중");
+      } else if (!nextReady.comfyui) {
+        setMessage("ComfyUI 준비 중");
       } else {
         setMessage("서비스 상태 확인 중");
       }
@@ -152,17 +192,41 @@ export default function LoadingPage() {
           BOOT · {String(Math.max(1, readyCount)).padStart(2, "0")} /{" "}
           {String(BOOT_STEPS.length).padStart(2, "0")}
         </Kicker>
-        <h1 style={titleStyle}>AI Image Studio 시작 중</h1>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+          }}
+        >
+          <h1 style={titleStyle}>AI Image Studio 시작 중</h1>
+          <button
+            type="button"
+            onClick={toggleTerminal}
+            aria-pressed={showTerminal}
+            aria-label={showTerminal ? "터미널 로그 숨기기" : "터미널 로그 보이기"}
+            style={terminalToggleStyle(showTerminal)}
+          >
+            {showTerminal ? "로그 숨기기" : "로그 보기"}
+          </button>
+        </div>
         <p style={descStyle}>
           부팅 로그를 보여드릴게요. 이상 없으면 곧 메인이 열려요.
         </p>
 
-        <Terminal
-          ready={ready}
-          activeKey={activeKey}
-          elapsedMs={elapsedMs}
-          message={message}
-        />
+        {showTerminal && (
+          <Terminal
+            ready={ready}
+            activeKey={activeKey}
+            elapsedMs={elapsedMs}
+            message={message}
+          />
+        )}
+
+        {elapsedMs > STARTUP_WARN_MS && readyCount < BOOT_STEPS.length && (
+          <StartupWarning activeLabel={LABELS[activeKey]} />
+        )}
 
         <Progress value={progress} tone="boot" />
 
@@ -291,6 +355,49 @@ function LogLine({
   );
 }
 
+/** 3분 이상 걸리는 비정상 부팅 시 표시되는 경고 배너.
+ *  백엔드 _STARTUP_TIMEOUT (120s) 후 프로세스가 강제 종료된 시나리오 가정 —
+ *  사용자가 logs 확인 + 종료 후 재시작을 결정할 수 있게 안내. */
+function StartupWarning({ activeLabel }: { activeLabel: string }) {
+  return (
+    <div
+      role="alert"
+      style={{
+        marginTop: 16,
+        padding: "12px 14px",
+        borderRadius: "var(--radius-sm)",
+        border: "1px solid rgba(217,119,6,.32)",
+        background: "rgba(217,119,6,.08)",
+        color: "var(--ink-2)",
+        fontSize: 12.5,
+        lineHeight: 1.55,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 4,
+          color: "#b45309",
+          fontWeight: 800,
+          fontSize: 12,
+          letterSpacing: ".02em",
+        }}
+      >
+        <span>⚠ 시작이 너무 오래 걸려요</span>
+      </div>
+      <div style={{ color: "var(--ink-3)" }}>
+        <b>{activeLabel}</b> 가 3분 넘게 응답하지 않아요. 보통 30~60초면 끝나요.
+        <br />
+        <code style={codeChipStyle}>logs/comfyui.log</code> ·{" "}
+        <code style={codeChipStyle}>logs/backend.log</code> 확인 후{" "}
+        <b>아래 종료 버튼</b> 으로 재시작을 권장해요.
+      </div>
+    </div>
+  );
+}
+
 function Kicker({ children }: { children: ReactNode }) {
   return (
     <div
@@ -388,6 +495,24 @@ function Status({
   );
 }
 
+/** 터미널 로그 토글 버튼 스타일 — 페이지 톤 (인라인) 일관 유지. */
+function terminalToggleStyle(active: boolean): CSSProperties {
+  return {
+    height: 26,
+    padding: "0 10px",
+    borderRadius: "var(--radius-sm)",
+    border: "1px solid var(--line)",
+    background: active ? "var(--bg-2)" : "var(--surface)",
+    color: active ? "var(--ink-2)" : "var(--ink-3)",
+    fontSize: 11.5,
+    fontWeight: 700,
+    letterSpacing: ".02em",
+    cursor: "pointer",
+    flexShrink: 0,
+    fontFamily: "Consolas, SFMono-Regular, monospace",
+  };
+}
+
 function buttonStyle(kind: "neutral" | "danger", disabled: boolean) {
   return {
     height: 34,
@@ -425,6 +550,16 @@ const descStyle: CSSProperties = {
   color: "var(--ink-3)",
   fontSize: 14,
   lineHeight: 1.6,
+};
+
+const codeChipStyle: CSSProperties = {
+  padding: "1px 6px",
+  borderRadius: 4,
+  border: "1px solid var(--line)",
+  background: "var(--bg-2)",
+  fontFamily: "Consolas, SFMono-Regular, monospace",
+  fontSize: 11.5,
+  color: "var(--ink-2)",
 };
 
 const cursorStyle: CSSProperties = {
