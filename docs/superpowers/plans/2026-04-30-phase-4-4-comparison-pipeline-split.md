@@ -1,9 +1,18 @@
 # Phase 4.4 — `comparison_pipeline.py` 1046줄 분할 plan
 
-> **버전**: v1 (2026-04-30 · Claude 작성 · 사용자 codex 1차 리뷰 대기)
+> **버전**: v2 (2026-04-30 · Claude 작성 + 사용자 codex 1차 리뷰 4 finding 반영)
 > **선행 commit**: master `e44f483` (Phase 4.3 prompt_pipeline 분할 + fastapi/pydantic pin + WPS433 cleanup)
 > **인계**: `memory/project_session_2026_04_30_phase_4_3_prompt_pipeline_split.md` + 본 plan
 > **검증 baseline**: backend pytest **361 PASS** / ruff clean · frontend vitest 91 / tsc / lint clean
+
+## v1 → v2 핵심 변경 (codex 1차 리뷰 반영)
+
+| # | 분류 | v1 문제 | v2 fix |
+|---|---|---|---|
+| C1 | Blocking | `_translate_comments_to_ko` 가 단계 2 에서 _common 으로 이동 + facade 호출도 `_c.X` lookup 변경. 그런데 patch 7건 갱신은 단계 4 로 미뤄져 있어 단계 2~3 시점에 test 가 facade `_translate_comments_to_ko` patch → 실제 호출은 `_c._translate_comments_to_ko` 로 가서 mock 안 먹음 | **단계 2 commit 안에서 patch 7건 즉시 갱신** (`studio.comparison_pipeline._translate_comments_to_ko` → `studio.comparison_pipeline._common._translate_comments_to_ko`) |
+| C2 | Blocking | `_COMPARE_HINT_DIRECTIVE` 를 `v3.py` 로 분류했지만 실제 사용처는 `_call_vision_pair_generic` (L865 — `system_content += _COMPARE_HINT_DIRECTIVE.replace(...)`) — **v2_generic 의 함수** | **`v2_generic.py` 로 재분류**. `SYSTEM_COMPARE_GENERIC` 과 한 묶음. v3 안에는 _COMPARE_HINT_DIRECTIVE reference 0건 (grep L440 은 SYSTEM_COMPARE 만) |
+| M1 | Minor | "production import 4 site" 표기 vs 표 3 row | **3 site** 통일 (router / routes/compare / pipelines/compare_analyze) |
+| M2 | Minor | `__all__` 예시 stale — `_COMPARE_HINT_DIRECTIVE` 가 v3 쪽에 있고 `SYSTEM_COMPARE` 중복 | C2 fix 와 함께 갱신 — `_COMPARE_HINT_DIRECTIVE` 를 v2_generic 묶음으로 + `SYSTEM_COMPARE` 중복 제거 |
 
 ---
 
@@ -44,7 +53,7 @@ Phase 4.3 (prompt_pipeline 975줄) master 머지 직후 다음 backend split.
 | L67~84 | COMPARE_AXES | `_common.py` | v2_generic 의 axes (analyze_pair_generic) |
 | L87~192 | SYSTEM_COMPARE | `v3.py` | analyze_pair 전용 |
 | L194~283 | SYSTEM_COMPARE_GENERIC | `v2_generic.py` | analyze_pair_generic 전용 |
-| L285~302 | `_COMPARE_HINT_DIRECTIVE` | `v3.py` | analyze_pair hint 처리 |
+| L285~302 | `_COMPARE_HINT_DIRECTIVE` | `v2_generic.py` | (codex C2 fix) `_call_vision_pair_generic` (L865) 가 사용 — v2_generic 전용 |
 | L306~322 | `ComparisonSlotEntry` dataclass | `_common.py` | v3 사용 (L651/662) + v2_generic 도 ComparisonAnalysisResult 의 slots 필드 reference |
 | L324~399 | `ComparisonAnalysisResult` dataclass | `_common.py` | v3 (L727/747/818) + v2_generic (L956/972/1031) 둘 다 사용 |
 | L401~409 | `_empty_scores` / `_empty_comments` | `_common.py` | _coerce_scores / _coerce_comments / v2_generic 사용 |
@@ -70,11 +79,11 @@ backend/studio/comparison_pipeline/
 ├── _common.py     ~430줄  (axes / dataclass / _to_b64 / _empty_* /
 │                          _coerce_scores / _coerce_comments / _compute_overall /
 │                          _TRANSLATE_SYSTEM / _translate_comments_to_ko)
-├── v3.py          ~370줄  (SYSTEM_COMPARE / _COMPARE_HINT_DIRECTIVE /
-│                          _call_vision_pair / _coerce_intent / _coerce_v3_slots /
+├── v3.py          ~350줄  (SYSTEM_COMPARE / _call_vision_pair /
+│                          _coerce_intent / _coerce_v3_slots /
 │                          _v3_overall / analyze_pair)
-└── v2_generic.py  ~230줄  (SYSTEM_COMPARE_GENERIC / _call_vision_pair_generic /
-                           analyze_pair_generic)
+└── v2_generic.py  ~250줄  (SYSTEM_COMPARE_GENERIC / _COMPARE_HINT_DIRECTIVE /
+                           _call_vision_pair_generic / analyze_pair_generic)
 ```
 
 > _common 이 가장 큰 sub-module (~430줄) — axes 정의 + dataclass + 5축 generic 처리 헬퍼 + 번역까지 응집. v3 / v2_generic 둘 다의 공통 기반.
@@ -99,7 +108,7 @@ backend/studio/comparison_pipeline/
 
 > **lazy import 0건** (grep 실증) — Phase 4.3 의 C2 함정 없음. 호출 site 분리 commit 만으로 patch 일관 동작.
 
-### 2.2 ⚠️ production import 4 site
+### 2.2 ⚠️ production import 3 site (codex M1 fix)
 
 | 호출자 | 옛 import | 새 import (단계 1 후 OK 동작) |
 |---|---|---|
@@ -180,7 +189,7 @@ from ..vision_pipeline import ProgressCallback
 - pytest 실행 → 361 PASS 확인 (변화 0)
 - commit: `refactor(comparison_pipeline): file → package 전환 + internal import 6 site .. 갱신 (Phase 4.4 단계 1)`
 
-### 단계 2: `_common.py` 분리 + facade re-export
+### 단계 2: `_common.py` 분리 + patch 7 site 즉시 갱신 (codex C1 fix) + facade re-export
 
 - `_common.py` 신설:
   - PERSON_AXES / OBJECT_SCENE_AXES / LEGACY_EDIT_AXES / AXES alias / COMPARE_AXES
@@ -191,13 +200,17 @@ from ..vision_pipeline import ProgressCallback
 - import: `from .._json_utils import (...)` + `from .._ollama_client import call_chat_payload` + `from ..prompt_pipeline import _DEFAULT_OLLAMA_URL, DEFAULT_TIMEOUT` + 필요 시 `from ..presets import DEFAULT_OLLAMA_ROLES`
 - facade `__init__.py` 에서 _common 항목 명시 import + re-export
 - facade 본체에서 동일 항목 정의 *제거* + facade 안 호출 site 도 `_c.X` lookup 으로 변경 (Phase 4.3 단계 3 학습 — facade 본체 동시 존재 시 호출 site 도 변경 필요)
+- **🔴 같은 commit 안에서 patch 7건 즉시 갱신** (codex C1 fix):
+  - test_comparison_pipeline.py L210/269/304/338/373/419/533:
+    `studio.comparison_pipeline._translate_comments_to_ko` → `studio.comparison_pipeline._common._translate_comments_to_ko`
+  - 이유: `_translate_comments_to_ko` 가 _common 으로 이동하면 facade 본체의 호출 site 가 `_c._translate_comments_to_ko(...)` lookup 으로 변경 → 옛 patch (`studio.comparison_pipeline._translate_comments_to_ko`) 가 facade attribute 만 변경 → mock 안 먹음. patch 갱신을 단계 4 로 미루면 단계 2~3 시점에 test 가 fail.
 - pytest → 361 PASS
-- commit: `refactor(comparison_pipeline): _common 그룹 분리 (Phase 4.4 단계 2)`
+- commit: `refactor(comparison_pipeline): _common 그룹 분리 + patch 7 site 갱신 (Phase 4.4 단계 2)`
 
 ### 단계 3: `v3.py` 분리 + patch 8 site 갱신
 
 - `v3.py` 신설:
-  - SYSTEM_COMPARE / _COMPARE_HINT_DIRECTIVE
+  - SYSTEM_COMPARE (단일 — `_COMPARE_HINT_DIRECTIVE` 는 v2_generic 으로 이동 · codex C2 fix)
   - _call_vision_pair
   - _coerce_intent / _coerce_v3_slots / _v3_overall
   - analyze_pair
@@ -211,10 +224,11 @@ from ..vision_pipeline import ProgressCallback
 - pytest → 361 PASS
 - commit: `refactor(comparison_pipeline): v3 분리 + patch 8 site 갱신 (Phase 4.4 단계 3)`
 
-### 단계 4: `v2_generic.py` 분리 + patch 7 site 갱신 + facade 정리 + `__all__`
+### 단계 4: `v2_generic.py` 분리 + facade 정리 + `__all__`
 
 - `v2_generic.py` 신설:
   - SYSTEM_COMPARE_GENERIC
+  - `_COMPARE_HINT_DIRECTIVE` (codex C2 fix — `_call_vision_pair_generic` 가 사용)
   - _call_vision_pair_generic
   - analyze_pair_generic
 - import: `from . import _common as _c` + `from .._ollama_client import call_chat_payload` + `from .._json_utils import parse_strict_json as _parse_strict_json` + 필요 시 `from ..presets import DEFAULT_OLLAMA_ROLES`
@@ -246,28 +260,25 @@ from ..vision_pipeline import ProgressCallback
         "_translate_comments_to_ko",
         # v3
         "SYSTEM_COMPARE",
-        "_COMPARE_HINT_DIRECTIVE",
         "_call_vision_pair",
         "_coerce_intent",
         "_coerce_v3_slots",
         "_v3_overall",
         "analyze_pair",
-        # v2_generic
+        # v2_generic (codex C2 fix — _COMPARE_HINT_DIRECTIVE 가 여기에)
         "SYSTEM_COMPARE_GENERIC",
+        "_COMPARE_HINT_DIRECTIVE",
         "_call_vision_pair_generic",
         "analyze_pair_generic",
         # 옛 호환 (test_comparison_pipeline 가 직접 import)
         "_coerce_score",  # _json_utils alias
         "_parse_strict_json",  # _json_utils alias
-        "SYSTEM_COMPARE",
     ]
     ```
-- **patch site 7건 즉시 갱신**:
-  - test_comparison_pipeline.py L210/269/304/338/373/419/533:
-    `studio.comparison_pipeline._translate_comments_to_ko` → `studio.comparison_pipeline._common._translate_comments_to_ko`
+- (patch site 7건은 단계 2 에서 이미 갱신됨 · codex C1 fix)
 - pytest → 361 PASS / ruff clean
 - **grep assertion**: `grep -rn "studio\.comparison_pipeline\.[A-Za-z_]+" backend/tests/` 결과 모든 매치가 sub-module path (`._common.X` / `.v3.X` / `.v2_generic.X`) 또는 단순 import 경로여야 함. flat patch 0건 보장.
-- commit: `refactor(comparison_pipeline): v2_generic 분리 + patch 7 site 갱신 + facade 정리 + __all__ (Phase 4.4 단계 4)`
+- commit: `refactor(comparison_pipeline): v2_generic 분리 + facade 정리 + __all__ (Phase 4.4 단계 4)`
 
 ### 단계 5: changelog + master `--no-ff` merge
 
