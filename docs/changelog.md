@@ -5,7 +5,25 @@
 
 ## 2026-04-30
 
-### Phase 3.5 — mock stream 3종 lib/api/mocks/ 분리 (current master)
+### Phase 3.5 후속 fix — vision/compare mock 도 mocks/ 분리 (current master)
+
+**검증**: tsc / ESLint clean · vitest **91 PASS** · 회귀 0건
+
+직전 Phase 3.5 (master `b6f2e11`) 가 generate/edit/video 만 분리했으나,
+사용자 리뷰로 `vision.ts` (mockAnalyze 53줄 file-private 함수) +
+`compare.ts` (인라인 mock 96줄) 도 실질 stream-mock 패턴이라 분리 누락 지적.
+본 fix 로 5 stream mock 모두 `lib/api/mocks/` 에 통일.
+
+| 파일 | 전 → 후 | mocks/ 신규 |
+|---|---|---|
+| vision.ts | 202 → 147 (−55) | mocks/vision.ts (66) |
+| compare.ts | 248 → 155 (−93) | mocks/compare.ts (117 · 인라인 → 함수 추출) |
+
+**효과**:
+- 5 mock (generate/edit/video/vision/compare) 모두 동일 패턴으로 분리 일관성 확보
+- compare.ts 의 인라인 100줄짜리 5축 mock 데이터가 별도 모듈로 떨어져 가독성 ↑
+
+### Phase 3.5 — mock stream 3종 lib/api/mocks/ 분리
 
 **검증**: tsc / ESLint clean · vitest **91 PASS** · 회귀 0건
 
