@@ -208,12 +208,21 @@ export default function LoadingPage() {
             aria-label={showTerminal ? "터미널 로그 숨기기" : "터미널 로그 보이기"}
             style={terminalToggleStyle(showTerminal)}
           >
-            {showTerminal ? "로그 숨기기" : "로그 보기"}
+            <span
+              aria-hidden
+              style={{
+                display: "inline-block",
+                marginRight: 6,
+                transition: "transform .15s ease",
+                transform: showTerminal ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            >
+              ▾
+            </span>
+            Terminal Log
           </button>
         </div>
-        <p style={descStyle}>
-          부팅 로그를 보여드릴게요. 이상 없으면 곧 메인이 열려요.
-        </p>
+        {/* 2026-04-30: "부팅 로그를 보여드릴게요..." 설명 문구 제거 — 군더더기. */}
 
         {showTerminal && (
           <Terminal
@@ -246,10 +255,11 @@ export default function LoadingPage() {
           <span>{progress}%</span>
         </div>
 
+        {/* 2026-04-30: 2x2 grid → 1열 stacked (종료 모달과 디자인 통일).
+            한 줄에 라벨 / 포트 / 상태 인라인 정렬. */}
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "1fr 1fr",
             gap: 8,
             marginTop: 18,
           }}
@@ -265,15 +275,8 @@ export default function LoadingPage() {
           ))}
         </div>
 
+        {/* 2026-04-30: "메인으로" 버튼 제거 — 모든 ready 시 자동 redirect 되므로 의미 없음. */}
         <div style={{ display: "flex", gap: 10, justifyContent: "flex-end", marginTop: 20 }}>
-          <button
-            type="button"
-            onClick={() => router.replace("/")}
-            disabled={!ready.backend}
-            style={buttonStyle("neutral", !ready.backend)}
-          >
-            메인으로
-          </button>
           <button
             type="button"
             onClick={handleShutdown}
@@ -442,6 +445,8 @@ function Progress({ value, tone }: { value: number; tone: "boot" | "shutdown" })
   );
 }
 
+/** 2026-04-30: 종료 모달 row 패턴과 동일 — 한 줄 안에 라벨 / 포트 / 상태 inline.
+ *  옛 2-line (라벨/상태 위에 포트 아래) → 1-line (서비스명  포트  상태) 로 단순화. */
 function Status({
   label,
   detail,
@@ -456,41 +461,49 @@ function Status({
   return (
     <div
       style={{
-        minHeight: 46,
-        padding: "8px 10px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        minHeight: 32,
+        padding: "0 12px",
         borderRadius: "var(--radius-sm)",
         border: "1px solid var(--line)",
         background: ok
           ? "rgba(16,185,129,.08)"
           : current
             ? "rgba(74,158,255,.08)"
-            : "var(--bg-2)",
+            : "var(--surface)",
+        color: ok ? "var(--green-ink)" : current ? "var(--accent-ink)" : "var(--ink-4)",
+        fontSize: 12,
+        fontWeight: 700,
       }}
     >
-      <div
+      <span>{label}</span>
+      <span
+        className="mono"
         style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 10,
-          color: ok ? "var(--green-ink)" : current ? "var(--accent-ink)" : "var(--ink-3)",
-          fontSize: 12,
-          fontWeight: 800,
-        }}
-      >
-        <span>{label}</span>
-        <span>{ok ? "OK" : current ? "RUN" : "WAIT"}</span>
-      </div>
-      <div
-        style={{
-          marginTop: 3,
+          flex: 1,
+          marginLeft: 12,
           color: "var(--ink-4)",
           fontFamily: "Consolas, SFMono-Regular, monospace",
           fontSize: 10.5,
+          fontWeight: 500,
+          letterSpacing: ".02em",
         }}
       >
         {detail}
-      </div>
+      </span>
+      <span
+        className="mono"
+        style={{
+          fontFamily: "Consolas, SFMono-Regular, monospace",
+          letterSpacing: ".04em",
+          fontWeight: 800,
+        }}
+      >
+        {ok ? "OK" : current ? "RUN" : "WAIT"}
+      </span>
     </div>
   );
 }
@@ -543,13 +556,6 @@ const titleStyle: CSSProperties = {
   fontSize: 27,
   lineHeight: 1.2,
   letterSpacing: 0,
-};
-
-const descStyle: CSSProperties = {
-  margin: 0,
-  color: "var(--ink-3)",
-  fontSize: 14,
-  lineHeight: 1.6,
 };
 
 const codeChipStyle: CSSProperties = {
