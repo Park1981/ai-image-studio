@@ -29,6 +29,17 @@ export interface PromptSnippet {
 interface SnippetState {
   entries: PromptSnippet[];
   add: (input: { name: string; prompt: string; thumbnail?: string }) => void;
+  /**
+   * 2026-04-30 (drawer 디자인 + 수정 기능):
+   * 부분 업데이트 — undefined 인 필드는 변경 X.
+   * thumbnail 은 명시적 undefined 로 제거 가능.
+   * sanitize: prompt 는 stripAllMarkers + trim, name 은 trim.
+   * 빈 name / 빈 prompt 로 덮어쓰면 silent skip.
+   */
+  update: (
+    id: string,
+    partial: { name?: string; prompt?: string; thumbnail?: string },
+  ) => void;
   remove: (id: string) => void;
   clearAll: () => void;
   /**
@@ -69,6 +80,29 @@ export const usePromptSnippetsStore = create<SnippetState>()(
             ...s.entries,
           ].slice(0, MAX_SNIPPETS),
         }));
+      },
+      update: (id, partial) => {
+        set((s) => {
+          const idx = s.entries.findIndex((e) => e.id === id);
+          if (idx < 0) return s;
+          const next = { ...s.entries[idx] };
+          if (partial.name !== undefined) {
+            const cleanName = partial.name.trim();
+            if (!cleanName) return s;
+            next.name = cleanName;
+          }
+          if (partial.prompt !== undefined) {
+            const cleanPrompt = stripAllMarkers(partial.prompt).trim();
+            if (!cleanPrompt) return s;
+            next.prompt = cleanPrompt;
+          }
+          if ("thumbnail" in partial) {
+            next.thumbnail = partial.thumbnail;
+          }
+          const updated = [...s.entries];
+          updated[idx] = next;
+          return { entries: updated };
+        });
       },
       remove: (id) =>
         set((s) => ({ entries: s.entries.filter((e) => e.id !== id) })),

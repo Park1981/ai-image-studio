@@ -72,4 +72,51 @@ describe("usePromptSnippetsStore", () => {
     clearAll();
     expect(usePromptSnippetsStore.getState().entries.length).toBe(0);
   });
+
+  // 2026-04-30 (drawer 디자인 + 수정 기능) — update 액션 회귀
+  it("update — name 만 변경 (prompt/thumbnail 보존)", () => {
+    const { add, update } = usePromptSnippetsStore.getState();
+    add({ name: "Old", prompt: "p", thumbnail: "data:image/webp;base64,xx" });
+    const id = usePromptSnippetsStore.getState().entries[0].id;
+    update(id, { name: "New" });
+    const e = usePromptSnippetsStore.getState().entries[0];
+    expect(e.name).toBe("New");
+    expect(e.prompt).toBe("p");
+    expect(e.thumbnail).toBe("data:image/webp;base64,xx");
+  });
+
+  it("update — prompt 의 <lib> 마커 자동 strip (sanitize)", () => {
+    const { add, update } = usePromptSnippetsStore.getState();
+    add({ name: "n", prompt: "old prompt" });
+    const id = usePromptSnippetsStore.getState().entries[0].id;
+    update(id, { prompt: "new, <lib>cinematic 35mm</lib>, warm" });
+    expect(usePromptSnippetsStore.getState().entries[0].prompt).toBe(
+      "new, cinematic 35mm, warm",
+    );
+  });
+
+  it("update — thumbnail undefined 명시 시 제거", () => {
+    const { add, update } = usePromptSnippetsStore.getState();
+    add({ name: "n", prompt: "p", thumbnail: "data:image/webp;base64,xx" });
+    const id = usePromptSnippetsStore.getState().entries[0].id;
+    update(id, { thumbnail: undefined });
+    expect(usePromptSnippetsStore.getState().entries[0].thumbnail).toBeUndefined();
+  });
+
+  it("update — 존재하지 않는 id 는 silent", () => {
+    const { add, update } = usePromptSnippetsStore.getState();
+    add({ name: "n", prompt: "p" });
+    update("non-existent", { name: "x" });
+    expect(usePromptSnippetsStore.getState().entries[0].name).toBe("n");
+  });
+
+  it("update — 빈 name / sanitize 후 빈 prompt 는 silent skip", () => {
+    const { add, update } = usePromptSnippetsStore.getState();
+    add({ name: "Original", prompt: "Original" });
+    const id = usePromptSnippetsStore.getState().entries[0].id;
+    update(id, { name: "  " });
+    update(id, { prompt: "<lib></lib>" });
+    expect(usePromptSnippetsStore.getState().entries[0].name).toBe("Original");
+    expect(usePromptSnippetsStore.getState().entries[0].prompt).toBe("Original");
+  });
 });
