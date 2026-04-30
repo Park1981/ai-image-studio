@@ -23,7 +23,6 @@ import { useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import ResearchBanner from "@/components/studio/ResearchBanner";
 import SnippetLibraryModal from "@/components/studio/SnippetLibraryModal";
-import SnippetRegisterModal from "@/components/studio/SnippetRegisterModal";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
@@ -41,8 +40,6 @@ import {
   useGenerateRunning,
 } from "@/stores/useGenerateStore";
 import type { PromptSnippet } from "@/stores/usePromptSnippetsStore";
-import { useSettingsStore } from "@/stores/useSettingsStore";
-import { toast } from "@/stores/useToastStore";
 import SizeCard from "./SizeCard";
 
 interface Props {
@@ -66,25 +63,67 @@ export default function GenerateLeftPanel({
     skipUpgrade, setSkipUpgrade,
   } = useGenerateInputs();
   const { generating, progress, stage } = useGenerateRunning();
-  const addTemplate = useSettingsStore((s) => s.addTemplate);
 
-  // 2026-04-30 (Phase 2B Task 7): 라이브러리 모달 / 신규 등록 모달 state.
+  // 2026-04-30 (Phase 2B Task 7 + 후속 UX): 라이브러리 모달 state 만 유지.
+  // [+ 라이브러리에 등록] 별도 버튼 제거 — LibraryModal 안 [+ 새 등록] 으로 통합.
   const [libraryOpen, setLibraryOpen] = useState(false);
-  const [registerOpen, setRegisterOpen] = useState(false);
 
-  // 카드 클릭 → textarea toggle (이미 있으면 제거 · 없으면 끝에 ", <lib>...</lib>" 추가)
+  // 카드 클릭 → textarea toggle + 모달 자동 닫기 + 커서 위치 삽입.
+  // 2026-04-30 (오빠 후속 피드백):
+  //   - 카드 선택 시 LibraryModal 자동 닫기
+  //   - 새 마커는 textarea 의 *현재 커서 위치* 에 삽입 (selection 영역 있으면 교체)
+  //   - 이미 마커 있으면 토글 제거 (그 자리에 모달 닫고 focus 만)
   const handleToggleSnippet = (snip: PromptSnippet) => {
+    const closeAndFocus = (newCursor?: number) => {
+      setLibraryOpen(false);
+      // setPrompt 가 다음 렌더에서 textarea value 갱신하므로 rAF 로 cursor 복원.
+      requestAnimationFrame(() => {
+        const ta = promptTextareaRef.current;
+        if (!ta) return;
+        ta.focus();
+        if (typeof newCursor === "number") {
+          ta.setSelectionRange(newCursor, newCursor);
+        }
+      });
+    };
+
+    // 1. 이미 마커 있으면 제거 (전체 textarea 에서 첫 매치 1회)
     if (hasMarker(prompt, snip.prompt)) {
       setPrompt(removeMarker(prompt, snip.prompt));
+      closeAndFocus();
       return;
     }
+
+    // 2. 새 마커 삽입 — 커서 위치 우선
     const wrapped = wrapMarker(snip.prompt);
-    if (!prompt.trim()) {
-      setPrompt(wrapped);
+    const ta = promptTextareaRef.current;
+
+    // ref 없거나 selection 정보 못 받으면 끝에 추가 (폴백)
+    if (!ta || ta.selectionStart == null) {
+      if (!prompt.trim()) {
+        setPrompt(wrapped);
+        closeAndFocus(wrapped.length);
+      } else {
+        const next = `${prompt.trimEnd()}, ${wrapped}`;
+        setPrompt(next);
+        closeAndFocus(next.length);
+      }
       return;
     }
-    // 끝에 콤마 + 마커 (양쪽 공백 정리)
-    setPrompt(`${prompt.trimEnd()}, ${wrapped}`);
+
+    // 커서 위치 / selection 영역 삽입
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd ?? start;
+    const before = prompt.slice(0, start);
+    const after = prompt.slice(end);
+
+    // 자연스러운 separator: before 끝이 콤마/공백 아니면 ", " 자동 삽입.
+    const beforeNeedsSep = before.length > 0 && !/[,\s]$/.test(before);
+    const afterNeedsSep = after.length > 0 && !/^[,\s]/.test(after);
+    const insert = `${beforeNeedsSep ? ", " : ""}${wrapped}${afterNeedsSep ? ", " : ""}`;
+
+    setPrompt(before + insert + after);
+    closeAndFocus(before.length + insert.length);
   };
 
   const sizeLabel = `${width}×${height}`;
@@ -159,48 +198,20 @@ export default function GenerateLeftPanel({
           />
           <div className="ais-prompt-footer">
             <div style={{ display: "flex", gap: 8 }}>
-              {/* 2026-04-30 (Task 7): 라이브러리 진입점 [📚] · 신규 등록 [+] */}
+              {/* 2026-04-30 (오빠 후속 UX 정리):
+               *  [+ 라이브러리에 등록] / [템플릿 저장] 별도 버튼 제거.
+               *  → 라이브러리 모달 안 [+ 새 등록] 이 currentPrompt 자동 pre-fill 로 흡수.
+               */}
               <button
                 type="button"
                 onClick={() => setLibraryOpen(true)}
                 className="ais-prompt-link"
-                title="프롬프트 라이브러리"
+                title="프롬프트 라이브러리 (등록도 모달 안에서)"
               >
                 📚 라이브러리
               </button>
-              <button
-                type="button"
-                onClick={() => setRegisterOpen(true)}
-                className="ais-prompt-link"
-                title="현재 프롬프트를 라이브러리에 등록"
-              >
-                <Icon name="sparkle" size={11} /> 라이브러리에 등록
-              </button>
             </div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (!prompt.trim()) {
-                    toast.warn("저장할 프롬프트가 없습니다.");
-                    return;
-                  }
-                  const name =
-                    typeof window !== "undefined"
-                      ? window.prompt("템플릿 이름?", prompt.slice(0, 20))
-                      : null;
-                  if (!name) return;
-                  addTemplate({ name: name.trim(), text: prompt });
-                  toast.success(
-                    "템플릿 저장됨",
-                    "⚙️ 설정 > 프롬프트 템플릿에서 불러오기",
-                  );
-                }}
-                className="ais-prompt-link"
-                title="현재 프롬프트를 템플릿으로 저장"
-              >
-                <Icon name="sparkle" size={11} /> 템플릿 저장
-              </button>
               <button
                 type="button"
                 onClick={() => setPrompt("")}
@@ -214,19 +225,12 @@ export default function GenerateLeftPanel({
         </div>
       </div>
 
-      {/* ── 라이브러리 모달 (Task 6/7) ── */}
+      {/* ── 라이브러리 모달 (Task 6/7 · 신규 등록은 모달 내부 [+ 새 등록] 으로) ── */}
       <SnippetLibraryModal
         open={libraryOpen}
         onClose={() => setLibraryOpen(false)}
         currentPrompt={prompt}
         onToggleSnippet={handleToggleSnippet}
-      />
-
-      {/* ── 신규 등록 모달 ([+] 직접 진입) ── */}
-      <SnippetRegisterModal
-        open={registerOpen}
-        onClose={() => setRegisterOpen(false)}
-        defaultPrompt={prompt}
       />
 
       {/* AI 프롬프트 보정 토글 (2026-04-27 오빠 피드백):
