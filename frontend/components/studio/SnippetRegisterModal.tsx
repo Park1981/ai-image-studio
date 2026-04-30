@@ -20,7 +20,11 @@ import dynamic from "next/dynamic";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/ui/Icon";
-import { cropBlobIfArea, dataUrlToBlob } from "@/lib/image-crop";
+import {
+  blobToCompressedThumbDataUrl,
+  cropBlobIfArea,
+  dataUrlToBlob,
+} from "@/lib/image-crop";
 import { stripAllMarkers } from "@/lib/snippet-marker";
 import { usePromptSnippetsStore } from "@/stores/usePromptSnippetsStore";
 import type { CropArea } from "@/stores/useEditStore";
@@ -139,7 +143,9 @@ export default function SnippetRegisterModal({
       if (image) {
         const blob = await dataUrlToBlob(image);
         const cropped = await cropBlobIfArea(blob, cropArea);
-        thumbnail = await blobToDataUrl(cropped);
+        // 2026-04-30 (localStorage quota fix): WebP 256px q=0.75 압축.
+        // PNG dataURL (수 MB) → WebP (~20-30KB) ≈ 95%+ 절감.
+        thumbnail = await blobToCompressedThumbDataUrl(cropped, 256, 0.75);
       }
       // store.add 안에서 stripAllMarkers + trim 자동 처리 (Codex v3 #4).
       add({ name, prompt, thumbnail });
@@ -385,13 +391,3 @@ const btnStyle: React.CSSProperties = {
   fontWeight: 600,
   cursor: "pointer",
 };
-
-/** Blob → data URL (FileReader 래핑). */
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("blob → dataURL 변환 실패"));
-    reader.readAsDataURL(blob);
-  });
-}
