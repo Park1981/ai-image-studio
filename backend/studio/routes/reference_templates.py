@@ -17,7 +17,6 @@ import json
 import logging
 import re
 
-import aiosqlite
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from PIL import UnidentifiedImageError
 from pydantic import BaseModel
@@ -239,16 +238,11 @@ async def promote_from_history(history_id: str, body: _PromoteBody) -> dict:
     #    영구 파일 N개 생성 + 마지막 UPDATE 만 살아남아 orphan 발생.
     #    수정: WHERE reference_ref = pool_ref 조건부 → race 패자는 rowcount==0 →
     #    방금 만든 template row + 영구 파일 rollback + 409 응답.
-    async with aiosqlite.connect(history_db._config._DB_PATH) as db:
-        cur = await db.execute(
-            "UPDATE studio_history SET reference_ref = ? "
-            "WHERE id = ? AND reference_ref = ?",
-            (image_url, history_id, pool_ref),
-        )
-        await db.commit()
-        race_lost = cur.rowcount == 0
-
-    if race_lost:
+    # Phase 4.1.1 cleanup (codex Open Question): direct connect+SQL → history_db helper.
+    swapped = await history_db.replace_reference_ref_if_current(
+        history_id, pool_ref, image_url,
+    )
+    if not swapped:
         # 다른 promote 요청이 먼저 성공함 — 우리가 만든 row + 파일 모두 rollback
         await history_db.delete_reference_template(new_id)
         delete_reference_file(image_url)
