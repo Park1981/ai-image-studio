@@ -242,9 +242,13 @@ button {
   color: var(--ink-4);
 }
 
-/* 프롬프트 입력 카드 shell (textarea + footer) */
+/* 프롬프트 입력 카드 shell (textarea + footer)
+ * 2026-04-30 (오빠 후속 피드백): footer 가 absolute 라 textarea grow 시 겹쳤음.
+ * shell 을 flex column 으로 + footer 를 normal flow 로 → 항상 textarea 아래에 배치. */
 .ais-prompt-shell {
   position: relative;
+  display: flex;
+  flex-direction: column;
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius);
@@ -258,7 +262,8 @@ button {
   outline: none;
   resize: none;
   background: transparent;
-  padding: 14px 44px 38px 16px;
+  /* footer 가 normal flow 로 분리 → textarea padding-bottom 은 12 로 충분 */
+  padding: 14px 44px 12px 16px;
   font-family: inherit;
   font-size: 14px;
   line-height: 1.6;
@@ -270,15 +275,13 @@ button {
   overflow-y: auto;
 }
 .ais-prompt-footer {
-  position: absolute;
-  bottom: 8px;
-  left: 10px;
-  right: 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 8px 12px 10px;
   font-size: 11px;
   color: var(--ink-4);
+  border-top: 1px solid var(--line);
 }
 .ais-prompt-link {
   all: unset;
