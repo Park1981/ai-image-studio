@@ -12,7 +12,7 @@ import json
 import logging
 from typing import Any, Awaitable
 
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from ..tasks import Task
 
@@ -35,6 +35,28 @@ def _spawn(coro: Awaitable[Any]) -> asyncio.Task[Any]:
     _BACKGROUND_TASKS.add(task)
     task.add_done_callback(_BACKGROUND_TASKS.discard)
     return task
+
+
+def parse_meta_object(meta: str) -> dict[str, Any]:
+    """multipart `meta` 필드 → JSON object dict 강제.
+
+    Codex C2 fix (2026-04-30): 옛 코드는 `json.loads(meta)` 후 바로 `.get()` 호출.
+    `meta=null`, `meta=[]`, `meta="x"` 등 비-object 페이로드에서 AttributeError → 500.
+    이 헬퍼는 decode 실패 + non-object 모두 400 으로 통일.
+
+    Raises:
+        HTTPException(400): JSON decode 실패 또는 dict 가 아닐 때.
+    """
+    try:
+        meta_obj = json.loads(meta)
+    except json.JSONDecodeError as e:
+        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+    if not isinstance(meta_obj, dict):
+        raise HTTPException(
+            400,
+            f"meta must be a JSON object, got {type(meta_obj).__name__}",
+        )
+    return meta_obj
 
 
 def _sse_format(event: str, data: dict[str, Any]) -> bytes:

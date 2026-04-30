@@ -11,7 +11,6 @@ task #17 (2026-04-26): router.py 풀 분해 2탄.
 from __future__ import annotations
 
 import io
-import json
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -35,7 +34,7 @@ from ..reference_pool import save_to_pool
 from ..schemas import GenerateBody, TaskCreated
 from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..tasks import TASKS, _new_task
-from ._common import _spawn, _stream_task, log
+from ._common import _spawn, _stream_task, log, parse_meta_object
 
 router = APIRouter()
 
@@ -85,10 +84,7 @@ async def create_edit_task(
     reference_image: UploadFile | None = File(None),
 ):
     """수정 요청 (multipart): image 파일 + meta JSON + 옵션 reference_image."""
-    try:
-        meta_obj = json.loads(meta)
-    except json.JSONDecodeError as e:
-        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+    meta_obj = parse_meta_object(meta)
 
     prompt = meta_obj.get("prompt", "").strip()
     if not prompt:
@@ -274,10 +270,7 @@ async def create_video_task(
 
     meta = { prompt, adult?, ollamaModel?, visionModel? }
     """
-    try:
-        meta_obj = json.loads(meta)
-    except json.JSONDecodeError as e:
-        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+    meta_obj = parse_meta_object(meta)
 
     prompt = meta_obj.get("prompt", "").strip()
     if not prompt:

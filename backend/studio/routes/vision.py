@@ -13,7 +13,6 @@ generate/edit/video 와 동일 패턴 — 진행 모달이 PipelineTimeline 단�
 from __future__ import annotations
 
 import io
-import json
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -23,7 +22,7 @@ from ..pipelines import _run_vision_analyze_pipeline
 from ..schemas import TaskCreated
 from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..tasks import TASKS, _new_task
-from ._common import _spawn, _stream_task, log
+from ._common import _spawn, _stream_task, log, parse_meta_object
 
 router = APIRouter()
 
@@ -40,10 +39,7 @@ async def create_vision_analyze_task(
 
     HTTP 200 원칙은 done event payload 안에서 보장 (provider="fallback" 폴백).
     """
-    try:
-        meta_obj = json.loads(meta)
-    except json.JSONDecodeError as e:
-        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+    meta_obj = parse_meta_object(meta)
 
     vision_model_override = (
         meta_obj.get("visionModel") or meta_obj.get("vision_model")
