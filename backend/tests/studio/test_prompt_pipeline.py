@@ -153,7 +153,7 @@ def test_upgrade_generate_prompt_injects_aspect_into_user_message() -> None:
             new=_fake_chat,
         ),
         patch(
-            "backend.studio.prompt_pipeline.translate_to_korean",
+            "backend.studio.prompt_pipeline.translate.translate_to_korean",
             new=AsyncMock(return_value="한국어 번역"),
         ),
     ):
@@ -246,7 +246,7 @@ def test_upgrade_generate_prompt_isolates_research_hints_in_user_message() -> No
             new=_fake_chat,
         ),
         patch(
-            "backend.studio.prompt_pipeline.translate_to_korean",
+            "backend.studio.prompt_pipeline.translate.translate_to_korean",
             new=AsyncMock(return_value=None),
         ),
     ):

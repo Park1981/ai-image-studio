@@ -191,7 +191,7 @@ def test_analyze_edit_source_person_domain() -> None:
         ),
         # clarify_edit_intent 도 stub (외부 호출 막기)
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="refined intent text"),
         ),
     ):
@@ -223,7 +223,7 @@ def test_analyze_edit_source_object_scene_domain() -> None:
             new=AsyncMock(return_value=_object_scene_json()),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="Change mug color to deep blue."),
         ),
     ):
@@ -249,7 +249,7 @@ def test_analyze_edit_source_uses_provided_refined_intent() -> None:
             "studio.vision_pipeline.edit_source._call_vision_edit_source",
             new=AsyncMock(return_value=_person_json()),
         ),
-        patch("studio.prompt_pipeline.clarify_edit_intent", new=clarify_mock),
+        patch("studio.prompt_pipeline.translate.clarify_edit_intent", new=clarify_mock),
     ):
         result = asyncio.run(
             analyze_edit_source(
@@ -273,7 +273,7 @@ def test_analyze_edit_source_vision_fail_fallback_shape() -> None:
             new=AsyncMock(return_value=""),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="refined"),
         ),
     ):
@@ -300,7 +300,7 @@ def test_analyze_edit_source_malformed_json_fallback() -> None:
             new=AsyncMock(return_value="{invalid not json"),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="refined"),
         ),
     ):
@@ -331,7 +331,7 @@ def test_analyze_edit_source_unknown_domain_normalizes_to_object_scene() -> None
             new=AsyncMock(return_value=payload),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="r"),
         ),
     ):
@@ -359,7 +359,7 @@ def test_analyze_edit_source_missing_slots_filled_with_preserve_default() -> Non
             new=AsyncMock(return_value=payload),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="r"),
         ),
     ):
@@ -395,7 +395,7 @@ def test_analyze_edit_source_invalid_action_normalizes_to_preserve() -> None:
             new=AsyncMock(return_value=payload),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="r"),
         ),
     ):
@@ -417,7 +417,7 @@ def test_to_dict_camelcase_for_frontend() -> None:
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="r"),
         ),
     ):
@@ -444,7 +444,7 @@ def test_compact_context_lists_all_slots_in_order() -> None:
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="Test intent."),
         ),
     ):
@@ -477,7 +477,7 @@ def test_compact_context_skips_preserve_slot_notes_spec19() -> None:
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="Test intent."),
         ),
     ):
@@ -514,7 +514,7 @@ def test_human_summary_returns_summary_or_intent() -> None:
             new=AsyncMock(return_value=_person_json()),
         ),
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="intent only"),
         ),
     ):
@@ -558,7 +558,7 @@ def test_run_vision_pipeline_passes_compact_context_when_matrix_ok() -> None:
     captured: dict[str, str] = {}
     with (
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="Refined English intent."),
         ),
         patch(
@@ -612,7 +612,7 @@ def test_run_vision_pipeline_unloads_models_between_stages_spec19() -> None:
 
     with (
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="intent"),
         ),
         patch(
@@ -652,7 +652,7 @@ def test_run_vision_pipeline_falls_back_to_caption_when_matrix_fails() -> None:
     captured: dict[str, str] = {}
     with (
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value="Refined."),
         ),
         patch(
@@ -685,7 +685,7 @@ def test_run_vision_pipeline_unavailable_when_both_fail() -> None:
     captured: dict[str, str] = {}
     with (
         patch(
-            "studio.prompt_pipeline.clarify_edit_intent",
+            "studio.prompt_pipeline.translate.clarify_edit_intent",
             new=AsyncMock(return_value=""),
         ),
         patch(
