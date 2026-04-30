@@ -807,9 +807,11 @@ async def test_compare_analyze_skips_clarify_when_refined_intent_cached(
     await history_db.init_studio_history_db()
 
     # 사전 row insert + refinedIntent 캐시
+    # Codex C1 fix (2026-04-30): history.id 는 edit-/gen-/vid- prefix.
+    # 옛 tsk-* 사용은 실제 history id 형식이 아니어서 게이트 통과해도 silent miss.
     cached_intent = "Change the top color to deep blue. Keep everything else unchanged."
     await history_db.insert_item({
-        "id": "tsk-cacef00d1234",
+        "id": "edit-cace1234",
         "mode": "edit",
         "prompt": "옷 색깔 바꿔줘",
         "label": "옷 색깔 바꿔줘",
@@ -817,7 +819,7 @@ async def test_compare_analyze_skips_clarify_when_refined_intent_cached(
         "steps": 4, "cfg": 1.0, "lightning": True,
         "model": "Qwen Image Edit 2511",
         "createdAt": 1700000000000,
-        "imageRef": "/images/studio/result/tsk-cacef00d1234.png",
+        "imageRef": "/images/studio/result/edit-cace1234.png",
         "refinedIntent": cached_intent,
     })
 
@@ -859,7 +861,7 @@ async def test_compare_analyze_skips_clarify_when_refined_intent_cached(
                 },
                 data={"meta": json.dumps({
                     "editPrompt": "옷 색깔 바꿔줘",
-                    "historyItemId": "tsk-cacef00d1234",
+                    "historyItemId": "edit-cace1234",
                 })},
             )
             assert res.status_code == 200
@@ -1221,9 +1223,10 @@ async def test_compare_analyze_persists_when_history_id_given(
 
     _set_temp_db(monkeypatch, tmp_path)
     await history_db.init_studio_history_db()
-    # 사전 row 삽입 (Task 5 의 task_id 형식 준수)
+    # Codex C1 fix (2026-04-30): edit-* 가 실제 history id 형식.
+    # 옛 tsk-aaaaaaaaaaaa 는 실제로 어떤 history row 와도 매치되지 않던 상태.
     await history_db.insert_item({
-        "id": "tsk-aaaaaaaaaaaa",
+        "id": "edit-aaaaaaaa",
         "mode": "edit",
         "prompt": "x", "label": "x",
         "width": 1024, "height": 1024, "seed": 1,
@@ -1254,14 +1257,14 @@ async def test_compare_analyze_persists_when_history_id_given(
                 },
                 data={"meta": json.dumps({
                     "editPrompt": "x",
-                    "historyItemId": "tsk-aaaaaaaaaaaa",
+                    "historyItemId": "edit-aaaaaaaa",
                 })},
             )
             assert res.status_code == 200
             body = await _drain_sse_done(cli, res.json()["stream_url"])
     assert body["saved"] is True
 
-    fetched = await history_db.get_item("tsk-aaaaaaaaaaaa")
+    fetched = await history_db.get_item("edit-aaaaaaaa")
     assert fetched["comparisonAnalysis"]["overall"] == 70
 
 
@@ -1300,7 +1303,7 @@ async def test_compare_analyze_unknown_history_id_saved_false(
                 },
                 data={"meta": json.dumps({
                     "editPrompt": "x",
-                    "historyItemId": "tsk-bbbbbbbbbbbb",  # 존재 안 함
+                    "historyItemId": "edit-bbbbbbbb",  # 형식 valid 지만 DB row 없음
                 })},
             )
             assert res.status_code == 200

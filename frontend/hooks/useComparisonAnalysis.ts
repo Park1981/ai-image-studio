@@ -122,8 +122,10 @@ export function useComparisonAnalysis() {
           source: item.sourceRef,
           result: item.imageRef,
           editPrompt: item.prompt,
-          // tsk- prefix 항목만 DB 저장 요청 (Task 5/6 의 _TASK_ID_RE 호환)
-          historyItemId: item.id.startsWith("tsk-") ? item.id : undefined,
+          // Codex C1 fix (2026-04-30): history.id 는 gen-/edit-/vid- prefix 라서
+          // 옛 startsWith("tsk-") 게이트로는 절대 통과 X → store 휘발 상태였음.
+          // 백엔드 HISTORY_ID_RE 가 형식 검증 + update_comparison rowcount 로 안전 차단.
+          historyItemId: item.id,
           visionModel,
           ollamaModel,
         });
