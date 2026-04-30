@@ -16,6 +16,7 @@ import uuid
 from typing import Any
 
 from .._gpu_lock import gpu_slot
+from .._lib_marker import strip_library_markers
 from ..claude_cli import research_prompt
 from ..comfy_api_builder import _snap_dimension, build_generate_from_request
 from ..presets import DEFAULT_OLLAMA_ROLES, GENERATE_MODEL, get_aspect
@@ -99,8 +100,10 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
             )
             from ..prompt_pipeline import UpgradeResult
 
+            # Codex v3 #2 (위치 2-a): pre_upgraded_prompt 경로는 위치 1 (upgrade
+            # 함수 안 strip) 을 거치지 않으므로 여기서 직접 strip.
             upgrade = UpgradeResult(
-                upgraded=body.pre_upgraded_prompt,
+                upgraded=strip_library_markers(body.pre_upgraded_prompt),
                 fallback=False,
                 provider="pre-confirmed",
                 original=body.prompt,
@@ -147,9 +150,13 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
 
         # Ollama unload + GPU gate 는 _dispatch_to_comfy 내부에서 공통 처리.
 
+        # Codex v3 #2 (위치 2-b): ComfyUI dispatch 직전 final_prompt 이중 안전망.
+        # 위치 1 + 2-a 가 모든 경로 커버하지만 추가 strip 으로 마커 잔존 0% 보장.
+        final_prompt = strip_library_markers(upgrade.upgraded)
+
         def _make_generate_prompt(_uploaded: str | None) -> dict[str, Any]:
             return build_generate_from_request(
-                prompt=upgrade.upgraded,
+                prompt=final_prompt,
                 aspect_label=body.aspect,
                 steps=body.steps,
                 cfg=body.cfg,
@@ -186,11 +193,14 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
         await asyncio.sleep(0.15)
 
         # 7. done
+        # Codex v3 #2 (위치 2-c · 위치 4): history DB 저장 prompt 도 strip — UI
+        # readability. body.prompt 는 사용자 원본 (마커 포함 가능).
+        history_prompt = strip_library_markers(body.prompt)
         item = {
             "id": f"gen-{uuid.uuid4().hex[:8]}",
             "mode": "generate",
-            "prompt": body.prompt,
-            "label": body.prompt[:28] + ("…" if len(body.prompt) > 28 else ""),
+            "prompt": history_prompt,
+            "label": history_prompt[:28] + ("…" if len(history_prompt) > 28 else ""),
             "width": saved_w,
             "height": saved_h,
             "seed": actual_seed,

@@ -12,6 +12,9 @@ import { videoImageStream } from "@/lib/api/video";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
+// 2026-04-30 (Phase 1 Task 0 · plan 2026-04-30-prompt-snippets-library.md):
+// usePromptHistoryStore 가 모든 모드의 canonical source.
+import { usePromptHistoryStore } from "@/stores/usePromptHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import { useVideoStore } from "@/stores/useVideoStore";
@@ -67,6 +70,9 @@ export function useVideoPipeline(
         "설정에서 시작하실 수 있고, Mock은 그대로 동작합니다.",
       );
     }
+
+    // 2026-04-30 (Phase 1 Task 0): prompt history 단일 source 에 등록.
+    usePromptHistoryStore.getState().add("video", prompt);
 
     setRunning(true);
     await consumePipelineStream(

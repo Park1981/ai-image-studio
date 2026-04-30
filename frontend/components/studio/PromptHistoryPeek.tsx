@@ -1,25 +1,23 @@
 /**
- * PromptHistoryPeek - 숨김 스프링 프롬프트 히스토리 메뉴.
+ * PromptHistoryPeek - 프롬프트 히스토리 메뉴.
+ *
+ * 2026-04-30 (Phase 1 · plan 2026-04-30-prompt-snippets-library.md):
+ *  - Task 0: 모든 모드의 canonical source = usePromptHistoryStore 단일화
+ *  - Task 2: 호버 → 클릭 트리거 + 외부 클릭 자동 닫기 + 각 row [X] + [전체 비우기]
  *
  * 동작:
- *  - 프롬프트 입력창 우상단 작은 📜 아이콘 (트리거)
- *  - 호버 150ms 유지 → 상단으로 탄성 스프링 슬라이드
- *  - 리스트: useHistoryStore.items 에서 mode 로 필터 + prompt dedupe + 최근 20개
- *  - 각 행: prompt 원문 클램프 + 상대 시간 + [📋 복사] + [↩ 사용]
- *  - hover 영역(트리거 + 패널) 벗어나면 300ms 지연 후 탄성 슬라이드 아웃
- *
- * 설계 결정:
- *  - framer-motion spring {stiffness: 400, damping: 24} = 쫀득한 탄성
- *  - delay 150ms (enter) · 300ms (leave) = 실수 hover / 실수 leave 방지
- *  - "사용" 클릭 시 패널 자동 close + 입력창 focus
+ *  - 프롬프트 입력창 우상단 📜 트리거 → 클릭 시 패널 toggle
+ *  - 패널 외부 클릭 → 자동 닫기
+ *  - 리스트: usePromptHistoryStore.entries 에서 mode 로 필터 + dedupe + 최근 20개
+ *  - 각 행: prompt 클램프 + 상대 시간 + [복사] + [사용] + [X] 삭제
+ *  - 빈 상태 안내 + 하단 [전체 비우기] (이 mode 만)
  */
 
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
-import { useHistoryStore } from "@/stores/useHistoryStore";
 import {
   usePromptHistoryStore,
   type PromptHistoryMode,
@@ -42,14 +40,11 @@ const MODE_LABEL: Record<Props["mode"], string> = {
 };
 
 const MAX_ITEMS = 20;
-const ENTER_DELAY = 150;
-const LEAVE_DELAY = 300;
 
 interface PromptPeekItem {
   id: string;
   prompt: string;
   createdAt: number;
-  meta?: string;
 }
 
 export default function PromptHistoryPeek({
@@ -57,61 +52,42 @@ export default function PromptHistoryPeek({
   onSelect,
   align = "right",
 }: Props) {
-  const items = useHistoryStore((s) => s.items);
   const promptEntries = usePromptHistoryStore((s) => s.entries);
+  const removeOne = usePromptHistoryStore((s) => s.removeOne);
+  const clearMode = usePromptHistoryStore((s) => s.clearMode);
   const [open, setOpen] = useState(false);
-  // hover 타이머 — 진입/이탈 지연 처리
-  const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  // mode 별 prompt 추출 + dedupe (최신 우선)
+  // mode 별 prompt 추출 + dedupe (최신 우선) — 단일 source.
   const prompts = useMemo(() => {
-    if (mode === "compare") {
-      return promptEntries
-        .filter((it) => it.mode === "compare")
-        .slice(0, MAX_ITEMS)
-        .map((it) => ({
-          id: it.id,
-          prompt: it.prompt,
-          createdAt: it.createdAt,
-        }));
-    }
-
     const seen = new Set<string>();
     const out: PromptPeekItem[] = [];
-    for (const it of items) {
-      if (it.mode !== mode) continue;
-      const key = it.prompt.trim();
+    for (const e of promptEntries) {
+      if (e.mode !== mode) continue;
+      const key = e.prompt.trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);
       out.push({
-        id: it.id,
-        prompt: it.prompt,
-        createdAt: it.createdAt,
-        meta: `${it.width}×${it.height}`,
+        id: e.id,
+        prompt: e.prompt,
+        createdAt: e.createdAt,
       });
       if (out.length >= MAX_ITEMS) break;
     }
     return out;
-  }, [items, mode, promptEntries]);
+  }, [promptEntries, mode]);
 
-  const scheduleOpen = () => {
-    if (leaveTimer.current) {
-      clearTimeout(leaveTimer.current);
-      leaveTimer.current = null;
-    }
-    if (open) return;
-    enterTimer.current = setTimeout(() => setOpen(true), ENTER_DELAY);
-  };
-
-  const scheduleClose = () => {
-    if (enterTimer.current) {
-      clearTimeout(enterTimer.current);
-      enterTimer.current = null;
-    }
+  // 외부 클릭 → 패널 자동 닫기 (Task 2)
+  useEffect(() => {
     if (!open) return;
-    leaveTimer.current = setTimeout(() => setOpen(false), LEAVE_DELAY);
-  };
+    function onDocClick(e: MouseEvent) {
+      if (!containerRef.current?.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, [open]);
 
   const handleCopy = async (prompt: string) => {
     try {
@@ -128,12 +104,21 @@ export default function PromptHistoryPeek({
     toast.info("프롬프트 적용", prompt.slice(0, 40));
   };
 
+  const handleClearAll = () => {
+    if (
+      typeof window !== "undefined" &&
+      window.confirm(`${MODE_LABEL[mode]} 히스토리 전체를 비울까요? (실행 취소 X)`)
+    ) {
+      clearMode(mode);
+      setOpen(false);
+    }
+  };
+
   const alignRight = align === "right";
 
   return (
     <div
-      onMouseEnter={scheduleOpen}
-      onMouseLeave={scheduleClose}
+      ref={containerRef}
       style={{
         position: "absolute",
         top: 6,
@@ -232,34 +217,61 @@ export default function PromptHistoryPeek({
             {prompts.length === 0 ? (
               <div
                 style={{
-                  padding: "18px 14px",
+                  padding: "20px 16px",
                   color: "var(--ink-4)",
                   fontSize: 12,
                   textAlign: "center",
                   lineHeight: 1.5,
                 }}
               >
-                아직 저장된 {MODE_LABEL[mode]} 프롬프트가 없습니다.
+                저장된 {MODE_LABEL[mode]} 프롬프트가 없어요.
               </div>
             ) : (
-              <ul
-                style={{
-                  listStyle: "none",
-                  margin: 0,
-                  padding: "4px 0",
-                  overflowY: "auto",
-                  flex: 1,
-                }}
-              >
-                {prompts.map((it) => (
-                  <PeekRow
-                    key={it.id}
-                    item={it}
-                    onCopy={() => handleCopy(it.prompt)}
-                    onSelect={() => handleSelect(it.prompt)}
-                  />
-                ))}
-              </ul>
+              <>
+                <ul
+                  style={{
+                    listStyle: "none",
+                    margin: 0,
+                    padding: "4px 0",
+                    overflowY: "auto",
+                    flex: 1,
+                  }}
+                >
+                  {prompts.map((it) => (
+                    <PeekRow
+                      key={it.id}
+                      item={it}
+                      onCopy={() => handleCopy(it.prompt)}
+                      onSelect={() => handleSelect(it.prompt)}
+                      onRemove={() => removeOne(it.id)}
+                    />
+                  ))}
+                </ul>
+                <div
+                  style={{
+                    borderTop: "1px solid var(--line)",
+                    padding: "8px 12px",
+                    display: "flex",
+                    justifyContent: "flex-end",
+                    background: "var(--bg-2)",
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handleClearAll}
+                    style={{
+                      all: "unset",
+                      cursor: "pointer",
+                      fontSize: 11,
+                      color: "var(--ink-4)",
+                      padding: "2px 6px",
+                      borderRadius: "var(--radius-sm)",
+                    }}
+                  >
+                    전체 비우기
+                  </button>
+                </div>
+              </>
             )}
           </motion.div>
         )}
@@ -273,10 +285,12 @@ function PeekRow({
   item,
   onCopy,
   onSelect,
+  onRemove,
 }: {
   item: PromptPeekItem;
   onCopy: () => void;
   onSelect: () => void;
+  onRemove: () => void;
 }) {
   const [rowHover, setRowHover] = useState(false);
   return (
@@ -319,14 +333,13 @@ function PeekRow({
           }}
         >
           {formatRelativeTime(item.createdAt)}
-          {item.meta ? ` · ${item.meta}` : ""}
         </div>
       </div>
       <div
         style={{
           display: "flex",
           gap: 4,
-          opacity: rowHover ? 1 : 0.35,
+          opacity: rowHover ? 1 : 0.45,
           transition: "opacity .12s",
         }}
       >
@@ -346,6 +359,12 @@ function PeekRow({
           title="이 프롬프트 사용"
           iconName="arrow-right"
           accent
+        />
+        <RemoveBtn
+          onClick={(e) => {
+            e.stopPropagation();
+            onRemove();
+          }}
         />
       </div>
     </li>
@@ -388,6 +407,40 @@ function IconBtn({
       }}
     >
       <Icon name={iconName} size={12} />
+    </button>
+  );
+}
+
+/* ── [X] 삭제 버튼 (Task 2) ── */
+function RemoveBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="이 프롬프트 삭제"
+      title="삭제"
+      style={{
+        all: "unset",
+        cursor: "pointer",
+        width: 24,
+        height: 24,
+        display: "grid",
+        placeItems: "center",
+        borderRadius: "var(--radius-sm)",
+        color: "var(--ink-4)",
+        transition: "background .12s, color .12s",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.color = "#b42318";
+        (e.currentTarget as HTMLButtonElement).style.background =
+          "rgba(239,68,68,.08)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-4)";
+        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+      }}
+    >
+      <Icon name="x" size={12} />
     </button>
   );
 }

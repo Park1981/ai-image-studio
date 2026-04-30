@@ -35,7 +35,12 @@ interface Props {
 export default function InfoPanel({ item, onClose }: Props) {
   return (
     <aside
-      onClick={onClose}
+      // 2026-04-30 (오빠 후속 피드백): 텍스트 드래그 + 부분 복사 활성화.
+      //   - 옛 onClick={onClose} 는 짧은 드래그 = click 으로 간주돼 selection 도중 모달이 닫혔음.
+      //   - currentTarget 가드 → 자식 (텍스트 영역 등) click 은 무시, aside 자체 빈 영역만 onClose.
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose(e);
+      }}
       // 패널 내 휠 이벤트는 상위 overlay 의 zoom 핸들러로 전파되지 않도록 차단 —
       // 패널 자체 overflowY:auto 가 정상 스크롤 담당.
       onWheel={(e) => e.stopPropagation()}
@@ -52,6 +57,9 @@ export default function InfoPanel({ item, onClose }: Props) {
         color: "rgba(255,255,255,.92)",
         zIndex: 3,
         boxShadow: "-8px 0 24px rgba(0,0,0,.4)",
+        // LightboxInner 부모의 userSelect:none 을 덮어써서 InfoPanel 안 텍스트는 선택 가능.
+        userSelect: "text",
+        WebkitUserSelect: "text",
       }}
     >
       {/* 헤더 — 프롬프트 28자 요약 (상단 타이틀) */}

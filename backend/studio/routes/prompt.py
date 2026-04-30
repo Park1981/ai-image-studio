@@ -13,6 +13,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException
 
 from .._gpu_lock import GpuBusyError, gpu_slot
+from .._lib_marker import strip_library_markers
 from ..claude_cli import research_prompt
 from ..comfy_api_builder import _snap_dimension
 from ..comfy_transport import ComfyUITransport
@@ -62,8 +63,10 @@ async def upgrade_only(body: UpgradeOnlyBody):
     except GpuBusyError as e:
         raise HTTPException(503, str(e)) from e
 
+    # Codex v3 #2 (위치 3): /upgrade-only 응답의 upgradedPrompt 도 strip — 모달
+    # 표시 + 프론트 textarea pre-fill 시 마커 잔존 방지 (위치 1 이중 안전망).
     return {
-        "upgradedPrompt": upgrade.upgraded,
+        "upgradedPrompt": strip_library_markers(upgrade.upgraded),
         "upgradedPromptKo": upgrade.translation,
         "provider": upgrade.provider,
         "fallback": upgrade.fallback,

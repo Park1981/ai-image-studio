@@ -308,3 +308,61 @@ def test_reference_clause_style_explicitly_blocks_image1_style_preserve() -> Non
     assert "image2" in clause.lower() or "IMAGE2" in clause
     assert "style" in lower or "tone" in lower or "color" in lower or "lighting" in lower
     assert "do not preserve" in lower or "replace" in lower or "match" in lower
+
+
+# ────────────────────────────────────────────────────────────────────
+# Phase 2B Task 8 (2026-04-30 · plan 2026-04-30-prompt-snippets-library.md):
+# SYSTEM_GENERATE 의 LIBRARY MARKER PRESERVATION 4 항목 system prompt 검증.
+# LLM 협조 layer (deterministic strip 안전망과 별도).
+# ────────────────────────────────────────────────────────────────────
+def test_system_generate_contains_library_marker_preservation() -> None:
+    """SYSTEM_GENERATE 가 <lib>...</lib> 마커 보존 4 항목을 모두 포함."""
+    from studio.prompt_pipeline.upgrade import SYSTEM_GENERATE
+
+    # 마커 자체와 4 항목 키워드 (preserve / keep / inner / strips) 모두 명시
+    assert "<lib>" in SYSTEM_GENERATE and "</lib>" in SYSTEM_GENERATE
+    lower = SYSTEM_GENERATE.lower()
+    # 1. 내부 내용 보존
+    assert "preserve the inner content" in lower
+    # 2. 마커 자체 보존
+    assert "keep the markers" in lower
+    # 3. backend strips 안내
+    assert "strips them deterministically" in lower
+    # 4. Korean 외부 번역하지만 마커는 그대로
+    assert "leave each `<lib>...</lib>` block as-is" in SYSTEM_GENERATE
+
+
+@pytest.mark.asyncio
+async def test_upgrade_result_upgraded_strips_lib_markers() -> None:
+    """upgrade_generate_prompt 결과의 UpgradeResult.upgraded 에 <lib> 잔존하지 않음.
+
+    LLM 이 system prompt 지시 무시해도 deterministic strip 안전망 (Codex v3 #2).
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from studio.prompt_pipeline import upgrade_generate_prompt
+
+    async def fake_chat(**kwargs):
+        # gemma4 가 마커 그대로 반환하는 worst-case 시뮬레이션
+        return "a girl, <lib>cinematic 35mm</lib>, warm"
+
+    with (
+        patch(
+            "studio.prompt_pipeline._ollama._call_ollama_chat",
+            new=AsyncMock(side_effect=fake_chat),
+        ),
+        patch(
+            "studio.prompt_pipeline.translate.translate_to_korean",
+            new=AsyncMock(return_value=None),
+        ),
+    ):
+        result = await upgrade_generate_prompt(
+            prompt="<lib>cinematic 35mm</lib>",
+            include_translation=False,
+            width=1024,
+            height=1024,
+        )
+
+    assert "<lib>" not in result.upgraded
+    assert "</lib>" not in result.upgraded
+    assert "cinematic 35mm" in result.upgraded
