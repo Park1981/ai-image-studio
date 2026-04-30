@@ -22,7 +22,7 @@ def _make_png_bytes() -> bytes:
 
 def _set_temp_db(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     db_path = tmp_path / "test_history.db"
-    monkeypatch.setattr("studio.history_db._DB_PATH", str(db_path))
+    monkeypatch.setattr("studio.history_db._config._DB_PATH", str(db_path))
     return db_path
 
 

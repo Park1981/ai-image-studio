@@ -27,9 +27,9 @@ def _tiny_png_bytes() -> bytes:
 
 
 def _set_temp_db(monkeypatch, tmp_path: Path) -> Path:
-    """history_db._DB_PATH 를 임시 디렉토리로 강제."""
+    """history_db._config._DB_PATH 를 임시 디렉토리로 강제."""
     db_path = tmp_path / "test_history.db"
-    monkeypatch.setattr("studio.history_db._DB_PATH", str(db_path))
+    monkeypatch.setattr("studio.history_db._config._DB_PATH", str(db_path))
     return db_path
 
 
@@ -67,7 +67,7 @@ async def test_init_db_adds_comparison_columns(monkeypatch, tmp_path: Path) -> N
     _set_temp_db(monkeypatch, tmp_path)
     await history_db.init_studio_history_db()
 
-    async with aiosqlite.connect(history_db._DB_PATH) as db:
+    async with aiosqlite.connect(history_db._config._DB_PATH) as db:
         cur = await db.execute("PRAGMA table_info(studio_history)")
         cols = {row[1] for row in await cur.fetchall()}
     assert "source_ref" in cols

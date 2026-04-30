@@ -29,27 +29,16 @@ Schema version (2026-04-27 · C2-P2-3 도입):
 from __future__ import annotations
 
 import json
-import logging
 import time
 import uuid
 from typing import Any
 
 import aiosqlite
 
-try:
-    from config import settings  # type: ignore
-
-    _DB_PATH = settings.history_db_path
-except Exception:
-    _DB_PATH = "./data/history.db"
-
-
-# 임시 풀 URL prefix — reference_pool 모듈과 동기. 순환 import 회피 위해 *문자열 상수로 직접 박음*.
-# (reference_pool.POOL_URL_PREFIX 와 항상 동일해야 함 — Codex C6 정책)
-_POOL_URL_PREFIX = "/images/studio/reference-pool/"
-
-
-log = logging.getLogger(__name__)
+# Phase 4.1 단계 2 — DB 경로 / URL prefix / logger 단일 source 는 _config.py.
+# sub-module 동일 패턴. monkeypatch · 직접 read 모두 _config attribute 사용 (alias 0건).
+from . import _config as _cfg
+from ._config import _POOL_URL_PREFIX, log
 
 
 # Schema version — 2026-04-27 (C2-P2-3) 도입.
@@ -217,7 +206,7 @@ async def init_studio_history_db() -> None:
     2026-04-27 (C2-P2-3): PRAGMA user_version 추적 도입.
     user_version = SCHEMA_VERSION 이면 마이그레이션 step 자체 skip (빠른 부팅).
     """
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         await db.execute(CREATE_TABLE)
         await db.execute(CREATE_IDX_CREATED)
         await db.execute(CREATE_IDX_MODE)
@@ -230,7 +219,7 @@ async def init_studio_history_db() -> None:
                 SCHEMA_VERSION,
                 current_version,
             )
-            log.info("studio_history DB ready at %s", _DB_PATH)
+            log.info("studio_history DB ready at %s", _cfg._DB_PATH)
             return
 
         log.info(
@@ -252,7 +241,7 @@ async def init_studio_history_db() -> None:
         if await _needs_video_mode_migration(db):
             await _migrate_add_video_mode(db)
     # v4 (2026-04-24): comparison 분석 영구 저장 컬럼 두 개 추가
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         for col_name in ("source_ref", "comparison_analysis"):
             try:
                 await db.execute(
@@ -264,7 +253,7 @@ async def init_studio_history_db() -> None:
                 pass
         await db.commit()
     # v5 (2026-04-24): video 전용 메타 4개 — adult(bool) / duration_sec / fps / frame_count
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         v5_cols = (
             ("adult", "INTEGER"),
             ("duration_sec", "REAL"),
@@ -285,7 +274,7 @@ async def init_studio_history_db() -> None:
     # Edit 한 사이클 안의 clarify_edit_intent 결과 (영문 1-2문장) 캐시.
     # 비교 분석 (compare-analyze) 이 historyItemId 받으면 이 캐시 재사용 →
     # gemma4 cold start ~5초 절약.
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         try:
             await db.execute(
                 "ALTER TABLE studio_history ADD COLUMN refined_intent TEXT"
@@ -298,7 +287,7 @@ async def init_studio_history_db() -> None:
     # v7 (2026-04-27): Edit multi-reference — reference_ref + reference_role 두 컬럼.
     # reference_ref = Library plan 의 영구 URL only (Phase 5 단계는 항상 NULL).
     # reference_role = 사용자 명시 role (face / outfit / style / background / custom).
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         for col_name in ("reference_ref", "reference_role"):
             try:
                 await db.execute(
@@ -311,14 +300,14 @@ async def init_studio_history_db() -> None:
         await db.commit()
     # v8 (2026-04-28 라이브러리 plan): reference_templates 테이블 + 인덱스 신규.
     # studio_history 와 별개 테이블이라 ALTER 가 아닌 CREATE.
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         await _migrate_create_reference_templates(db)
         log.info("Migrated: reference_templates 테이블 + 인덱스 생성")
         # 모든 마이그레이션 적용 후 schema version 마킹 (다음 부팅에서 skip).
         await _set_schema_version(db, SCHEMA_VERSION)
         await db.commit()
     log.info(
-        "studio_history DB ready at %s (schema v%d)", _DB_PATH, SCHEMA_VERSION
+        "studio_history DB ready at %s (schema v%d)", _cfg._DB_PATH, SCHEMA_VERSION
     )
 
 
@@ -328,7 +317,7 @@ async def insert_item(item: dict[str, Any]) -> None:
     spec 19 후속 (v6): item.get("refinedIntent") 도 함께 저장 (Edit 한 사이클의
     gemma4 정제 결과 캐시 — 비교 분석에서 재사용). generate/video 는 None.
     """
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         await db.execute(
             """INSERT OR REPLACE INTO studio_history
             (id, mode, prompt, label, width, height, seed, steps, cfg, lightning,
@@ -398,7 +387,7 @@ async def list_items(
     )
     params.append(int(limit))
 
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(sql, params)
         rows = await cur.fetchall()
@@ -406,7 +395,7 @@ async def list_items(
 
 
 async def get_item(item_id: str) -> dict[str, Any] | None:
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM studio_history WHERE id = ?", (item_id,)
@@ -416,7 +405,7 @@ async def get_item(item_id: str) -> dict[str, Any] | None:
 
 
 async def delete_item(item_id: str) -> bool:
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             "DELETE FROM studio_history WHERE id = ?", (item_id,)
         )
@@ -441,7 +430,7 @@ async def delete_item_with_refs(
         (deleted, source_ref, image_ref). deleted=False 면 나머지는 None.
     """
     pool_ref_to_unlink: str | None = None
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT source_ref, image_ref, reference_ref FROM studio_history WHERE id = ?",
@@ -481,7 +470,7 @@ async def delete_item_with_refs(
 
 
 async def clear_all() -> int:
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute("DELETE FROM studio_history")
         await db.commit()
         return cur.rowcount
@@ -499,7 +488,7 @@ async def clear_all_with_refs() -> tuple[int, list[str], list[str]]:
         (deleted_count, source_refs, image_refs). refs 리스트는 NULL 제외.
     """
     pool_refs_to_unlink: list[str] = []
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT source_ref, image_ref, reference_ref FROM studio_history"
@@ -538,7 +527,7 @@ async def _safe_pool_unlink(rel_url: str) -> None:
     실패 (path 검증 실패 / 파일 IO 에러) 는 silent — 로그만 남김.
     """
     try:
-        from .reference_pool import delete_pool_ref
+        from ..reference_pool import delete_pool_ref
 
         await delete_pool_ref(rel_url)
     except ValueError as e:
@@ -549,7 +538,7 @@ async def _safe_pool_unlink(rel_url: str) -> None:
 
 async def count_pool_refs() -> int:
     """studio_history 중 임시 풀 prefix 로 시작하는 reference_ref 보유 row 개수."""
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             "SELECT COUNT(*) FROM studio_history WHERE reference_ref LIKE ?",
             (_POOL_URL_PREFIX + "%",),
@@ -560,7 +549,7 @@ async def count_pool_refs() -> int:
 
 async def list_history_pool_refs() -> set[str]:
     """studio_history 의 임시 풀 reference_ref 모두 set 반환 (orphan 검출용)."""
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             "SELECT DISTINCT reference_ref FROM studio_history WHERE reference_ref LIKE ?",
             (_POOL_URL_PREFIX + "%",),
@@ -575,7 +564,7 @@ async def count_source_ref_usage(source_ref: str) -> int:
     같은 원본에서 여러 수정을 만드는 경우가 있으므로
     파일 삭제 전에 0건인지 확인해야 안전 (다른 row 가 같은 원본 쓸 수 있음).
     """
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             "SELECT COUNT(*) FROM studio_history WHERE source_ref = ?",
             (source_ref,),
@@ -590,7 +579,7 @@ async def count_image_ref_usage(image_ref: str) -> int:
     image_ref 는 본래 1:1 매핑이지만, 히스토리 복제/재수정 흐름에서
     중복 참조 가능성이 있으므로 삭제 전 안전 체크.
     """
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             "SELECT COUNT(*) FROM studio_history WHERE image_ref = ?",
             (image_ref,),
@@ -605,7 +594,7 @@ _VALID_MODES = ("generate", "edit", "video")
 async def count_items(mode: str | None = None) -> int:
     where_sql = "WHERE mode = ?" if mode in _VALID_MODES else ""
     params = [mode] if mode in _VALID_MODES else []
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             f"SELECT COUNT(*) FROM studio_history {where_sql}", params
         )
@@ -623,7 +612,7 @@ async def get_stats() -> dict[str, Any]:
     # 자체는 stateless 라 함수 내부 import 안전.
     import os
 
-    from .storage import _result_path_from_url  # noqa: WPS433
+    from ..storage import _result_path_from_url  # noqa: WPS433
 
     by_mode: dict[str, dict[str, int]] = {
         "generate": {"count": 0, "size_bytes": 0},
@@ -631,7 +620,7 @@ async def get_stats() -> dict[str, Any]:
         "video": {"count": 0, "size_bytes": 0},
     }
 
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             "SELECT mode, image_ref FROM studio_history"
         )
@@ -660,7 +649,7 @@ async def get_stats() -> dict[str, Any]:
     # DB 파일 자체 크기 (sqlite-wal 등 부가 파일은 제외 — 메인 DB 만)
     db_size = 0
     try:
-        db_size = os.path.getsize(_DB_PATH)
+        db_size = os.path.getsize(_cfg._DB_PATH)
     except OSError:
         pass
 
@@ -681,7 +670,7 @@ async def update_comparison(
         rowcount > 0 (해당 id 의 row 가 존재하고 갱신됐으면 True).
     """
     payload = json.dumps(analysis, ensure_ascii=False)
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             "UPDATE studio_history SET comparison_analysis = ? WHERE id = ?",
             (payload, item_id),
@@ -798,7 +787,7 @@ async def list_reference_templates() -> list[dict[str, Any]]:
 
     NULL last_used_at 은 0 으로 치환해 created_at DESC 로 fallback.
     """
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM reference_templates "
@@ -814,7 +803,7 @@ async def get_reference_template(template_id: str) -> dict[str, Any] | None:
     Codex 3차 리뷰 fix: 클라이언트의 정규화된 absolute referenceRef 를 DB 저장 근거로
     쓰지 않고, template id 로 DB 의 상대 image_ref 를 다시 조회한다.
     """
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT * FROM reference_templates WHERE id = ?",
@@ -830,7 +819,7 @@ async def insert_reference_template(item: dict[str, Any]) -> str:
     Returns: 신규 id (tpl-<uuid8>).
     """
     new_id = item.get("id") or f"tpl-{uuid.uuid4().hex[:8]}"
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         await db.execute(
             """
             INSERT INTO reference_templates (
@@ -858,7 +847,7 @@ async def delete_reference_template(template_id: str) -> tuple[bool, str | None]
 
     Returns: (deleted, image_ref). deleted=False 면 image_ref 도 None.
     """
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         db.row_factory = aiosqlite.Row
         cur = await db.execute(
             "SELECT image_ref FROM reference_templates WHERE id = ?",
@@ -877,7 +866,7 @@ async def delete_reference_template(template_id: str) -> tuple[bool, str | None]
 
 async def touch_reference_template(template_id: str) -> bool:
     """last_used_at 갱신 — 사용자가 이 템플릿으로 수정 실행 시 호출."""
-    async with aiosqlite.connect(_DB_PATH) as db:
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
         cur = await db.execute(
             "UPDATE reference_templates SET last_used_at = ? WHERE id = ?",
             (int(time.time() * 1000), template_id),

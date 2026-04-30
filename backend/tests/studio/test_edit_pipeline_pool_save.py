@@ -121,7 +121,7 @@ async def test_template_pick_skips_save_to_pool(
 
     # tmp DB + 영구 라이브러리 row
     db_path = tmp_path / "test_history.db"
-    monkeypatch.setattr("studio.history_db._DB_PATH", str(db_path))
+    monkeypatch.setattr("studio.history_db._config._DB_PATH", str(db_path))
     await history_db.init_studio_history_db()
 
     # Codex C3 fix: 서버가 templateId 의 imageRef 를 직접 read → 실제 파일 필요.
