@@ -5,7 +5,86 @@
 
 ## 2026-04-30
 
-### Edit Reference Library v9 — UI 통합 + 사후 저장 + 임시 풀 cascade cleanup (current master)
+### Codex+Claude 통합 리팩토링 리뷰 — Phase 0~3.4 완료 (current master)
+
+**검증**: backend ruff **clean** · pytest **361 PASS** · frontend vitest **91 PASS** · tsc/ESLint clean · 회귀 0건
+**규모**: 11 commits · 46 files · -1,130줄 (dead code 청소 효과)
+
+#### Codex 리뷰 문서 → 실증 → 실행 흐름
+
+1. Codex 가 `docs/refactor-review-final-2026-04-30.md` 작성 (Claude+Codex 통합 리뷰)
+2. Claude 가 핵심 주장 100% 실증 검증 (Critical 4 + Important 5 + Recommended 4)
+3. 검증 통과한 항목만 phase 별 실행 (위험도 순)
+4. 실행 후 Codex 후속 리뷰 → stale warning 게이트 잔여점 1건 추가 발견 → 즉시 fix
+
+#### Phase 0 — baseline gate (`6041cda`)
+
+- backend ruff 9건 fix (E402 6 / F401 1 / F841 2)
+- 전: ruff fail 9 → 후: ruff clean
+
+#### Phase 1 — Critical correctness 4건
+
+| commit | 항목 | 영향 |
+|---|---|---|
+| `09deffc` | C1: compare-analyze edit-* 영구 저장 | history.id 저장 회복 (옛 silent miss) |
+| `72da932` | C2: multipart meta object 검증 공통화 | 4 endpoint 500 → 400 정상 |
+| `fdd7c52` | C3: referenceTemplateId 서버 권위 | 신뢰 경계 분리 |
+| `a063715` | C4: promote conditional UPDATE + rollback | race orphan 차단 |
+
+회귀 테스트 추가:
+- `test_meta_object_validation.py` (신규 22건 · 4 endpoint × 5~6 케이스)
+- `test_reference_promote_route.py` 에 race 시나리오 2건 추가
+- `test_comparison_pipeline.py` 의 옛 `tsk-*` 테스트 → `edit-*` 로 갱신
+- `test_edit_pipeline_pool_save.py` / `test_reference_templates.py` template path 흐름 갱신
+
+#### Phase 2 — dead code 청소 (`334ec25`)
+
+- frontend 7 파일 삭제 (1,165줄):
+  - `icons.tsx` / `PipelineSteps.tsx` / `SelectedItemPreview.tsx` / `StudioResultCard.tsx`
+  - `ResultInfoModal.tsx` / `AiEnhanceCard.tsx` / `VramBadge.tsx`
+- backend 2 파일 삭제 (355줄 + 13 test):
+  - `studio/workflow_runner.py` + `tests/studio/test_workflow_runner.py`
+- stale comment 정리 (3건) + CLAUDE.md 컴포넌트 목록 갱신
+- 보존 (메모리 노트): `prompt-flow/GenerateUseCaseDiagram.tsx` (cherry-pick 가능)
+
+#### Phase 3 — frontend 구조 분할
+
+| commit | 항목 | 효과 |
+|---|---|---|
+| `f40482c` | 3.1 stage slice 추출 | `lib/stage.ts` + `stores/createStageSlice.ts` 신규. Generate/Edit/Video 3 store 의 stage 추적 5 필드 + 2 액션 공통화 (Codex caveat: persist 차이 보존) |
+| `18beb7e` | 3.2 SettingsDrawer 분할 | 1466 → 221줄 (-85%). 5 파일 분리 (Section/Process/SystemMetrics/History/ReferencePool) |
+| `09b8de0` | 3.3 AppHeader ShutdownButton 분리 | 457 → 127줄 (-72%). 옛 ShutdownBtn/Overlay/btn helper 348줄 분리 |
+| `09b8de0` | 3.4 ImageLightbox Inner 분리 | 466 → 27줄 (-94%). LightboxInner 391줄 별도 파일 |
+
+#### Codex 후속 리뷰 잔여점 fix (`fa6bd00`)
+
+- `useComparisonAnalysis.ts:155` 의 saved=false 경고 게이트 옛 `tsk-` 패턴 → `HISTORY_ID_RE` 정합
+- C1 본 fix 시 historyItemId 전송 게이트는 제거했지만 경고 조건만 잊었던 stale 항목
+
+#### Phase 별 commit 흐름 (11개)
+
+1. `5b540c1` — refactor 리뷰 문서 (Codex 작성)
+2. `6041cda` — Phase 0: ruff baseline clean
+3. `09deffc` — Phase 1.C1: compare-analyze 영구 저장
+4. `72da932` — Phase 1.C2: meta object 검증 공통화
+5. `fdd7c52` — Phase 1.C3: template trust boundary
+6. `a063715` — Phase 1.C4: promote race fix
+7. `334ec25` — Phase 2: dead code 8건 삭제
+8. `f40482c` — Phase 3.1: stage slice 추출
+9. `18beb7e` — Phase 3.2: SettingsDrawer 분할
+10. `09b8de0` — Phase 3.3+3.4: AppHeader + Lightbox 분리
+11. `fa6bd00` — Codex 후속 리뷰: stale warning 게이트 정리
+
+#### 의도적 보류 (별도 세션 권장)
+
+- **Phase 3.5 (mock stream 분리)** — R2, 가치 낮음
+- **Phase 4 (backend 5 파일 분할)** — 영향 5,235줄 + 30+ mock.patch site 갱신.
+  Codex 자체 caveat 인용: "분할 시 테스트 patch target 을 반드시 lookup 모듈
+  기준으로 갱신". 별도 PR 점진 진행 권장.
+
+---
+
+### Edit Reference Library v9 — UI 통합 + 사후 저장 + 임시 풀 cascade cleanup
 
 **master HEAD**: `358783b` (push 완료)
 **검증**: backend pytest **349 PASS** · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
