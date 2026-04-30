@@ -22,6 +22,7 @@
 
 "use client";
 
+import { useEffect, useState } from "react";
 import {
   PIPELINE_DEFS,
   type PipelineCtx,
@@ -39,6 +40,9 @@ import { useVisionStore } from "@/stores/useVisionStore";
 import { useVisionCompareStore } from "@/stores/useVisionCompareStore";
 import { TimelineRow } from "./TimelineRow";
 
+/** Live tick 갱신 주기 (ms) — 0.1s 표시 정밀도에 맞춰 200ms 가 자연스러움. */
+const LIVE_TICK_MS = 200;
+
 export function PipelineTimeline({ mode }: { mode: PipelineMode }) {
   const { stageHistory, running } = usePipelineRuntime(mode);
   const ctx = usePipelineCtx(mode, stageHistory);
@@ -46,21 +50,31 @@ export function PipelineTimeline({ mode }: { mode: PipelineMode }) {
   // 표시할 stage 만 필터 (enabled 콜백 적용 — 미정의 시 항상 true)
   const order = PIPELINE_DEFS[mode].filter((d) => d.enabled?.(ctx) ?? true);
 
-  // 도착한 stage 빠른 lookup + 인덱스 판정
+  // 도착한 stage 빠른 lookup — first-write-wins.
+  // 2026-04-30 codex 후속 fix: comfyui-sampling 이 백엔드에서 progress 마다 N번 emit
+  // 되는데, 옛 last-write-wins 는 마지막 progress 도착 시각만 남겨서 live elapsed 가
+  // 0.2 → 0.4 식으로 떨림. 첫 도착 (= 진짜 stage 시작) 시각을 보존해야 함.
   const byType = new Map<string, StageEvent>();
-  for (const s of stageHistory) byType.set(s.type, s);
+  for (const s of stageHistory) {
+    if (!byType.has(s.type)) byType.set(s.type, s);
+  }
   const lastArrived = stageHistory[stageHistory.length - 1];
 
   // 마지막 도착 stage 의 order 안 인덱스 (없으면 -1)
   const arrivedIdx = lastArrived
     ? order.findIndex((o) => o.type === lastArrived.type)
     : -1;
-  // 현재 진행 중인 row 인덱스 (running 일 때만 의미)
-  const nextIdx = !running
-    ? order.length
-    : arrivedIdx + 1 < order.length
-      ? arrivedIdx + 1
-      : arrivedIdx;
+
+  // 2026-04-30 fix: codex 의견 적용 — 마지막 도착 stage 를 running 으로 표시.
+  //   - 옛 nextIdx 로직: arrivedIdx + 1 → 도착 즉시 done 처리, 마지막 stage RUNNING 안 뜸
+  //   - 새 activeIdx 로직: running 중엔 마지막 도착 stage 가 곧 진행 중인 stage
+  //   - ComfyUI sampling (60s) 처럼 stage event 1번만 emit + 다음 도착 늦은 케이스에
+  //     "✅ + 시간 없음" 어색 표시 방지 → 스피너 + live elapsed 둘 다 살림.
+  const activeIdx = running ? arrivedIdx : order.length;
+
+  // running 중일 때만 매 200ms 리렌더 (live elapsed 갱신용).
+  // running=false 면 interval 안 돌림 (idle CPU/리렌더 0).
+  const nowTick = useNowTick(running);
 
   return (
     <ol
@@ -75,9 +89,18 @@ export function PipelineTimeline({ mode }: { mode: PipelineMode }) {
     >
       {order.map((def, i) => {
         const arrived = byType.get(def.type);
-        const isDone = !!arrived && (i < nextIdx || !running);
-        const isRunning = running && i === nextIdx - 1 && !isDone;
-        const elapsed = computeElapsedFor(stageHistory, def.type);
+        const { isDone, isRunning } = computeRowState({
+          i,
+          arrived: !!arrived,
+          running,
+          activeIdx,
+        });
+        // live elapsed 는 byType (first-write-wins) 의 첫 도착 시각 사용 — 진짜 stage 시작 기준.
+        // 완료 elapsed (computeElapsedFor) 도 같은 type 중복 emit 을 견디도록 fix.
+        const elapsed =
+          isRunning && arrived
+            ? computeLiveElapsed(arrived.arrivedAt, nowTick)
+            : computeElapsedFor(stageHistory, def.type);
 
         return (
           <div
@@ -100,6 +123,17 @@ export function PipelineTimeline({ mode }: { mode: PipelineMode }) {
       })}
     </ol>
   );
+}
+
+/** running 일 때만 200ms 주기로 갱신되는 현재 시각 ms (live elapsed 전용). */
+function useNowTick(running: boolean): number {
+  const [tick, setTick] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    const id = setInterval(() => setTick(Date.now()), LIVE_TICK_MS);
+    return () => clearInterval(id);
+  }, [running]);
+  return tick;
 }
 
 /* ────────────────────────────────────────────────
@@ -174,18 +208,53 @@ function usePipelineCtx(
  * 보조 — elapsed 계산
  * ──────────────────────────────────────────────── */
 
-/** 특정 stage 의 소요 시간 (다음 stage 도착 시각 − 본인 도착 시각).
- *  마지막 stage 면 null (다음이 없어서 계산 불가). */
-function computeElapsedFor(
+/** 특정 stage 의 소요 시간 (다음 다른 stage 도착 시각 − 본인 첫 도착 시각).
+ *
+ *  2026-04-30 codex 후속 fix: comfyui-sampling 같이 progress 마다 여러 번 emit 되는
+ *  type 의 elapsed 가 "progress 이벤트 사이 간격" 으로 잘못 계산되던 버그 차단.
+ *    - cur = 같은 type 의 *첫* 도착 (진짜 stage 시작)
+ *    - next = idx 다음의 *다른 type* 첫 도착 (다음 stage 시작)
+ *  → ComfyUI sampling 60s 가 "60.5" 로 정확히 표시됨 (옛 로직: 0.3 같은 progress 간격)
+ *
+ *  마지막 stage (다른 type 의 다음 도착 없음) 면 null (계산 불가). */
+export function computeElapsedFor(
   stageHistory: StageEvent[],
   type: string,
 ): string | null {
   const idx = stageHistory.findIndex((s) => s.type === type);
   if (idx < 0) return null;
   const cur = stageHistory[idx];
-  const next = stageHistory[idx + 1];
+  // 같은 type 의 progress 이벤트는 건너뛰고 *다른 type* 의 다음 도착만 인정.
+  const next = stageHistory.slice(idx + 1).find((s) => s.type !== type);
   if (!next) return null;
   return ((next.arrivedAt - cur.arrivedAt) / 1000).toFixed(1);
+}
+
+/** running 중인 stage 의 live 경과 시간 (현재 tick − 도착 시각).
+ *  음수 방지 — clock skew / 직전 도착에 대비해 0 으로 clamp. */
+export function computeLiveElapsed(arrivedAt: number, nowTick: number): string {
+  const sec = Math.max(0, (nowTick - arrivedAt) / 1000);
+  return sec.toFixed(1);
+}
+
+/** Row 별 표시 상태 결정 (테스트 가능한 순수 함수).
+ *  codex 의견 (2026-04-30) — activeIdx 단순화 + arrived 가드:
+ *    activeIdx = running ? arrivedIdx : order.length
+ *    isRunning = running && i === activeIdx && arrived  ← codex Minor: arrived 가드
+ *    isDone    = arrived && (!running || i < activeIdx)
+ *
+ *  arrived 가드 의의: enabled 콜백으로 필터된 order 와 stageHistory 의 race 방어.
+ *  activeIdx=-1 (아직 0개 도착) 시점에도 i=-1 케이스가 안 생겨 안전. */
+export function computeRowState(args: {
+  i: number;
+  arrived: boolean;
+  running: boolean;
+  activeIdx: number;
+}): { isDone: boolean; isRunning: boolean } {
+  const { i, arrived, running, activeIdx } = args;
+  const isRunning = running && i === activeIdx && arrived;
+  const isDone = arrived && (!running || i < activeIdx);
+  return { isDone, isRunning };
 }
 
 /* ────────────────────────────────────────────────
