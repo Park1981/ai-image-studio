@@ -101,11 +101,21 @@ export function useEditPipeline({
     // → effectiveUseRef 로 한 곳에서 통일해 모든 reference 필드를 일관되게 OFF.
     const effectiveUseRef = useReferenceImage && !!referenceImage;
 
+    // 2026-04-30 (오빠 후속 fix): 라이브러리 픽 vs 수동 업로드 분기.
+    //   - 라이브러리 픽 (pickedTemplateId 있음): templateId 만 보냄, multipart reference_image 생략.
+    //     → fetch(http URL) 자체 호출 안 함 → CORS 차단 무관 + 백엔드 가드 충돌 자동 해소.
+    //   - 수동 업로드: multipart 만 보냄, templateId 없음.
+    //   백엔드 가드: "referenceTemplateId 와 reference_image multipart 동시 전송 금지".
+    const isLibraryPick = effectiveUseRef && !!pickedTemplateId;
+
     // Phase 2 (2026-04-28): reference 가 있고 crop area 도 있으면 *클라이언트* 에서
     // 미리 crop 해서 cropped File 로 전송. area 없으면 원본 data URL 그대로.
     // crop 변환 실패 (canvas / toBlob) 시 사용자에게 toast + 진입 차단.
+    //
+    // 2026-04-30 (오빠 후속 fix): 라이브러리 픽 케이스는 crop / fetch 둘 다 skip
+    //   (templateId 만 보내면 백엔드가 알아서 reference 조회 — fetch http URL 호출 안 함).
     let resolvedReferenceImage: string | File | undefined;
-    if (effectiveUseRef && referenceImage) {
+    if (effectiveUseRef && referenceImage && !isLibraryPick) {
       if (referenceCropArea) {
         try {
           const original = await dataUrlToBlob(referenceImage);
@@ -138,15 +148,14 @@ export function useEditPipeline({
         visionModel: visionModelSel,
         // effectiveUseRef 로 모든 reference 필드를 한꺼번에 게이트 — 백엔드 400 차단.
         useReferenceImage: effectiveUseRef,
-        referenceImage: effectiveUseRef ? resolvedReferenceImage : undefined,
+        // 라이브러리 픽이면 multipart 생략 (templateId 만) · 수동 업로드면 multipart 만.
+        referenceImage: isLibraryPick ? undefined : resolvedReferenceImage,
         referenceRole: effectiveUseRef ? effectiveRole : undefined,
-        // v8 라이브러리 plan: 토글 OFF 면 stale picked 값 있어도 전송 X.
-        // referenceRef 는 absolute URL 일 수 있으므로 백엔드 DB 저장 근거로 신뢰 X
-        // (Codex 3차 리뷰 fix). referenceTemplateId 가 권위 있는 신뢰 키.
-        referenceRef: effectiveUseRef
+        // 라이브러리 픽일 때만 templateId / templateRef 전송 (수동 업로드 시 stale 값 차단).
+        referenceRef: isLibraryPick
           ? (pickedTemplateRef ?? undefined)
           : undefined,
-        referenceTemplateId: effectiveUseRef
+        referenceTemplateId: isLibraryPick
           ? (pickedTemplateId ?? undefined)
           : undefined,
       }),
