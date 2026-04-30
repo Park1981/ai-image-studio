@@ -138,10 +138,11 @@ backend/studio/prompt_pipeline/
 | `studio/pipelines/generate.py:22, 100` | `from ..prompt_pipeline import upgrade_generate_prompt` + `from ..prompt_pipeline import UpgradeResult` (lazy) | facade re-export 그대로 ✅ |
 | `studio/pipelines/video.py:33` | `from ..prompt_pipeline import UpgradeResult` | facade re-export 그대로 ✅ |
 | `studio/vision_pipeline/_common.py:27` | `from ..prompt_pipeline import (DEFAULT_TIMEOUT, _DEFAULT_OLLAMA_URL)` | facade re-export 그대로 ✅ |
-| `studio/vision_pipeline/edit_source.py:25, 174, 511` | `from ..prompt_pipeline import (UpgradeResult, upgrade_edit_prompt)` + lazy `clarify_edit_intent` | facade re-export 그대로 ✅ |
+| `studio/vision_pipeline/edit_source.py:25` | `from ..prompt_pipeline import (UpgradeResult, upgrade_edit_prompt)` | facade re-export 그대로 ✅ (top-level import 유지) |
+| `studio/vision_pipeline/edit_source.py:174, 511` | lazy `from ..prompt_pipeline import clarify_edit_intent` | **단계 4 에서 `from ..prompt_pipeline.translate import clarify_edit_intent` 로 변경** (codex C2 fix) |
 | `studio/vision_pipeline/image_detail.py:21` | `from ..prompt_pipeline import translate_to_korean` | facade re-export 그대로 ✅ |
 
-> **결론**: production 코드는 **무손상**. facade `__init__.py` 의 re-export 가 모든 import 경로를 그대로 보존. 단계 1 (file → package) 종료 시점에 production 코드 0 라인 변경.
+> **결론**: production 코드 변경 범위는 **단계 4 의 edit_source.py lazy import 2라인 (L174/L511) 만**. 나머지 production import 경로는 facade re-export 가 그대로 보존. 단계 1 (file → package) 종료 시점엔 production 코드 0 라인 변경.
 
 ### 2.3 facade internal import 전환 (codex C1 fix · Phase 4.2 와 동일 함정)
 
@@ -338,7 +339,7 @@ facade `__init__.py` 작성 시 `_DEFAULT_OLLAMA_URL` 같은 **상수**의 re-ex
 - **patch site 즉시 갱신**: 각 sub-module 분리 commit 안에서 patch site 갱신 (단계 5 일괄 미루지 않음)
 - **facade alias 제거**: 단계 5 시점에 facade 안 본체 0줄 (re-export + `__all__` 만)
 - **grep assertion `[A-Za-z_]+` 패턴**: private patch (`_call_ollama_chat` / `_run_upgrade_call`) 누락 방지
-- **lazy import 호환**: `vision_pipeline/edit_source.py` 의 lazy `from ..prompt_pipeline import clarify_edit_intent` 는 facade re-export 살아있으면 그대로 동작 — 변경 0
+- **lazy import 도 submodule 직접 (codex C2)**: `vision_pipeline/edit_source.py` 의 lazy import 2 site (L174/L511) 도 단계 4 안에서 `from ..prompt_pipeline.translate import clarify_edit_intent` 로 변경. facade re-export 의 함수 객체 reference snapshot 함정 회피 (옵션 D 일관성)
 
 ---
 
