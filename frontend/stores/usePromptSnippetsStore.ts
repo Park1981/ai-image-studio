@@ -31,6 +31,12 @@ interface SnippetState {
   add: (input: { name: string; prompt: string; thumbnail?: string }) => void;
   remove: (id: string) => void;
   clearAll: () => void;
+  /**
+   * 2026-04-30 (localStorage quota 후속 fix):
+   * 옛 PNG dataURL 썸네일을 WebP 256px 로 압축. idempotent —
+   * 이미 WebP 면 skip. 실패한 항목은 원본 유지 (안전).
+   */
+  migrateLargeThumbnails: () => Promise<void>;
 }
 
 const MAX_SNIPPETS = 80;
@@ -44,7 +50,7 @@ function makeId(): string {
 
 export const usePromptSnippetsStore = create<SnippetState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       entries: [],
       add: ({ name, prompt, thumbnail }) => {
         const cleanName = name.trim();
@@ -67,6 +73,39 @@ export const usePromptSnippetsStore = create<SnippetState>()(
       remove: (id) =>
         set((s) => ({ entries: s.entries.filter((e) => e.id !== id) })),
       clearAll: () => set({ entries: [] }),
+      migrateLargeThumbnails: async () => {
+        // 2026-04-30 후속 fix — 옛 PNG dataURL 썸네일 → WebP 256px 압축.
+        // idempotent: 이미 WebP 면 skip. 실패한 항목은 원본 유지 (사용자 데이터 손실 방지).
+        // dynamic import 로 image-crop (canvas/Image 의존) lazy 로딩 — store init 시 X.
+        const before = get().entries;
+        if (before.length === 0) return;
+
+        const { compressDataUrlToWebp } = await import("@/lib/image-crop");
+        const updated: PromptSnippet[] = [];
+        let changed = 0;
+
+        for (const e of before) {
+          if (!e.thumbnail || e.thumbnail.startsWith("data:image/webp")) {
+            updated.push(e);
+            continue;
+          }
+          try {
+            const next = await compressDataUrlToWebp(e.thumbnail);
+            updated.push({ ...e, thumbnail: next });
+            changed += 1;
+          } catch (err) {
+            console.warn("[snippets] 썸네일 마이그레이션 실패:", e.id, err);
+            updated.push(e);
+          }
+        }
+
+        if (changed > 0) {
+          set({ entries: updated });
+          console.log(
+            `[snippets] 썸네일 ${changed}/${before.length}개 WebP 마이그레이션 완료`,
+          );
+        }
+      },
     }),
     {
       name: "ais:prompt-snippets",

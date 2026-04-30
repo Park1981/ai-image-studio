@@ -19,7 +19,7 @@
 
 "use client";
 
-import { useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import ResearchBanner from "@/components/studio/ResearchBanner";
 import SnippetLibraryModal from "@/components/studio/SnippetLibraryModal";
@@ -39,8 +39,15 @@ import {
   useGenerateInputs,
   useGenerateRunning,
 } from "@/stores/useGenerateStore";
-import type { PromptSnippet } from "@/stores/usePromptSnippetsStore";
+import {
+  type PromptSnippet,
+  usePromptSnippetsStore,
+} from "@/stores/usePromptSnippetsStore";
 import SizeCard from "./SizeCard";
+
+// 2026-04-30 (localStorage quota 후속 fix): 옛 PNG 썸네일 → WebP 마이그레이션
+// 모듈 레벨 flag 로 첫 mount 1회만 실행 (페이지 재진입 시 idempotent skip).
+let snippetThumbsMigrated = false;
 
 interface Props {
   /** prompt textarea ref — useAutoGrowTextarea 훅이 부모에서 관리 */
@@ -67,6 +74,14 @@ export default function GenerateLeftPanel({
   // 2026-04-30 (Phase 2B Task 7 + 후속 UX): 라이브러리 모달 state 만 유지.
   // [+ 라이브러리에 등록] 별도 버튼 제거 — LibraryModal 안 [+ 새 등록] 으로 통합.
   const [libraryOpen, setLibraryOpen] = useState(false);
+
+  // 2026-04-30 (localStorage quota 후속 fix): 마운트 1회 자동 마이그레이션.
+  // 옛 PNG dataURL 썸네일을 WebP 256px 로 압축 (idempotent — 이미 webp 면 skip).
+  useEffect(() => {
+    if (snippetThumbsMigrated) return;
+    snippetThumbsMigrated = true;
+    void usePromptSnippetsStore.getState().migrateLargeThumbnails();
+  }, []);
 
   // 카드 클릭 → textarea toggle + 모달 자동 닫기 + 커서 위치 삽입.
   // 2026-04-30 (오빠 후속 피드백):
