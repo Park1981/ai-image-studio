@@ -37,47 +37,67 @@ export default function SnippetCropper({
 }: Props) {
   const [crop, setCrop] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(1);
+  // 2026-04-30 (codex review fix · Nit): 96px 미만 → 원본 저장 fallback 인 걸
+  // 사용자에게 명시. 안 보이면 "crop 적용됐다" 오해 위험.
+  const [tooSmall, setTooSmall] = useState(false);
 
   const handleCropComplete = (_area: Area, areaPixels: Area) => {
     if (
       areaPixels.width < MIN_THUMB_PX ||
       areaPixels.height < MIN_THUMB_PX
     ) {
+      setTooSmall(true);
       onCropArea(null);
       return;
     }
+    setTooSmall(false);
     onCropArea(areaPixels);
   };
 
   return (
-    <div
-      style={{
-        position: "relative",
-        width: "100%",
-        height,
-        borderRadius: "var(--radius-md)",
-        overflow: "hidden",
-        background: "var(--surface-2, var(--bg-2))",
-      }}
-    >
-      <Cropper
-        image={image}
-        crop={crop}
-        zoom={zoom}
-        aspect={ASPECT}
-        onCropChange={setCrop}
-        onZoomChange={setZoom}
-        onCropComplete={handleCropComplete}
-        objectFit="contain"
-        minZoom={1}
-        maxZoom={3}
-        zoomSpeed={0.25}
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div
         style={{
-          cropAreaStyle: {
-            color: "rgba(0, 0, 0, 0.75)",
-          },
+          position: "relative",
+          width: "100%",
+          height,
+          borderRadius: "var(--radius-md)",
+          overflow: "hidden",
+          background: "var(--surface-2, var(--bg-2))",
         }}
-      />
+      >
+        <Cropper
+          image={image}
+          crop={crop}
+          zoom={zoom}
+          aspect={ASPECT}
+          onCropChange={setCrop}
+          onZoomChange={setZoom}
+          onCropComplete={handleCropComplete}
+          objectFit="contain"
+          minZoom={1}
+          maxZoom={3}
+          zoomSpeed={0.25}
+          style={{
+            cropAreaStyle: {
+              color: "rgba(0, 0, 0, 0.75)",
+            },
+          }}
+        />
+      </div>
+      <div
+        role="status"
+        aria-live="polite"
+        style={{
+          fontSize: 11,
+          color: tooSmall ? "#b42318" : "var(--ink-4)",
+          minHeight: 14,
+        }}
+      >
+        {tooSmall
+          ? `⚠ 선택 영역이 ${MIN_THUMB_PX}px 미만이라 원본이 저장돼요.`
+          : "마우스 드래그/휠로 영역 조정 (1:1 정사각)"}
+      </div>
     </div>
   );
 }

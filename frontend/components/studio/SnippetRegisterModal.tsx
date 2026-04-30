@@ -21,6 +21,7 @@ import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/ui/Icon";
 import { cropBlobIfArea, dataUrlToBlob } from "@/lib/image-crop";
+import { stripAllMarkers } from "@/lib/snippet-marker";
 import { usePromptSnippetsStore } from "@/stores/usePromptSnippetsStore";
 import type { CropArea } from "@/stores/useEditStore";
 
@@ -93,9 +94,17 @@ export default function SnippetRegisterModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // 2026-04-30 (codex review fix · Important #1):
+  // store.add 가 stripAllMarkers(prompt).trim() 후 빈값이면 silent skip 하므로
+  // 모달도 같은 sanitize 기준으로 canSubmit 판단해야 silent fail 방지.
+  // 예: `<lib></lib>` 만 입력해도 raw trim 으론 활성화돼서 닫기만 되는 함정.
+  const sanitizedPrompt = useMemo(
+    () => stripAllMarkers(prompt).trim(),
+    [prompt],
+  );
   const canSubmit = useMemo(
-    () => !submitting && name.trim().length > 0 && prompt.trim().length > 0,
-    [submitting, name, prompt],
+    () => !submitting && name.trim().length > 0 && sanitizedPrompt.length > 0,
+    [submitting, name, sanitizedPrompt],
   );
 
   const handlePickFile = () => {
@@ -115,6 +124,14 @@ export default function SnippetRegisterModal({
 
   const handleSubmit = async () => {
     if (!canSubmit) return;
+    // 2026-04-30 (codex review fix · Important #1): canSubmit 와 동일 sanitize
+    // 가드를 handleSubmit 에서도 한 번 더 — race / 직접 호출 시 안전망.
+    if (sanitizedPrompt.length === 0) {
+      setError(
+        "프롬프트가 비어있어요. <lib> 마커만 적혀있는 경우 저장되지 않습니다.",
+      );
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
