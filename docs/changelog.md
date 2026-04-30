@@ -5,7 +5,52 @@
 
 ## 2026-04-30
 
-### Phase 4.4 — backend `comparison_pipeline.py` 1046줄 3 sub-module 분할 (current master)
+### Phase 4.5 — backend `comfy_api_builder.py` 1197줄 4 sub-module 분할 (current master · Phase 4 시리즈 마무리)
+
+**검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
+
+선행 commit: master `c8176e1` (Phase 4.4 comparison_pipeline 분할). plan v2 (사용자 codex 1차 리뷰 2 Blocking 반영) 따라 단계적 진행.
+
+**plan v2 핵심 결정 (codex C1+C2 fix)**:
+- C1 Blocking: `_common.py` 가 `log = logging.getLogger(__name__)` 명시 + edit.py 가 `from ._common import log` (`build_edit_api` L430 의 `log.info(...)` 호환) — 모든 sub-module 공유 logger 패턴
+- C2 Blocking: `_common.py` 에 `from ..presets import LoraEntry` 명시 (`_build_lora_chain` L149 type annotation 의존)
+
+**5 commit 흐름** (단계별 — Phase 4 시리즈 중 가장 단순):
+1. `c34b480` — 단계 1: file → package + presets import `..` 갱신
+2. `4540a92` — 단계 2: `_common` 그룹 분리 (types + log + 7 헬퍼)
+3. `aebb5a8` — 단계 3: `generate` 분리 (Qwen Image 2512 text2img)
+4. `31c426c` — 단계 4: `edit` 분리 (Qwen Edit 2511 + multi-ref)
+5. `94a4da8` — 단계 5: `video` 분리 (LTX Video 2.3 i2v) + facade 정리 + `__all__` 24 항목
+
+**규모**:
+- 옛 `studio/comfy_api_builder.py` 1197줄 → 5 파일 (총 1,330줄, +133줄 헤더/sub-module 보일러):
+  - facade `__init__.py` 91줄 (pure re-export + `__all__` 24 항목)
+  - `_common.py` 169줄 (ApiPrompt/NodeRef + log + 7 헬퍼)
+  - `generate.py` 213줄 (GenerateApiInput + build_generate_*)
+  - `edit.py` 401줄 (EditApiInput + build_edit_api dispatcher + multi-ref + build_edit_*)
+  - `video.py` 456줄 (_build_video_lora_chain + build_video_from_request — LTX-2.3 2-stage)
+
+**patch site 0건** — Phase 4 시리즈 중 가장 안전한 phase. test 모두 직접 import + 실제 호출 (mock 없음). production import 5 site + test direct import 7 site 모두 facade re-export 통과.
+
+**효과**:
+- 3 빌더 흐름 (Generate / Edit / Video) 분리 → 단일 책임
+- 공용 7 헬퍼 _common 응집 — 재사용성 명시
+- production import 5 site (pipelines/edit + generate + video + _dispatch + routes/prompt) 무손상
+
+### Phase 4 시리즈 마무리 (4.1 → 4.5)
+
+| Phase | 대상 | 옛 줄 수 | 분할 결과 | patch site |
+|---|---|---|---|---|
+| 4.1 | history_db.py | 886 | 7 파일 | 11 |
+| 4.1.1 | helper 추출 | (작음) | replace_reference_ref_if_current | - |
+| 4.2 | vision_pipeline.py | 1131 | 4 파일 | 44 |
+| 4.3 | prompt_pipeline.py | 975 | 5 파일 | 36 |
+| 4.4 | comparison_pipeline.py | 1046 | 4 파일 | 15 |
+| 4.5 | comfy_api_builder.py | 1197 | 5 파일 | 0 |
+
+**총 5,235줄 → 25 파일** (각 파일 평균 ~209줄). 옵션 D 일관 적용. patch site 106건 모두 sub-module path (flat patch 0건).
+
+### Phase 4.4 — backend `comparison_pipeline.py` 1046줄 3 sub-module 분할
 
 **검증**: backend pytest **361 PASS** · ruff clean · frontend vitest **91 PASS** · tsc / ESLint clean · 회귀 0건
 
