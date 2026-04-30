@@ -11,7 +11,6 @@ task #17 (2026-04-26): router.py 풀 분해 2탄.
 from __future__ import annotations
 
 import io
-import json
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -32,10 +31,11 @@ from ..presets import (
     VIDEO_MODEL,
 )
 from ..reference_pool import save_to_pool
+from ..reference_storage import reference_path_from_url
 from ..schemas import GenerateBody, TaskCreated
 from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..tasks import TASKS, _new_task
-from ._common import _spawn, _stream_task, log
+from ._common import _spawn, _stream_task, log, parse_meta_object
 
 router = APIRouter()
 
@@ -85,10 +85,7 @@ async def create_edit_task(
     reference_image: UploadFile | None = File(None),
 ):
     """수정 요청 (multipart): image 파일 + meta JSON + 옵션 reference_image."""
-    try:
-        meta_obj = json.loads(meta)
-    except json.JSONDecodeError as e:
-        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+    meta_obj = parse_meta_object(meta)
 
     prompt = meta_obj.get("prompt", "").strip()
     if not prompt:
@@ -142,78 +139,104 @@ async def create_edit_task(
     # 토글 OFF 또는 파일 미동봉이면 None — 옛 단일 흐름 100% 동일.
     reference_bytes: bytes | None = None
     reference_filename: str | None = None
-    # Codex Phase 1-3 통합 리뷰 fix (2026-04-28): useRef=false 인데 reference_image 가
-    # multipart 로 동봉된 silent-drop 케이스. 클라이언트 버그/오용 가능성을 가시화하기
-    # 위해 stream buffer 를 명시적으로 drain + log warning. 사용자 흐름은 그대로 (200).
-    if reference_image is not None and not use_reference_image:
-        await reference_image.read()  # drain — body 무시
-        log.warning(
-            "edit: reference_image multipart 동봉됐지만 useReferenceImage=false → 무시함",
-        )
-    if use_reference_image and reference_image is not None:
-        reference_bytes = await reference_image.read()
-        if reference_bytes:
-            if len(reference_bytes) > STUDIO_MAX_IMAGE_BYTES:
-                raise HTTPException(
-                    413,
-                    f"reference image too large: {len(reference_bytes)} bytes "
-                    f"(max {STUDIO_MAX_IMAGE_BYTES})",
-                )
-            try:
-                with Image.open(io.BytesIO(reference_bytes)) as ref_im:
-                    _ = ref_im.size  # 손상 검증만
-            except UnidentifiedImageError as e:
-                raise HTTPException(
-                    400, f"invalid reference image format: {e}"
-                ) from e
-            reference_filename = reference_image.filename or "reference.png"
-        else:
-            reference_bytes = None  # 빈 파일은 무시
+    reference_ref_url: str | None = None
 
-    # ⚠️ Backend 게이트 (Codex 리뷰 — zero-regression 보장):
-    # reference_bytes 가 None 이면 reference_role 도 None 강제.
-    # 옛 단일 흐름에서 role 누수로 SYSTEM_EDIT 에 multi-ref clause 가 들어가는 위험 차단.
-    if reference_bytes is None:
-        reference_role = None
-
-    # ⚠️ Codex 2차 리뷰 fix #4: useReferenceImage=true 인데 파일 없는 케이스 거부.
-    # 조용히 단일 흐름으로 폴백하면 사용자 의도/데이터 의미가 깨짐.
-    if use_reference_image and reference_bytes is None:
-        raise HTTPException(
-            400,
-            "참조 이미지 토글이 켜져 있는데 reference_image 파일이 없거나 비어있습니다.",
-        )
-
-    # v8 라이브러리 plan (2026-04-28) — Codex 2차/3차 리뷰 fix.
-    # referenceTemplateId 가 있으면 DB 조회로 image_ref (영구 상대 URL) 결정 →
-    # history.referenceRef 권위 있는 값으로 사용. 클라이언트의 referenceRef 는
-    # absolute URL 일 수 있고 조작 가능하므로 신뢰하지 않음.
+    # 메타에서 referenceTemplateId 추출 (서버 권위 경로 분기 키)
     reference_template_id_meta = meta_obj.get("referenceTemplateId")
     if isinstance(reference_template_id_meta, str):
         reference_template_id_meta = reference_template_id_meta.strip() or None
     else:
         reference_template_id_meta = None
 
-    reference_ref_url: str | None = None
-    if use_reference_image and reference_template_id_meta:
-        tpl = await history_db.get_reference_template(reference_template_id_meta)
-        if tpl is None:
-            raise HTTPException(404, "reference template not found")
-        reference_ref_url = tpl["imageRef"]  # DB 의 상대 영구 URL
-    elif use_reference_image and reference_bytes is not None:
-        # v9 (2026-04-29 · Codex C4): 사용자 직접 업로드 → 임시 풀 저장.
-        # history.referenceRef 가 임시 풀 URL 로 기록 → 결과 후 사후 promote 가능.
-        try:
-            reference_ref_url = await save_to_pool(
-                reference_bytes,
-                (reference_image.content_type if reference_image else None)
-                or "image/png",
-            )
-        except ValueError as e:
-            raise HTTPException(400, f"invalid reference image: {e}") from e
+    # Codex Phase 1-3 리뷰 fix (2026-04-28): useRef=false 인데 reference_image 가
+    # multipart 로 동봉된 silent-drop 케이스. 클라이언트 버그 가시화 + body drain.
+    if reference_image is not None and not use_reference_image:
+        await reference_image.read()  # drain — body 무시
+        log.warning(
+            "edit: reference_image multipart 동봉됐지만 useReferenceImage=false → 무시함",
+        )
 
-    # 토글 OFF 또는 reference_bytes 없음이면 stale template/ref 메타도 무효화.
-    if not use_reference_image or reference_bytes is None:
+    if use_reference_image:
+        # ┌──────────────────────────────────────────────────────────┐
+        # │ Codex C3 fix (2026-04-30): 서버 권위 reference_bytes 결정. │
+        # │  - referenceTemplateId 있음 → DB tpl["imageRef"] 의 파일 read.│
+        # │  - 없음 → 클라이언트 multipart bytes (직접 업로드).          │
+        # │ 옛 흐름은 templateId 가 있어도 클라이언트 multipart bytes 를 │
+        # │ ComfyUI 에 전달 → "기록은 templateA / 생성은 imageB" 가능. │
+        # └──────────────────────────────────────────────────────────┘
+        if reference_template_id_meta:
+            # 양쪽 동시 동봉은 명시적 거부 — 신뢰 경계 모호 + 클라이언트 버그 가시화
+            if reference_image is not None:
+                await reference_image.read()  # drain
+                raise HTTPException(
+                    400,
+                    "referenceTemplateId 와 reference_image multipart 를 동시에 보낼 수 없습니다 "
+                    "(서버 권위 충돌 방지 — 둘 중 하나만 사용).",
+                )
+            tpl = await history_db.get_reference_template(reference_template_id_meta)
+            if tpl is None:
+                raise HTTPException(404, "reference template not found")
+            tpl_path = reference_path_from_url(tpl["imageRef"])
+            if tpl_path is None or not tpl_path.exists():
+                raise HTTPException(
+                    410, "reference template file missing on server"
+                )
+            try:
+                reference_bytes = tpl_path.read_bytes()
+            except OSError as e:
+                raise HTTPException(
+                    500, f"reference template read failed: {e}"
+                ) from e
+            if len(reference_bytes) > STUDIO_MAX_IMAGE_BYTES:
+                # 옛 영구 파일이 max 초과 — 정책상 거부 (이론상 발생 거의 X)
+                raise HTTPException(
+                    413, "reference template file exceeds size limit"
+                )
+            reference_filename = tpl_path.name
+            reference_ref_url = tpl["imageRef"]  # history 기록 = 서버 권위
+        elif reference_image is not None:
+            # 직접 업로드 경로 — 옛 검증 흐름 그대로
+            reference_bytes = await reference_image.read()
+            if not reference_bytes:
+                reference_bytes = None
+            elif len(reference_bytes) > STUDIO_MAX_IMAGE_BYTES:
+                raise HTTPException(
+                    413,
+                    f"reference image too large: {len(reference_bytes)} bytes "
+                    f"(max {STUDIO_MAX_IMAGE_BYTES})",
+                )
+            else:
+                try:
+                    with Image.open(io.BytesIO(reference_bytes)) as ref_im:
+                        _ = ref_im.size  # 손상 검증만
+                except UnidentifiedImageError as e:
+                    raise HTTPException(
+                        400, f"invalid reference image format: {e}"
+                    ) from e
+                reference_filename = reference_image.filename or "reference.png"
+                # v9 (2026-04-29): 임시 풀 저장 → 사후 promote 가능
+                try:
+                    reference_ref_url = await save_to_pool(
+                        reference_bytes,
+                        (reference_image.content_type or "image/png"),
+                    )
+                except ValueError as e:
+                    raise HTTPException(400, f"invalid reference image: {e}") from e
+
+    # ⚠️ Backend 게이트 (Codex 리뷰 — zero-regression 보장):
+    # reference_bytes 가 None 이면 reference_role 도 None 강제.
+    if reference_bytes is None:
+        reference_role = None
+
+    # useReferenceImage=true 인데 파일 없는 케이스 거부 (templateId 없고 multipart 도 없음)
+    if use_reference_image and reference_bytes is None:
+        raise HTTPException(
+            400,
+            "참조 이미지 토글이 켜져 있는데 reference_image 또는 referenceTemplateId 가 필요합니다.",
+        )
+
+    # 토글 OFF 면 stale template/ref 메타도 무효화
+    if not use_reference_image:
         reference_ref_url = None
         reference_template_id_meta = None
 
@@ -274,10 +297,7 @@ async def create_video_task(
 
     meta = { prompt, adult?, ollamaModel?, visionModel? }
     """
-    try:
-        meta_obj = json.loads(meta)
-    except json.JSONDecodeError as e:
-        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+    meta_obj = parse_meta_object(meta)
 
     prompt = meta_obj.get("prompt", "").strip()
     if not prompt:

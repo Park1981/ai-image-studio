@@ -15,7 +15,13 @@
 import { create } from "zustand";
 import { useShallow } from "zustand/react/shallow";
 import type { EditVisionAnalysis } from "@/lib/api/types";
-import type { StageEvent } from "@/stores/useGenerateStore";
+import type { StageEvent } from "@/lib/stage";
+// Phase 3 stage slice 추출 (refactor doc 2026-04-30 §I3) — 3 store 공통.
+import {
+  STAGE_INITIAL_STATE,
+  createStageActions,
+  type StageSliceState,
+} from "@/stores/createStageSlice";
 
 /** Multi-reference 이미지의 역할 preset ID (2026-04-27) */
 export type ReferenceRoleId = "face" | "outfit" | "style" | "background" | "custom";
@@ -32,7 +38,9 @@ export interface CropArea {
   height: number;
 }
 
-export interface EditState {
+// stage slice 5 필드 (stageHistory / startedAt / samplingStep / samplingTotal) 는
+// StageSliceState 에서 inherit. createStageActions 가 pushStage / setSampling 제공.
+export interface EditState extends StageSliceState {
   /** data URL (업로드) 또는 히스토리 imageRef */
   sourceImage: string | null;
   /** 화면 표시용 파일명/라벨 */
@@ -72,18 +80,8 @@ export interface EditState {
   pickedTemplateId: string | null;
   pickedTemplateRef: string | null;
 
-  // 파이프라인 상태
+  // 파이프라인 상태 (Edit 만의 추가 — stage slice 5 필드는 위에서 inherit)
   running: boolean;
-  /** 진행 모달용 stage 이벤트 타임라인 (Phase 2 통일).
-   *  백엔드 emit("stage", {...}) 가 도착할 때마다 push.
-   *  같은 type 이 진입 + 완료로 두 번 들어오면 byType Map 이 후자 (payload 풍부) 로 덮어씀. */
-  stageHistory: StageEvent[];
-  /** 실행 시작 시각 (ms since epoch) — 경과 시간 계산용 */
-  startedAt: number | null;
-  /** ComfyUI 샘플러 현재 스텝 */
-  samplingStep: number | null;
-  /** ComfyUI 샘플러 총 스텝 */
-  samplingTotal: number | null;
   /** 백엔드 stage.progress (0~100) — ProgressModal 상단 진행바가 이 값을 그대로 표시 */
   pipelineProgress: number;
   pipelineLabel: string;
@@ -157,12 +155,12 @@ export const useEditStore = create<EditState>((set) => ({
   pickedTemplateRef: null,
 
   running: false,
-  stageHistory: [],
-  startedAt: null,
-  samplingStep: null,
-  samplingTotal: null,
   pipelineProgress: 0,
   pipelineLabel: "",
+
+  // stage slice 5 필드 + 2 액션 (lib/stage.ts + createStageSlice.ts) — 3 store 공통.
+  ...STAGE_INITIAL_STATE,
+  ...createStageActions<EditState>(set),
 
   compareX: 50,
 
@@ -223,10 +221,6 @@ export const useEditStore = create<EditState>((set) => ({
       pipelineProgress: progress,
       pipelineLabel: label ?? s.pipelineLabel,
     })),
-  pushStage: (evt) =>
-    set((s) => ({
-      stageHistory: [...s.stageHistory, { ...evt, arrivedAt: Date.now() }],
-    })),
   resetPipeline: () =>
     set({
       running: false,
@@ -237,8 +231,7 @@ export const useEditStore = create<EditState>((set) => ({
       pipelineProgress: 0,
       pipelineLabel: "",
     }),
-  setSampling: (step, total) =>
-    set({ samplingStep: step, samplingTotal: total }),
+  // pushStage / setSampling 은 createStageActions 가 위에서 주입.
 }));
 
 /* ──────────── 그룹 selectors (task #8 · 2026-04-26) ────────────

@@ -332,3 +332,133 @@ async def test_promote_db_failure_rolls_back_file(
     # tmp_template_dir 가 비어있어야 (rollback)
     files = list(tmp_template_dir.iterdir())
     assert files == []
+
+
+# ─────────────────────────────────────────────
+# C4 — race condition (refactor doc 2026-04-30)
+# ─────────────────────────────────────────────
+
+
+@pytest.mark.asyncio
+async def test_promote_race_lost_409_and_rollback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tmp_pool_dir: Path,
+    tmp_template_dir: Path,
+) -> None:
+    """Codex C4 — 동시 promote 시 race 패자는 409 + template/파일 rollback.
+
+    시나리오:
+      1. history h1.reference_ref = pool_ref (임시 풀)
+      2. 첫 promote 시작 → step 1~5 성공 (영구 파일 생성 + DB row insert)
+      3. 직전 (step 5 와 6 사이) 다른 promote 가 먼저 history 의
+         reference_ref 를 swap 했다고 가정 (DB 직접 UPDATE 로 시뮬레이션)
+      4. 첫 promote 의 step 6 conditional UPDATE 실패 (rowcount==0)
+      5. 검증: 첫 promote 는 409 + template row 삭제 + 영구 파일 삭제
+    """
+    import aiosqlite
+
+    from main import app  # type: ignore
+    from studio import history_db
+    from studio.reference_pool import save_to_pool
+
+    _set_temp_db(monkeypatch, tmp_path)
+    await history_db.init_studio_history_db()
+
+    pool_ref = await save_to_pool(_make_png_bytes(), "image/png")
+    await history_db.insert_item(
+        _make_history_item("h1", reference_ref=pool_ref, reference_role="outfit")
+    )
+
+    # insert_reference_template 호출 직후 — 다른 요청이 먼저 swap 한 상황 시뮬레이션.
+    # 원본 함수를 wrap 해서 호출 후 history.reference_ref 를 가짜 영구 URL 로 바꿈.
+    real_insert = history_db.insert_reference_template
+
+    async def _insert_then_simulate_race(item: dict) -> str:
+        new_id = await real_insert(item)
+        # 다른 promote 요청이 먼저 swap 한 상태를 만듦 — DB 직접 UPDATE.
+        async with aiosqlite.connect(history_db._DB_PATH) as db:
+            await db.execute(
+                "UPDATE studio_history SET reference_ref = ? WHERE id = ?",
+                ("/images/studio/reference-templates/winner.png", "h1"),
+            )
+            await db.commit()
+        return new_id
+
+    monkeypatch.setattr(
+        "studio.history_db.insert_reference_template",
+        _insert_then_simulate_race,
+    )
+
+    with patch(
+        "studio.routes.reference_templates.analyze_reference",
+        new_callable=AsyncMock,
+    ) as mock_v:
+        mock_v.return_value = "ok"
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post(
+                "/api/studio/reference-templates/promote/h1",
+                json={"name": "loser"},
+            )
+
+    # 패자는 409 (race lost)
+    assert resp.status_code == 409, resp.text
+
+    # 우리가 만든 template row 는 rollback 됐어야 — 'loser' 이름의 row 0건
+    async with aiosqlite.connect(history_db._DB_PATH) as db:
+        db.row_factory = aiosqlite.Row
+        cur = await db.execute(
+            "SELECT COUNT(*) AS c FROM reference_templates WHERE name = ?",
+            ("loser",),
+        )
+        row = await cur.fetchone()
+        assert row["c"] == 0, "패자 template row 가 rollback 안 됨 (orphan)"
+
+    # 우리가 만든 영구 파일도 rollback (디렉토리 비어있어야)
+    files = list(tmp_template_dir.iterdir())
+    assert files == [], f"패자 영구 파일 rollback 안 됨 (orphan): {files}"
+
+
+@pytest.mark.asyncio
+async def test_promote_conditional_update_uses_correct_pool_ref(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    tmp_pool_dir: Path,
+    tmp_template_dir: Path,
+) -> None:
+    """Codex C4 — UPDATE WHERE reference_ref = ? 조건이 정상 흐름은 막지 않음.
+
+    insert_reference_template 호출 중 race 시뮬레이션 없이 정상 promote 가
+    여전히 200 으로 성공하는지 — C4 fix 가 정상 흐름 회귀 차단.
+    """
+    from main import app  # type: ignore
+    from studio import history_db
+    from studio.reference_pool import save_to_pool
+
+    _set_temp_db(monkeypatch, tmp_path)
+    await history_db.init_studio_history_db()
+
+    pool_ref = await save_to_pool(_make_png_bytes(), "image/png")
+    await history_db.insert_item(
+        _make_history_item("h1", reference_ref=pool_ref, reference_role="outfit")
+    )
+
+    with patch(
+        "studio.routes.reference_templates.analyze_reference",
+        new_callable=AsyncMock,
+    ) as mock_v:
+        mock_v.return_value = "ok"
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post(
+                "/api/studio/reference-templates/promote/h1",
+                json={"name": "winner"},
+            )
+
+    assert resp.status_code == 200, resp.text
+    # history.reference_ref 가 영구 URL 로 swap 됐는지 (정상 흐름 회귀 차단)
+    item = await history_db.get_item("h1")
+    assert item["referenceRef"].startswith("/images/studio/reference-templates/")

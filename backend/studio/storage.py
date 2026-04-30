@@ -46,8 +46,15 @@ EDIT_SOURCE_DIR = STUDIO_OUTPUT_DIR / "edit-source"
 EDIT_SOURCE_DIR.mkdir(parents=True, exist_ok=True)
 EDIT_SOURCE_URL_PREFIX = f"{STUDIO_URL_PREFIX}/edit-source"
 
-# task_id 검증 정규식 — path traversal 방지 (CLAUDE.md 보안 규칙)
+# task_id 검증 정규식 — path traversal 방지 (CLAUDE.md 보안 규칙).
+# tsk-* 는 SSE 내부 task 채널 id 전용 (edit-source PNG 파일명 등에 사용).
 TASK_ID_RE = re.compile(r"^tsk-[0-9a-f]{12}$")
+
+# history row id 검증 정규식 — 클라이언트로부터 history id 받는 엔드포인트
+# (compare-analyze 등) 의 입력 검증용. gen-/edit-/vid- prefix + uuid4 hex 8자.
+# Codex C1 fix (2026-04-30): TASK_ID_RE 가 tsk-* 만 허용해서 edit-* / gen-* /
+# vid-* 결과의 비교 분석이 영구 저장되지 않던 버그 차단용.
+HISTORY_ID_RE = re.compile(r"^(gen|edit|vid)-[0-9a-f]{8}$")
 
 # edit-source 파일명 화이트리스트 (path traversal 방지).
 # 저장 시 uuid4 hex + ".png/.jpg/.jpeg/.webp" 포맷이므로 이 정규식 외엔 삭제 거부.

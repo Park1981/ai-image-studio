@@ -122,8 +122,10 @@ export function useComparisonAnalysis() {
           source: item.sourceRef,
           result: item.imageRef,
           editPrompt: item.prompt,
-          // tsk- prefix 항목만 DB 저장 요청 (Task 5/6 의 _TASK_ID_RE 호환)
-          historyItemId: item.id.startsWith("tsk-") ? item.id : undefined,
+          // Codex C1 fix (2026-04-30): history.id 는 gen-/edit-/vid- prefix 라서
+          // 옛 startsWith("tsk-") 게이트로는 절대 통과 X → store 휘발 상태였음.
+          // 백엔드 HISTORY_ID_RE 가 형식 검증 + update_comparison rowcount 로 안전 차단.
+          historyItemId: item.id,
           visionModel,
           ollamaModel,
         });
@@ -150,7 +152,10 @@ export function useComparisonAnalysis() {
         }
 
         // DB 저장 실패 경고 — historyItemId 전달했는데 saved=false
-        if (item.id.startsWith("tsk-") && !saved) {
+        // Codex C1 잔여 fix (2026-04-30): 옛 startsWith("tsk-") 게이트는 실제 history id
+        // 형식 (gen-/edit-/vid-) 과 매치 안 돼서 edit-* 저장 실패 시 경고가 안 뜨던
+        // stale 조건. 백엔드 HISTORY_ID_RE 와 동일 패턴으로 매칭해 정합성 회복.
+        if (/^(gen|edit|vid)-[0-9a-f]{8}$/.test(item.id) && !saved) {
           toast.warn("DB 저장 실패", "재시작 후 결과가 사라질 수 있습니다.");
         }
       } catch (err) {

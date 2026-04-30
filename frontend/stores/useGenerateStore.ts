@@ -19,6 +19,16 @@ import {
   getAspect,
   type AspectRatioLabel,
 } from "@/lib/model-presets";
+import type { StageEvent } from "@/lib/stage";
+// Phase 3 stage slice 추출 (refactor doc 2026-04-30 §I3) — 3 store 공통 5 필드 + 2 액션.
+import {
+  STAGE_INITIAL_STATE,
+  createStageActions,
+  type StageSliceState,
+} from "@/stores/createStageSlice";
+
+// 옛 import 호환 — StageEvent 를 useGenerateStore 에서 직접 import 하던 외부 코드 보존.
+export type { StageEvent } from "@/lib/stage";
 
 /** Qwen/ComfyUI 권장: 8의 배수 + 256~2048 clamp */
 export function snapDimension(v: number): number {
@@ -26,24 +36,12 @@ export function snapDimension(v: number): number {
   return Math.round(clamped / 8) * 8;
 }
 
-export interface StageEvent {
-  type: string;
-  /** UI 라벨 (예: "gemma4 업그레이드") */
-  label: string;
-  /** 0-100 */
-  progress: number;
-  /** 도착 시점 (ms since epoch) */
-  arrivedAt: number;
-  /** 백엔드가 보낸 추가 payload (description / finalPrompt / editVisionAnalysis 등 stage 별 detail).
-   *  PipelineTimeline 의 StageDef.renderDetail 콜백이 사용. 옵셔널 — 없으면 detail 박스 안 그림.
-   *  2026-04-27 (Phase 1): StageDef 시스템 도입 — Generate 는 현재 payload 안 보내지만 Edit/Video Phase 2/3 에서 활용. */
-  payload?: Record<string, unknown>;
-}
-
 /** 프리셋 중 어느 것과도 안 맞는 사용자 지정 사이즈 */
 export type AspectValue = AspectRatioLabel | "custom";
 
-export interface GenerateState {
+// stage slice 5 필드 (stageHistory / startedAt / samplingStep / samplingTotal) 는
+// StageSliceState 에서 inherit. createStageActions 가 pushStage / setSampling 제공.
+export interface GenerateState extends StageSliceState {
   prompt: string;
   /** 프리셋 라벨 또는 "custom" (사용자가 픽셀 직접 수정한 경우) */
   aspect: AspectValue;
@@ -60,20 +58,12 @@ export interface GenerateState {
    *  사용자가 이미 정제된 영문 프롬프트를 복사해서 붙여넣은 케이스용. default false. */
   skipUpgrade: boolean;
 
-  // 실행 상태 (영속 X)
+  // 실행 상태 (Generate 만의 추가 — Edit/Video 와 발산 지점)
   generating: boolean;
   progress: number;
   stage: string;
-  /** 진행 모달용 stage 이벤트 타임라인 */
-  stageHistory: StageEvent[];
-  /** 실행 시작 시각 (ms since epoch) — 경과 시간 계산용 */
-  startedAt: number | null;
-  /** ComfyUI 샘플러 현재 스텝 (예: 3) */
-  samplingStep: number | null;
-  /** ComfyUI 샘플러 총 스텝 (예: 40) */
-  samplingTotal: number | null;
 
-  // actions
+  // actions (Generate 고유)
   setPrompt: (v: string) => void;
   /** 프리셋 선택 — 비율잠금 ON 이면 width 유지 + height 재계산, OFF 면 프리셋 기본값 */
   setAspect: (v: AspectValue) => void;
@@ -86,16 +76,16 @@ export interface GenerateState {
   setResearch: (v: boolean) => void;
   setRunning: (generating: boolean, progress?: number, stage?: string) => void;
   resetRunning: () => void;
-  pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
-  /** ComfyUI 샘플링 스텝 업데이트 */
-  setSampling: (step: number | null, total: number | null) => void;
-
   /** Lightning 토글 */
   applyLightning: (on: boolean) => void;
   /** 스타일 LoRA 토글 — id 또는 null. 활성 시 호환성 처리는 호출부에서 (Lightning OFF 등) */
   setStyleId: (id: string | null) => void;
   /** AI 프롬프트 보정 우회 토글 */
   setSkipUpgrade: (v: boolean) => void;
+
+  // stage slice 액션 (3 store 공통)
+  pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
+  setSampling: (step: number | null, total: number | null) => void;
 }
 
 export const useGenerateStore = create<GenerateState>()(
@@ -117,10 +107,9 @@ export const useGenerateStore = create<GenerateState>()(
         generating: false,
         progress: 0,
         stage: "",
-        stageHistory: [],
-        startedAt: null,
-        samplingStep: null,
-        samplingTotal: null,
+        // stage slice 5 필드 + 2 액션 (lib/stage.ts + createStageSlice.ts)
+        ...STAGE_INITIAL_STATE,
+        ...createStageActions<GenerateState>(set),
 
         setPrompt: (v) => set({ prompt: v }),
         setAspect: (v) =>
@@ -189,15 +178,6 @@ export const useGenerateStore = create<GenerateState>()(
             samplingStep: null,
             samplingTotal: null,
           }),
-        pushStage: (evt) =>
-          set((s) => ({
-            stageHistory: [
-              ...s.stageHistory,
-              { ...evt, arrivedAt: Date.now() },
-            ],
-          })),
-        setSampling: (step, total) =>
-          set({ samplingStep: step, samplingTotal: total }),
 
         applyLightning: (on) => set({ lightning: on }),
         setStyleId: (id) => set({ styleId: id }),

@@ -274,7 +274,7 @@ export interface HistoryItem {
   /** 비교 분석 결과. 분석 안 한 경우 undefined. */
   comparisonAnalysis?: ComparisonAnalysis;
   /** Edit 비전 구조 분석 (Phase 1 · 휘발). 이 세션에서 실행된 edit 에만 포함.
-   *  옛 히스토리 로드 시 undefined → AiEnhanceCard 는 visionDescription 단락으로 폴백. */
+   *  옛 히스토리 로드 시 undefined → InfoPanel 은 visionDescription 단락으로 폴백. */
   editVisionAnalysis?: EditVisionAnalysis;
   /** spec 19 후속 (v6 캐싱) — Edit 한 사이클의 clarify_edit_intent 결과 캐시.
    *  비교 분석 (compare-analyze) 이 historyItemId 받으면 이 값을 재사용해

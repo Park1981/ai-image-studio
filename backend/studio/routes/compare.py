@@ -14,8 +14,6 @@ GPU lock + ComfyUI 충돌 방지 정책은 백그라운드 파이프라인이 �
 
 from __future__ import annotations
 
-import json
-
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
@@ -26,7 +24,7 @@ from ..prompt_pipeline import clarify_edit_intent  # noqa: F401 — 옛 테스�
 from ..schemas import TaskCreated
 from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..tasks import TASKS, _new_task
-from ._common import _spawn, _stream_task
+from ._common import _spawn, _stream_task, parse_meta_object
 
 router = APIRouter()
 
@@ -46,10 +44,7 @@ async def create_compare_analyze_task(
 
     응답: { task_id, stream_url } — 클라이언트가 stream_url 로 SSE 구독.
     """
-    try:
-        meta_obj = json.loads(meta)
-    except json.JSONDecodeError as e:
-        raise HTTPException(400, f"meta JSON invalid: {e}") from e
+    meta_obj = parse_meta_object(meta)
 
     context = (meta_obj.get("context") or "edit").strip().lower()
     edit_prompt = (meta_obj.get("editPrompt") or "").strip()

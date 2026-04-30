@@ -314,13 +314,13 @@ def test_delete_reference_file_round_trip(monkeypatch, tmp_path: Path):
 
 @pytest.mark.asyncio
 async def test_edit_route_reference_template_id_overrides_client_referenceref(
-    monkeypatch,
+    monkeypatch, tmp_path,
 ) -> None:
     """라이브러리 픽 케이스: referenceTemplateId 로 DB 조회 → image_ref 가 권위.
 
-    클라이언트가 absolute URL 의 referenceRef 를 보내도 backend 가 신뢰하지 않고
-    DB 의 상대 image_ref 를 _run_edit_pipeline 에 전달.
-    Codex 2차/3차 리뷰 fix 회귀 차단.
+    Codex C3 fix (2026-04-30): 옛 흐름은 DB image_ref 를 history 기록만 하고
+    ComfyUI 에는 클라이언트 multipart bytes 전달 (신뢰 경계 깨짐). 이제는
+    multipart 동시 전송 자체를 거부 + templateId 만 전송 시 서버가 파일 read.
     """
     import json as _json
     from unittest.mock import AsyncMock
@@ -328,14 +328,23 @@ async def test_edit_route_reference_template_id_overrides_client_referenceref(
     from httpx import ASGITransport, AsyncClient
 
     from main import app  # type: ignore
+    from studio import reference_storage
 
-    # DB 조회 mock — DB image_ref 는 상대 영구 URL.
+    # tmp REFERENCE_DIR 격리 + 실제 파일 작성 (서버가 read 함)
+    tmp_ref_dir = tmp_path / "ref-templates"
+    tmp_ref_dir.mkdir()
+    monkeypatch.setattr(reference_storage, "REFERENCE_DIR", tmp_ref_dir)
+    fname = "00000000000000000000000000000abc.png"
+    template_bytes = _make_png_bytes()
+    (tmp_ref_dir / fname).write_bytes(template_bytes)
+    image_url = f"/images/studio/reference-templates/{fname}"
+
     monkeypatch.setattr(
         "studio.history_db.get_reference_template",
         AsyncMock(
             return_value={
                 "id": "tpl-test",
-                "imageRef": "/images/studio/reference-templates/db-relative.png",
+                "imageRef": image_url,
                 "name": "db",
             }
         ),
@@ -362,7 +371,7 @@ async def test_edit_route_reference_template_id_overrides_client_referenceref(
             "/api/studio/edit",
             files={
                 "image": ("src.png", _make_png_bytes(), "image/png"),
-                "reference_image": ("ref.png", _make_png_bytes(), "image/png"),
+                # Codex C3: templateId 만 전송, multipart reference_image 동시 전송 금지
             },
             data={
                 "meta": _json.dumps(
@@ -382,17 +391,53 @@ async def test_edit_route_reference_template_id_overrides_client_referenceref(
         )
 
     assert resp.status_code == 200, resp.text
-    # 핵심 검증: DB 조회한 상대 URL 이 pipeline 으로 전달됐는지
-    assert (
-        captured_kwargs.get("reference_ref_url")
-        == "/images/studio/reference-templates/db-relative.png"
-    )
+    # 핵심 검증: DB 조회한 상대 URL 이 pipeline 으로 전달
+    assert captured_kwargs.get("reference_ref_url") == image_url
     assert captured_kwargs.get("reference_template_id") == "tpl-test"
+    # C3 핵심 — 서버가 read 한 templateId 의 실제 파일 bytes 가 ComfyUI 로 전달됨
+    assert captured_kwargs.get("reference_bytes") == template_bytes
+
+
+@pytest.mark.asyncio
+async def test_edit_route_template_id_with_multipart_rejected_400(monkeypatch) -> None:
+    """Codex C3: referenceTemplateId 와 reference_image multipart 동시 전송 시 400."""
+    import json as _json
+
+    from httpx import ASGITransport, AsyncClient
+
+    from main import app  # type: ignore
+
+    async with AsyncClient(
+        transport=ASGITransport(app=app), base_url="http://test"
+    ) as ac:
+        resp = await ac.post(
+            "/api/studio/edit",
+            files={
+                "image": ("src.png", _make_png_bytes(), "image/png"),
+                "reference_image": ("ref.png", _make_png_bytes(), "image/png"),
+            },
+            data={
+                "meta": _json.dumps(
+                    {
+                        "prompt": "test",
+                        "useReferenceImage": True,
+                        "referenceRole": "outfit",
+                        "referenceTemplateId": "tpl-x",
+                    }
+                )
+            },
+        )
+
+    assert resp.status_code == 400, resp.text
+    assert "동시에 보낼 수 없습니다" in resp.json()["detail"]
 
 
 @pytest.mark.asyncio
 async def test_edit_route_unknown_template_id_returns_404(monkeypatch) -> None:
-    """존재하지 않는 referenceTemplateId → 404 (조회 실패)."""
+    """존재하지 않는 referenceTemplateId → 404 (조회 실패).
+
+    Codex C3 fix: multipart reference_image 없이 templateId 만 보내야 함.
+    """
     import json as _json
     from unittest.mock import AsyncMock
 
@@ -412,7 +457,7 @@ async def test_edit_route_unknown_template_id_returns_404(monkeypatch) -> None:
             "/api/studio/edit",
             files={
                 "image": ("src.png", _make_png_bytes(), "image/png"),
-                "reference_image": ("ref.png", _make_png_bytes(), "image/png"),
+                # Codex C3: templateId 만 전송
             },
             data={
                 "meta": _json.dumps(

@@ -28,10 +28,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-# Phase 6 (2026-04-27): progress callback 시그니처 — analyze_* 함수가 단계 transition
-# 시점에 호출. router (task-based SSE) 가 stage emit 으로 변환. None 이면 무영향.
-ProgressCallback = Callable[[str], Awaitable[None]]
-
 from ._json_utils import coerce_str as _coerce_str
 from ._json_utils import parse_strict_json as _parse_strict_json
 from ._ollama_client import call_chat_payload
@@ -43,6 +39,10 @@ from .prompt_pipeline import (
     translate_to_korean,
     upgrade_edit_prompt,
 )
+
+# Phase 6 (2026-04-27): progress callback 시그니처 — analyze_* 함수가 단계 transition
+# 시점에 호출. router (task-based SSE) 가 stage emit 으로 변환. None 이면 무영향.
+ProgressCallback = Callable[[str], Awaitable[None]]
 
 log = logging.getLogger(__name__)
 

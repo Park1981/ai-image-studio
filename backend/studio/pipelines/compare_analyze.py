@@ -30,7 +30,7 @@ from .. import history_db, ollama_unload
 from .._gpu_lock import GpuBusyError, gpu_slot
 from ..comparison_pipeline import analyze_pair, analyze_pair_generic
 from ..prompt_pipeline import clarify_edit_intent
-from ..storage import TASK_ID_RE
+from ..storage import HISTORY_ID_RE
 from ..tasks import Task
 
 log = logging.getLogger(__name__)
@@ -82,9 +82,12 @@ async def _run_compare_analyze_pipeline(
         # - 비교 분석 lock 과는 분리 (gemma4 cold start 가 다른 compare 요청 막지 않게)
         refined_intent = ""
         if context != "compare":
+            # Codex C1 fix (2026-04-30): TASK_ID_RE → HISTORY_ID_RE.
+            # history.id 는 gen-/edit-/vid- prefix 라서 옛 TASK_ID_RE (tsk-*) 로는
+            # 절대 매치되지 않아 캐시 lookup 자체가 죽어 있었음.
             if (
                 isinstance(history_item_id_raw, str)
-                and TASK_ID_RE.match(history_item_id_raw)
+                and HISTORY_ID_RE.match(history_item_id_raw)
             ):
                 try:
                     cached_item = await history_db.get_item(history_item_id_raw)
@@ -197,11 +200,15 @@ async def _run_compare_analyze_pipeline(
             await task.emit("error", {"message": str(e), "code": "gpu_busy"})
             return
 
-        # ── 4단계: DB persist (edit context + history_item_id 매치 시만) ──
+        # ── 4단계: DB persist (history id 가 gen-/edit-/vid- 형식 매치 시만) ──
+        # Codex C1 fix (2026-04-30): TASK_ID_RE 는 SSE 내부 task 채널 id (tsk-*) 전용.
+        # 클라이언트가 보내는 historyItemId 는 gen-/edit-/vid- prefix 라서 옛 코드는
+        # 절대 saved=True 가 될 수 없었음 → 결과가 store 휘발 상태.
+        # update_comparison 은 rowcount==0 이면 False 반환 (id 매치 row 없음 → 무시).
         saved = False
         if (
             isinstance(history_item_id_raw, str)
-            and TASK_ID_RE.match(history_item_id_raw)
+            and HISTORY_ID_RE.match(history_item_id_raw)
         ):
             try:
                 saved = await history_db.update_comparison(

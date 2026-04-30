@@ -7,8 +7,8 @@
  *  3. 우측 [×] → 확인 모달 후 삭제
  *
  * 본 컴포넌트는 *살아있는* templates 만 보여주므로 onError 404 fallback 불필요.
- * 옛 history 행의 referenceRef 가 깨진 경우는 `BeforeAfterSlider` /
- * `ResultInfoModal` / `HistoryGallery` 쪽에서 별도 onError 처리 필요 (Task 6 보강).
+ * 옛 history 행의 referenceRef 가 깨진 경우는 `BeforeAfterSlider` / `HistoryGallery`
+ * / `InfoPanel` 쪽에서 별도 onError 처리 필요 (Task 6 보강).
  */
 
 "use client";
