@@ -1,9 +1,21 @@
 # Phase 4.2 — `vision_pipeline.py` 1131줄 분할 plan
 
-> **버전**: v1 (2026-04-30 · Claude 작성 · 사용자 codex 1차 리뷰 대기)
+> **버전**: v2 (2026-04-30 · Claude 작성 + 사용자 codex 1차 리뷰 6 finding 반영)
 > **선행 commit**: master `a8bad41` (Phase 4.1.1 helper 추출 완료)
 > **인계**: `memory/project_session_2026_04_30_phase_4_1_history_db_split.md` + 본 plan
 > **검증 baseline**: backend pytest 361 / ruff clean · frontend vitest 91 / tsc / lint clean
+
+## v1 → v2 핵심 변경 (codex 1차 리뷰 반영)
+
+| # | 분류 | v1 문제 | v2 fix |
+|---|---|---|---|
+| C1 | Critical | 단계 1 "facade 안 import depth 그대로" → 패키지 전환 후 internal import 6 site (`._json_utils` x2 / `._ollama_client` / `.presets` / `.prompt_pipeline` x2 lazy) 가 `studio.vision_pipeline.X` 같은 없는 모듈 찾음 | facade `__init__.py` 의 internal import 모두 `..` 로 갱신 명시 (단계 1 안에서) |
+| C2 | Critical | `_aspect_label` 을 image_detail 전용으로 명시 | 실제 grep — Edit 의 `_call_vision_edit_source` (L751) + Vision Analyzer 의 `_call_vision_recipe_v2` (L971) 둘 다 사용. **`_common.py` 로 이동** |
+| C3 | Critical | 옵션 D 채택 시 patch target 갱신을 단계 5 일괄 → 단계 3 (edit_source 이동) 종료 시 옛 patch fail | **각 함수 이동 commit 안에서 patch target 즉시 갱신** (단계 3 = edit 관련 patch / 단계 4 = image_detail 관련 patch) |
+| I1 | Important | plan 안 옵션 추천 충돌 (line 107 옵션 C / line 147 옵션 D) | **옵션 D 확정** (CLAUDE.md 🔴 정합 + Phase 4.1 11 site 갱신 패턴 확장) |
+| I2 | Important | grep assertion `[^_]` 가 private patch (`_call_vision_edit_source` 등) 못 잡음 | **`[A-Za-z_]+` 패턴 통일** |
+| I3 | Important | `SYSTEM_VISION_RECIPE_V2` (L182) / `VisionPipelineResult` (L371) / `VisionAnalysisResult` (L895) 그룹 매핑 누락 | image_detail / edit_source / image_detail 명시 + facade `__all__` 포함 |
+| R1 | Recommended | production import 7 / 12 파일 (잘못) | **6 production + 5 test = 11 파일** (실제 grep 결과) |
 
 ---
 
@@ -49,18 +61,26 @@ Phase 4.1 (history_db.py 886줄) 완료 후 다음 본격 backend split.
 | L692~723 | `_coerce_domain` / `_coerce_action` / `_coerce_slots` | edit_source.py | Edit JSON coerce 전용 |
 | L724~784 | `_call_vision_edit_source` | edit_source.py | Edit 매트릭스 호출 |
 | L785~925 | `analyze_edit_source` | edit_source.py | Edit 매트릭스 진입점 |
-| L926~956 | `_aspect_label` | image_detail.py | Vision Analyzer 전용 helper |
+| L926~956 | `_aspect_label` | **`_common.py`** (codex C2 fix) | Edit (`_call_vision_edit_source` L751) + Vision Analyzer (`_call_vision_recipe_v2` L971) 둘 다 사용 |
+| L182 | `SYSTEM_VISION_RECIPE_V2` (codex I3) | `image_detail.py` | Vision Analyzer recipe v2 system |
+| L371 | `VisionPipelineResult` dataclass (codex I3) | `edit_source.py` | run_vision_pipeline return type |
+| L895 | `VisionAnalysisResult` dataclass (codex I3) | `image_detail.py` | analyze_image_detailed return type |
 | L957~1006 | `_call_vision_recipe_v2` | image_detail.py | Vision Analyzer 호출 |
 | L1007~1125 | `analyze_image_detailed` | image_detail.py | Vision Analyzer 진입점 |
 | L1126~1131 | `_to_base64` | _common.py | 모든 vision 호출 헬퍼 |
 
-**최종 분할** (예상):
+**최종 분할** (v2 갱신 — codex C2 + I3 반영):
 ```
 backend/studio/vision_pipeline/
-├── __init__.py          (facade · re-export + __all__ · ~80줄)
-├── _common.py           (ProgressCallback / VISION_SYSTEM / _describe_image / _to_base64 / _DEFAULT_OLLAMA_URL / DEFAULT_TIMEOUT alias · ~150줄)
-├── edit_source.py       (EDIT_VISION_ANALYSIS_SYSTEM / EditSlotEntry / EditVisionAnalysis / _coerce_* / _call_vision_edit_source / analyze_edit_source / run_vision_pipeline · ~600줄)
-└── image_detail.py      (SYSTEM_VISION_DETAILED / _aspect_label / _call_vision_recipe_v2 / analyze_image_detailed · ~250줄)
+├── __init__.py          facade · re-export + __all__ · ~90줄
+├── _common.py           ProgressCallback / VISION_SYSTEM / _describe_image / _to_base64 /
+│                        _aspect_label (codex C2) / _DEFAULT_OLLAMA_URL alias / DEFAULT_TIMEOUT alias · ~180줄
+├── edit_source.py       EDIT_VISION_ANALYSIS_SYSTEM / VisionPipelineResult (codex I3) /
+│                        EditSlotEntry / EditVisionAnalysis / _coerce_* /
+│                        _call_vision_edit_source / analyze_edit_source / run_vision_pipeline · ~600줄
+└── image_detail.py      SYSTEM_VISION_DETAILED / SYSTEM_VISION_RECIPE_V2 (codex I3) /
+                         VisionAnalysisResult (codex I3) / _call_vision_recipe_v2 /
+                         analyze_image_detailed · ~270줄
 ```
 
 > 각 sub-file 200~600줄. edit_source 가 가장 큰 그룹 (Edit 매트릭스 흐름 응집).
@@ -104,29 +124,6 @@ backend/studio/vision_pipeline/
 
 → Python attribute lookup 은 **호출 시점**에 모듈 dict 에서 가져옴. `vision_pipeline._describe_image` 호출 시 `vision_pipeline.__init__` 의 `_describe_image` attribute 를 lookup → monkeypatch 가 facade attribute 를 patch 하면 patch 가 보임. 즉 **옵션 C 안전**.
 
-#### 권장 = 옵션 C
-
-이유:
-- Phase 4.1 history_db 와 동일 패턴 (이미 검증됨 · 회귀 0)
-- monkeypatch 44 site 갱신 0건 (위험 최소)
-- sub-module 간 cross-module 호출은 facade 경유로 통일 (가독성 약간 ↓ 하지만 patch 정합 ↑)
-
-**구체 패턴**:
-```python
-# studio/vision_pipeline/edit_source.py
-from . import _common  # 같은 패키지 안의 sub-module
-
-async def _call_vision_edit_source(...):
-    # _common._describe_image 직접 호출 X — facade 경유
-    from .. import vision_pipeline
-    base64_data = vision_pipeline._to_base64(image_bytes)
-    ...
-```
-
-→ test 가 `studio.vision_pipeline._to_base64` patch 하면 facade attribute 가 patched. `from .. import vision_pipeline` 으로 받은 module 의 _to_base64 lookup 도 patched 본 받음.
-
-근데 이게 가독성/순환 import 측면에서 별로일 수도. **다른 옵션 = sub-module 안에서 direct import + patch site 갱신**:
-
 #### 옵션 D — sub-module 직접 import + 44 patch site 갱신 (Phase 4.1 monkeypatch 갱신 패턴 일관)
 
 - 4.1 에서 11 site 갱신했듯 4.2 도 44 site 갱신
@@ -144,9 +141,20 @@ async def _call_vision_edit_source(...):
 | Phase 4.1 일관성 | (4.1 은 다른 패턴 · sub-module 안 호출 매우 적음) | △ (4.1 11 site 갱신 패턴 확장) |
 | 회귀 위험 | 낮음 (patch 변경 0) | 중 (44 site 누락 위험) |
 
-**잠정 권장 = 옵션 D** (CLAUDE.md 🔴 정책 명시 + Phase 4.1 11 site 갱신 패턴 확장).
+**확정 = 옵션 D** (codex 1차 리뷰 I1 결정).
 
-→ codex 1차 리뷰에서 결정 받기 (위험 vs 정합 trade-off).
+이유:
+- CLAUDE.md 🔴 Critical "patch site = lookup module 기준" 정합
+- Phase 4.1 11 site 갱신 패턴 확장
+- sub-module 가독성 ↑ (`from . import _common; _common._describe_image()`)
+- facade 경유 호출 (옵션 C) 은 리팩토링 후 코드 품질 애매 (codex 평가)
+
+**⚠️ codex C3 fix — patch target 갱신 시점**:
+v1 의 단계 5 일괄 갱신은 단계 3 (edit_source 이동) 종료 시 옛 patch target (`studio.vision_pipeline._call_vision_edit_source`) fail.
+→ **각 함수 이동 commit 안에서 즉시 갱신**:
+- 단계 3 (edit_source 이동) → edit 관련 patch target 갱신 (같은 commit)
+- 단계 4 (image_detail 이동) → image_detail 관련 patch target 갱신 (같은 commit)
+- 단계 2 (_common 이동 시 `_describe_image` / `_to_base64` 등) → _common 관련 patch target 갱신 (같은 commit)
 
 ### 2.2 ⚠️ lazy import `_describe_image` + `_DEFAULT_OLLAMA_URL`
 
@@ -168,53 +176,85 @@ async def _call_vision_edit_source(...):
 
 ## 3. 단계별 실행 plan
 
-### 단계 1 — facade rename + lazy import depth fix (1 commit)
+### 단계 1 — facade rename + facade internal import depth fix (1 commit · ⭐ codex C1 fix)
 - `git mv backend/studio/vision_pipeline.py backend/studio/vision_pipeline/__init__.py`
 - module → package 전환
-- (Phase 4.1 단계 1 패턴) lazy import depth 변경 site grep 후 fix:
-  - `from ._json_utils import` → `from .._json_utils import` (sub-module 으로 옮길 때만 영향)
-  - `from ._ollama_client import` → 동일
-  - `from .presets import` → 동일
-  - `from .prompt_pipeline import` → 동일
-  - 단, facade `__init__.py` 안에선 그대로 유지 (depth 동일)
+- **facade `__init__.py` 안의 internal import 6 site 모두 `..` 로 갱신** (codex C1):
+  - L31~32: `from ._json_utils import ...` → `from .._json_utils import ...` (2개)
+  - L33: `from ._ollama_client import ...` → `from .._ollama_client import ...`
+  - L34: `from .presets import ...` → `from ..presets import ...`
+  - L35: `from .prompt_pipeline import ...` → `from ..prompt_pipeline import ...`
+  - L424, L818: lazy `from .prompt_pipeline import clarify_edit_intent` → `from ..prompt_pipeline import clarify_edit_intent` (2개)
 - 검증: `pytest tests/studio/` 361 PASS
 
-### 단계 2 — _common.py 분리 + cross-module 패턴 결정 (1 commit)
-- `_common.py` 신규: ProgressCallback / VISION_SYSTEM / _describe_image / _to_base64 / _DEFAULT_OLLAMA_URL alias / DEFAULT_TIMEOUT alias / log
+### 단계 2 — _common.py 분리 + 관련 patch target 즉시 갱신 (1 commit · codex C3 fix)
+- `_common.py` 신규:
+  - `ProgressCallback` typedef
+  - `VISION_SYSTEM` (Edit 짧은 캡션 system)
+  - `_describe_image` (qwen2.5vl 캡션 헬퍼)
+  - `_to_base64` (이미지 → base64)
+  - `_aspect_label` (Edit + Vision Analyzer 둘 다 사용 · codex C2 fix)
+  - `_DEFAULT_OLLAMA_URL` alias (`from ..prompt_pipeline import _DEFAULT_OLLAMA_URL`)
+  - `DEFAULT_TIMEOUT` alias (`from ..prompt_pipeline import DEFAULT_TIMEOUT`)
+  - `log = logging.getLogger("studio.vision_pipeline")`
 - facade `__init__.py` 갱신: `_common` 항목 제거 + `from ._common import ...` 명시 import
-- 외부 import 영향 0건 (facade re-export)
+- **patch target 즉시 갱신** (codex C3):
+  - `studio.vision_pipeline._describe_image` → `studio.vision_pipeline._common._describe_image` (10 site)
+  - `studio.vision_pipeline._to_base64` 가 patch 되는 site 있으면 → `_common._to_base64`
+  - `studio.vision_pipeline._aspect_label` patch site 있으면 → `_common._aspect_label`
+- 검증: `pytest tests/studio/` 361 PASS + ruff clean
+
+### 단계 3 — edit_source.py 분리 + edit 관련 patch target 즉시 갱신 (1 commit · codex C3 fix)
+- `edit_source.py` 신규:
+  - `EDIT_VISION_ANALYSIS_SYSTEM` 매트릭스 system
+  - `EditSlotEntry` / `EditVisionAnalysis` dataclass
+  - `VisionPipelineResult` dataclass (codex I3 — run_vision_pipeline return type)
+  - 도메인별 슬롯 키 정의
+  - `_empty_fallback_slots` / `_coerce_domain` / `_coerce_action` / `_coerce_slots`
+  - `_call_vision_edit_source`
+  - `analyze_edit_source`
+  - `run_vision_pipeline` (Edit 진입점)
+- 옵션 D 패턴: sub-module 안 `from . import _common as _c; _c._describe_image(...)` + `_c._aspect_label(...)`
+- facade `__init__.py` 갱신: `edit_source` 그룹 제거 + `from .edit_source import ...` 명시 import
+- **patch target 즉시 갱신** (codex C3):
+  - `studio.vision_pipeline._call_vision_edit_source` → `studio.vision_pipeline.edit_source._call_vision_edit_source` (~15 site)
+  - `studio.vision_pipeline.upgrade_edit_prompt` → `studio.vision_pipeline.edit_source.upgrade_edit_prompt` (~5 site · Edit 흐름 lookup)
+  - `studio.vision_pipeline.asyncio.sleep` → `studio.vision_pipeline.edit_source.asyncio.sleep` (1 site · run_vision_pipeline 단계별 unload)
 - 검증: `pytest tests/studio/` 361 PASS
 
-### 단계 3 — edit_source.py 분리 (1 commit)
-- 옵션 D 채택 시: sub-module 안 `from . import _common; _common._describe_image()` 패턴
-- patch target 갱신 (이번 commit 안 또는 단계 5 일괄)
-- EDIT_VISION_ANALYSIS_SYSTEM / EditSlotEntry / EditVisionAnalysis / _empty_fallback_slots / _coerce_* / _call_vision_edit_source / analyze_edit_source / run_vision_pipeline 모두 이동
-- facade re-export 갱신
+### 단계 4 — image_detail.py 분리 + image_detail 관련 patch target 즉시 갱신 (1 commit · codex C3 fix)
+- `image_detail.py` 신규:
+  - `SYSTEM_VISION_DETAILED` 폴백 system
+  - `SYSTEM_VISION_RECIPE_V2` recipe v2 system (codex I3)
+  - `VisionAnalysisResult` dataclass (codex I3 — analyze_image_detailed return type)
+  - `_call_vision_recipe_v2`
+  - `analyze_image_detailed`
+- 옵션 D 패턴: `from . import _common as _c; _c._describe_image(...)` + `_c._aspect_label(...)`
+- facade `__init__.py` 갱신: `image_detail` 그룹 제거 + `from .image_detail import ...` 명시 import
+- **patch target 즉시 갱신** (codex C3):
+  - `studio.vision_pipeline._call_vision_recipe_v2` → `studio.vision_pipeline.image_detail._call_vision_recipe_v2` (~10 site)
+  - `studio.vision_pipeline.translate_to_korean` → `studio.vision_pipeline.image_detail.translate_to_korean` (~5 site · Vision Analyzer 흐름 lookup)
 - 검증: `pytest tests/studio/` 361 PASS
 
-### 단계 4 — image_detail.py 분리 (1 commit)
-- SYSTEM_VISION_DETAILED / _aspect_label / _call_vision_recipe_v2 / analyze_image_detailed 이동
-- facade re-export 갱신
-- 검증: `pytest tests/studio/` 361 PASS
-
-### 단계 5 — patch site 44개 일괄 갱신 (옵션 D · 1 commit)
-- `studio.vision_pipeline._call_vision_edit_source` → `studio.vision_pipeline.edit_source._call_vision_edit_source`
-- `studio.vision_pipeline._call_vision_recipe_v2` → `studio.vision_pipeline.image_detail._call_vision_recipe_v2`
-- `studio.vision_pipeline._describe_image` → `studio.vision_pipeline._common._describe_image`
-- `studio.vision_pipeline.upgrade_edit_prompt` → `studio.vision_pipeline.edit_source.upgrade_edit_prompt` (Edit 흐름이 import 받음)
-- `studio.vision_pipeline.translate_to_korean` → `studio.vision_pipeline.image_detail.translate_to_korean`
-- `studio.vision_pipeline.asyncio.sleep` → `studio.vision_pipeline.edit_source.asyncio.sleep` (run_vision_pipeline 의 단계별 unload sleep)
-- 단계 5 종료 grep assertion: `grep -rn 'studio\.vision_pipeline\.[^_]' backend/tests/ | grep -v "edit_source\.\|image_detail\.\|_common\."` = 0 (구버전 patch 잔여 검출)
-- 검증: `pytest tests/` 361 PASS
-
-### 단계 6 — facade 정리 + `__all__` 명시 (1 commit)
+### 단계 5 — facade 정리 + `__all__` 명시 (1 commit · codex I3)
 - 옛 stale comment 제거
-- 명시 import + `__all__` (Phase 4.1 패턴)
+- 명시 import + `__all__` 정의 (Phase 4.1 패턴):
+  - `_common.py` 항목: ProgressCallback / VISION_SYSTEM / _describe_image / _to_base64 / _aspect_label / _DEFAULT_OLLAMA_URL / DEFAULT_TIMEOUT
+  - `edit_source.py` 항목: EDIT_VISION_ANALYSIS_SYSTEM / EditSlotEntry / EditVisionAnalysis / VisionPipelineResult / _coerce_* / _empty_fallback_slots / _call_vision_edit_source / analyze_edit_source / run_vision_pipeline
+  - `image_detail.py` 항목: SYSTEM_VISION_DETAILED / SYSTEM_VISION_RECIPE_V2 / VisionAnalysisResult / _call_vision_recipe_v2 / analyze_image_detailed
+- **단계 5 종료 grep assertion** (codex I2 fix · `[A-Za-z_]+` 패턴):
+  ```bash
+  grep -rnE 'studio\.vision_pipeline\.[A-Za-z_]+' backend/tests/ \
+    | grep -vE "studio\.vision_pipeline\.(edit_source|image_detail|_common)\." \
+    | grep -v "from studio\.vision_pipeline import" \
+    | wc -l
+  # = 0 이어야 통과
+  ```
 - 검증: `pytest tests/` 361 PASS + ruff clean
 
-### 단계 7 — changelog + master --no-ff merge (2 commit)
+### 단계 6 — changelog + master --no-ff merge (2 commit)
 
-**예상 commit 수**: 8 (rename + _common + edit_source + image_detail + patch + facade + changelog + merge)
+**예상 commit 수**: 7 (rename + _common + edit + image + facade + changelog + merge)
 
 ---
 
@@ -228,19 +268,20 @@ async def _call_vision_edit_source(...):
 - `pytest tests/studio/test_comparison_pipeline.py -v` — comparison 의 vision_pipeline import 검증
 - `pytest tests/` 풀 (361 PASS)
 
-단계 5 종료 grep assertion (옵션 D 채택 시):
+단계 5 종료 grep assertion (codex I2 fix · `[A-Za-z_]+` 패턴):
 ```bash
-grep -rn 'studio\.vision_pipeline\.[A-Za-z_]\+' backend/tests/ \
-  | grep -v "studio\.vision_pipeline\.\(edit_source\|image_detail\|_common\)\." \
-  | grep -v "from studio\.vision_pipeline import"
+grep -rnE 'studio\.vision_pipeline\.[A-Za-z_]+' backend/tests/ \
+  | grep -vE "studio\.vision_pipeline\.(edit_source|image_detail|_common)\." \
+  | grep -v "from studio\.vision_pipeline import" \
+  | wc -l
 # = 0 이어야 통과
 ```
 
 ---
 
-## 5. 외부 import 영향 (12 파일)
+## 5. 외부 import 영향 (11 파일 · codex R1 fix)
 
-### Production (7 파일)
+### Production (6 파일 · grep 실증)
 - `studio/comparison_pipeline.py:34` — `from .vision_pipeline import ProgressCallback`
 - `studio/pipelines/edit.py:33` — `from ..vision_pipeline import run_vision_pipeline`
 - `studio/pipelines/vision_analyze.py:25` — `from ..vision_pipeline import analyze_image_detailed`
@@ -254,7 +295,7 @@ grep -rn 'studio\.vision_pipeline\.[A-Za-z_]\+' backend/tests/ \
 - `tests/studio/test_edit_vision_analysis.py:31` — Edit slot dataclass + run_vision_pipeline 등
 - `tests/studio/test_matrix_directive_block.py:14` — Edit 매트릭스 directive
 - `tests/studio/test_role_slot_removal.py` (3 site) — `EditSlotEntry, EditVisionAnalysis`
-- `tests/studio/test_vision_analyzer.py:19, 260, 276` — Vision Analyzer + helper
+- `tests/studio/test_vision_analyzer.py:19, 260, 276` — Vision Analyzer + `_aspect_label` + `_call_vision_recipe_v2`
 
 → facade 명시 re-export + `__all__` 시 변경 0건.
 
