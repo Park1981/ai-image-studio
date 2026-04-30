@@ -330,3 +330,39 @@ def test_system_generate_contains_library_marker_preservation() -> None:
     assert "strips them deterministically" in lower
     # 4. Korean 외부 번역하지만 마커는 그대로
     assert "leave each `<lib>...</lib>` block as-is" in SYSTEM_GENERATE
+
+
+@pytest.mark.asyncio
+async def test_upgrade_result_upgraded_strips_lib_markers() -> None:
+    """upgrade_generate_prompt 결과의 UpgradeResult.upgraded 에 <lib> 잔존하지 않음.
+
+    LLM 이 system prompt 지시 무시해도 deterministic strip 안전망 (Codex v3 #2).
+    """
+    from unittest.mock import AsyncMock, patch
+
+    from studio.prompt_pipeline import upgrade_generate_prompt
+
+    async def fake_chat(**kwargs):
+        # gemma4 가 마커 그대로 반환하는 worst-case 시뮬레이션
+        return "a girl, <lib>cinematic 35mm</lib>, warm"
+
+    with (
+        patch(
+            "studio.prompt_pipeline._ollama._call_ollama_chat",
+            new=AsyncMock(side_effect=fake_chat),
+        ),
+        patch(
+            "studio.prompt_pipeline.translate.translate_to_korean",
+            new=AsyncMock(return_value=None),
+        ),
+    ):
+        result = await upgrade_generate_prompt(
+            prompt="<lib>cinematic 35mm</lib>",
+            include_translation=False,
+            width=1024,
+            height=1024,
+        )
+
+    assert "<lib>" not in result.upgraded
+    assert "</lib>" not in result.upgraded
+    assert "cinematic 35mm" in result.upgraded
