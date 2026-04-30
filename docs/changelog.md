@@ -5,7 +5,26 @@
 
 ## 2026-04-30
 
-### Codex+Claude 통합 리팩토링 리뷰 — Phase 0~3.4 완료 (current master)
+### Phase 3.5 — mock stream 3종 lib/api/mocks/ 분리 (current master)
+
+**검증**: tsc / ESLint clean · vitest **91 PASS** · 회귀 0건
+
+`generate.ts` / `edit.ts` / `video.ts` 안의 file-private `mock*Stream` 3종을
+새 디렉토리 `frontend/lib/api/mocks/` 로 분리. 실 백엔드 호출 분기는 원본
+파일에 그대로 두고, USE_MOCK 분기만 named import 로 위임.
+
+| 파일 | 전 → 후 | mocks/ 신규 |
+|---|---|---|
+| generate.ts | 209 → 150 (−59) | mocks/generate.ts (70) |
+| edit.ts | 250 → 198 (−52) | mocks/edit.ts (59) |
+| video.ts | 219 → 154 (−65) | mocks/video.ts (86) |
+
+**효과**:
+- 실 백엔드 호출 흐름 (multipart 업로드 + SSE drain) 만 원본 파일에 남아 가독성 ↑
+- mock 데이터 (sample 프롬프트 / 가짜 stage timing 등) 검증·수정 시 원본 흐름 안 건드림
+- 인계 plan 의 보류 항목 (Phase 3.5 R2 워밍업) 소화
+
+### Codex+Claude 통합 리팩토링 리뷰 — Phase 0~3.4 완료
 
 **검증**: backend ruff **clean** · pytest **361 PASS** · frontend vitest **91 PASS** · tsc/ESLint clean · 회귀 0건
 **규모**: 11 commits · 46 files · -1,130줄 (dead code 청소 효과)
