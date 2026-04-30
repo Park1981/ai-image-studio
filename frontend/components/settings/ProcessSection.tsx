@@ -76,7 +76,7 @@ export default function ProcessSection() {
       </ServiceCard>
       <ServiceCard
         name="ComfyUI"
-        port={8188}
+        port={8000}
         status={comfyui}
         open={comfyuiOpen}
         onExpand={() => setComfyuiOpen((v) => !v)}

@@ -12,7 +12,7 @@
 
 import { create } from "zustand";
 import type { VisionCompareAnalysis } from "@/lib/api/types";
-import type { StageEvent } from "@/stores/useGenerateStore";
+import type { StageEvent } from "@/lib/stage";
 
 export type CompareViewerMode = "slider" | "sidebyside";
 
