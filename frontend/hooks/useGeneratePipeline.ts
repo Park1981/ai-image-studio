@@ -27,6 +27,9 @@ import { GENERATE_MODEL } from "@/lib/model-presets";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
+// 2026-04-30 (Phase 1 Task 0 · plan 2026-04-30-prompt-snippets-library.md):
+// usePromptHistoryStore 가 모든 모드의 canonical source — PromptHistoryPeek 가 이 store 만 읽음.
+import { usePromptHistoryStore } from "@/stores/usePromptHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 
@@ -192,6 +195,10 @@ export function useGeneratePipeline(): UseGeneratePipeline {
         "설정에서 시작해도 되고, Mock 은 그대로 돌아가.",
       );
     }
+
+    // 2026-04-30 (Phase 1 Task 0): prompt history 단일 source 에 등록.
+    // skipUpgrade / 모달 경유 / 일반 흐름 모든 분기 공통 진입점.
+    usePromptHistoryStore.getState().add("generate", prompt);
 
     // skipUpgrade ON: 사용자가 이미 정제된 영문 프롬프트를 입력 — gemma4 단계 스킵.
     // prompt 자체를 preUpgradedPrompt 로 보내면 백엔드가 upgrade 호출 우회 (~10초 절약).

@@ -20,6 +20,9 @@ import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { useEditStore } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
+// 2026-04-30 (Phase 1 Task 0 · plan 2026-04-30-prompt-snippets-library.md):
+// usePromptHistoryStore 가 모든 모드의 canonical source.
+import { usePromptHistoryStore } from "@/stores/usePromptHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 
@@ -79,6 +82,9 @@ export function useEditPipeline({
       toast.warn("수정 지시를 입력해 주세요.");
       return;
     }
+
+    // 2026-04-30 (Phase 1 Task 0): prompt history 단일 source 에 등록.
+    usePromptHistoryStore.getState().add("edit", prompt);
 
     // Multi-reference (2026-04-27): role 최종 문자열 결정.
     // "custom" + 자유 텍스트 → 텍스트 그대로 / "custom" + 빈 값 → undefined (role 명시 없음).

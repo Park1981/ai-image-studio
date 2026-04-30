@@ -1,17 +1,15 @@
 /**
- * PromptHistoryPeek - 숨김 스프링 프롬프트 히스토리 메뉴.
+ * PromptHistoryPeek - 프롬프트 히스토리 메뉴.
+ *
+ * 2026-04-30 (Phase 1 Task 0 · plan 2026-04-30-prompt-snippets-library.md):
+ * 모든 모드의 canonical source = usePromptHistoryStore 단일화.
+ * 옛 useHistoryStore.items 의존 제거 — pipeline hook 들이 submit 시 add 호출.
  *
  * 동작:
- *  - 프롬프트 입력창 우상단 작은 📜 아이콘 (트리거)
- *  - 호버 150ms 유지 → 상단으로 탄성 스프링 슬라이드
- *  - 리스트: useHistoryStore.items 에서 mode 로 필터 + prompt dedupe + 최근 20개
- *  - 각 행: prompt 원문 클램프 + 상대 시간 + [📋 복사] + [↩ 사용]
- *  - hover 영역(트리거 + 패널) 벗어나면 300ms 지연 후 탄성 슬라이드 아웃
- *
- * 설계 결정:
- *  - framer-motion spring {stiffness: 400, damping: 24} = 쫀득한 탄성
- *  - delay 150ms (enter) · 300ms (leave) = 실수 hover / 실수 leave 방지
- *  - "사용" 클릭 시 패널 자동 close + 입력창 focus
+ *  - 프롬프트 입력창 우상단 📜 트리거 → 클릭 시 패널 펼침 (외부 클릭 자동 닫기 · Task 2)
+ *  - 리스트: usePromptHistoryStore.entries 에서 mode 로 필터 + dedupe + 최근 20개
+ *  - 각 행: prompt 원문 클램프 + 상대 시간 + [복사] + [사용] + [X] 삭제 (Task 2)
+ *  - 빈 상태 안내 + [전체 비우기] (Task 2)
  */
 
 "use client";
@@ -19,7 +17,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useMemo, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
-import { useHistoryStore } from "@/stores/useHistoryStore";
 import {
   usePromptHistoryStore,
   type PromptHistoryMode,
@@ -49,7 +46,6 @@ interface PromptPeekItem {
   id: string;
   prompt: string;
   createdAt: number;
-  meta?: string;
 }
 
 export default function PromptHistoryPeek({
@@ -57,43 +53,30 @@ export default function PromptHistoryPeek({
   onSelect,
   align = "right",
 }: Props) {
-  const items = useHistoryStore((s) => s.items);
   const promptEntries = usePromptHistoryStore((s) => s.entries);
   const [open, setOpen] = useState(false);
-  // hover 타이머 — 진입/이탈 지연 처리
+  // hover 타이머 (Task 2 에서 클릭 + 외부클릭 패턴으로 교체 예정)
   const enterTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // mode 별 prompt 추출 + dedupe (최신 우선)
+  // mode 별 prompt 추출 + dedupe (최신 우선) — 단일 source.
   const prompts = useMemo(() => {
-    if (mode === "compare") {
-      return promptEntries
-        .filter((it) => it.mode === "compare")
-        .slice(0, MAX_ITEMS)
-        .map((it) => ({
-          id: it.id,
-          prompt: it.prompt,
-          createdAt: it.createdAt,
-        }));
-    }
-
     const seen = new Set<string>();
     const out: PromptPeekItem[] = [];
-    for (const it of items) {
-      if (it.mode !== mode) continue;
-      const key = it.prompt.trim();
+    for (const e of promptEntries) {
+      if (e.mode !== mode) continue;
+      const key = e.prompt.trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);
       out.push({
-        id: it.id,
-        prompt: it.prompt,
-        createdAt: it.createdAt,
-        meta: `${it.width}×${it.height}`,
+        id: e.id,
+        prompt: e.prompt,
+        createdAt: e.createdAt,
       });
       if (out.length >= MAX_ITEMS) break;
     }
     return out;
-  }, [items, mode, promptEntries]);
+  }, [promptEntries, mode]);
 
   const scheduleOpen = () => {
     if (leaveTimer.current) {
@@ -319,7 +302,6 @@ function PeekRow({
           }}
         >
           {formatRelativeTime(item.createdAt)}
-          {item.meta ? ` · ${item.meta}` : ""}
         </div>
       </div>
       <div
