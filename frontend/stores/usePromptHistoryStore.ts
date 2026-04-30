@@ -15,10 +15,21 @@ export interface PromptHistoryEntry {
 interface PromptHistoryState {
   entries: PromptHistoryEntry[];
   add: (mode: PromptHistoryMode, prompt: string) => void;
+  /** 2026-04-30 (Phase 1 Task 1): 단일 entry 삭제. */
+  removeOne: (id: string) => void;
   clearMode: (mode: PromptHistoryMode) => void;
 }
 
 const MAX_PROMPTS = 80;
+
+// 2026-04-30 (Codex v3 #1): 옛 `${mode}-${Date.now()}` 는 같은 ms 연속 add 시 충돌.
+// crypto.randomUUID 우선 + jsdom/구버전 환경 fallback.
+function makeEntryId(mode: PromptHistoryMode): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `${mode}-${crypto.randomUUID()}`;
+  }
+  return `${mode}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
 
 export const usePromptHistoryStore = create<PromptHistoryState>()(
   persist(
@@ -34,7 +45,7 @@ export const usePromptHistoryStore = create<PromptHistoryState>()(
           return {
             entries: [
               {
-                id: `${mode}-${Date.now()}`,
+                id: makeEntryId(mode),
                 mode,
                 prompt: text,
                 createdAt: Date.now(),
@@ -44,6 +55,8 @@ export const usePromptHistoryStore = create<PromptHistoryState>()(
           };
         });
       },
+      removeOne: (id) =>
+        set((s) => ({ entries: s.entries.filter((x) => x.id !== id) })),
       clearMode: (mode) =>
         set((s) => ({ entries: s.entries.filter((x) => x.mode !== mode) })),
     }),
