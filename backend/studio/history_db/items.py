@@ -131,6 +131,32 @@ async def update_comparison(
         await db.commit()
         return cur.rowcount > 0
 
+
+async def replace_reference_ref_if_current(
+    history_id: str, current_ref: str, new_ref: str,
+) -> bool:
+    """history row 의 reference_ref 가 current_ref 와 같을 때만 new_ref 로 교체.
+
+    promote race 대응 (codex C4 + Phase 4.1.1 cleanup): WHERE reference_ref = current_ref
+    조건부 UPDATE 라 두 promote 요청이 동시 도착해도 한쪽만 성공한다.
+    rowcount==0 이면 다른 promote 가 먼저 성공함 → caller 가 rollback (template + 영구 파일).
+
+    routes/reference_templates.py 가 직접 connect+SQL 하던 패턴을 history_db 안으로
+    캡슐화 (codex Open Question · route ↔ DB layer 경계 정리).
+
+    Returns:
+        True = swap 성공, False = race lost (다른 promote 가 먼저 성공).
+    """
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
+        cur = await db.execute(
+            "UPDATE studio_history SET reference_ref = ? "
+            "WHERE id = ? AND reference_ref = ?",
+            (new_ref, history_id, current_ref),
+        )
+        await db.commit()
+        return cur.rowcount > 0
+
+
 def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
     """row → 프론트 HistoryItem shape."""
     hints_raw = row["research_hints"]

@@ -40,6 +40,7 @@ from .items import (  # noqa: F401
     get_item,
     insert_item,
     list_items,
+    replace_reference_ref_if_current,
     update_comparison,
 )
 
@@ -94,6 +95,7 @@ __all__ = [
     "get_item",
     "insert_item",
     "list_items",
+    "replace_reference_ref_if_current",
     "update_comparison",
     # cascade
     "_safe_pool_unlink",
