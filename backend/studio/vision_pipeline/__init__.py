@@ -28,11 +28,11 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Awaitable, Callable
 
-from ._json_utils import coerce_str as _coerce_str
-from ._json_utils import parse_strict_json as _parse_strict_json
-from ._ollama_client import call_chat_payload
-from .presets import DEFAULT_OLLAMA_ROLES
-from .prompt_pipeline import (
+from .._json_utils import coerce_str as _coerce_str
+from .._json_utils import parse_strict_json as _parse_strict_json
+from .._ollama_client import call_chat_payload
+from ..presets import DEFAULT_OLLAMA_ROLES
+from ..prompt_pipeline import (
     _DEFAULT_OLLAMA_URL,
     DEFAULT_TIMEOUT,
     UpgradeResult,
@@ -421,9 +421,9 @@ async def run_vision_pipeline(
         ollama_url: 미지정 시 settings.ollama_url
     """
     # 지연 import — 순환 회피. clarify_edit_intent 는 prompt_pipeline 에 있음.
-    from .prompt_pipeline import clarify_edit_intent  # noqa: WPS433
+    from ..prompt_pipeline import clarify_edit_intent  # noqa: WPS433
     # 지연 import — 모델 단계별 unload 헬퍼 (옵션 B · 16GB VRAM swap 차단).
-    from . import ollama_unload  # noqa: WPS433
+    from .. import ollama_unload  # noqa: WPS433
 
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
 
@@ -815,7 +815,7 @@ async def analyze_edit_source(
         EditVisionAnalysis — fallback=True 경로도 slots 5개 모두 preserve+빈 note.
     """
     # text_model 은 lazy import 우회 — clarify_edit_intent 가 prompt_pipeline 에 있음
-    from .prompt_pipeline import clarify_edit_intent  # noqa: WPS433 (지연 import 정당)
+    from ..prompt_pipeline import clarify_edit_intent  # noqa: WPS433 (지연 import 정당)
 
     resolved_vision = vision_model or DEFAULT_OLLAMA_ROLES.vision
     resolved_text = text_model or DEFAULT_OLLAMA_ROLES.text
