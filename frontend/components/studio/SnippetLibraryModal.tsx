@@ -1,16 +1,19 @@
 /**
- * SnippetLibraryModal — 라이브러리 목록 모달.
+ * SnippetLibraryModal — 프롬프트 라이브러리 Drawer (수정/삭제 통합).
  *
- * 2026-04-30 (Phase 2B Task 6 · plan 2026-04-30-prompt-snippets-library.md · v3).
+ * 2026-04-30 (drawer 디자인 통일 — Edit 의 ReferenceLibraryDrawer 패턴 따라감 · 옵션 B).
  *
  * 동작:
- *   - 카드 그리드 (썸네일 또는 📄 placeholder)
- *   - 카드 클릭 → onToggleSnippet 콜백 (부모가 textarea toggle)
- *   - 카드 [X] → confirm → remove
- *   - [+ 새 등록] → SnippetRegisterModal 띄움 (z-index 더 높게)
- *   - 빈 상태 안내
- *   - 외부 클릭 → onClose
- *   - z-index = 9997 (등록 모달 9998 < ShutdownButton 9999)
+ *   - 우측 Drawer (480px) · overlay 클릭 / ESC / [×] 로 닫기
+ *   - 카드 그리드 (2열) · 썸네일 140px · 이름 + prompt 미리보기
+ *   - 카드 클릭 → onToggleSnippet (라이브러리 픽 = textarea 단일 활성)
+ *   - 카드 우상단 [✎] 수정 / [×] 삭제
+ *   - 카드 좌상단 ✓ — 현재 textarea 에 active 인 카드 표시
+ *   - 헤더 [+ 새 등록] 버튼
+ *   - 빈 상태 dashed 안내
+ *   - z-index 9997 (등록/수정 모달 9998 < ShutdownButton 9999)
+ *
+ * 컴포넌트 이름은 Modal 그대로 유지 (역사적 + import 호환). 형태만 Drawer.
  */
 
 "use client";
@@ -18,11 +21,11 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/ui/Icon";
+import { hasMarker } from "@/lib/snippet-marker";
 import {
   type PromptSnippet,
   usePromptSnippetsStore,
 } from "@/stores/usePromptSnippetsStore";
-import { hasMarker } from "@/lib/snippet-marker";
 import SnippetRegisterModal from "./SnippetRegisterModal";
 
 interface Props {
@@ -41,7 +44,10 @@ export default function SnippetLibraryModal({
 }: Props) {
   const entries = usePromptSnippetsStore((s) => s.entries);
   const remove = usePromptSnippetsStore((s) => s.remove);
-  const [registerOpen, setRegisterOpen] = useState(false);
+
+  // 등록/수정 통합 모달 — modalMode null 이면 닫힘.
+  const [modalMode, setModalMode] = useState<"create" | "edit" | null>(null);
+  const [modalTarget, setModalTarget] = useState<PromptSnippet | null>(null);
 
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
@@ -49,61 +55,91 @@ export default function SnippetLibraryModal({
     setMounted(true);
   }, []);
 
+  // ESC = Drawer 닫기 (sub-modal 열려있으면 그쪽 ESC 가 우선 — 동시 닫힘 자연스러움)
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && modalMode === null) {
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose, modalMode]);
+
   if (!mounted || !open) return null;
+
+  const handleDelete = (s: PromptSnippet) => {
+    if (
+      typeof window !== "undefined" &&
+      window.confirm(`"${s.name}" 항목을 삭제할까요?`)
+    ) {
+      remove(s.id);
+    }
+  };
 
   return createPortal(
     <>
+      {/* Overlay — 클릭 시 닫힘 (Edit Drawer 와 동일 톤) */}
       <div
+        onClick={onClose}
+        style={{
+          position: "fixed",
+          inset: 0,
+          background: "rgba(23,20,14,.32)",
+          zIndex: 9996,
+        }}
+      />
+      {/* Drawer 본체 */}
+      <aside
         role="dialog"
         aria-modal="true"
         aria-label="프롬프트 라이브러리"
         style={{
           position: "fixed",
           top: 0,
-          left: 0,
           right: 0,
           bottom: 0,
+          width: 480,
+          maxWidth: "100vw",
+          background: "var(--bg)",
+          borderLeft: "1px solid var(--line)",
+          boxShadow: "var(--shadow-lg)",
           zIndex: 9997,
           display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 24,
-          background: "rgba(31,31,31,.28)",
-          backdropFilter: "blur(8px)",
-          WebkitBackdropFilter: "blur(8px)",
+          flexDirection: "column",
+          padding: "20px 24px",
+          gap: 14,
+          overflowY: "auto",
         }}
-        onClick={onClose}
       >
-        <section
-          onClick={(e) => e.stopPropagation()}
+        <div
           style={{
-            width: "min(720px, 100%)",
-            maxHeight: "calc(100vh - 48px)",
-            overflowY: "auto",
-            border: "1px solid var(--line)",
-            borderRadius: "var(--radius-card)",
-            background: "var(--surface)",
-            padding: 24,
-            boxShadow: "var(--shadow-lg)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
           }}
         >
-          <div
+          <h2
             style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              marginBottom: 16,
+              fontSize: 16,
+              fontWeight: 700,
+              color: "var(--ink)",
+              margin: 0,
             }}
           >
-            <h1 style={{ margin: 0, fontSize: 22, lineHeight: 1.2 }}>
-              📚 프롬프트 라이브러리
-            </h1>
+            📚 프롬프트 라이브러리
+          </h2>
+          <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
             <button
               type="button"
-              onClick={() => setRegisterOpen(true)}
+              onClick={() => {
+                setModalTarget(null);
+                setModalMode("create");
+              }}
               style={{
-                height: 32,
-                padding: "0 12px",
+                height: 28,
+                padding: "0 10px",
                 borderRadius: "var(--radius-sm)",
                 border: "1px solid var(--accent)",
                 background: "var(--accent)",
@@ -115,94 +151,123 @@ export default function SnippetLibraryModal({
             >
               + 새 등록
             </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="닫기"
+              style={{
+                all: "unset",
+                cursor: "pointer",
+                fontSize: 18,
+                color: "var(--ink-3)",
+                padding: "4px 8px",
+              }}
+            >
+              ×
+            </button>
           </div>
+        </div>
 
-          {entries.length === 0 ? (
-            <div
-              style={{
-                padding: "60px 20px",
-                textAlign: "center",
-                color: "var(--ink-4)",
-                fontSize: 13,
-              }}
-            >
-              <div style={{ fontSize: 36, marginBottom: 8 }}>📚</div>
-              <p style={{ margin: 0 }}>라이브러리가 비어있어요.</p>
-              <p style={{ margin: "4px 0 0", fontSize: 12 }}>
-                위 [+ 새 등록] 버튼으로 첫 항목을 등록해 주세요.
-              </p>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))",
-                gap: 10,
-              }}
-            >
-              {entries.map((s) => {
-                const active = hasMarker(currentPrompt, s.prompt);
-                return (
-                  <SnippetCard
-                    key={s.id}
-                    snippet={s}
-                    active={active}
-                    onClick={() => onToggleSnippet(s)}
-                    onDelete={() => {
-                      if (
-                        typeof window !== "undefined" &&
-                        window.confirm(`"${s.name}" 항목을 삭제할까요?`)
-                      ) {
-                        remove(s.id);
-                      }
-                    }}
-                  />
-                );
-              })}
-            </div>
-          )}
-        </section>
-      </div>
+        {entries.length === 0 ? (
+          <div
+            style={{
+              padding: "30px 20px",
+              textAlign: "center",
+              fontSize: 12.5,
+              color: "var(--ink-4)",
+              border: "1px dashed var(--line-2, var(--line))",
+              borderRadius: "var(--radius)",
+            }}
+          >
+            저장된 프롬프트가 없어요.
+            <br />위 [+ 새 등록] 버튼으로 첫 항목을 등록해 주세요.
+          </div>
+        ) : (
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: 10,
+            }}
+          >
+            {entries.map((s) => {
+              const active = hasMarker(currentPrompt, s.prompt);
+              return (
+                <SnippetCard
+                  key={s.id}
+                  snippet={s}
+                  active={active}
+                  onPick={() => onToggleSnippet(s)}
+                  onEdit={() => {
+                    setModalTarget(s);
+                    setModalMode("edit");
+                  }}
+                  onDelete={() => handleDelete(s)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </aside>
 
+      {/* 등록/수정 통합 모달 — modalMode 에 따라 mode/editTarget 다르게 */}
       <SnippetRegisterModal
-        open={registerOpen}
-        onClose={() => setRegisterOpen(false)}
+        open={modalMode !== null}
+        mode={modalMode ?? "create"}
+        editTarget={modalTarget ?? undefined}
         defaultPrompt={currentPrompt}
+        onClose={() => {
+          setModalMode(null);
+          setModalTarget(null);
+        }}
       />
     </>,
     document.body,
   );
 }
 
+/* ── 카드 ── */
+
 function SnippetCard({
   snippet,
   active,
-  onClick,
+  onPick,
+  onEdit,
   onDelete,
 }: {
   snippet: PromptSnippet;
   active: boolean;
-  onClick: () => void;
+  onPick: () => void;
+  onEdit: () => void;
   onDelete: () => void;
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
+      onClick={onPick}
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onPick();
+        }
+      }}
+      title={snippet.prompt}
       style={{
         position: "relative",
+        background: "var(--surface)",
         border: active ? "2px solid var(--accent)" : "1px solid var(--line)",
-        borderRadius: "var(--radius-sm)",
-        background: active ? "rgba(74,158,255,.06)" : "var(--surface)",
-        cursor: "pointer",
+        borderRadius: "var(--radius)",
         overflow: "hidden",
-        transition: "all .15s",
+        cursor: "pointer",
+        transition: "border-color .15s",
       }}
-      onClick={onClick}
-      title={snippet.prompt}
     >
+      {/* 썸네일 */}
       <div
         style={{
           width: "100%",
-          aspectRatio: "1 / 1",
+          height: 140,
           background: "var(--bg-2)",
           display: "grid",
           placeItems: "center",
@@ -216,74 +281,85 @@ function SnippetCard({
           <img
             src={snippet.thumbnail}
             alt={snippet.name}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+            }}
           />
         ) : (
           <span aria-hidden>📄</span>
         )}
       </div>
 
-      <div
-        style={{
-          padding: "8px 10px",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 6,
-        }}
-      >
-        <span
+      {/* 이름 + 프롬프트 미리보기 */}
+      <div style={{ padding: "8px 10px" }}>
+        <div
           style={{
             fontSize: 12,
-            fontWeight: 700,
-            color: "var(--ink-2)",
+            fontWeight: 600,
+            color: "var(--ink)",
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            flex: 1,
           }}
-          title={snippet.name}
         >
           {snippet.name}
-        </span>
-        <button
-          type="button"
+        </div>
+        <div
+          style={{
+            fontSize: 10.5,
+            color: "var(--ink-3)",
+            marginTop: 4,
+            lineHeight: 1.4,
+            maxHeight: 28,
+            overflow: "hidden",
+            display: "-webkit-box",
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: "vertical",
+          }}
+        >
+          {snippet.prompt}
+        </div>
+      </div>
+
+      {/* 우상단 액션: [✎] [×] — Edit drawer 와 통일된 검정 반투명 원형 */}
+      <div
+        style={{
+          position: "absolute",
+          top: 6,
+          right: 6,
+          display: "flex",
+          gap: 4,
+        }}
+      >
+        <CardActionBtn
+          iconName="edit"
+          label="수정"
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit();
+          }}
+        />
+        <CardActionBtn
+          iconName="x"
+          label="삭제"
           onClick={(e) => {
             e.stopPropagation();
             onDelete();
           }}
-          aria-label="이 항목 삭제"
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            width: 22,
-            height: 22,
-            display: "grid",
-            placeItems: "center",
-            color: "var(--ink-4)",
-            borderRadius: 4,
-          }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = "#b42318";
-            (e.currentTarget as HTMLButtonElement).style.background =
-              "rgba(239,68,68,.08)";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-4)";
-            (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-          }}
-        >
-          <Icon name="x" size={11} />
-        </button>
+        />
       </div>
 
+      {/* 좌상단 active ✓ — 옛 우상단에서 위치 변경 (액션 버튼과 충돌 방지) */}
       {active && (
         <div
           aria-hidden
           style={{
             position: "absolute",
             top: 6,
-            right: 6,
+            left: 6,
             width: 22,
             height: 22,
             borderRadius: "50%",
@@ -299,5 +375,38 @@ function SnippetCard({
         </div>
       )}
     </div>
+  );
+}
+
+function CardActionBtn({
+  iconName,
+  label,
+  onClick,
+}: {
+  iconName: "edit" | "x";
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: "50%",
+        background: "rgba(0,0,0,.55)",
+        color: "#fff",
+        border: "none",
+        cursor: "pointer",
+        display: "grid",
+        placeItems: "center",
+        padding: 0,
+      }}
+    >
+      <Icon name={iconName} size={11} />
+    </button>
   );
 }
