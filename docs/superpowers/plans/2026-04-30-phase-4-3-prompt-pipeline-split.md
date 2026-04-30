@@ -1,9 +1,20 @@
 # Phase 4.3 — `prompt_pipeline.py` 975줄 분할 plan
 
-> **버전**: v1 (2026-04-30 · Claude 작성 · 사용자 codex 1차 리뷰 대기)
+> **버전**: v2 (2026-04-30 · Claude 작성 + 사용자 codex 1차 리뷰 5 finding 반영)
 > **선행 commit**: master `e2546e0` (Phase 4.2 vision_pipeline 4 파일 분할 완료)
 > **인계**: `memory/project_session_2026_04_30_phase_4_2_vision_pipeline_split.md` + 본 plan
 > **검증 baseline**: backend pytest **361 PASS** / ruff clean · frontend vitest 91 / tsc / lint clean
+
+## v1 → v2 핵심 변경 (codex 1차 리뷰 반영)
+
+| # | 분류 | v1 문제 | v2 fix |
+|---|---|---|---|
+| C1 | Blocking | 단계 1 의 `prompt_pipeline.py` L20 `from ._ollama_client import call_chat_payload` 가 패키지 전환 후 `studio.prompt_pipeline._ollama_client` 로 해석 → import 깨짐 (Phase 4.2 C1 finding 과 동일 함정) | **단계 1 안에서 명시 갱신** — `from ._ollama_client import` → `from .._ollama_client import` (한 단계 위 모듈 명시) |
+| C2 | Blocking | facade `__init__.py` 의 `clarify_edit_intent` re-export 가 *함수 객체 reference snapshot* — submodule (`translate.clarify_edit_intent`) 만 patch 해도 facade attribute 는 옛 reference 유지. `vision_pipeline/edit_source.py` 의 lazy `from ..prompt_pipeline import clarify_edit_intent` 가 facade attribute 를 fresh lookup 해서 *patch 안 먹음* | **lazy import 도 submodule 직접 import 로 변경** — edit_source.py L174, L511 의 `from ..prompt_pipeline import clarify_edit_intent` → `from ..prompt_pipeline.translate import clarify_edit_intent`. 단계 4 안에서 lazy import 갱신 + patch site 16건 모두 submodule path (`studio.prompt_pipeline.translate.clarify_edit_intent`) 로 갱신 (옵션 D 일관성) |
+| I1 | Important | `_call_ollama_chat` patch 8건 → 실제 grep 10건 (test_edit_vision_analysis 4 + test_prompt_pipeline 2 + test_video_pipeline 4) | **10건** 으로 정정 (grep 실증) |
+| I2 | Important | `clarify_edit_intent` patch 17건 → 실제 grep 16건 (test_edit_vision_analysis 의 import 라인 1건 제외) | **16건** 으로 정정 (grep 실증) |
+| M1 | Minor | "production import 8 site" 표기 vs 본문 표 11 row 불일치 | **11 site** 로 통일 |
+| | | **합계 35 → 36** patch site (_call_ollama_chat 10 + clarify_edit_intent 16 + translate_to_korean 6 + _run_upgrade_call 4) |
 
 ---
 
@@ -92,25 +103,29 @@ backend/studio/prompt_pipeline/
 
 ## 2. 핵심 위험 (Phase 4.2 와 동급)
 
-### 2.1 ⚠️ Mock.patch site 36건 (Phase 4.2 의 44 와 비슷한 규모)
+### 2.1 ⚠️ Mock.patch site 36건 (codex I1 + I2 fix · grep 실증)
 
-`studio.prompt_pipeline.X` 또는 `backend.studio.prompt_pipeline.X` 패턴으로 patch 하는 site:
+`studio.prompt_pipeline.X` 또는 `backend.studio.prompt_pipeline.X` 패턴으로 patch 하는 site (실제 grep):
 
 | 옛 patch target | 새 patch target | 건수 |
 |---|---|---|
-| `studio.prompt_pipeline._call_ollama_chat` | `studio.prompt_pipeline._ollama._call_ollama_chat` | 6 |
+| `studio.prompt_pipeline._call_ollama_chat` | `studio.prompt_pipeline._ollama._call_ollama_chat` | 8 |
 | `backend.studio.prompt_pipeline._call_ollama_chat` | `backend.studio.prompt_pipeline._ollama._call_ollama_chat` | 2 |
-| `studio.prompt_pipeline.clarify_edit_intent` | `studio.prompt_pipeline.translate.clarify_edit_intent` | 17 |
+| `studio.prompt_pipeline.clarify_edit_intent` | `studio.prompt_pipeline.translate.clarify_edit_intent` | 16 |
 | `studio.prompt_pipeline.translate_to_korean` | `studio.prompt_pipeline.translate.translate_to_korean` | 4 |
 | `backend.studio.prompt_pipeline.translate_to_korean` | `backend.studio.prompt_pipeline.translate.translate_to_korean` | 2 |
 | `studio.prompt_pipeline._run_upgrade_call` | `studio.prompt_pipeline.upgrade._run_upgrade_call` | 4 |
-| **합계** | | **35** |
+| **합계** | | **36** |
 
-> **건수 확정 방법**: `grep -nc "studio\.prompt_pipeline\." tests/studio/*.py` — test_edit_vision_analysis 20 + test_prompt_pipeline 4 + test_video_pipeline 8 + test_role_slot_removal 4 = 36 (1건 차이는 import 라인 1개 — 실제 patch 35건). 단계 7 grep assertion 으로 0건 확인.
+> **건수 확정 (grep 실증, 2026-04-30)**:
+> - `_call_ollama_chat`: test_edit_vision_analysis 4 + test_prompt_pipeline 2 (backend prefix) + test_video_pipeline 4 = **10**
+> - `clarify_edit_intent`: test_edit_vision_analysis L194/226/252/276/303/334/362/398/420/447/480/517/561/615/655/688 = **16** (L26 import 라인 제외)
+> - `translate_to_korean`: test_prompt_pipeline 2 (backend prefix) + test_video_pipeline 4 = **6**
+> - `_run_upgrade_call`: test_role_slot_removal 4 = **4**
 
-> **lazy import 검증**: `vision_pipeline/edit_source.py` (L174 / L511) 가 `from ..prompt_pipeline import clarify_edit_intent` 를 함수 안 lazy import. 분할 후 갱신 필요 여부 — 함수 안 lazy import 라 매 호출마다 fresh attribute lookup → facade `clarify_edit_intent` re-export 가 살아있으면 옛 동작 유지. *patch target 만 갱신* 하면 됨 (호출 site 변경 0).
+> **lazy import 정책 (codex C2 fix)**: `vision_pipeline/edit_source.py` 의 lazy `from ..prompt_pipeline import clarify_edit_intent` (L174 / L511) 가 facade attribute 를 fresh lookup 함. 그러나 facade `__init__.py` 의 re-export 는 *함수 객체 reference snapshot* — submodule 만 patch 해도 facade attribute 는 옛 reference 유지 → patch 안 먹음. 따라서 **lazy import 자체를 submodule 직접 import 로 변경** (`from ..prompt_pipeline.translate import clarify_edit_intent`). 옵션 D 일관성 + Phase 4.2 의 patch site 갱신 패턴과 동일.
 
-### 2.2 ⚠️ production import 8 site
+### 2.2 ⚠️ production import 11 site (codex M1 fix)
 
 | 호출자 | 옛 import | 새 import (단계 1 후 OK 동작) |
 |---|---|---|
@@ -128,23 +143,47 @@ backend/studio/prompt_pipeline/
 
 > **결론**: production 코드는 **무손상**. facade `__init__.py` 의 re-export 가 모든 import 경로를 그대로 보존. 단계 1 (file → package) 종료 시점에 production 코드 0 라인 변경.
 
-### 2.3 facade internal import 전환 (Phase 4.2 C1 fix 패턴)
+### 2.3 facade internal import 전환 (codex C1 fix · Phase 4.2 와 동일 함정)
 
-분할 후 facade `__init__.py` 가 4 sub-module 에서 re-export 하므로 facade 안의 *internal import* 갱신은 **불필요** (각 sub-module 이 자신의 import 를 가짐). Phase 4.2 의 C1 같은 함정은 회피.
+**🔴 단계 1 안에서 즉시 갱신 필요** — `prompt_pipeline.py` 의 단일 internal import 한 줄:
 
-단 sub-module 의 internal import (Phase 4.2 의 `..` 갱신 패턴) 는 필요:
-- `_common.py`: `from .._ollama_client import call_chat_payload` 가 아니라 `_call_ollama_chat` 만 _ollama.py 로 → `_common.py` 는 `call_chat_payload` 미사용 (clean)
+```python
+# 옛 (단일 모듈 시점):
+from ._ollama_client import call_chat_payload  # L20
+
+# 새 (패키지 전환 후 facade __init__.py 안):
+from .._ollama_client import call_chat_payload  # 한 단계 위 ollama_client 모듈
+```
+
+> **함정**: `prompt_pipeline.py` → `prompt_pipeline/__init__.py` 로 옮기면 `.` 는 `studio.prompt_pipeline` 자체를 가리킴. `._ollama_client` = `studio.prompt_pipeline._ollama_client` (없는 모듈) → ImportError. Phase 4.2 의 C1 finding 과 *동일 함정*. 단계 1 commit 안에서 갱신 누락 시 pytest 즉시 fail.
+
+### 2.4 sub-module internal import 패턴 (옵션 D 확정)
+
+분할 후 sub-module 들이 본체를 가지므로 sub-module 의 internal import:
+- `_common.py`: 외부 의존 없음 (작음)
 - `_ollama.py`: `from .._ollama_client import call_chat_payload` (한 단계 위 ollama_client 모듈)
 - `translate.py`: `from . import _common as _c` + `_c._strip_repeat_noise(...)` + `_c._DEFAULT_OLLAMA_URL` + `from . import _ollama as _o` + `_o._call_ollama_chat(...)`
 - `upgrade.py`: `from . import _common as _c` + `_c.UpgradeResult` / `_c._strip_repeat_noise` / `_c._DEFAULT_OLLAMA_URL` / `_c.DEFAULT_TIMEOUT` + `from . import _ollama as _o` + `_o._call_ollama_chat(...)` + `from . import translate as _t` + `_t.translate_to_korean(...)` (로컬 호출 옵션 D)
 
 > **옵션 D 확정** (Phase 4.2 와 동일): `from . import _common as _c` + `_c.X()` 패턴 — patch lookup 이 정의 위치 모듈에서 일어나도록 보장.
 
-### 2.4 lazy import 보존 정책
+### 2.5 lazy import 정책 변경 (codex C2 fix)
 
-기존 `vision_pipeline/edit_source.py` 의 lazy import (`from ..prompt_pipeline import clarify_edit_intent`) 는 facade re-export 활성 시 그대로 작동. **변경 불필요**. mock.patch target 만 `studio.prompt_pipeline.translate.clarify_edit_intent` 로 갱신.
+`vision_pipeline/edit_source.py` 의 lazy import 2 site (L174, L511) 는 분할 후 *facade* 가 아니라 *submodule* 직접 import 로 변경:
 
-### 2.5 함수 안 import re-binding 위험 (Phase 4.2 단계 1 lazy 발견과 동일)
+```python
+# 옛:
+from ..prompt_pipeline import clarify_edit_intent  # facade lookup
+
+# 새 (단계 4 안에서 갱신):
+from ..prompt_pipeline.translate import clarify_edit_intent  # submodule 직접 lookup
+```
+
+> **이유**: facade `__init__.py` 의 re-export `from .translate import clarify_edit_intent` 는 facade attribute 를 *함수 객체 reference snapshot* 으로 bind. 이후 submodule (`translate.clarify_edit_intent`) 만 patch 하면 submodule attribute 만 변경되고 facade attribute 는 옛 함수 객체 그대로. lazy import 가 facade attribute 를 fresh lookup 해도 옛 함수 받아옴 → patch 안 먹음. 호출 site (lazy import) 도 submodule 로 변경해야 일관 동작.
+
+> **patch site 16건 모두 submodule path 갱신 + lazy import 2 site 동시 갱신** (단계 4 commit 안에서 함께).
+
+### 2.6 함수 안 import re-binding 위험 (Phase 4.2 단계 1 lazy 발견과 동일)
 
 facade `__init__.py` 작성 시 `_DEFAULT_OLLAMA_URL` 같은 **상수**의 re-export 는 *시점 snapshot* 임. test_prompt_pipeline 의 monkeypatch 가 `_DEFAULT_OLLAMA_URL` 을 변경하지는 않지만 (grep 결과 없음), 안전 차원에서 facade 가 *모듈 attribute 로 expose* 하는 형태로 작성.
 
@@ -158,13 +197,15 @@ facade `__init__.py` 작성 시 `_DEFAULT_OLLAMA_URL` 같은 **상수**의 re-ex
 - 사용자가 직접 codex 1차 리뷰 받아옴 (Phase 4.1 + 4.2 검증된 패턴)
 - 리뷰 finding 반영하여 v2 plan 갱신 후 단계 1 진입
 
-### 단계 1: file → package 전환 (facade 골격 + production import 무손상)
+### 단계 1: file → package 전환 + `_ollama_client` import depth 갱신 (codex C1 fix)
 
 - `mkdir backend/studio/prompt_pipeline/`
 - `mv backend/studio/prompt_pipeline.py backend/studio/prompt_pipeline/__init__.py`
+- **🔴 같은 commit 안에서 즉시 갱신** (codex C1 fix):
+  - L20 `from ._ollama_client import call_chat_payload` → `from .._ollama_client import call_chat_payload`
 - facade 안 모든 production 노출 항목을 그대로 유지 (re-export 미실행 단계 — 옛 단일 모듈 그대로 facade 안에 박혀있음)
 - pytest 실행 → 361 PASS 확인 (변화 0)
-- commit: `refactor(prompt_pipeline): file → package 전환 (Phase 4.3 단계 1)`
+- commit: `refactor(prompt_pipeline): file → package 전환 + _ollama_client import .. 갱신 (Phase 4.3 단계 1)`
 
 ### 단계 2: `_common.py` 분리 + facade re-export
 
@@ -174,30 +215,33 @@ facade `__init__.py` 작성 시 `_DEFAULT_OLLAMA_URL` 같은 **상수**의 re-ex
 - pytest → 361 PASS
 - commit: `refactor(prompt_pipeline): _common 그룹 분리 (Phase 4.3 단계 2)`
 
-### 단계 3: `_ollama.py` 분리 + patch site 즉시 갱신 (codex C3 fix)
+### 단계 3: `_ollama.py` 분리 + patch site 즉시 갱신 (codex I1 fix · 10건)
 
 - `_ollama.py` 신설: `_call_ollama_chat` 만 (1 함수)
 - import: `from .._ollama_client import call_chat_payload`
 - facade `__init__.py` 에서 `from ._ollama import _call_ollama_chat` re-export
-- **patch site 8건 즉시 갱신** (`studio.prompt_pipeline._call_ollama_chat` → `studio.prompt_pipeline._ollama._call_ollama_chat` + `backend.` prefix 동일 변환)
-  - test_edit_vision_analysis.py: 4건 (L142, 154, 164, 175 — clarify 호출 안 _call_ollama_chat)
+- **patch site 10건 즉시 갱신** (`studio.prompt_pipeline._call_ollama_chat` → `studio.prompt_pipeline._ollama._call_ollama_chat` + `backend.` prefix 동일 변환)
+  - test_edit_vision_analysis.py: 4건 (L142, 154, 164, 175)
   - test_prompt_pipeline.py: 2건 (L152, 245 — backend prefix)
   - test_video_pipeline.py: 4건 (L130, 150, 178, 198)
-  - **재확인**: `grep -nc "studio\.prompt_pipeline\._call_ollama_chat"` 으로 정확한 건수 박제
 - pytest → 361 PASS
-- commit: `refactor(prompt_pipeline): _ollama 분리 + patch 8 site 갱신 (Phase 4.3 단계 3)`
+- commit: `refactor(prompt_pipeline): _ollama 분리 + patch 10 site 갱신 (Phase 4.3 단계 3)`
 
-### 단계 4: `translate.py` 분리 + patch site 즉시 갱신
+### 단계 4: `translate.py` 분리 + lazy import 갱신 (codex C2 fix) + patch site 즉시 갱신 (codex I2 fix · 22건)
 
 - `translate.py` 신설: `SYSTEM_TRANSLATE_KO` / `SYSTEM_CLARIFY_INTENT` / `clarify_edit_intent` / `translate_to_korean`
 - import: `from . import _common as _c` + `from . import _ollama as _o`
 - 함수 안에서 `_c._strip_repeat_noise(...)` + `_c._DEFAULT_OLLAMA_URL` + `_o._call_ollama_chat(...)` 호출 (옵션 D)
 - facade `__init__.py` 에서 4 항목 re-export
-- **patch site 23건 즉시 갱신**
-  - `clarify_edit_intent` 17건 (모두 test_edit_vision_analysis.py)
-  - `translate_to_korean` 6건 (test_prompt_pipeline.py 2 + test_video_pipeline.py 4)
+- **🔴 같은 commit 안에서 lazy import 2 site 갱신 (codex C2 fix)**:
+  - `vision_pipeline/edit_source.py` L174: `from ..prompt_pipeline import clarify_edit_intent` → `from ..prompt_pipeline.translate import clarify_edit_intent`
+  - `vision_pipeline/edit_source.py` L511: 동일 변경
+  - 이유: facade re-export 가 함수 객체 reference snapshot 이라 submodule patch 가 facade attribute 까지 갱신 못함. lazy import 가 facade attribute 를 fresh lookup 해도 옛 함수 받아옴. 호출 site 자체를 submodule 직접 import 로 변경해야 patch 일관 동작.
+- **patch site 22건 즉시 갱신**
+  - `clarify_edit_intent` 16건 (test_edit_vision_analysis.py L194/226/252/276/303/334/362/398/420/447/480/517/561/615/655/688)
+  - `translate_to_korean` 6건 (test_prompt_pipeline.py L156/249 backend prefix + test_video_pipeline.py L131/151/179/199)
 - pytest → 361 PASS
-- commit: `refactor(prompt_pipeline): translate 분리 + patch 23 site 갱신 (Phase 4.3 단계 4)`
+- commit: `refactor(prompt_pipeline): translate 분리 + edit_source lazy import 갱신 + patch 22 site 갱신 (Phase 4.3 단계 4)`
 
 ### 단계 5: `upgrade.py` 분리 + patch site 즉시 갱신 + facade 정리 + `__all__`
 
@@ -298,16 +342,7 @@ facade `__init__.py` 작성 시 `_DEFAULT_OLLAMA_URL` 같은 **상수**의 re-ex
 
 ---
 
-## 7. v1 → v2 변경 (codex 1차 리뷰 후 채울 영역)
-
-> 사용자가 codex 1차 리뷰 받아오면 이 섹션에 finding fix 표 작성:
->
-> | # | 분류 | v1 문제 | v2 fix |
-> |---|---|---|---|
-
----
-
-## 8. 다음 후속 plan (별도 세션)
+## 7. 다음 후속 plan (별도 세션)
 
 - **Phase 4.4**: `comparison_pipeline.py` (1046줄) → v3 / v2_generic / _common 그룹
 - **Phase 4.5**: `comfy_api_builder.py` (1197줄) → builder_generate / _edit / _video / _common 그룹
