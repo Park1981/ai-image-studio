@@ -203,7 +203,7 @@ async def test_analyze_pair_happy_path() -> None:
 
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
@@ -262,7 +262,7 @@ async def test_analyze_pair_object_scene_domain() -> None:
     })
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
@@ -297,7 +297,7 @@ async def test_analyze_pair_vision_fail_fallback() -> None:
     translate_mock = AsyncMock(return_value={"comments_ko": {}, "summary_ko": ""})
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=""),
         ),
         patch(
@@ -331,7 +331,7 @@ async def test_analyze_pair_json_parse_fail_fallback() -> None:
 
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value="{invalid: not json"),
         ),
         patch(
@@ -366,7 +366,7 @@ async def test_analyze_pair_partial_slots_average_only_present() -> None:
     })
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
@@ -412,7 +412,7 @@ async def test_analyze_pair_translation_fail_keeps_en() -> None:
     })
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
@@ -526,7 +526,7 @@ async def test_analyze_pair_parses_transform_prompt_and_uncertain() -> None:
 
     with (
         patch(
-            "studio.comparison_pipeline._call_vision_pair",
+            "studio.comparison_pipeline.v3._call_vision_pair",
             new=AsyncMock(return_value=raw_json),
         ),
         patch(
@@ -583,7 +583,7 @@ async def test_analyze_pair_passes_refined_intent_to_vision_call() -> None:
         return ""
 
     with patch(
-        "studio.comparison_pipeline._call_vision_pair",
+        "studio.comparison_pipeline.v3._call_vision_pair",
         new=_fake_call,
     ):
         await analyze_pair(
