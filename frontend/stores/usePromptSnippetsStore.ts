@@ -1,0 +1,77 @@
+/**
+ * usePromptSnippetsStore — 사용자 큐레이션 prompt 라이브러리.
+ *
+ * 2026-04-30 (Phase 2A Task 3 · plan 2026-04-30-prompt-snippets-library.md · v3).
+ *
+ * 정책:
+ *   - 카테고리 X (라벨 자체가 카테고리 역할)
+ *   - 썸네일 옵셔널 (data URL · 사용자가 crop 한 영역)
+ *   - dedupe 없음 (사용자 판단)
+ *   - id = crypto.randomUUID (Codex v3 #1 — 같은-ms 충돌 방지)
+ *   - 저장 시 prompt 의 기존 <lib>...</lib> 마커 strip (중첩 방지 · Codex v3 #4)
+ *   - localStorage persist · 80개 자동 제한
+ */
+
+"use client";
+
+import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
+import { stripAllMarkers } from "@/lib/snippet-marker";
+
+export interface PromptSnippet {
+  id: string;
+  name: string;
+  prompt: string;
+  thumbnail?: string;
+  createdAt: number;
+}
+
+interface SnippetState {
+  entries: PromptSnippet[];
+  add: (input: { name: string; prompt: string; thumbnail?: string }) => void;
+  remove: (id: string) => void;
+  clearAll: () => void;
+}
+
+const MAX_SNIPPETS = 80;
+
+function makeId(): string {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return `snip-${crypto.randomUUID()}`;
+  }
+  return `snip-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export const usePromptSnippetsStore = create<SnippetState>()(
+  persist(
+    (set) => ({
+      entries: [],
+      add: ({ name, prompt, thumbnail }) => {
+        const cleanName = name.trim();
+        // Codex v3 #4: 저장 시 기존 <lib>...</lib> 마커 strip — 중첩 방지.
+        const cleanPrompt = stripAllMarkers(prompt).trim();
+        if (!cleanName || !cleanPrompt) return;
+        set((s) => ({
+          entries: [
+            {
+              id: makeId(),
+              name: cleanName,
+              prompt: cleanPrompt,
+              thumbnail,
+              createdAt: Date.now(),
+            },
+            ...s.entries,
+          ].slice(0, MAX_SNIPPETS),
+        }));
+      },
+      remove: (id) =>
+        set((s) => ({ entries: s.entries.filter((e) => e.id !== id) })),
+      clearAll: () => set({ entries: [] }),
+    }),
+    {
+      name: "ais:prompt-snippets",
+      storage: createJSONStorage(() => localStorage),
+      version: 1,
+    },
+  ),
+);
