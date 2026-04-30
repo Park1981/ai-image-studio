@@ -1,9 +1,16 @@
 # Phase 4.5 — `comfy_api_builder.py` 1197줄 분할 plan
 
-> **버전**: v1 (2026-04-30 · Claude 작성 · 사용자 codex 1차 리뷰 대기)
+> **버전**: v2 (2026-04-30 · Claude 작성 + 사용자 codex 1차 리뷰 2 Blocking 반영)
 > **선행 commit**: master `c8176e1` (Phase 4.4 comparison_pipeline 분할 완료)
 > **인계**: `memory/project_session_2026_04_30_phase_4_4_comparison_pipeline_split.md` + 본 plan
 > **검증 baseline**: backend pytest **361 PASS** / ruff clean · frontend vitest 91 / tsc / lint clean
+
+## v1 → v2 핵심 변경 (codex 1차 리뷰 반영)
+
+| # | 분류 | v1 문제 | v2 fix |
+|---|---|---|---|
+| C1 | Blocking | `build_edit_api` (L430) 이 `log.info(...)` 사용. v1 plan 의 edit.py import 항목에 `log` 없음 → 분리 시 NameError | `_common.py` 가 `log = logging.getLogger(__name__)` 명시 + edit.py 가 `from ._common import log` (Phase 4.3/4.4 와 동일 패턴 — 모든 sub-module 공유 logger) |
+| C2 | Blocking | v1 plan "_common.py 외부 의존 없음" 틀림 — `_build_lora_chain` (L149) 이 `LoraEntry` 타입 사용 → import 누락 시 F821 | `_common.py` 에 `from ..presets import LoraEntry` 명시 |
 
 ---
 
@@ -137,7 +144,9 @@ from ..presets import (...)  # 한 단계 위 모듈 명시
 
 분할 후 sub-module 의 internal import:
 - `_common.py`:
-  - 외부 의존 없음 (logging / itertools / typing 만)
+  - `import logging` + `log = logging.getLogger(__name__)` (codex C1 fix — 모든 sub-module 공유 logger)
+  - `from ..presets import LoraEntry` (codex C2 fix — `_build_lora_chain` L149 type 의존)
+  - `from itertools import count` + `from typing import Any, Callable, Iterable`
   - ApiPrompt / NodeRef 타입 정의 + 7 헬퍼 함수
 - `generate.py`:
   - `from ..presets import GENERATE_MODEL, get_aspect, get_generate_style, LoraEntry`
@@ -145,6 +154,7 @@ from ..presets import (...)  # 한 단계 위 모듈 명시
   - or `from ._common import ApiPrompt, NodeRef, ...` 직접 import (helpers 가 patch 대상 아니므로 OK)
 - `edit.py`:
   - `from ..presets import EDIT_MODEL, LoraEntry, get_aspect`
+  - `from ._common import log` (codex C1 fix — `build_edit_api` L430 의 `log.info(...)` 호환)
   - `from . import _common as _c` + `_c.X` 사용 (또는 직접 import)
 - `video.py`:
   - `from ..presets import (VIDEO_MODEL, VideoLoraEntry, active_video_loras, compute_video_resize, resolve_video_unet_name, VIDEO_LONGER_EDGE_DEFAULT, QUALITY_BASE_SIGMAS, QUALITY_UPSCALE_SIGMAS)`
@@ -179,8 +189,11 @@ from ..presets import (...)  # 한 단계 위 모듈 명시
 
 - `_common.py` 신설:
   - `ApiPrompt` / `NodeRef` types
+  - `log = logging.getLogger(__name__)` (codex C1 fix — 모든 sub-module 공유)
   - `_make_id_gen` / `_snap_dimension` / `_build_loaders` / `_apply_lora_chain` / `_build_lora_chain` / `_apply_model_sampling` / `_save_image_node`
-- import: `import logging`, `from itertools import count`, `from typing import Any, Callable, Iterable`
+- import:
+  - `import logging`, `from itertools import count`, `from typing import Any, Callable, Iterable`
+  - `from ..presets import LoraEntry` (codex C2 fix — `_build_lora_chain` 의 type annotation)
 - facade `__init__.py` 에서 _common 항목 명시 import + re-export
 - facade 본체에서 동일 항목 정의 *제거* + facade 안 다른 함수의 호출 site 가 import 된 reference 로 그대로 작동 (helpers patch 대상 아니라 _c lookup 불필요)
 - pytest → 361 PASS
@@ -203,7 +216,7 @@ from ..presets import (...)  # 한 단계 위 모듈 명시
 - `edit.py` 신설:
   - `EditApiInput` dataclass
   - `build_edit_api` / `_multi_ref_negative_prompt` / `_build_edit_api_single` / `_build_edit_api_multi_ref` / `build_edit_from_request`
-- import: `from ..presets import EDIT_MODEL, LoraEntry, get_aspect` + `from . import _common as _c` + `from ._common import ApiPrompt, NodeRef`
+- import: `from ..presets import EDIT_MODEL, LoraEntry, get_aspect` + `from . import _common as _c` + `from ._common import ApiPrompt, NodeRef, log` (codex C1 fix — `build_edit_api` L430 의 `log.info(...)` 호환)
 - facade `__init__.py` 에서 edit 항목 import + re-export
 - facade 본체에서 edit 정의 제거
 - pytest → 361 PASS
