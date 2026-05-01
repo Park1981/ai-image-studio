@@ -40,7 +40,11 @@ function PromptModeRadioImpl({ value, onChange }: Props) {
       className="ais-prompt-mode-segmented"
       role="radiogroup"
       aria-label="AI 보정 모드"
+      data-value={value}
     >
+      {/* 슬라이드 thumb — active 옵션 위로 부드럽게 transform 이동.
+       *  버튼들은 transparent + thumb 가 흰 pill 배경 책임. iOS segmented 패턴. */}
+      <span aria-hidden className="ais-prompt-mode-thumb" />
       {OPTIONS.map((opt) => {
         const active = opt.id === value;
         return (

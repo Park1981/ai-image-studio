@@ -401,23 +401,46 @@ button {
   box-shadow: 0 2px 8px rgba(74, 158, 255, 0.08);
 }
 .ais-prompt-mode-segmented {
+  position: relative;
   display: inline-flex;
   gap: 0;
-  padding: 2px;
+  padding: 3px;
   background: rgba(0, 0, 0, 0.04);
   border-radius: 999px;
-  align-self: flex-start;
-  /* 카드 폭 100% 채우지 않고 내용물 너비만 — 시각 hierarchy 회복 */
+  align-self: center;
+  /* 가운데 정렬 + 내용물 너비만 — 시각 균형 */
   width: fit-content;
 }
+/* iOS-style 슬라이드 thumb — active 위치로 부드럽게 translate.
+ *  width 50% (각 버튼 동등) + transition cubic-bezier 자연 ease. */
+.ais-prompt-mode-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  height: calc(100% - 6px);
+  background: var(--surface);
+  border-radius: 999px;
+  box-shadow:
+    0 0 0 0.5px rgba(74, 158, 255, 0.18),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+  transition: transform .28s cubic-bezier(.32, .72, 0, 1);
+  pointer-events: none;
+  z-index: 0;
+}
+.ais-prompt-mode-segmented[data-value="precise"] .ais-prompt-mode-thumb {
+  transform: translateX(100%);
+}
 .ais-prompt-mode-seg-btn {
-  height: 24px;
-  min-width: 78px;
-  padding: 0 14px;
+  position: relative;
+  z-index: 1;
+  height: 28px;
+  min-width: 92px;
+  padding: 0 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 500;
   font-family: inherit;
   letter-spacing: 0.04em;
@@ -427,10 +450,8 @@ button {
   background: transparent;
   color: var(--ink-3);
   transition:
-    background .2s ease,
-    color .2s ease,
-    box-shadow .2s ease,
-    font-weight .2s ease,
+    color .22s ease,
+    font-weight .22s ease,
     transform .15s ease;
 }
 .ais-prompt-mode-seg-btn:hover:not([data-active="true"]) {
@@ -440,13 +461,8 @@ button {
   transform: scale(0.96);
 }
 .ais-prompt-mode-seg-btn[data-active="true"] {
-  background: var(--surface);
   color: var(--accent-ink);
   font-weight: 600;
-  /* 카드와 동급 weight 안 되게 그림자 약화 — 절제된 active */
-  box-shadow:
-    0 0 0 0.5px rgba(74, 158, 255, 0.18),
-    0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 /* Primary CTA 버튼 — sticky 하단 + progress bar overlay (edit/video 공용) */
