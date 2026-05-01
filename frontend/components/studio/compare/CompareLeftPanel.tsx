@@ -14,10 +14,10 @@
 
 "use client";
 
-import {
-  CompareImageSlot,
-} from "@/components/studio/CompareImageSlot";
+import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
+import { CompareImageSlot } from "@/components/studio/CompareImageSlot";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import { StudioModeHeader } from "@/components/studio/StudioLayout";
 import Icon from "@/components/ui/Icon";
 import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
@@ -47,6 +47,8 @@ export default function CompareLeftPanel({
   setHint,
   onAnalyze,
 }: Props) {
+  const hintTextareaRef = useAutoGrowTextarea(hint);
+
   return (
     <>
       <StudioModeHeader
@@ -101,79 +103,35 @@ export default function CompareLeftPanel({
 
       {/* 비교 지시 (선택) */}
       <div style={{ marginTop: 6 }}>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            marginBottom: 10,
-          }}
-        >
+        <div className="ais-field-header">
           <label
-            style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
           >
+            <SectionAccentBar accent="blue" />
             비교 지시{" "}
             <span style={{ color: "var(--ink-4)", fontWeight: 400 }}>(선택)</span>
           </label>
-          <span
-            className="mono"
-            style={{ fontSize: 10.5, color: "var(--ink-4)" }}
-          >
-            {hint.length} chars
-          </span>
         </div>
-        <div
-          style={{
-            position: "relative",
-            background: "var(--surface)",
-            border: "1px solid var(--line)",
-            borderRadius: "var(--radius)",
-            boxShadow: "var(--shadow-sm)",
-          }}
-        >
+        <div className="ais-prompt-shell">
           <PromptHistoryPeek mode="compare" onSelect={(p) => setHint(p)} />
           <textarea
+            ref={hintTextareaRef}
             value={hint}
             onChange={(e) => setHint(e.target.value)}
             placeholder="예: 의상 차이에 집중해 주세요 / 색감 변화 위주로 비교"
             rows={3}
-            style={{
-              display: "block",
-              width: "100%",
-              border: "none",
-              outline: "none",
-              resize: "none",
-              background: "transparent",
-              padding: "12px 42px 30px 14px",
-              fontFamily: "inherit",
-              fontSize: 13.5,
-              lineHeight: 1.55,
-              color: "var(--ink)",
-              borderRadius: "var(--radius)",
-              minHeight: 76,
-            }}
+            className="ais-prompt-textarea"
           />
           {hint.length > 0 && (
             <button
               type="button"
               onClick={() => setHint("")}
+              aria-label="비교 지시 비우기"
               title="비교 지시 비우기"
-              style={{
-                all: "unset",
-                cursor: "pointer",
-                position: "absolute",
-                bottom: 6,
-                right: 10,
-                fontSize: 11,
-                color: "var(--ink-4)",
-                display: "flex",
-                alignItems: "center",
-                gap: 3,
-                padding: "4px 6px",
-                borderRadius: "var(--radius-sm)",
-              }}
+              className="ais-prompt-clear-icon"
             >
-              <Icon name="x" size={10} /> 비우기
+              <Icon name="x" size={12} />
             </button>
           )}
         </div>

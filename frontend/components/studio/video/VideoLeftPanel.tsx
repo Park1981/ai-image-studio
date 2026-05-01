@@ -137,9 +137,8 @@ export default function VideoLeftPanel({
       </div>
 
       {/* ── 영상 지시 prompt ── */}
-      {/* 2026-05-01 (UX 통일): chars 메타 제거 + 비우기를 Generate/Edit 와 동일한
-       *  ais-prompt-footer 우측 패턴으로 변경 (옛 position:absolute · 조건부 표시).
-       *  Video 영역엔 라이브러리 기능이 아직 없어 좌측 placeholder 만 둠. */}
+      {/* 2026-05-01 (UX 통일): Generate/Edit/Compare 와 동일한 auto-grow textarea
+       *  + 우하단 X 아이콘 박스 패턴. */}
       <div>
         <div className="ais-field-header">
           <label
@@ -160,19 +159,17 @@ export default function VideoLeftPanel({
             rows={3}
             className="ais-prompt-textarea"
           />
-          <div className="ais-prompt-footer">
-            <div />
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => setPrompt("")}
-                title="프롬프트 비우기"
-                className="ais-prompt-clear"
-              >
-                <Icon name="x" size={10} /> 비우기
-              </button>
-            </div>
-          </div>
+          {prompt.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPrompt("")}
+              aria-label="프롬프트 비우기"
+              title="프롬프트 비우기"
+              className="ais-prompt-clear-icon"
+            >
+              <Icon name="x" size={12} />
+            </button>
+          )}
         </div>
       </div>
 

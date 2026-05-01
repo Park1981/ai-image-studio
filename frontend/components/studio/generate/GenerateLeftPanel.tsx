@@ -173,8 +173,8 @@ export default function GenerateLeftPanel({
       </div>
 
       {/* ── 프롬프트 카드 ── */}
-      {/* 2026-05-01 (UX 통일): chars·KO 메타 제거 + 라이브러리 버튼을 Edit 참조이미지
-       *  헤더와 동일한 우측 텍스트 링크 스타일로 이동 (footer 안 인라인 → 헤더 우측). */}
+      {/* 2026-05-01 (UX 통일): Compare/Edit/Video 와 동일한 auto-grow textarea
+       *  + 우하단 X 아이콘 박스 패턴. */}
       <div>
         <div className="ais-field-header">
           <label
@@ -211,20 +211,17 @@ export default function GenerateLeftPanel({
             rows={3}
             className="ais-prompt-textarea"
           />
-          <div className="ais-prompt-footer">
-            {/* 좌측 placeholder — 옛 [📚 라이브러리] 버튼 헤더로 이동 (2026-05-01) */}
-            <div />
-            <div style={{ display: "flex", gap: 10 }}>
-              <button
-                type="button"
-                onClick={() => setPrompt("")}
-                title="프롬프트 비우기"
-                className="ais-prompt-clear"
-              >
-                <Icon name="x" size={10} /> 비우기
-              </button>
-            </div>
-          </div>
+          {prompt.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setPrompt("")}
+              aria-label="프롬프트 비우기"
+              title="프롬프트 비우기"
+              className="ais-prompt-clear-icon"
+            >
+              <Icon name="x" size={12} />
+            </button>
+          )}
         </div>
       </div>
 

@@ -56,6 +56,7 @@ export default function PromptHistoryPeek({
   const removeOne = usePromptHistoryStore((s) => s.removeOne);
   const clearMode = usePromptHistoryStore((s) => s.clearMode);
   const [open, setOpen] = useState(false);
+  const [triggerHover, setTriggerHover] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   // mode 별 prompt 추출 + dedupe (최신 우선) — 단일 source.
@@ -121,8 +122,8 @@ export default function PromptHistoryPeek({
       ref={containerRef}
       style={{
         position: "absolute",
-        top: 6,
-        [alignRight ? "right" : "left"]: 6,
+        top: 10,
+        [alignRight ? "right" : "left"]: 10,
         zIndex: 5,
       }}
     >
@@ -130,6 +131,8 @@ export default function PromptHistoryPeek({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
+        onMouseEnter={() => setTriggerHover(true)}
+        onMouseLeave={() => setTriggerHover(false)}
         title={`이전 ${MODE_LABEL[mode]} 프롬프트 (${prompts.length}개)`}
         style={{
           all: "unset",
@@ -139,12 +142,27 @@ export default function PromptHistoryPeek({
           borderRadius: "var(--radius-sm)",
           display: "grid",
           placeItems: "center",
-          background: open ? "var(--accent)" : "var(--surface)",
-          color: open ? "#fff" : "var(--ink-3)",
-          border: "1px solid var(--line)",
-          transition: "background .15s, color .15s, transform .18s",
-          transform: open ? "scale(1.05)" : "scale(1)",
-          boxShadow: open ? "0 2px 8px rgba(74,158,255,.3)" : "none",
+          background: open
+            ? "var(--accent)"
+            : triggerHover
+              ? "var(--bg-2)"
+              : "var(--surface)",
+          color: open ? "#fff" : triggerHover ? "var(--ink-2)" : "var(--ink-3)",
+          border: `1px solid ${
+            open ? "var(--accent-ink)" : triggerHover ? "var(--line-2)" : "var(--line)"
+          }`,
+          transition:
+            "background .15s, color .15s, border-color .15s, box-shadow .15s, transform .18s",
+          transform: open
+            ? "scale(1.05)"
+            : triggerHover
+              ? "translateY(-1px)"
+              : "scale(1)",
+          boxShadow: open
+            ? "0 2px 8px rgba(74,158,255,.3)"
+            : triggerHover
+              ? "0 2px 8px rgba(0,0,0,.08)"
+              : "none",
         }}
       >
         <Icon name="clock" size={13} />
