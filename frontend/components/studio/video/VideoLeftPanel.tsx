@@ -137,6 +137,9 @@ export default function VideoLeftPanel({
       </div>
 
       {/* ── 영상 지시 prompt ── */}
+      {/* 2026-05-01 (UX 통일): chars 메타 제거 + 비우기를 Generate/Edit 와 동일한
+       *  ais-prompt-footer 우측 패턴으로 변경 (옛 position:absolute · 조건부 표시).
+       *  Video 영역엔 라이브러리 기능이 아직 없어 좌측 placeholder 만 둠. */}
       <div>
         <div className="ais-field-header">
           <label
@@ -146,7 +149,6 @@ export default function VideoLeftPanel({
             <SectionAccentBar accent="blue" />
             영상 지시
           </label>
-          <span className="mono ais-field-meta">{prompt.length} chars</span>
         </div>
         <div className="ais-prompt-shell">
           <PromptHistoryPeek mode="video" onSelect={(p) => setPrompt(p)} />
@@ -158,23 +160,26 @@ export default function VideoLeftPanel({
             rows={3}
             className="ais-prompt-textarea"
           />
-          {prompt.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setPrompt("")}
-              title="프롬프트 비우기"
-              className="ais-prompt-clear"
-              style={{ position: "absolute", bottom: 6, right: 10 }}
-            >
-              <Icon name="x" size={10} /> 비우기
-            </button>
-          )}
+          <div className="ais-prompt-footer">
+            <div />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setPrompt("")}
+                title="프롬프트 비우기"
+                className="ais-prompt-clear"
+              >
+                <Icon name="x" size={10} /> 비우기
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* AI 프롬프트 보정 토글 (2026-04-27):
+      {/* AI 프롬프트 보정 토글 (2026-04-27 · 2026-05-01 default OFF 로 변경):
        *  Generate 와 동일 패턴 — 직관 매칭 (ON=기능 ON · OFF=기능 OFF).
-       *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약 (Generate 보다 큼).
+       *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약.
+       *  영상 사용자는 보통 영문 프롬프트를 직접 다듬어 쓰는 경향 → 기본 OFF.
        */}
       <Toggle
         checked={!skipUpgrade}
@@ -183,8 +188,8 @@ export default function VideoLeftPanel({
         label="🪄 AI 프롬프트 보정"
         desc={
           skipUpgrade
-            ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약)"
-            : "ON · 이미지 분석 + 한국어 → 영문 정제 (기본)"
+            ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약 · 기본)"
+            : "ON · 이미지 분석 + 한국어 → 영문 정제"
         }
       />
 

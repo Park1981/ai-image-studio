@@ -123,7 +123,9 @@ export const useVideoStore = create<VideoState>((set) => ({
   adult: false,
   longerEdge: VIDEO_LONGER_EDGE_DEFAULT,
   lightning: true,
-  skipUpgrade: false,
+  // 2026-05-01: default OFF 로 변경 (영상 사용자는 영문 프롬프트 직접 다듬어 쓰는 경향).
+  // skipUpgrade=true → AI 보정 우회 (gemma4/vision 호출 X · ~15초 절약).
+  skipUpgrade: true,
 
   running: false,
   pipelineProgress: 0,
