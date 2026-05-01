@@ -191,6 +191,8 @@ export default function EditLeftPanel({
       </div>
 
       {/* ── 수정 지시 prompt ── */}
+      {/* 2026-05-01 (UX 통일): chars 메타 제거 + 비우기를 Generate 와 동일한 footer 패턴으로
+       *  변경 (옛 position:absolute → ais-prompt-footer 우측). */}
       <div>
         <div className="ais-field-header">
           <label
@@ -200,7 +202,6 @@ export default function EditLeftPanel({
             <SectionAccentBar accent="blue" />
             수정 지시
           </label>
-          <span className="mono ais-field-meta">{prompt.length} chars</span>
         </div>
         <div className="ais-prompt-shell">
           <PromptHistoryPeek mode="edit" onSelect={(p) => setPrompt(p)} />
@@ -212,17 +213,19 @@ export default function EditLeftPanel({
             rows={3}
             className="ais-prompt-textarea"
           />
-          {prompt.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setPrompt("")}
-              title="프롬프트 비우기"
-              className="ais-prompt-clear"
-              style={{ position: "absolute", bottom: 6, right: 10 }}
-            >
-              <Icon name="x" size={10} /> 비우기
-            </button>
-          )}
+          <div className="ais-prompt-footer">
+            <div />
+            <div style={{ display: "flex", gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setPrompt("")}
+                title="프롬프트 비우기"
+                className="ais-prompt-clear"
+              >
+                <Icon name="x" size={10} /> 비우기
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
