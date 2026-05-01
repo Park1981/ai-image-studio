@@ -123,6 +123,7 @@ export function Toggle({
   desc,
   align = "left",
   tone = "neutral",
+  disabled = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -130,6 +131,8 @@ export function Toggle({
   desc?: string;
   align?: "left" | "right";
   tone?: "neutral" | "amber";
+  /** 2026-05-01 — 항상 ON 인데 시각적으로 표시만 필요한 케이스 (Edit AI 보정 등). */
+  disabled?: boolean;
 }) {
   // tone 별 색깔 매핑
   const toneColors =
@@ -199,12 +202,13 @@ export function Toggle({
         display: "flex",
         alignItems: "center",
         gap: 10,
-        cursor: "pointer",
+        cursor: disabled ? "not-allowed" : "pointer",
         padding: "8px 10px",
         borderRadius: "var(--radius-sm)",
         background: checked ? toneColors.bg : "var(--bg-2)",
         border: `1px solid ${checked ? toneColors.border : "var(--line)"}`,
         transition: "all .15s",
+        opacity: disabled ? 0.7 : 1,
       }}
     >
       {/*
@@ -215,7 +219,11 @@ export function Toggle({
       <input
         type="checkbox"
         checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
+        onChange={(e) => {
+          if (disabled) return;
+          onChange(e.target.checked);
+        }}
+        disabled={disabled}
         aria-label={label}
         style={{
           position: "absolute",
@@ -224,7 +232,7 @@ export function Toggle({
           height: "100%",
           margin: 0,
           opacity: 0,
-          cursor: "pointer",
+          cursor: disabled ? "not-allowed" : "pointer",
           border: 0,
         }}
       />

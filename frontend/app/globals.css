@@ -381,6 +381,50 @@ button {
   to   { transform: rotate(360deg); }
 }
 
+/* Phase 2 후속 (2026-05-01) — AI 보정 카드 통합 + 모드 segmented control.
+ *  Toggle 옆 또는 아래에 instant/thinking 가로 50/50 옵션. 활성 = 흰 배경 + accent.
+ *  카드 wrap (.ais-magic-prompt-card) 은 Toggle 자체 카드 패턴 재사용 (ais-toggle-row). */
+.ais-magic-prompt-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ais-prompt-mode-segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  background: var(--line);
+  border-radius: 8px;
+  width: 100%;
+}
+.ais-prompt-mode-seg-btn {
+  flex: 1;
+  padding: 7px 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 500;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  background: transparent;
+  color: var(--ink-3);
+  transition: background .14s, color .14s, box-shadow .14s, font-weight .14s;
+}
+.ais-prompt-mode-seg-btn:hover:not([data-active="true"]) {
+  color: var(--ink-2);
+}
+.ais-prompt-mode-seg-btn[data-active="true"] {
+  background: var(--surface);
+  color: var(--accent-ink);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
 /* Primary CTA 버튼 — sticky 하단 + progress bar overlay (edit/video 공용) */
 .ais-cta-sticky {
   position: sticky;

@@ -272,10 +272,21 @@ export default function EditLeftPanel({
         }
       />
 
-      {/* Phase 2 (2026-05-01) — 보정 모드 (빠른/정밀)
-       *  Edit 은 보정 우회 토글이 없으므로 항상 노출. clarify_edit_intent 와
-       *  upgrade_edit_prompt 양쪽이 영향받음. */}
-      <PromptModeRadio value={promptMode} onChange={setPromptMode} />
+      {/* AI 보정 카드 (Phase 2 후속 · 2026-05-01) — Generate/Video 와 통일 패턴.
+       *  Edit 은 보정 우회 옵션 없음 (vision + clarify + upgrade 가 본질) →
+       *  토글은 *disabled checked* 로 시각 일관성만 표현, 모드 segmented 는 항상 활성.
+       *  clarify_edit_intent 와 upgrade_edit_prompt 양쪽에 promptMode 영향. */}
+      <div className="ais-magic-prompt-card">
+        <Toggle
+          checked
+          disabled
+          onChange={() => undefined}
+          align="right"
+          label="🪄 AI 프롬프트 보정"
+          desc="ON · 한국어/자연어 → 영문 정제 (Edit 필수)"
+        />
+        <PromptModeRadio value={promptMode} onChange={setPromptMode} />
+      </div>
 
       {/* 수정 후 자동 비교 분석 — 옛 설정 토글에서 이 위치로 이동 (오빠 피드백 2026-04-27).
        *  결과 완료 시 백그라운드로 5축 평가. VRAM>13GB 면 자동 skip. */}

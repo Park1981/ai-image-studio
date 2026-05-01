@@ -274,25 +274,25 @@ export default function GenerateLeftPanel({
        *  Lightning 의 의미 반전 + 라벨 동적 패턴은 "빠른/퀄리티" 모드 선택이라 자연스러웠지만,
        *  보정 토글은 단순 기능 ON/OFF 라 직관 따르는 게 옳음 (오빠 피드백).
        */}
-      <Toggle
-        checked={!skipUpgrade}
-        onChange={(v) => setSkipUpgrade(!v)}
-        align="right"
-        label="🪄 AI 프롬프트 보정"
-        desc={
-          skipUpgrade
-            ? "OFF · 프롬프트 그대로 사용 (~10초 절약)"
-            : "ON · 한국어/자연어 → 영문 정제 (기본)"
-        }
-      />
-
-      {/* Phase 2 (2026-05-01) — 보정 모드 (빠른/정밀) · 보정 ON 일 때만 노출 */}
-      {!skipUpgrade && (
-        <PromptModeRadio
-          value={promptMode}
-          onChange={setPromptMode}
+      {/* AI 보정 카드 — 토글 + (ON 일 때만) instant/thinking segmented 통합.
+       *  Phase 2 후속 (2026-05-01) — 옛: Toggle + 별도 PromptModeRadio 카드 두 개 분리.
+       *  신: 하나의 카드 wrap 안에 Toggle 위 + segmented 아래 (오빠 디자인 피드백). */}
+      <div className="ais-magic-prompt-card">
+        <Toggle
+          checked={!skipUpgrade}
+          onChange={(v) => setSkipUpgrade(!v)}
+          align="right"
+          label="🪄 AI 프롬프트 보정"
+          desc={
+            skipUpgrade
+              ? "OFF · 프롬프트 그대로 사용 (~10초 절약)"
+              : "ON · 한국어/자연어 → 영문 정제 (기본)"
+          }
         />
-      )}
+        {!skipUpgrade && (
+          <PromptModeRadio value={promptMode} onChange={setPromptMode} />
+        )}
+      </div>
 
       {/* Claude 조사 토글 — Lightning 과 동일 패턴 (우측 토글 · amber 톤) */}
       <ResearchBanner checked={research} onChange={setResearch} />

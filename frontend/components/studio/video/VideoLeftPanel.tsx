@@ -203,27 +203,25 @@ export default function VideoLeftPanel({
         <PromptToolsResults tools={promptTools} />
       </div>
 
-      {/* AI 프롬프트 보정 토글 (2026-04-27 · 2026-05-01 default OFF 로 변경):
-       *  Generate 와 동일 패턴 — 직관 매칭 (ON=기능 ON · OFF=기능 OFF).
-       *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약.
-       *  영상 사용자는 보통 영문 프롬프트를 직접 다듬어 쓰는 경향 → 기본 OFF.
-       */}
-      <Toggle
-        checked={!skipUpgrade}
-        onChange={(v) => setSkipUpgrade(!v)}
-        align="right"
-        label="🪄 AI 프롬프트 보정"
-        desc={
-          skipUpgrade
-            ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약 · 기본)"
-            : "ON · 이미지 분석 + 한국어 → 영문 정제"
-        }
-      />
-
-      {/* Phase 2 (2026-05-01) — 보정 모드 (빠른/정밀) · 보정 ON 일 때만 노출 */}
-      {!skipUpgrade && (
-        <PromptModeRadio value={promptMode} onChange={setPromptMode} />
-      )}
+      {/* AI 보정 카드 (Phase 2 후속 · 2026-05-01) — Generate/Edit 와 통일 패턴.
+       *  Toggle + segmented 를 하나의 카드 wrap. 토글 OFF 면 segmented 미노출.
+       *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약 (기본 OFF). */}
+      <div className="ais-magic-prompt-card">
+        <Toggle
+          checked={!skipUpgrade}
+          onChange={(v) => setSkipUpgrade(!v)}
+          align="right"
+          label="🪄 AI 프롬프트 보정"
+          desc={
+            skipUpgrade
+              ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약 · 기본)"
+              : "ON · 이미지 분석 + 한국어 → 영문 정제"
+          }
+        />
+        {!skipUpgrade && (
+          <PromptModeRadio value={promptMode} onChange={setPromptMode} />
+        )}
+      </div>
 
       {/* ── 영상 해상도 슬라이더 ── */}
       <VideoResolutionSlider
