@@ -62,6 +62,9 @@ export default function VideoLeftPanel({
   } = useVideoInputs();
   const { running } = useVideoRunning();
 
+  // Codex Phase 5 fix Medium — PromptToolsBar 로 ollamaModel override 패스스루.
+  const ollamaModelForTools = useSettingsStore((s) => s.ollamaModel);
+
   // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store sync.
   // Codex Phase 4 리뷰 Medium #2 fix — session-only 정책 정합 (settings 변경은 다음 mount 부터 반영).
   const promptModeInitRef = useRef(false);
@@ -184,10 +187,12 @@ export default function VideoLeftPanel({
             </button>
           )}
         </div>
-        {/* Phase 5 (2026-05-01) — 프롬프트 도구 (번역/분리) · spec §6.5 */}
+        {/* Phase 5 (2026-05-01) — 프롬프트 도구 (번역/분리) · spec §6.5
+         *  Codex Phase 5 fix Medium: settings ollamaModel 전파 (옛 prop 누락). */}
         <PromptToolsBar
           prompt={prompt}
           onPromptChange={setPrompt}
+          ollamaModel={ollamaModelForTools}
           disabled={running}
         />
       </div>

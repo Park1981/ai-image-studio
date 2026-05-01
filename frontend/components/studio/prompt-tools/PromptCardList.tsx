@@ -2,16 +2,19 @@
  * PromptCardList - 프롬프트 분리 결과 카드 리스트.
  *
  * Phase 5 (2026-05-01) 신설.
+ * Codex Phase 5 리뷰 fix (Medium / Low):
+ *   - sections prop 변경 시 selected/deleted state 자동 reset (이전 분리 잔존 차단)
+ *   - 기본 *미선택* (전체 선택 + append → 원문 중복 위험 회피)
+ *   - 액션 분리: [선택 추가] (textarea 끝에 append) + [원본 교체] (선택 카드들로 prompt 통째 교체)
  *
- * spec §6.5 의 카드 액션:
+ * spec §6.5 카드 액션:
  *  - 복사 (clipboard)
- *  - 원본에 적용 (선택 카드들의 text 를 textarea 끝에 추가)
- *  - 카드 삭제 (해당 카드만 리스트에서 제거)
- *  - 원본 유지 (= 닫기 버튼)
+ *  - 카드 삭제
+ *  - "원본에 적용" / "선택 카드만 적용" / "원본 유지"
  *
  * spec §11 비목표: "분리 결과로 원본을 자동 덮어쓰지 않는다".
- *  - 사용자가 [선택 적용] / [모두 적용] 명시 클릭 시에만 textarea 변경.
- *  - 자동 mount-effect 등으로 prompt 를 만지지 않는다.
+ *  - 자동 mount-effect 등 prompt 만지는 path 없음.
+ *  - 사용자가 명시 [선택 추가] / [원본 교체] 클릭 시에만 textarea 변경.
  */
 
 "use client";
@@ -21,8 +24,10 @@ import type { PromptSection, PromptSectionKey } from "@/lib/api/prompt-tools";
 
 interface Props {
   sections: PromptSection[];
-  /** 선택 카드들의 text 를 textarea 끝에 추가. ", " 로 join. */
-  onApply: (texts: string[]) => void;
+  /** 선택 카드들의 text 를 textarea 끝에 추가 (", " join · 기존 prompt 보존). */
+  onAppend: (texts: string[]) => void;
+  /** 선택 카드들의 text 로 prompt 를 통째 교체 (원본 손실 — 명시 클릭만). */
+  onReplace: (texts: string[]) => void;
   /** "원본 유지" / 닫기 — 카드 영역 자체 숨김 */
   onClose: () => void;
 }
@@ -48,13 +53,23 @@ const KEY_LABEL_KO: Record<PromptSectionKey, string> = {
   etc: "기타",
 };
 
-function PromptCardListImpl({ sections, onApply, onClose }: Props) {
-  // 선택 상태 — 모든 카드 기본 선택 (선택적용 누르면 그 카드들만 textarea 추가)
-  const [selected, setSelected] = useState<Set<number>>(
-    () => new Set(sections.map((_, i) => i)),
-  );
-  // 삭제된 카드 (UI 만 — 다시 분리 누르면 새 결과로 갱신)
+function PromptCardListImpl({ sections, onAppend, onReplace, onClose }: Props) {
+  // Codex Phase 5 fix (Medium): 기본 *미선택*. 전체 선택 + append 가 원문과 거의
+  // 중복되는 결과 만드는 안티패턴 방지. 사용자가 원하는 카드만 명시 체크.
+  const [selected, setSelected] = useState<Set<number>>(() => new Set());
   const [deleted, setDeleted] = useState<Set<number>>(() => new Set());
+
+  // Codex Phase 5 fix (Medium): sections prop 변경 시 selected/deleted reset.
+  // React 공식 권장 패턴 — "derive state from props" (render-phase 비교 + setState).
+  // 같은 reference 면 no-op, 새 reference 면 즉시 reset 후 즉시 re-render.
+  // useEffect 대안보다 React 의 set-state-in-effect 룰 회피 + cascading render 1회 줄임.
+  // 참고: https://react.dev/reference/react/useState#storing-information-from-previous-renders
+  const [prevSections, setPrevSections] = useState(sections);
+  if (prevSections !== sections) {
+    setPrevSections(sections);
+    setSelected(new Set());
+    setDeleted(new Set());
+  }
 
   const toggleSelect = (idx: number) => {
     setSelected((cur) => {
@@ -93,6 +108,8 @@ function PromptCardListImpl({ sections, onApply, onClose }: Props) {
   const selectedTexts = visibleEntries
     .filter(({ idx }) => selected.has(idx))
     .map(({ section }) => section.text);
+
+  const hasSelection = selectedTexts.length > 0;
 
   return (
     <div
@@ -242,6 +259,10 @@ function PromptCardListImpl({ sections, onApply, onClose }: Props) {
         })}
       </ul>
 
+      {/* Codex Phase 5 fix (Low): 액션 분리.
+       *  - 선택 추가 = textarea 끝에 append (기존 prompt 보존)
+       *  - 원본 교체 = 선택 카드들로 prompt 통째 교체 (명시 확정 — destructive)
+       *  둘 다 hasSelection 시에만 활성. 기본 미선택이라 명시 체크 후에만 enable. */}
       <div
         style={{
           display: "flex",
@@ -252,8 +273,28 @@ function PromptCardListImpl({ sections, onApply, onClose }: Props) {
       >
         <button
           type="button"
-          onClick={() => onApply(selectedTexts)}
-          disabled={selectedTexts.length === 0}
+          onClick={() => onReplace(selectedTexts)}
+          disabled={!hasSelection}
+          title="선택 카드들로 원본 프롬프트를 통째 교체"
+          style={{
+            padding: "6px 12px",
+            fontSize: 12,
+            fontWeight: 500,
+            borderRadius: 6,
+            border: "1px solid var(--line)",
+            background: "transparent",
+            color: hasSelection ? "var(--ink-2)" : "var(--ink-5)",
+            cursor: hasSelection ? "pointer" : "not-allowed",
+            opacity: hasSelection ? 1 : 0.5,
+          }}
+        >
+          원본 교체
+        </button>
+        <button
+          type="button"
+          onClick={() => onAppend(selectedTexts)}
+          disabled={!hasSelection}
+          title="선택 카드들을 원본 끝에 추가"
           style={{
             padding: "6px 12px",
             fontSize: 12,
@@ -262,11 +303,11 @@ function PromptCardListImpl({ sections, onApply, onClose }: Props) {
             border: "1px solid var(--accent, rgba(99,102,241,0.6))",
             background: "var(--accent-soft, rgba(99,102,241,0.18))",
             color: "var(--ink)",
-            cursor: selectedTexts.length === 0 ? "not-allowed" : "pointer",
-            opacity: selectedTexts.length === 0 ? 0.5 : 1,
+            cursor: hasSelection ? "pointer" : "not-allowed",
+            opacity: hasSelection ? 1 : 0.5,
           }}
         >
-          선택 적용 ({selectedTexts.length})
+          선택 추가 ({selectedTexts.length})
         </button>
       </div>
     </div>

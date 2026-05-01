@@ -75,6 +75,9 @@ export default function GenerateLeftPanel({
   } = useGenerateInputs();
   const { generating, progress, stage } = useGenerateRunning();
 
+  // Codex Phase 5 fix Medium — settings 의 ollamaModel override 를 PromptToolsBar 로 전파.
+  const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
+
   // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store 로 sync.
   // Codex Phase 4 리뷰 Medium #2 fix: settings 변경이 페이지 session 토글을 즉시 덮어쓰던
   // 옛 동작 차단. settings 변경 효과는 페이지 재진입 시점부터 반영 (= "session-only" 정책 정합).
@@ -238,10 +241,13 @@ export default function GenerateLeftPanel({
             </button>
           )}
         </div>
-        {/* Phase 5 (2026-05-01) — 프롬프트 도구 (번역/분리) · spec §6.5 */}
+        {/* Phase 5 (2026-05-01) — 프롬프트 도구 (번역/분리) · spec §6.5
+         *  Codex Phase 5 fix Medium: settings 의 ollamaModel override 패스스루.
+         *  옛엔 prop 누락이라 사용자가 텍스트 모델 바꿔도 도구만 백엔드 default 썼음. */}
         <PromptToolsBar
           prompt={prompt}
           onPromptChange={setPrompt}
+          ollamaModel={ollamaModelSel}
           disabled={generating}
         />
       </div>

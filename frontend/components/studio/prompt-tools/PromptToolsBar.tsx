@@ -2,19 +2,13 @@
  * PromptToolsBar - 프롬프트 도구 (번역 / 분리) 진입점.
  *
  * Phase 5 (2026-05-01) 신설.
+ * Codex Phase 5 리뷰 fix:
+ *  - High: 번역 결과를 *카드* 로 노출 (옛 즉시 교체/200자 토스트 → 명시 [원본 교체] / [복사] / [닫기])
+ *  - Medium: ollamaModel override prop 받아 splitPrompt/translatePrompt 에 전달
+ *  - Low: 분리 카드 액션 분리 — [선택 추가] (append) + [원본 교체] (replace)
  *
- * spec §6.5:
- *   [번역] [분리] 버튼 — Generate/Edit/Video LeftPanel 의 prompt textarea 아래.
- *
- * 상호작용:
- *  - [번역 한→영]: 한국어 prompt → 영문. 결과를 textarea 에 *append* (덮어쓰기 X).
- *  - [번역 영→한]: 영문 prompt → 한국어. 결과는 토스트로만 보여주고 textarea 안 건드림
- *    (한국어 텍스트를 모델에 보낼 일 없음 — 단순 사용자 확인 용).
- *  - [분리]: PromptSplitResponse 받아 PromptCardList 컴포넌트로 노출.
- *  - 모든 호출 동안 spinner + 버튼 disabled.
- *
- * spec §11 비목표: 분리 결과로 원본 textarea 자동 덮어쓰지 않음 — 카드 안의 [선택 적용]
- * 클릭 시에만 textarea 끝에 phrase append.
+ * spec §11 비목표 준수: 분리/번역 결과로 원본 textarea 자동 덮지 않음.
+ *  - 사용자 명시 클릭 (Append/Replace) 시에만 textarea 변경.
  */
 
 "use client";
@@ -24,22 +18,30 @@ import {
   splitPrompt,
   translatePrompt,
   type PromptSection,
+  type TranslateDirection,
 } from "@/lib/api/prompt-tools";
 import { toast } from "@/stores/useToastStore";
 import PromptCardList from "./PromptCardList";
+import PromptTranslationCard from "./PromptTranslationCard";
 
 interface Props {
   /** 현재 textarea 의 prompt 값 (입력) */
   prompt: string;
-  /** prompt 갱신 콜백 — onApply 시 textarea 끝에 phrase append */
+  /** prompt 갱신 콜백 — Append (append) / Replace (전체 교체) */
   onPromptChange: (next: string) => void;
-  /** Ollama 모델 override (없으면 백엔드 기본값) */
+  /** Ollama 모델 override (Codex Phase 5 fix Medium — 옛엔 안 받아 백엔드 default 만 썼음).
+   *  설정 패널의 ollamaModel 을 그대로 패스스루. undefined 면 백엔드 기본값. */
   ollamaModel?: string;
   /** disabled 가드 — 페이지 가 generating 중일 때 등 */
   disabled?: boolean;
 }
 
 type ToolBusy = "split" | "translate-en" | "translate-ko" | null;
+
+interface TranslationCardState {
+  text: string;
+  direction: TranslateDirection;
+}
 
 function PromptToolsBarImpl({
   prompt,
@@ -49,6 +51,10 @@ function PromptToolsBarImpl({
 }: Props) {
   const [busy, setBusy] = useState<ToolBusy>(null);
   const [sections, setSections] = useState<PromptSection[] | null>(null);
+  // Codex Phase 5 fix High — 번역 결과는 카드로 노출 (옛 즉시 교체 X)
+  const [translation, setTranslation] = useState<TranslationCardState | null>(
+    null,
+  );
 
   const trimmed = prompt.trim();
   const blocked = disabled || busy !== null || !trimmed;
@@ -76,7 +82,7 @@ function PromptToolsBarImpl({
     }
   };
 
-  const runTranslate = async (direction: "ko" | "en") => {
+  const runTranslate = async (direction: TranslateDirection) => {
     if (blocked) return;
     setBusy(direction === "en" ? "translate-en" : "translate-ko");
     try {
@@ -87,39 +93,49 @@ function PromptToolsBarImpl({
       });
       if (res.fallback || !res.translated) {
         toast.warn("번역 실패", res.error ?? "원본 유지됩니다.");
+        setTranslation(null);
         return;
       }
-      if (direction === "en") {
-        // 한→영: textarea 의 한국어 prompt 를 영문으로 *교체* (사용자 의도 — 모델에
-        // 영문 보내야 하므로). textarea 가 비어있을 때 호출됐으면 append 와 동치.
-        onPromptChange(res.translated);
-        toast.success("번역 완료 (한→영)", "프롬프트가 영문으로 교체됐습니다.");
-      } else {
-        // 영→한: 한국어 결과는 textarea 에 안 넣음 (모델 호환 영문 그대로 유지).
-        // 사용자 확인용 — 토스트 + 길면 콘솔에 풀버전 출력.
-        toast.info(
-          "번역 완료 (영→한)",
-          res.translated.length > 200
-            ? `${res.translated.slice(0, 200)}…`
-            : res.translated,
-        );
-      }
+      // Codex Phase 5 fix High — 결과를 카드로 보여주고 사용자가 명시 [원본 교체] 클릭.
+      // 옛: 한→영은 즉시 교체 (원문 즉시 손실), 영→한은 200자 토스트 (비교/복사 불가).
+      setTranslation({ text: res.translated, direction });
+      toast.success(
+        direction === "en" ? "번역 완료 (한→영)" : "번역 완료 (영→한)",
+        "카드 확인 후 [원본 교체] / [복사]",
+      );
     } catch (err) {
       toast.error(
         "번역 실패",
         err instanceof Error ? err.message : "알 수 없는 오류",
       );
+      setTranslation(null);
     } finally {
       setBusy(null);
     }
   };
 
-  const handleApply = (texts: string[]) => {
+  // 분리 카드 — 선택 추가 (textarea 끝에 append, 기존 prompt 보존)
+  const handleAppend = (texts: string[]) => {
     if (texts.length === 0) return;
     const joined = texts.join(", ");
     const next = trimmed ? `${trimmed.replace(/\s+$/, "")}, ${joined}` : joined;
     onPromptChange(next);
-    toast.success("카드 적용", `${texts.length}개 phrase 추가됨`);
+    toast.success("카드 추가", `${texts.length}개 phrase 추가됨`);
+  };
+
+  // 분리 카드 — 원본 교체 (선택 카드들로 prompt 통째 교체 · destructive)
+  const handleReplaceFromSections = (texts: string[]) => {
+    if (texts.length === 0) return;
+    onPromptChange(texts.join(", "));
+    toast.success("원본 교체", `${texts.length}개 phrase 로 교체됨`);
+    setSections(null);
+  };
+
+  // 번역 카드 — 원본 교체 (한→영 결과를 textarea 에 반영)
+  const handleTranslationReplace = (text: string) => {
+    onPromptChange(text);
+    toast.success("원본 교체", "번역 결과로 교체됨");
+    setTranslation(null);
   };
 
   return (
@@ -154,10 +170,19 @@ function PromptToolsBarImpl({
           title="긴 프롬프트를 카테고리 카드로 분리"
         />
       </div>
+      {translation && (
+        <PromptTranslationCard
+          translated={translation.text}
+          direction={translation.direction}
+          onClose={() => setTranslation(null)}
+          onReplace={handleTranslationReplace}
+        />
+      )}
       {sections && (
         <PromptCardList
           sections={sections}
-          onApply={handleApply}
+          onAppend={handleAppend}
+          onReplace={handleReplaceFromSections}
           onClose={() => setSections(null)}
         />
       )}
