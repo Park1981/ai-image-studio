@@ -22,6 +22,7 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
+import PromptToolsBar from "@/components/studio/prompt-tools/PromptToolsBar";
 import ResearchBanner from "@/components/studio/ResearchBanner";
 import SnippetLibraryModal from "@/components/studio/SnippetLibraryModal";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
@@ -237,6 +238,12 @@ export default function GenerateLeftPanel({
             </button>
           )}
         </div>
+        {/* Phase 5 (2026-05-01) — 프롬프트 도구 (번역/분리) · spec §6.5 */}
+        <PromptToolsBar
+          prompt={prompt}
+          onPromptChange={setPrompt}
+          disabled={generating}
+        />
       </div>
 
       {/* ── 라이브러리 모달 (Task 6/7 · 신규 등록은 모달 내부 [+ 새 등록] 으로) ── */}

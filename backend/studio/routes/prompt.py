@@ -10,7 +10,10 @@ task #17 (2026-04-26): router.py 풀 분해 2탄.
 
 from __future__ import annotations
 
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, ConfigDict, Field
 
 from .._gpu_lock import GpuBusyError, gpu_slot
 from .._lib_marker import strip_library_markers
@@ -18,11 +21,37 @@ from ..claude_cli import research_prompt
 from ..comfy_api_builder import _snap_dimension
 from ..comfy_transport import ComfyUITransport
 from ..presets import DEFAULT_OLLAMA_ROLES, GENERATE_MODEL, get_aspect
-from ..prompt_pipeline import upgrade_generate_prompt
+from ..prompt_pipeline import (
+    split_prompt_cards,
+    translate_prompt,
+    upgrade_generate_prompt,
+)
 from ..schemas import ResearchBody, UpgradeOnlyBody
 from ._common import log
 
 router = APIRouter()
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 5 (2026-05-01) — 프롬프트 분리 + 양방향 번역 엔드포인트.
+# spec §5.6 — POST /api/studio/prompt/split + POST /api/studio/prompt/translate.
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class PromptSplitBody(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    ollama_model: str | None = Field(default=None, alias="ollamaModel")
+
+    model_config = ConfigDict(populate_by_name=True)
+
+
+class PromptTranslateBody(BaseModel):
+    prompt: str = Field(..., min_length=1)
+    # "ko" = 영→한, "en" = 한→영. 잘못된 값은 422 (Pydantic 기본).
+    direction: Literal["ko", "en"]
+    ollama_model: str | None = Field(default=None, alias="ollamaModel")
+
+    model_config = ConfigDict(populate_by_name=True)
 
 
 @router.post("/upgrade-only")
@@ -73,6 +102,67 @@ async def upgrade_only(body: UpgradeOnlyBody):
         "provider": upgrade.provider,
         "fallback": upgrade.fallback,
         "researchHints": research_hints,
+    }
+
+
+@router.post("/prompt/split")
+async def prompt_split(body: PromptSplitBody) -> dict:
+    """긴 프롬프트 → 의미 카드 (sections 배열).
+
+    Phase 5 (2026-05-01) — spec §5.6.
+
+    UI 가 카드 형태로 노출. 원본 textarea 는 자동 덮어쓰지 않음 (spec §11 비목표).
+    응답 shape: { sections: [{key, text}], provider, fallback, error?, raw? }
+    """
+    try:
+        async with gpu_slot("prompt-split"):
+            result = await split_prompt_cards(
+                prompt=body.prompt,
+                model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
+            )
+    except GpuBusyError as e:
+        raise HTTPException(503, str(e)) from e
+
+    return {
+        "sections": [s.to_dict() for s in result.sections],
+        "provider": result.provider,
+        "fallback": result.fallback,
+        "error": result.error,
+        # raw 는 디버그 용 — UI 에는 표시 안 하지만 fallback 시 진단에 유용.
+        # 길이 cap (16KB) — 모델이 폭주해도 응답 크기 안전망.
+        "raw": (result.raw or "")[:16384],
+    }
+
+
+@router.post("/prompt/translate")
+async def prompt_translate(body: PromptTranslateBody) -> dict:
+    """프롬프트 한↔영 양방향 번역.
+
+    Phase 5 (2026-05-01) — spec §4.4 / §5.6.
+
+    direction:
+      - "ko" — 영문 → 한국어
+      - "en" — 한국어 → 영문 (Stable Diffusion / Qwen 호환)
+
+    LoRA / weight / negative 등 특수 토큰은 SYSTEM 프롬프트가 보존 강제.
+    실패 시 translated=원문 + fallback=true (UI 가 그대로 표시).
+    """
+    try:
+        async with gpu_slot("prompt-translate"):
+            result = await translate_prompt(
+                text=body.prompt,
+                direction=body.direction,
+                model=body.ollama_model or DEFAULT_OLLAMA_ROLES.text,
+            )
+    except GpuBusyError as e:
+        raise HTTPException(503, str(e)) from e
+
+    return {
+        "translated": result.translated,
+        "provider": result.provider,
+        "fallback": result.fallback,
+        "direction": result.direction,
+        "error": result.error,
     }
 
 

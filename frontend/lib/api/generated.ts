@@ -336,6 +336,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/prompt/split": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prompt Split
+         * @description 긴 프롬프트 → 의미 카드 (sections 배열).
+         *
+         *     Phase 5 (2026-05-01) — spec §5.6.
+         *
+         *     UI 가 카드 형태로 노출. 원본 textarea 는 자동 덮어쓰지 않음 (spec §11 비목표).
+         *     응답 shape: { sections: [{key, text}], provider, fallback, error?, raw? }
+         */
+        post: operations["prompt_split_api_studio_prompt_split_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/prompt/translate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Prompt Translate
+         * @description 프롬프트 한↔영 양방향 번역.
+         *
+         *     Phase 5 (2026-05-01) — spec §4.4 / §5.6.
+         *
+         *     direction:
+         *       - "ko" — 영문 → 한국어
+         *       - "en" — 한국어 → 영문 (Stable Diffusion / Qwen 호환)
+         *
+         *     LoRA / weight / negative 등 특수 토큰은 SYSTEM 프롬프트가 보존 강제.
+         *     실패 시 translated=원문 + fallback=true (UI 가 그대로 표시).
+         */
+        post: operations["prompt_translate_api_studio_prompt_translate_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/reference-pool/orphans": {
         parameters: {
             query?: never;
@@ -743,6 +797,25 @@ export interface components {
             message?: string | null;
             /** Ok */
             ok: boolean;
+        };
+        /** PromptSplitBody */
+        PromptSplitBody: {
+            /** Ollamamodel */
+            ollamaModel?: string | null;
+            /** Prompt */
+            prompt: string;
+        };
+        /** PromptTranslateBody */
+        PromptTranslateBody: {
+            /**
+             * Direction
+             * @enum {string}
+             */
+            direction: "ko" | "en";
+            /** Ollamamodel */
+            ollamaModel?: string | null;
+            /** Prompt */
+            prompt: string;
         };
         /** ResearchBody */
         ResearchBody: {
@@ -1291,6 +1364,76 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessAction"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prompt_split_api_studio_prompt_split_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptSplitBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    prompt_translate_api_studio_prompt_translate_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptTranslateBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Validation Error */

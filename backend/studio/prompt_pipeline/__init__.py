@@ -42,6 +42,15 @@ from .translate import (  # noqa: F401 — facade re-export
     clarify_edit_intent,
     translate_to_korean,
 )
+from .tools import (  # noqa: F401 — facade re-export (Phase 5 · 2026-05-01)
+    ALLOWED_SECTION_KEYS,
+    PromptSection,
+    PromptSplitResult,
+    PromptTranslateResult,
+    TranslateDirection,
+    split_prompt_cards,
+    translate_prompt,
+)
 from .upgrade import (  # noqa: F401 — facade re-export
     DOMAIN_VALID_SLOTS,
     ROLE_INSTRUCTIONS,
@@ -79,6 +88,14 @@ __all__ = [
     "SYSTEM_CLARIFY_INTENT",
     "clarify_edit_intent",
     "translate_to_korean",
+    # tools (Phase 5 · 2026-05-01)
+    "ALLOWED_SECTION_KEYS",
+    "PromptSection",
+    "PromptSplitResult",
+    "PromptTranslateResult",
+    "TranslateDirection",
+    "split_prompt_cards",
+    "translate_prompt",
     # upgrade — system prompts
     "SYSTEM_GENERATE",
     "SYSTEM_EDIT",
