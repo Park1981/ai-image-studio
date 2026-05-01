@@ -443,13 +443,17 @@ Vision description 은 기존 정책 유지.
 
 분리 결과 카드는 원본 아래에 표시한다.
 
-카드 액션:
+카드 액션 (구현 채택 — Codex Phase 5 리뷰 fix · 2026-05-01):
 
-- 복사
-- 원본에 적용
-- 선택 카드만 적용
-- 카드 삭제
-- 원본 유지
+- **복사** — 카드 텍스트를 clipboard 로
+- **선택 추가** (= "선택 카드만 적용") — 체크된 카드들의 text 를 textarea 끝에 `, ` join 으로 *append*. 기존 prompt 보존.
+- **원본 교체** (= "원본에 적용") — 체크된 카드들의 text 로 textarea 통째로 *replace*. destructive 동작 (원본 손실).
+- **카드 삭제** — 해당 카드만 visible 리스트에서 제거 (sections state 자체는 유지).
+- **닫기** (= "원본 유지") — 카드 영역 unmount, prompt 영향 0.
+
+**기본 미선택**: 카드가 도착해도 기본 체크박스 unchecked. 사용자가 명시 체크 후에야 [선택 추가] / [원본 교체] 활성. 이전 안 (기본 전체 선택 + append) 은 원문과 거의 같은 phrase 가 중복되는 안티패턴이라 회피.
+
+**spec §11 비목표 정합**: 자동 mount-effect 등 prompt 만지는 path 없음. 사용자 명시 클릭만 textarea 변경.
 
 ## 7. 실패/폴백 정책
 
@@ -466,9 +470,14 @@ Vision description 은 기존 정책 유지.
 정밀 보강 fallback 은 두 가지 중 하나로 결정한다.
 
 1. 자동 빠른 보강 재시도
-2. 원본으로 폴백
+2. 원본으로 폴백 (provider=`fallback-precise-failed` 명시 라벨)
 
-추천은 1번이다. 사용자는 "정밀" 을 눌렀지만 원본으로 바로 떨어지는 것보다 빠른 보강 결과라도 받는 편이 유용하다.
+**구현 채택: 2번 (원본 폴백 + 명시 라벨)** — v2 plan §3.3 결정 (2026-05-01).
+
+사유:
+- 자동 재시도는 사용자 인지를 흐림 — "정밀 눌렀는데 빠른 결과 도착" 이 silent.
+- `fallback-precise-failed` 별도 provider 로 표기하면 UI 가 *모달 경고 + DetailBox warn + toast* 3-layer 안내 가능.
+- 사용자가 원하면 `[재업그레이드]` 버튼 (Generate 모달) 또는 [빠른] 모드 전환 후 재시도 — 명시 클릭만 받음.
 
 ## 8. 성능 기준
 
@@ -601,3 +610,75 @@ intent 정제: 보강 모드에 따라 fast=false / precise=true
 가장 먼저 해야 할 작업은 기능 UI 가 아니라 Ollama 호출부의 `think` 옵션화와
 `thinking fallback` 분리다. 이 안전장치를 먼저 넣어야 정밀 보강과 prompt split 을
 안정적으로 확장할 수 있다.
+
+## 13. 구현 결과 + 알려진 이슈 (2026-05-01)
+
+### 13.1 구현 완료 항목
+
+3 commit 으로 master 박제:
+
+- **`ac364ca`** — Phase 1~4 + Codex Phase 4 리뷰 4 finding fix
+  · 호출 옵션화 (회귀 0 안전망)
+  · 모드 enum + upgrade/clarify 함수 확장 (`fallback-precise-failed` 신규 provider)
+  · Frontend 토글 + 전파 (settings + 페이지 session)
+  · UI 경고 + 4 stage 라벨 모드 분기 (`gemmaSubLabel` 콜백)
+
+- **`4e96f85`** — Phase 5 (프롬프트 분리 + 양방향 번역)
+  · `prompt_pipeline/tools.py` 신규 (`split_prompt_cards` + `translate_prompt`)
+  · `POST /prompt/split` + `POST /prompt/translate` 엔드포인트
+  · `PromptToolsBar` + `PromptCardList` 컴포넌트 (3 LeftPanel 통합)
+
+- **`ebd99c8`** — Codex Phase 5 리뷰 4 finding fix
+  · 번역 결과를 카드 (`PromptTranslationCard`) 로 노출
+  · 분리 카드 sections 변경 시 state reset (React derive-state-from-props 패턴)
+  · settings ollamaModel 3 LeftPanel → PromptToolsBar 전파
+  · 카드 액션 분리 (`[선택 추가]` append + `[원본 교체]` replace) + 기본 미선택
+
+검증: pytest 371 → 405 (+34) / vitest 125 → 150 (+25) / tsc clean / ESLint clean.
+
+### 13.2 알려진 이슈 (후속 작업 후보)
+
+#### 🟡 M1 — `keep_alive=0` 정책 후속 실험 (성능)
+
+본 spec §8 의 권장사항 그대로 — 정밀 보강은 모델 reload 비용 큼. 사용자가
+`[정밀]` + `[분리]` + `[번역]` 빈번 사용 시 매번 cold reload ~5초 추가.
+
+후속 plan 후보: `gemma4-un` 호출 직후 `keep_alive: "30s"` 짧은 유지 실험.
+ComfyUI sampling 시 강제 unload (`force_unload_all_loaded_models`) 는 그대로
+유지해야 16GB VRAM swap 회피. 따라서 *Ollama 단독 사용 구간* (사용자가
+입력 다듬는 동안) 만 30s 유지하고 ComfyUI dispatch 직전 강제 unload —
+이 경계가 코드 레벨에서 어떻게 구현될지가 plan 핵심.
+
+#### 🟡 M2 — Edit Compare 자동 트리거 + 정밀 모드 UX 정책
+
+사용자가 Edit `[정밀]` 켠 상태에서 결과가 나오면 `useEditPipeline.ts:243` 의
+`analyzeComparison(item, { silent: true, promptMode: editPromptMode })` 가
+*Edit 모드 그대로* 자동 Compare 호출. cache miss 시 `clarify_edit_intent` 도
+`think:true` → **60s+ 추가**. 자동이라 사용자 인지 X.
+
+ProgressModal 의 `intent-refine` stage 라벨이 "정밀" 표시는 함 (Phase 4) 이지만
+백그라운드 분석이라 모달 자체가 안 뜸 (Edit 결과 자체는 이미 완료).
+
+후속 정책 결정 옵션:
+- (A) 현재 동작 유지 (모드 일관성 우선)
+- (B) 자동 트리거는 *항상 fast* 강제 (속도 우선) — 수동 분석은 모드 따라감
+- (C) 자동 분석 시작 시 toast 안내 ("정밀 분석 진행 중 · ~60초")
+
+#### 🟢 L1 — Mount-time flicker (Settings precise 사용자만)
+
+**원인**: `useGenerateStore` 등 페이지 store 의 `promptMode` 초기값이 `"fast"` 고정.
+mount effect (`useRef + getState()` Codex Phase 4 fix Medium #2) 가 settings 의
+`promptEnhanceMode` 로 sync 하는 구조라, settings 가 `"precise"` 인 사용자는
+첫 paint 와 effect 실행 사이 한 frame `[빠른]` 표시 가능.
+
+**persist 흔적은 아님** — `useGenerateStore` 의 `partialize` 가 `promptMode` 명시적
+제외 (`stores/useGenerateStore.ts:244-253`). 새로고침 후 store 는 항상 default
+`"fast"` 로 init.
+
+**대응 옵션**:
+- (A) 현재 구조 유지 — 1 frame flicker 미세, UX 영향 무시 가능 수준
+- (B) `useState` lazy init 으로 settings 값 가져와 store default 동적 결정
+- (C) `PromptModeRadio` 가 settings 값 직접 구독 — store sync 제거 (페이지 session
+  토글 의미 약화)
+
+본 commit 범위 X — 후속 plan 후보. 옵션 A 가 가장 단순 + 영향 미세.
