@@ -173,6 +173,8 @@ export default function GenerateLeftPanel({
       </div>
 
       {/* ── 프롬프트 카드 ── */}
+      {/* 2026-05-01 (UX 통일): chars·KO 메타 제거 + 라이브러리 버튼을 Edit 참조이미지
+       *  헤더와 동일한 우측 텍스트 링크 스타일로 이동 (footer 안 인라인 → 헤더 우측). */}
       <div>
         <div className="ais-field-header">
           <label
@@ -182,9 +184,22 @@ export default function GenerateLeftPanel({
             <SectionAccentBar accent="blue" />
             프롬프트
           </label>
-          <span className="mono ais-field-meta">
-            {prompt.length} chars · KO
-          </span>
+          <button
+            type="button"
+            onClick={() => setLibraryOpen(true)}
+            style={{
+              all: "unset",
+              cursor: "pointer",
+              fontSize: 11,
+              color: "var(--ink-3)",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+            title="프롬프트 라이브러리 (등록도 모달 안에서)"
+          >
+            <Icon name="grid" size={11} /> 라이브러리에서 선택
+          </button>
         </div>
         <div className="ais-prompt-shell">
           <PromptHistoryPeek mode="generate" onSelect={(p) => setPrompt(p)} />
@@ -197,20 +212,8 @@ export default function GenerateLeftPanel({
             className="ais-prompt-textarea"
           />
           <div className="ais-prompt-footer">
-            <div style={{ display: "flex", gap: 8 }}>
-              {/* 2026-04-30 (오빠 후속 UX 정리):
-               *  [+ 라이브러리에 등록] / [템플릿 저장] 별도 버튼 제거.
-               *  → 라이브러리 모달 안 [+ 새 등록] 이 currentPrompt 자동 pre-fill 로 흡수.
-               */}
-              <button
-                type="button"
-                onClick={() => setLibraryOpen(true)}
-                className="ais-prompt-link"
-                title="프롬프트 라이브러리 (등록도 모달 안에서)"
-              >
-                📚 라이브러리
-              </button>
-            </div>
+            {/* 좌측 placeholder — 옛 [📚 라이브러리] 버튼 헤더로 이동 (2026-05-01) */}
+            <div />
             <div style={{ display: "flex", gap: 10 }}>
               <button
                 type="button"
