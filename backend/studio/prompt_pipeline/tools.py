@@ -157,7 +157,7 @@ async def split_prompt_cards(
     prompt: str,
     *,
     model: str = "gemma4-un:latest",
-    timeout: float = 30.0,
+    timeout: float = 60.0,
     ollama_url: str | None = None,
 ) -> PromptSplitResult:
     """긴 프롬프트 → 의미 카드 (sections 배열).
@@ -165,7 +165,7 @@ async def split_prompt_cards(
     Args:
         prompt: 사용자 원본 프롬프트 (한/영 · 빈 입력 허용)
         model: Ollama 모델 (gemma4-un · think:false 자동 적용)
-        timeout: 30s 권장 (cold start 여유)
+        timeout: 60s 권장 (긴 프롬프트 + cold start 여유)
         ollama_url: 기본 settings.ollama_url
 
     Returns:

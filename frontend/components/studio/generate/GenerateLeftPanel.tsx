@@ -22,7 +22,9 @@
 import { useEffect, useRef, useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
-import PromptToolsBar from "@/components/studio/prompt-tools/PromptToolsBar";
+import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
+import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
+import { usePromptTools } from "@/hooks/usePromptTools";
 import ResearchBanner from "@/components/studio/ResearchBanner";
 import SnippetLibraryModal from "@/components/studio/SnippetLibraryModal";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
@@ -75,8 +77,17 @@ export default function GenerateLeftPanel({
   } = useGenerateInputs();
   const { generating, progress, stage } = useGenerateRunning();
 
-  // Codex Phase 5 fix Medium — settings 의 ollamaModel override 를 PromptToolsBar 로 전파.
+  // Codex Phase 5 fix Medium — settings 의 ollamaModel override 를 도구로 전파.
   const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
+
+  // Phase 5 후속 (2026-05-01) — 프롬프트 도구 (번역/분리) state + 핸들러 통합 hook.
+  // PromptToolsButtons (textarea 안) + PromptToolsResults (textarea 외부) 가 같은 hook 공유.
+  const promptTools = usePromptTools({
+    prompt,
+    onPromptChange: setPrompt,
+    ollamaModel: ollamaModelSel,
+    disabled: generating,
+  });
 
   // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store 로 sync.
   // Codex Phase 4 리뷰 Medium #2 fix: settings 변경이 페이지 session 토글을 즉시 덮어쓰던
@@ -229,6 +240,9 @@ export default function GenerateLeftPanel({
             rows={3}
             className="ais-prompt-textarea"
           />
+          {/* Phase 5 후속 (2026-05-01) — 도구 버튼 (번역/분리) textarea 안 우측.
+           *  히스토리 (top:10) 하단 + 비우기 (bottom:10) 위 영역에 세로 stack. */}
+          <PromptToolsButtons tools={promptTools} />
           {prompt.length > 0 && (
             <button
               type="button"
@@ -241,15 +255,8 @@ export default function GenerateLeftPanel({
             </button>
           )}
         </div>
-        {/* Phase 5 (2026-05-01) — 프롬프트 도구 (번역/분리) · spec §6.5
-         *  Codex Phase 5 fix Medium: settings 의 ollamaModel override 패스스루.
-         *  옛엔 prop 누락이라 사용자가 텍스트 모델 바꿔도 도구만 백엔드 default 썼음. */}
-        <PromptToolsBar
-          prompt={prompt}
-          onPromptChange={setPrompt}
-          ollamaModel={ollamaModelSel}
-          disabled={generating}
-        />
+        {/* 번역/분리 결과 카드 — 도구 버튼 클릭 후 textarea 외부 아래에 펼침. */}
+        <PromptToolsResults tools={promptTools} />
       </div>
 
       {/* ── 라이브러리 모달 (Task 6/7 · 신규 등록은 모달 내부 [+ 새 등록] 으로) ── */}

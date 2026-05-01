@@ -118,6 +118,7 @@ async def test_split_payload_uses_json_format_temp0_thinkfalse() -> None:
     assert call["format"] == "json"
     assert call["temperature"] == 0.0
     assert call["num_predict"] == 1024
+    assert call["timeout"] == 60.0
 
 
 @pytest.mark.asyncio

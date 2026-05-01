@@ -20,7 +20,9 @@
 import { useEffect, useRef, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
-import PromptToolsBar from "@/components/studio/prompt-tools/PromptToolsBar";
+import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
+import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
+import { usePromptTools } from "@/hooks/usePromptTools";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import {
@@ -62,8 +64,16 @@ export default function VideoLeftPanel({
   } = useVideoInputs();
   const { running } = useVideoRunning();
 
-  // Codex Phase 5 fix Medium — PromptToolsBar 로 ollamaModel override 패스스루.
+  // Codex Phase 5 fix Medium — settings 의 ollamaModel override 를 도구로 전파.
   const ollamaModelForTools = useSettingsStore((s) => s.ollamaModel);
+
+  // Phase 5 후속 (2026-05-01) — 프롬프트 도구 (번역/분리) state + 핸들러 통합 hook.
+  const promptTools = usePromptTools({
+    prompt,
+    onPromptChange: setPrompt,
+    ollamaModel: ollamaModelForTools,
+    disabled: running,
+  });
 
   // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store sync.
   // Codex Phase 4 리뷰 Medium #2 fix — session-only 정책 정합 (settings 변경은 다음 mount 부터 반영).
@@ -175,6 +185,8 @@ export default function VideoLeftPanel({
             rows={3}
             className="ais-prompt-textarea"
           />
+          {/* Phase 5 후속 (2026-05-01) — 도구 버튼 (번역/분리) textarea 안 우측. */}
+          <PromptToolsButtons tools={promptTools} />
           {prompt.length > 0 && (
             <button
               type="button"
@@ -187,14 +199,8 @@ export default function VideoLeftPanel({
             </button>
           )}
         </div>
-        {/* Phase 5 (2026-05-01) — 프롬프트 도구 (번역/분리) · spec §6.5
-         *  Codex Phase 5 fix Medium: settings ollamaModel 전파 (옛 prop 누락). */}
-        <PromptToolsBar
-          prompt={prompt}
-          onPromptChange={setPrompt}
-          ollamaModel={ollamaModelForTools}
-          disabled={running}
-        />
+        {/* 번역/분리 결과 카드 — textarea 외부 아래에 펼침. */}
+        <PromptToolsResults tools={promptTools} />
       </div>
 
       {/* AI 프롬프트 보정 토글 (2026-04-27 · 2026-05-01 default OFF 로 변경):

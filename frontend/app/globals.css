@@ -298,6 +298,86 @@ button {
   box-shadow: 0 2px 8px rgba(239,68,68,.12);
 }
 
+/* Phase 5 후속 (2026-05-01) — 프롬프트 도구 (번역/분리) textarea 안 우측 세로 stack.
+ *  히스토리 (top:10) 와 비우기 (bottom:10) 사이. 5px gap 으로 26×26 박스 stack. */
+.ais-prompt-tools-stack {
+  position: absolute;
+  top: 46px;
+  right: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 5;
+}
+.ais-prompt-tool-btn {
+  all: unset;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  color: var(--ink-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  transition: background .12s, color .12s, border-color .12s, box-shadow .12s;
+}
+.ais-prompt-tool-btn:hover:not(:disabled) {
+  color: var(--ink);
+  background: var(--surface-2, rgba(0,0,0,.03));
+  border-color: var(--line-strong, var(--line));
+  box-shadow: 0 2px 8px rgba(0,0,0,.06);
+}
+.ais-prompt-tool-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+.ais-prompt-tool-btn[aria-expanded="true"] {
+  color: var(--ink);
+  background: var(--accent-soft, rgba(99,102,241,0.18));
+  border-color: var(--accent, rgba(99,102,241,0.6));
+}
+
+/* Phase 5 후속 — 번역 dropdown 메뉴 (도구 버튼 좌측 펼침 — textarea 안쪽으로 침범 방지) */
+.ais-prompt-tool-menu {
+  position: absolute;
+  top: 0;
+  right: calc(100% + 6px);
+  min-width: 180px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 20px rgba(0,0,0,.10);
+  padding: 4px;
+  z-index: 6;
+}
+.ais-prompt-tool-menuitem {
+  all: unset;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  padding: 6px 10px;
+  border-radius: 4px;
+  color: var(--ink);
+  transition: background .12s, color .12s;
+}
+.ais-prompt-tool-menuitem:hover:not(:disabled) {
+  background: var(--surface-2, rgba(0,0,0,.04));
+}
+.ais-prompt-tool-menuitem:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+/* spinner 회전 — 도구 버튼 busy 상태 */
+@keyframes ais-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
 /* Primary CTA 버튼 — sticky 하단 + progress bar overlay (edit/video 공용) */
 .ais-cta-sticky {
   position: sticky;
