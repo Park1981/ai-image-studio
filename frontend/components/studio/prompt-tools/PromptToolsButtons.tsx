@@ -75,7 +75,20 @@ export default function PromptToolsButtons({ tools }: Props) {
   const enItemDisabled = blocked || !koreanIn; // 한→영: 한글 없으면 disabled
 
   return (
-    <div className="ais-prompt-tools-stack">
+    <div
+      className="ais-prompt-tools-stack"
+      // 안전망 — globals.css 의 .ais-prompt-tools-stack 가 hot-reload 안 잡힌 dev 환경 대비.
+      // CSS 가 정상 로드되면 inline 과 동일값이라 영향 X. 미로드 시 inline 이 fallback.
+      style={{
+        position: "absolute",
+        top: 46,
+        right: 10,
+        display: "flex",
+        flexDirection: "column",
+        gap: 6,
+        zIndex: 5,
+      }}
+    >
       {/* 번역 — dropdown */}
       <div ref={menuRef} style={{ position: "relative" }}>
         <button

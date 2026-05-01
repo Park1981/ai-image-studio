@@ -176,7 +176,7 @@ function PromptCardListImpl({ sections, onAppend, onReplace, onClose }: Props) {
                 borderRadius: 6,
                 background: isSelected
                   ? "var(--accent-soft, rgba(99,102,241,0.08))"
-                  : "var(--surface-2, rgba(255,255,255,0.02))",
+                  : "transparent",
                 border: "1px solid var(--line)",
               }}
             >

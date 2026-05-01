@@ -42,18 +42,21 @@ function PromptModeRadioImpl({ value, onChange }: Props) {
         justifyContent: "space-between",
         padding: "8px 12px",
         borderRadius: 8,
-        background: "var(--surface-2, rgba(255,255,255,0.02))",
+        background: "var(--surface)",
+        border: "1px solid var(--line)",
         gap: 12,
       }}
       role="radiogroup"
       aria-label="AI 보정 모드"
     >
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontSize: 13, fontWeight: 600 }}>🧠 보정 모드</div>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
+          🧠 보정 모드
+        </div>
         <div
           style={{
             fontSize: 11,
-            color: "var(--text-muted, rgba(255,255,255,0.55))",
+            color: "var(--ink-3)",
             marginTop: 2,
           }}
         >
@@ -66,10 +69,10 @@ function PromptModeRadioImpl({ value, onChange }: Props) {
       <div
         style={{
           display: "inline-flex",
-          gap: 4,
+          gap: 2,
           padding: 2,
           borderRadius: 6,
-          background: "var(--surface-3, rgba(0,0,0,0.25))",
+          background: "var(--line)",
         }}
       >
         {OPTIONS.map((opt) => {
@@ -89,12 +92,9 @@ function PromptModeRadioImpl({ value, onChange }: Props) {
                 borderRadius: 4,
                 border: "none",
                 cursor: "pointer",
-                color: active
-                  ? "var(--text-primary, #fff)"
-                  : "var(--text-muted, rgba(255,255,255,0.55))",
-                background: active
-                  ? "var(--accent-soft, rgba(99,102,241,0.35))"
-                  : "transparent",
+                color: active ? "var(--accent-ink)" : "var(--ink-3)",
+                background: active ? "var(--surface)" : "transparent",
+                boxShadow: active ? "0 1px 3px rgba(0,0,0,.08)" : "none",
                 transition: "background 120ms, color 120ms",
               }}
             >

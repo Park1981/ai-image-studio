@@ -95,7 +95,7 @@ function PromptTranslationCardImpl({
           fontSize: 12.5,
           lineHeight: 1.6,
           color: "var(--ink)",
-          background: "var(--surface-2, rgba(255,255,255,0.02))",
+          background: "var(--surface)",
           border: "1px solid var(--line)",
           borderRadius: 6,
           maxHeight: 240,

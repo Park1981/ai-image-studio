@@ -268,8 +268,10 @@ button {
   line-height: 1.6;
   color: var(--ink);
   border-radius: var(--radius);
-  /* auto-grow: 내용만큼만 + 상한 60vh 에서 내부 스크롤 */
-  min-height: 96px;
+  /* auto-grow: 내용만큼만 + 상한 60vh 에서 내부 스크롤
+   * 2026-05-01 — 우측 stack (히스토리 + 도구 2개 = 100px) + 비우기 (bottom:10 + 26)
+   * 와 겹치지 않도록 min-height 144 로 상향. 옛 96px 은 도구 도입 전 기준이었음. */
+  min-height: 144px;
   max-height: 60vh;
   overflow-y: auto;
   box-sizing: border-box;
