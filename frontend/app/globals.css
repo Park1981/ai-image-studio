@@ -402,38 +402,49 @@ button {
 }
 .ais-prompt-mode-segmented {
   display: flex;
-  gap: 2px;
+  gap: 0;
   padding: 3px;
-  background: var(--line);
-  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.045);
+  border-radius: 999px;
   width: 100%;
+  align-self: stretch;
 }
 .ais-prompt-mode-seg-btn {
   flex: 1;
-  padding: 7px 12px;
+  height: 28px;
+  padding: 0 12px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
-  font-size: 12.5px;
+  font-size: 11.5px;
   font-weight: 500;
   font-family: inherit;
-  letter-spacing: 0.01em;
-  border-radius: 6px;
+  letter-spacing: 0.02em;
+  border-radius: 999px;
   border: none;
   cursor: pointer;
   background: transparent;
   color: var(--ink-3);
-  transition: background .14s, color .14s, box-shadow .14s, font-weight .14s;
+  transition:
+    background .18s ease,
+    color .18s ease,
+    box-shadow .18s ease,
+    font-weight .18s ease,
+    transform .18s ease;
 }
 .ais-prompt-mode-seg-btn:hover:not([data-active="true"]) {
   color: var(--ink-2);
+}
+.ais-prompt-mode-seg-btn:active:not([data-active="true"]) {
+  transform: scale(0.97);
 }
 .ais-prompt-mode-seg-btn[data-active="true"] {
   background: var(--surface);
   color: var(--accent-ink);
   font-weight: 600;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.05),
+    0 0 0 0.5px rgba(74, 158, 255, 0.15);
 }
 
 /* Primary CTA 버튼 — sticky 하단 + progress bar overlay (edit/video 공용) */
