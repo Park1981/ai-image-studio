@@ -401,50 +401,52 @@ button {
   box-shadow: 0 2px 8px rgba(74, 158, 255, 0.08);
 }
 .ais-prompt-mode-segmented {
-  display: flex;
+  display: inline-flex;
   gap: 0;
-  padding: 3px;
-  background: rgba(0, 0, 0, 0.045);
+  padding: 2px;
+  background: rgba(0, 0, 0, 0.04);
   border-radius: 999px;
-  width: 100%;
-  align-self: stretch;
+  align-self: flex-start;
+  /* 카드 폭 100% 채우지 않고 내용물 너비만 — 시각 hierarchy 회복 */
+  width: fit-content;
 }
 .ais-prompt-mode-seg-btn {
-  flex: 1;
-  height: 28px;
-  padding: 0 12px;
+  height: 24px;
+  min-width: 78px;
+  padding: 0 14px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 500;
   font-family: inherit;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
   border-radius: 999px;
   border: none;
   cursor: pointer;
   background: transparent;
   color: var(--ink-3);
   transition:
-    background .18s ease,
-    color .18s ease,
-    box-shadow .18s ease,
-    font-weight .18s ease,
-    transform .18s ease;
+    background .2s ease,
+    color .2s ease,
+    box-shadow .2s ease,
+    font-weight .2s ease,
+    transform .15s ease;
 }
 .ais-prompt-mode-seg-btn:hover:not([data-active="true"]) {
   color: var(--ink-2);
 }
 .ais-prompt-mode-seg-btn:active:not([data-active="true"]) {
-  transform: scale(0.97);
+  transform: scale(0.96);
 }
 .ais-prompt-mode-seg-btn[data-active="true"] {
   background: var(--surface);
   color: var(--accent-ink);
   font-weight: 600;
+  /* 카드와 동급 weight 안 되게 그림자 약화 — 절제된 active */
   box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.05),
-    0 0 0 0.5px rgba(74, 158, 255, 0.15);
+    0 0 0 0.5px rgba(74, 158, 255, 0.18),
+    0 1px 2px rgba(0, 0, 0, 0.04);
 }
 
 /* Primary CTA 버튼 — sticky 하단 + progress bar overlay (edit/video 공용) */
