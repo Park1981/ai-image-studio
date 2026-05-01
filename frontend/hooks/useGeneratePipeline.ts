@@ -66,6 +66,7 @@ export function useGeneratePipeline(): UseGeneratePipeline {
   const research = useGenerateStore((s) => s.research);
   const styleId = useGenerateStore((s) => s.styleId);
   const skipUpgrade = useGenerateStore((s) => s.skipUpgrade);
+  const promptMode = useGenerateStore((s) => s.promptMode);
   // 실행 상태
   const generating = useGenerateStore((s) => s.generating);
   const setRunning = useGenerateStore((s) => s.setRunning);
@@ -126,6 +127,8 @@ export function useGeneratePipeline(): UseGeneratePipeline {
         preUpgradedPrompt: preUpgraded,
         preResearchHints,
         styleId,
+        // Phase 2 (2026-05-01) — gemma4 보강 모드 (백엔드 default = fast)
+        promptMode,
       }),
       {
         on: {
@@ -137,6 +140,12 @@ export function useGeneratePipeline(): UseGeneratePipeline {
               toast.error(
                 "ComfyUI 오류 (Mock 폴백 적용)",
                 e.item.comfyError.slice(0, 160),
+              );
+            } else if (e.item.promptProvider === "fallback-precise-failed") {
+              // Phase 2 (2026-05-01) — 정밀 보강 실패 별도 분기
+              toast.warn(
+                "정밀 보강 실패",
+                "원본 프롬프트로 생성됐어요. 빠른 모드로 다시 시도해 보세요.",
               );
             } else if (e.item.promptProvider === "fallback") {
               toast.warn(
@@ -221,6 +230,8 @@ export function useGeneratePipeline(): UseGeneratePipeline {
           aspect,
           width,
           height,
+          // Phase 2 (2026-05-01) — 사전 검수 모달 호출에도 모드 전파
+          promptMode,
         });
         setUpgradeResult(result);
       } catch (err) {
@@ -257,6 +268,9 @@ export function useGeneratePipeline(): UseGeneratePipeline {
         aspect,
         width,
         height,
+        // Phase 2 후속 (Codex Phase 4 리뷰 High #1) — 재업그레이드 경로도 promptMode 전파.
+        // 이전엔 누락 → 정밀 모드에서 [재업그레이드] 누르면 백엔드 default = fast 로 떨어짐.
+        promptMode,
       });
       setUpgradeResult(result);
     } catch (err) {

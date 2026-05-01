@@ -59,6 +59,8 @@ async def upgrade_only(body: UpgradeOnlyBody):
                 research_context="\n".join(research_hints) if research_hints else None,
                 width=resolved_w,
                 height=resolved_h,
+                # Phase 2 (2026-05-01) — 사용자가 모달 띄우기 전 [정밀] 토글한 경우 전파
+                prompt_mode=body.prompt_mode or "fast",
             )
     except GpuBusyError as e:
         raise HTTPException(503, str(e)) from e

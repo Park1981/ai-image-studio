@@ -61,9 +61,12 @@ describe("PIPELINE_DEFS — 정적 일관성", () => {
   });
 
   it("subLabel 정의된 경우 비어있지 않음 + 길이 sane", () => {
+    // Phase 2 (2026-05-01) — subLabel 이 string | (ctx) => string 두 형태 지원.
+    // 콜백 형태는 fast / precise 두 분기 모두 sane 검증.
     for (const mode of ALL_MODES) {
       for (const stage of PIPELINE_DEFS[mode]) {
-        if (stage.subLabel !== undefined) {
+        if (stage.subLabel === undefined) continue;
+        if (typeof stage.subLabel === "string") {
           expect(
             stage.subLabel,
             `${mode}.${stage.type} subLabel 빈 문자열`,
@@ -72,6 +75,19 @@ describe("PIPELINE_DEFS — 정적 일관성", () => {
             stage.subLabel.length,
             `${mode}.${stage.type} subLabel "${stage.subLabel}" 길이 1-30`,
           ).toBeLessThanOrEqual(30);
+        } else {
+          // 함수: fast / precise 두 ctx 로 호출해 결과 검증
+          for (const promptMode of ["fast", "precise"] as const) {
+            const result = stage.subLabel({ promptMode });
+            expect(
+              result,
+              `${mode}.${stage.type} subLabel(${promptMode}) 빈 문자열`,
+            ).toBeTruthy();
+            expect(
+              result.length,
+              `${mode}.${stage.type} subLabel(${promptMode})="${result}" 길이 1-30`,
+            ).toBeLessThanOrEqual(30);
+          }
         }
       }
     }

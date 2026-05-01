@@ -24,6 +24,7 @@ import Icon from "@/components/ui/Icon";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
 import { copyText } from "@/lib/image-actions";
 import type { HistoryItem } from "@/lib/api/types";
+import { useEditStore } from "@/stores/useEditStore";
 
 export const INFO_PANEL_WIDTH = 340;
 
@@ -293,6 +294,10 @@ export default function InfoPanel({ item, onClose }: Props) {
 function ComparisonInPanel({ item }: { item: HistoryItem }) {
   // 비교 분석 훅: 분석 실행 + 진행 상태
   const { analyze, isBusy } = useComparisonAnalysis();
+  // Phase 2 후속 (Codex Phase 4 리뷰 Medium #1) — Edit context 비교 분석은 Edit promptMode
+  // 따라감 (자동/수동 모두 일관). lightbox 가 Edit 항목을 띄울 때 그 시점의 Edit store
+  // 모드 reflect. Vision Compare 메뉴는 별도 페이지 + 별도 hook 이라 영향 없음.
+  const editPromptMode = useEditStore((s) => s.promptMode);
   // 상세 모달 열림/닫힘 state
   const [open, setOpen] = useState(false);
   return (
@@ -300,9 +305,9 @@ function ComparisonInPanel({ item }: { item: HistoryItem }) {
       <ComparisonAnalysisCard
         item={item}
         busy={isBusy(item.id)}
-        onAnalyze={() => analyze(item)}
+        onAnalyze={() => analyze(item, { promptMode: editPromptMode })}
         onOpenDetail={() => setOpen(true)}
-        onReanalyze={() => analyze(item)}
+        onReanalyze={() => analyze(item, { promptMode: editPromptMode })}
       />
       {/* 분석 결과 있을 때만 모달 렌더 (z-index 80 — Lightbox 70 위) */}
       {open && item.comparisonAnalysis && (

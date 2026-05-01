@@ -68,6 +68,8 @@ async def _run_video_pipeline_task(
     lightning: bool = True,
     *,
     pre_upgraded_prompt: str | None = None,
+    # Phase 2 (2026-05-01) — gemma4 보강 모드 ("fast" | "precise")
+    prompt_mode: str = "fast",
 ) -> None:
     """Video i2v 파이프라인 백그라운드 실행 (5 step).
 
@@ -135,6 +137,7 @@ async def _run_video_pipeline_task(
                     vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
                     text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
                     adult=adult,
+                    prompt_mode=prompt_mode,
                 )
 
             # stage 완료 payload 에 description 흡수.

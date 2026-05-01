@@ -32,6 +32,8 @@ export async function upgradeOnly(params: {
   aspect?: string;
   width?: number;
   height?: number;
+  /** Phase 2 (2026-05-01) — gemma4 보강 모드. 미전달 시 백엔드 default = "fast". */
+  promptMode?: "fast" | "precise";
 }): Promise<UpgradeOnlyResult> {
   if (USE_MOCK) {
     await sleep(800 + Math.random() * 600);

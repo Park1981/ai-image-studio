@@ -22,8 +22,10 @@ from . import translate as _t
 from .._lib_marker import strip_library_markers
 from ._common import (
     DEFAULT_TIMEOUT,
+    PromptEnhanceMode,
     UpgradeResult,
     _DEFAULT_OLLAMA_URL,
+    _resolve_mode_options,
     _strip_repeat_noise,
     log,
 )
@@ -399,48 +401,61 @@ async def _run_upgrade_call(
     resolved_url: str,
     include_translation: bool,
     log_label: str,
+    prompt_mode: PromptEnhanceMode | str | None = "fast",
 ) -> UpgradeResult:
     """upgrade_*_prompt 공통 흐름 헬퍼 (Claude E · 2026-04-27).
 
     3 함수 (generate/edit/video) 의 공통 보일러플레이트 통합:
       1. _call_ollama_chat 호출 → 빈 응답 시 ValueError
       2. _strip_repeat_noise + strip
-      3. 실패 시 fallback UpgradeResult 반환 (provider=fallback)
+      3. 실패 시 fallback UpgradeResult 반환 (provider=fallback / fallback-precise-failed)
       4. 성공 시 옵션으로 translate_to_korean 호출
       5. 성공 UpgradeResult 반환
 
-    호출자는 (system, user_msg, original) 만 결정하면 되고 SYSTEM 분기 +
-    user message 조립 로직은 함수별로 유지.
+    Phase 2 (2026-05-01): `prompt_mode` 인자 추가. `"precise"` 는 think=True +
+    num_predict 4096 + timeout 하한 120s. 실패 시 provider="fallback-precise-failed"
+    로 표기해 UI 가 분기 (모달 경고 + DetailBox warn + toast).
 
     Args:
         system: SYSTEM_GENERATE / SYSTEM_EDIT / build_system_video(...) 등
         user_msg: 함수별로 조립된 user 메시지
         original: 폴백 시 upgraded 자리에 들어갈 원본 (사용자 입력)
         log_label: 실패 로그 prefix (예: "gemma4 upgrade", "Edit prompt upgrade")
+        prompt_mode: "fast" (기본) | "precise". 미인식 값은 fast 로 정규화.
     """
+    opts = _resolve_mode_options(prompt_mode, base_timeout=timeout)
     try:
         upgraded_raw = await _o._call_ollama_chat(
             ollama_url=resolved_url,
             model=model,
             system=system,
             user=user_msg,
-            timeout=timeout,
+            timeout=opts["timeout"],
+            think=opts["think"],
+            num_predict=opts["num_predict"],
         )
         en = _strip_repeat_noise(upgraded_raw.strip()).strip()
         if not en:
             raise ValueError("Empty response from Ollama")
     except Exception as e:
-        log.warning("%s failed, falling back to original: %s", log_label, e)
+        # 정밀 모드 실패는 별도 provider 로 표기 — UI 가 경고 분기.
+        is_precise = prompt_mode == "precise"
+        provider = "fallback-precise-failed" if is_precise else "fallback"
+        log.warning(
+            "%s failed (mode=%s), falling back to original: %s",
+            log_label, prompt_mode, e,
+        )
         return UpgradeResult(
             upgraded=original,
             fallback=True,
-            provider="fallback",
+            provider=provider,
             original=original,
             translation=None,
         )
 
     ko = None
     if include_translation:
+        # 번역은 §4.4 정책상 항상 fast (think:false). 정밀 모드 영향 없음.
         ko = await _t.translate_to_korean(
             en, model=model, timeout=60.0, ollama_url=resolved_url
         )
@@ -464,6 +479,7 @@ async def upgrade_generate_prompt(
     *,
     width: int = 0,
     height: int = 0,
+    prompt_mode: PromptEnhanceMode | str | None = "fast",
 ) -> UpgradeResult:
     """생성용 프롬프트 업그레이드 (v3: 2-call — en 먼저, 그다음 ko 번역).
 
@@ -520,6 +536,7 @@ async def upgrade_generate_prompt(
         resolved_url=resolved_url,
         include_translation=include_translation,
         log_label="gemma4 upgrade",
+        prompt_mode=prompt_mode,
     )
     # Codex v3 #2 (위치 1): UpgradeResult.upgraded 의 <lib> 마커 strip — UI /
     # history 에 잔존 방지. LLM 협조 (system prompt) 무시 시 deterministic 안전망.
@@ -669,6 +686,7 @@ async def upgrade_edit_prompt(
     *,
     analysis: Any = None,
     reference_role: str | None = None,
+    prompt_mode: PromptEnhanceMode | str | None = "fast",
 ) -> UpgradeResult:
     """수정용 프롬프트 업그레이드 (v3 + spec 16 매트릭스 directive 통합).
 
@@ -711,6 +729,7 @@ async def upgrade_edit_prompt(
         resolved_url=resolved_url,
         include_translation=include_translation,
         log_label="Edit prompt upgrade",
+        prompt_mode=prompt_mode,
     )
 
     # 2026-04-28 Phase 1'' Layer 2: gemma4 결과 post-process — image2 phrase 강제 주입.
@@ -749,6 +768,8 @@ async def upgrade_video_prompt(
     ollama_url: str | None = None,
     include_translation: bool = True,
     adult: bool = False,
+    *,
+    prompt_mode: PromptEnhanceMode | str | None = "fast",
 ) -> UpgradeResult:
     """Video i2v 용 프롬프트 업그레이드 (v3: 2-call).
 
@@ -782,6 +803,7 @@ async def upgrade_video_prompt(
         resolved_url=resolved_url,
         include_translation=include_translation,
         log_label="Video prompt upgrade",
+        prompt_mode=prompt_mode,
     )
 
 

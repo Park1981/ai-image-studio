@@ -334,6 +334,8 @@ export interface GenerateRequest {
   /** 활성 스타일 LoRA id (GENERATE_STYLES.id 와 매칭). null/undefined 면 미사용.
    *  백엔드가 sampling 파라미터 자동 override + LoRA 체인에 추가 + Lightning 강제 OFF. */
   styleId?: string | null;
+  /** gemma4 보강 모드 (Phase 2 · 2026-05-01). 미전달 시 백엔드 default = "fast". */
+  promptMode?: "fast" | "precise";
 }
 
 export interface UpgradeOnlyResult {
@@ -364,6 +366,8 @@ export interface EditRequest {
   referenceRef?: string;
   /** v8 라이브러리 plan — template id. 백엔드가 image_ref 조회 + last_used_at touch */
   referenceTemplateId?: string;
+  /** gemma4 보강 모드 (Phase 2 · 2026-05-01) — clarify_edit_intent + upgrade_edit_prompt 양쪽 영향. */
+  promptMode?: "fast" | "precise";
 }
 
 export type GenStage =
@@ -554,6 +558,8 @@ export interface VideoRequest {
    * undefined / 빈 문자열이면 평소처럼 보정 수행.
    */
   preUpgradedPrompt?: string;
+  /** gemma4 보강 모드 (Phase 2 · 2026-05-01). 미전달 시 백엔드 default = "fast". */
+  promptMode?: "fast" | "precise";
 }
 
 export type VideoStage =

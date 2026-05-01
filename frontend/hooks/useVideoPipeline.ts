@@ -38,6 +38,7 @@ export function useVideoPipeline(
   const longerEdge = useVideoStore((s) => s.longerEdge);
   const lightning = useVideoStore((s) => s.lightning);
   const skipUpgrade = useVideoStore((s) => s.skipUpgrade);
+  const promptMode = useVideoStore((s) => s.promptMode);
   // 실행 상태
   const running = useVideoStore((s) => s.running);
   const setRunning = useVideoStore((s) => s.setRunning);
@@ -86,6 +87,8 @@ export function useVideoPipeline(
         visionModel: visionModelSel,
         // skipUpgrade ON: 사용자가 정제된 영문 프롬프트 직접 입력 — vision + gemma4 우회.
         preUpgradedPrompt: skipUpgrade ? prompt : undefined,
+        // Phase 2 (2026-05-01) — gemma4 보강 모드 (정밀 시 motion/camera/preserve 해석 깊어짐).
+        promptMode,
       }),
       {
         on: {
@@ -135,6 +138,12 @@ export function useVideoPipeline(
               toast.error(
                 "ComfyUI 오류 (Mock 폴백 적용)",
                 e.item.comfyError.slice(0, 160),
+              );
+            } else if (e.item.promptProvider === "fallback-precise-failed") {
+              // Phase 2 (2026-05-01) — 정밀 보강 실패 별도 분기
+              toast.warn(
+                "정밀 보강 실패",
+                "원본 프롬프트로 생성됐어요. 빠른 모드로 다시 시도해 보세요.",
               );
             } else if (e.item.promptProvider === "fallback") {
               toast.warn("gemma4 업그레이드 실패", "Ollama 상태 확인 필요");

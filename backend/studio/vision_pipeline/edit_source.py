@@ -154,6 +154,8 @@ async def run_vision_pipeline(
     # Multi-reference (2026-04-27 Phase 4): image2 자체는 비전 분석 X —
     # 사용자 명시 role 만 upgrade 단계로 전달해 SYSTEM_EDIT 분기 반영.
     reference_role: str | None = None,
+    # Phase 2 (2026-05-01) — gemma4 보강 모드 ("fast" | "precise") · clarify + upgrade 양쪽 전파.
+    prompt_mode: str = "fast",
 ) -> VisionPipelineResult:
     """Edit 모드 비전 파이프라인 (v2 · spec 15장 패러다임 전환).
 
@@ -195,6 +197,8 @@ async def run_vision_pipeline(
         model=text_model,
         timeout=60.0,
         ollama_url=resolved_url,
+        # Phase 2 (2026-05-01) — 정제는 Edit 품질 영향 큼 (spec §4.3) → 모드 패스스루
+        prompt_mode=prompt_mode,
     )
 
     # spec 19 옵션 B: gemma4 (clarify) 끝났으니 비전 호출 전 명시적 unload.
@@ -218,6 +222,10 @@ async def run_vision_pipeline(
             refined_intent=refined_intent,  # 정제 결과 재사용 (중복 호출 방지)
             width=width,
             height=height,
+            # Phase 2 (2026-05-01): production 경로는 refined_intent 가 항상 있어 no-op.
+            # 명시적 패스스루로 일관성 (외부에서 analyze_edit_source 단독 호출하는
+            # 테스트/시나리오에서도 모드 영향 받게).
+            prompt_mode=prompt_mode,
         )
 
     # 성공 판정 — fallback=False 이고 (summary 또는 어떤 슬롯의 note 라도 있음)
@@ -275,6 +283,8 @@ async def run_vision_pipeline(
         analysis=analysis if analysis_ok else None,
         # Multi-reference (2026-04-27 Phase 4): None 이면 옛 SYSTEM_EDIT 그대로.
         reference_role=reference_role,
+        # Phase 2 (2026-05-01) — Edit 본 보강 단계 모드 패스스루
+        prompt_mode=prompt_mode,
     )
     return VisionPipelineResult(
         image_description=description,
@@ -488,6 +498,9 @@ async def analyze_edit_source(
     refined_intent: str | None = None,
     width: int = 0,
     height: int = 0,
+    # Phase 2 (2026-05-01) — refined_intent 미전달 시 자체 호출하는 clarify 에 모드 전파.
+    # run_vision_pipeline 이 외부에서 refined_intent 채워주는 production 경로는 영향 없음.
+    prompt_mode: str = "fast",
 ) -> EditVisionAnalysis:
     """SOURCE 이미지 + 사용자 수정 지시 → 도메인별 5 슬롯 매트릭스 분석.
 
@@ -524,6 +537,7 @@ async def analyze_edit_source(
             model=resolved_text,
             timeout=60.0,
             ollama_url=resolved_url,
+            prompt_mode=prompt_mode,
         )
     else:
         intent = refined_intent.strip()

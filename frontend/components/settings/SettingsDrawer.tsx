@@ -166,6 +166,8 @@ function PreferencesSection() {
     setHideGeneratePrompts,
     setHideEditPrompts,
     setHideVideoPrompts,
+    promptEnhanceMode,
+    setPromptEnhanceMode,
   } = useSettingsStore();
   // 비노출 (오빠 피드백 2026-04-27 후속4):
   //  - lightningByDefault — 각 페이지 좌측 패널 lightning 토글로 충분 (중복 제거).
@@ -191,6 +193,78 @@ function PreferencesSection() {
         label="프롬프트 숨기기 (생성 · 수정 · 영상)"
         desc="ON: 진행 모달 프롬프트 접힘 + 생성 전 검수 모달 미노출 / OFF: 펼침 + 검수 모달 노출"
       />
+      {/* Phase 2 (2026-05-01) — gemma4 보강 모드 default.
+       *  페이지 *마운트 시점* 의 기본값 (Codex 리뷰 Medium #2 fix).
+       *  사용자가 페이지에서 토글한 값은 session-only — 여기서 변경해도 즉시 안 덮음.
+       *  설정 변경은 다음 페이지 재진입 (또는 새로고침) 시점부터 반영. */}
+      <div
+        role="radiogroup"
+        aria-label="AI 보정 모드 기본값"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 12,
+          padding: "8px 12px",
+          marginTop: 8,
+          borderRadius: 8,
+          background: "var(--surface-2, rgba(255,255,255,0.02))",
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>
+            🧠 AI 보정 모드 기본값
+          </div>
+          <div
+            style={{
+              fontSize: 11,
+              color: "var(--ink-4, rgba(255,255,255,0.55))",
+              marginTop: 2,
+            }}
+          >
+            페이지 마운트 시점의 기본 모드 (페이지 토글은 session-only · 다음 진입부터 반영)
+          </div>
+        </div>
+        <div
+          style={{
+            display: "inline-flex",
+            gap: 4,
+            padding: 2,
+            borderRadius: 6,
+            background: "var(--surface-3, rgba(0,0,0,0.25))",
+          }}
+        >
+          {(["fast", "precise"] as const).map((mode) => {
+            const active = promptEnhanceMode === mode;
+            return (
+              <button
+                key={mode}
+                type="button"
+                role="radio"
+                aria-checked={active}
+                onClick={() => setPromptEnhanceMode(mode)}
+                style={{
+                  padding: "4px 10px",
+                  fontSize: 12,
+                  fontWeight: 600,
+                  borderRadius: 4,
+                  border: "none",
+                  cursor: "pointer",
+                  color: active
+                    ? "var(--text-primary, #fff)"
+                    : "var(--ink-4, rgba(255,255,255,0.55))",
+                  background: active
+                    ? "var(--accent-soft, rgba(99,102,241,0.35))"
+                    : "transparent",
+                  transition: "background 120ms, color 120ms",
+                }}
+              >
+                {mode === "fast" ? "빠른" : "정밀"}
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </Section>
   );
 }

@@ -59,6 +59,8 @@ async def _run_edit_pipeline(
     # reference_template_id = touch (last_used_at 갱신) 용.
     reference_ref_url: str | None = None,
     reference_template_id: str | None = None,
+    # Phase 2 (2026-05-01) — gemma4 보강 모드 ("fast" | "precise")
+    prompt_mode: str = "fast",
 ) -> None:
     try:
         # Phase 4 (2026-04-27 진행 모달 store 통일 · 정리):
@@ -83,6 +85,8 @@ async def _run_edit_pipeline(
                 height=source_height,
                 # Multi-ref (2026-04-27 Phase 4 Task 13): reference role 을 upgrade 단계로 전달.
                 reference_role=reference_role,
+                # Phase 2 (2026-05-01) — clarify_edit_intent + upgrade_edit_prompt 양쪽 패스스루
+                prompt_mode=prompt_mode,
             )
         # getattr 로 안전 접근 — 기존 테스트의 경량 mock (속성 없음) 호환.
         _analysis = getattr(vision, "edit_vision_analysis", None)

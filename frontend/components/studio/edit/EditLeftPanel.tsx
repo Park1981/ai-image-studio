@@ -20,9 +20,10 @@
 
 import dynamic from "next/dynamic";
 import type { RefObject } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import HistoryPicker from "@/components/studio/HistoryPicker";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import ReferenceLibraryDrawer from "./ReferenceLibraryDrawer";
@@ -70,6 +71,7 @@ export default function EditLeftPanel({
     // v9 라이브러리 plan (옛 saveAsTemplate / templateName 제거 · Phase B.2)
     pickedTemplateRef,
     setPickedTemplateId, setPickedTemplateRef,
+    promptMode, setPromptMode,
   } = useEditInputs();
   const { running } = useEditRunning();
   const items = useHistoryStore((s) => s.items);
@@ -78,6 +80,15 @@ export default function EditLeftPanel({
   const setAutoCompareAnalysis = useSettingsStore(
     (s) => s.setAutoCompareAnalysis,
   );
+
+  // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store sync.
+  // Codex Phase 4 리뷰 Medium #2 fix — session-only 정책 정합 (settings 변경은 다음 mount 부터 반영).
+  const promptModeInitRef = useRef(false);
+  useEffect(() => {
+    if (promptModeInitRef.current) return;
+    promptModeInitRef.current = true;
+    setPromptMode(useSettingsStore.getState().promptEnhanceMode);
+  }, [setPromptMode]);
 
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
   // v8 라이브러리 plan: 라이브러리 Drawer open 토글.
@@ -243,6 +254,11 @@ export default function EditLeftPanel({
             : "Lightning OFF · 풀 퀄리티 · 약 ~38s 예상"
         }
       />
+
+      {/* Phase 2 (2026-05-01) — 보정 모드 (빠른/정밀)
+       *  Edit 은 보정 우회 토글이 없으므로 항상 노출. clarify_edit_intent 와
+       *  upgrade_edit_prompt 양쪽이 영향받음. */}
+      <PromptModeRadio value={promptMode} onChange={setPromptMode} />
 
       {/* 수정 후 자동 비교 분석 — 옛 설정 토글에서 이 위치로 이동 (오빠 피드백 2026-04-27).
        *  결과 완료 시 백그라운드로 5축 평가. VRAM>13GB 면 자동 skip. */}

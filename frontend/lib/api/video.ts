@@ -67,6 +67,8 @@ async function* realVideoStream(
       visionModel: req.visionModel,
       // skipUpgrade ON 시 vision + gemma4 단계 모두 우회 (~15초 절약).
       preUpgradedPrompt: req.preUpgradedPrompt,
+      // Phase 2 (2026-05-01) — gemma4 보강 모드. 백엔드 default 가 fast 이므로 미전달 OK.
+      promptMode: req.promptMode,
     }),
   );
 

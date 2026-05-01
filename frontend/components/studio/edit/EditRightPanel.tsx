@@ -47,6 +47,9 @@ export default function EditRightPanel({
   const { sourceImage, sourceWidth, sourceHeight } = useEditInputs();
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
+  // Phase 2 후속 (Codex Phase 4 리뷰 Medium #1) — 수동 비교 분석도 Edit promptMode 전파.
+  // 자동 트리거와 동일 정책: cache miss 시 clarify_edit_intent 가 같은 모드로 호출.
+  const editPromptMode = useEditStore((s) => s.promptMode);
 
   const items = useHistoryStore((s) => s.items);
   const selectHistory = useHistoryStore((s) => s.select);
@@ -91,9 +94,9 @@ export default function EditRightPanel({
           <ComparisonAnalysisCard
             item={afterItem!}
             busy={isBusy(afterItem!.id)}
-            onAnalyze={() => analyze(afterItem!)}
+            onAnalyze={() => analyze(afterItem!, { promptMode: editPromptMode })}
             onOpenDetail={onComparisonModalOpen}
-            onReanalyze={() => analyze(afterItem!)}
+            onReanalyze={() => analyze(afterItem!, { promptMode: editPromptMode })}
           />
         </>
       ) : (

@@ -95,6 +95,12 @@ async def create_edit_task(
     ollama_model_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
     vision_model_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
 
+    # Phase 2 (2026-05-01): gemma4 보강 모드 ("fast" | "precise"). 미전달 / 미인식 → fast.
+    prompt_mode_raw = meta_obj.get("promptMode") or meta_obj.get("prompt_mode")
+    prompt_mode: str = (
+        "precise" if isinstance(prompt_mode_raw, str) and prompt_mode_raw == "precise" else "fast"
+    )
+
     # Multi-reference (2026-04-27): meta 의 토글 + role 파싱.
     # 토글 OFF (기본) 면 옛 단일 이미지 흐름 100% 동일.
     use_reference_image = bool(meta_obj.get("useReferenceImage", False))
@@ -260,6 +266,7 @@ async def create_edit_task(
             # v8 라이브러리 plan
             reference_ref_url=reference_ref_url,
             reference_template_id=reference_template_id_meta,
+            prompt_mode=prompt_mode,
         )
     )
     return TaskCreated(
@@ -316,6 +323,11 @@ async def create_video_task(
     pre_upgraded_prompt: str | None = (
         pre_upgraded_raw.strip() if isinstance(pre_upgraded_raw, str) and pre_upgraded_raw.strip() else None
     )
+    # Phase 2 (2026-05-01): gemma4 보강 모드 ("fast" | "precise"). 미전달 / 미인식 → fast.
+    video_prompt_mode_raw = meta_obj.get("promptMode") or meta_obj.get("prompt_mode")
+    video_prompt_mode: str = (
+        "precise" if isinstance(video_prompt_mode_raw, str) and video_prompt_mode_raw == "precise" else "fast"
+    )
     # longerEdge: 사용자 지정 긴 변 픽셀. 누락/0 이면 기본값.
     longer_edge_raw = meta_obj.get("longerEdge") or meta_obj.get("longer_edge")
     longer_edge: int | None = None
@@ -361,6 +373,7 @@ async def create_video_task(
             longer_edge,
             lightning,
             pre_upgraded_prompt=pre_upgraded_prompt,
+            prompt_mode=video_prompt_mode,
         )
     )
     return TaskCreated(

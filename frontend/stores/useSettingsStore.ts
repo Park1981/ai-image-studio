@@ -21,6 +21,17 @@ export interface PromptTemplate {
   text: string;
 }
 
+/**
+ * gemma4 보강 모드 (Phase 2 · 2026-05-01).
+ *
+ * - "fast": think:false, num_predict 800, 5~15초 응답. 기본값.
+ * - "precise": think:true, num_predict 4096, 30~60초+. 사용자 명시 선택만.
+ *
+ * 페이지 (Generate/Edit/Video) 별 session store 가 settings 의 기본값을 init 으로 받고,
+ * 사용자가 그 페이지 패널에서 토글한 값은 새로 페이지 진입 시 settings 기본값으로 다시 초기화 됨.
+ */
+export type PromptEnhanceMode = "fast" | "precise";
+
 export interface SettingsState {
   /* 모델 선택 (UI 용 표시값 — 실제 파일명은 model-presets 에서) */
   generateModel: string;
@@ -54,6 +65,12 @@ export interface SettingsState {
   autoStartComfy: boolean;
   /** Edit 결과 완료 후 자동 비교 분석 (백그라운드). 기본 false. */
   autoCompareAnalysis: boolean;
+  /**
+   * gemma4 프롬프트 보강 기본 모드 (Phase 2 · 2026-05-01).
+   * 페이지 진입 시 페이지 store 의 promptMode 가 이 값으로 init.
+   * 기본 "fast" — 정밀 모드는 사용자 명시 선택.
+   */
+  promptEnhanceMode: PromptEnhanceMode;
 
   /* 프롬프트 템플릿 */
   templates: PromptTemplate[];
@@ -69,6 +86,7 @@ export interface SettingsState {
   setLightningByDefault: (v: boolean) => void;
   setAutoStartComfy: (v: boolean) => void;
   setAutoCompareAnalysis: (v: boolean) => void;
+  setPromptEnhanceMode: (v: PromptEnhanceMode) => void;
   addTemplate: (t: Omit<PromptTemplate, "id">) => void;
   removeTemplate: (id: string) => void;
 }
@@ -107,6 +125,7 @@ export const useSettingsStore = create<SettingsState>()(
       lightningByDefault: false,
       autoStartComfy: false,
       autoCompareAnalysis: false,
+      promptEnhanceMode: "fast",
 
       templates: DEFAULT_TEMPLATES,
 
@@ -120,6 +139,7 @@ export const useSettingsStore = create<SettingsState>()(
       setLightningByDefault: (v) => set({ lightningByDefault: v }),
       setAutoStartComfy: (v) => set({ autoStartComfy: v }),
       setAutoCompareAnalysis: (v) => set({ autoCompareAnalysis: v }),
+      setPromptEnhanceMode: (v) => set({ promptEnhanceMode: v }),
 
       addTemplate: (t) =>
         set((s) => ({
@@ -134,7 +154,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "ais:settings",
       storage: createJSONStorage(() => localStorage),
-      version: 4,
+      version: 5,
       migrate: (persisted: unknown, fromVersion: number) => {
         const obj = (persisted as Record<string, unknown>) || {};
         // v1 → v2: autoCompareAnalysis 기본 false 추가
@@ -158,6 +178,11 @@ export const useSettingsStore = create<SettingsState>()(
         // 기본 true (Edit/Generate 와 일관 — 깔끔 모드 기본).
         if (fromVersion < 4) {
           obj.hideVideoPrompts = true;
+        }
+        // v4 → v5: promptEnhanceMode 신설 (Phase 2 · 2026-05-01).
+        // 기본 "fast" — 정밀 모드는 사용자 명시 선택만.
+        if (fromVersion < 5) {
+          obj.promptEnhanceMode = "fast";
         }
         return obj as unknown as SettingsState;
       },

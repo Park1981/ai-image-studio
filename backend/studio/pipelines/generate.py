@@ -126,6 +126,8 @@ async def _run_generate_pipeline(task: Task, body: GenerateBody) -> None:
                     # (preset 이든 직접 지정이든) → SYSTEM_GENERATE composition 정확도 ↑
                     width=resolved_w,
                     height=resolved_h,
+                    # Phase 2 (2026-05-01) — Generate body 의 promptMode 전파
+                    prompt_mode=body.prompt_mode or "fast",
                 )
 
         # 4. API 포맷 조립

@@ -42,6 +42,8 @@ class GenerateBody(BaseModel):
     # 스타일 LoRA 토글 (2026-04-25) — None / "asian_influencer" 등 GENERATE_STYLES.id
     # 활성 시 sampling 파라미터 자동 override + Lightning 강제 OFF + LoRA 체인 추가
     style_id: str | None = Field(default=None, alias="styleId")
+    # Phase 2 (2026-05-01) — gemma4 보강 모드 ("fast" | "precise"). 미전달 시 fast.
+    prompt_mode: str | None = Field(default="fast", alias="promptMode")
 
     # Pydantic V2: class-based Config 대신 model_config = ConfigDict(...)
     model_config = ConfigDict(populate_by_name=True)
@@ -62,6 +64,8 @@ class UpgradeOnlyBody(BaseModel):
     aspect: str = "1:1"
     width: int | None = Field(default=None, ge=256, le=2048)
     height: int | None = Field(default=None, ge=256, le=2048)
+    # Phase 2 (2026-05-01) — gemma4 보강 모드 ("fast" | "precise"). 미전달 시 fast.
+    prompt_mode: str | None = Field(default="fast", alias="promptMode")
 
     model_config = ConfigDict(populate_by_name=True)
 

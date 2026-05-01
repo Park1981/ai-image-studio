@@ -185,6 +185,18 @@
             "title": "Prompt",
             "type": "string"
           },
+          "promptMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "fast",
+            "title": "Promptmode"
+          },
           "research": {
             "default": false,
             "title": "Research",
@@ -351,6 +363,18 @@
             "minLength": 1,
             "title": "Prompt",
             "type": "string"
+          },
+          "promptMode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": "fast",
+            "title": "Promptmode"
           },
           "research": {
             "default": false,

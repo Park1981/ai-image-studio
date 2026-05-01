@@ -48,6 +48,7 @@ export function useEditPipeline({
   const referenceImage = useEditStore((s) => s.referenceImage);
   const referenceRole = useEditStore((s) => s.referenceRole);
   const referenceRoleCustom = useEditStore((s) => s.referenceRoleCustom);
+  const promptMode = useEditStore((s) => s.promptMode);
   // Phase 2 (2026-04-28): 수동 crop 영역 (있으면 reference 를 미리 crop 해서 전송)
   const referenceCropArea = useEditStore((s) => s.referenceCropArea);
   // v9 라이브러리 plan (2026-04-29 · Phase B.4): 라이브러리 픽 케이스 식별용.
@@ -158,6 +159,8 @@ export function useEditPipeline({
         referenceTemplateId: isLibraryPick
           ? (pickedTemplateId ?? undefined)
           : undefined,
+        // Phase 2 (2026-05-01) — gemma4 보강 모드 (clarify + upgrade 양쪽 영향)
+        promptMode,
       }),
       {
         on: {
@@ -224,6 +227,12 @@ export function useEditPipeline({
                 "ComfyUI 오류 (Mock 폴백 적용)",
                 e.item.comfyError.slice(0, 160),
               );
+            } else if (e.item.promptProvider === "fallback-precise-failed") {
+              // Phase 2 (2026-05-01) — 정밀 보강 실패 별도 분기
+              toast.warn(
+                "정밀 보강 실패",
+                "원본 프롬프트로 진행됐어요. 빠른 모드로 다시 시도해 보세요.",
+              );
             } else if (e.item.promptProvider === "fallback") {
               toast.warn("gemma4 업그레이드 실패", "Ollama 상태 확인 필요");
             }
@@ -240,7 +249,9 @@ export function useEditPipeline({
               e.item.sourceRef &&
               !isComparisonBusy(e.item.id)
             ) {
-              void analyzeComparison(e.item, { silent: true });
+              // Phase 2 (2026-05-01) — Edit 모드 그대로 자동 Compare 에 전파.
+              // cache miss 시 clarify_edit_intent 가 동일 모드로 호출.
+              void analyzeComparison(e.item, { silent: true, promptMode });
             }
             // v9 (2026-04-29 · Phase B.4): 옛 자동 저장 호출 제거.
             // 사용자가 결과 확인 후 ActionBar 의 📚 라이브러리 저장 버튼 → POST /promote/{id}

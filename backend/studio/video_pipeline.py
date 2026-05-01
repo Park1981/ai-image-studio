@@ -53,6 +53,9 @@ async def run_video_pipeline(
     timeout: float = DEFAULT_TIMEOUT,
     ollama_url: str | None = None,
     adult: bool = False,
+    *,
+    # Phase 2 (2026-05-01) — gemma4 보강 모드 ("fast" | "precise") · upgrade 단계로 패스스루.
+    prompt_mode: str = "fast",
 ) -> VideoPipelineResult:
     """영상 생성용 2단계 체이닝 실행.
 
@@ -93,6 +96,7 @@ async def run_video_pipeline(
         timeout=timeout,
         ollama_url=resolved_url,
         adult=adult,
+        prompt_mode=prompt_mode,
     )
 
     return VideoPipelineResult(

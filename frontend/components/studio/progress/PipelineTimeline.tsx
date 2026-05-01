@@ -58,6 +58,19 @@ export function PipelineTimeline({ mode }: { mode: PipelineMode }) {
   for (const s of stageHistory) {
     if (!byType.has(s.type)) byType.set(s.type, s);
   }
+
+  // Phase 2 후속 (Codex Phase 4 리뷰 High #2) — DetailBox renderDetail 용 payload 는
+  // *모든 같은-type 이벤트의 merge* 사용. edit/video prompt-merge 와 compare vision-pair
+  // 는 시작 이벤트 (payload 비고) → 완료 이벤트 (finalPrompt/provider 풍부) 두 번 emit.
+  // first-write-wins 만 쓰면 완료 payload 가 무시되어 fallback-precise-failed 톤 + 본문이
+  // 안 보임. left-to-right merge 로 마지막 truthy 값이 우선 (빈 payload 는 no-op).
+  const payloadByType = new Map<string, Record<string, unknown>>();
+  for (const s of stageHistory) {
+    if (!s.payload) continue;
+    const cur = payloadByType.get(s.type) ?? {};
+    payloadByType.set(s.type, { ...cur, ...s.payload });
+  }
+
   const lastArrived = stageHistory[stageHistory.length - 1];
 
   // 마지막 도착 stage 의 order 안 인덱스 (없으면 -1)
@@ -110,13 +123,24 @@ export function PipelineTimeline({ mode }: { mode: PipelineMode }) {
             <TimelineRow
               n={i + 1}
               label={def.label}
-              subLabel={def.subLabel}
+              // Phase 2 (2026-05-01) — subLabel 콜백 분기 (정밀 모드 라벨 변경 등)
+              subLabel={
+                typeof def.subLabel === "function"
+                  ? def.subLabel(ctx)
+                  : def.subLabel
+              }
               state={isDone ? "done" : isRunning ? "running" : "pending"}
               elapsed={elapsed}
             />
-            {/* StageDef.renderDetail 정의된 stage 만 — done 일 때 + payload 있을 때 + 결과 truthy 일 때 */}
+            {/* StageDef.renderDetail 정의된 stage 만 — done 일 때 + payload 있을 때 + 결과 truthy 일 때.
+             *  Phase 2 후속 (Codex Phase 4 리뷰 High #2): merged payload 전달 — 시작/완료 두 emit 의
+             *  payload 가 합쳐진 form. 같은 type 의 마지막 truthy 값이 우선 (finalPrompt/provider 등). */}
             {isDone && def.renderDetail && arrived && (
-              <DetailRenderer def={def} arrived={arrived} ctx={ctx} />
+              <DetailRenderer
+                def={def}
+                payload={payloadByType.get(def.type) ?? arrived.payload ?? {}}
+                ctx={ctx}
+              />
             )}
           </div>
         );
@@ -185,6 +209,12 @@ function usePipelineCtx(
   const hideEdit = useSettingsStore((s) => s.hideEditPrompts);
   const hideGen = useSettingsStore((s) => s.hideGeneratePrompts);
   const hideVideo = useSettingsStore((s) => s.hideVideoPrompts);
+  // Phase 2 (2026-05-01) — mode 별 promptMode 도 ctx 에 주입.
+  // gemma4-un 사용 4 stage (generate.gemma4-upgrade / edit·video.prompt-merge /
+  // compare.intent-refine) 의 subLabel 콜백에서 사용.
+  const genPromptMode = useGenerateStore((s) => s.promptMode);
+  const editPromptMode = useEditStore((s) => s.promptMode);
+  const videoPromptMode = useVideoStore((s) => s.promptMode);
 
   // warmup stage 가 도착했는지 — Phase 5 자동 기동 시 활성. stageHistory 안 type 검사.
   const warmupArrived = stageHistory.some((s) => s.type === "comfyui-warmup");
@@ -192,6 +222,20 @@ function usePipelineCtx(
   const intentRefineArrived = stageHistory.some(
     (s) => s.type === "intent-refine",
   );
+
+  // Phase 2 (2026-05-01) — Compare 의 자동 트리거 케이스는 Edit 모드 전파됐으므로
+  // editPromptMode 를 그대로 사용. 수동 Compare (Vision Compare 메뉴) 도 같은 store
+  // 안 쓰지만 그 케이스는 intent-refine stage 자체 emit 안 하므로 영향 없음.
+  const promptMode =
+    mode === "generate"
+      ? genPromptMode
+      : mode === "edit"
+      ? editPromptMode
+      : mode === "video"
+      ? videoPromptMode
+      : mode === "compare"
+      ? editPromptMode
+      : undefined;
 
   return {
     research: mode === "generate" ? research : undefined,
@@ -201,6 +245,7 @@ function usePipelineCtx(
     hideVideoPrompts: mode === "video" ? hideVideo : undefined,
     warmupArrived,
     intentRefineArrived: mode === "compare" ? intentRefineArrived : undefined,
+    promptMode,
   };
 }
 
@@ -261,18 +306,21 @@ export function computeRowState(args: {
  * 보조 — renderDetail 결과 wrap
  * ──────────────────────────────────────────────── */
 
-/** StageDef.renderDetail 결과 렌더 — null 반환 시 wrapper 자체 안 그림. */
+/** StageDef.renderDetail 결과 렌더 — null 반환 시 wrapper 자체 안 그림.
+ *
+ *  Phase 2 후속 (Codex Phase 4 리뷰 High #2): payload 를 외부에서 받음.
+ *  PipelineTimeline 이 *시작/완료 두 emit 의 payload merge* 후 전달 → 완료 단계의
+ *  finalPrompt / provider 가 항상 보임 (옛 first-write-wins 한계 해소). */
 function DetailRenderer({
   def,
-  arrived,
+  payload,
   ctx,
 }: {
   def: StageDef;
-  arrived: StageEvent;
+  payload: Record<string, unknown>;
   ctx: PipelineCtx;
 }) {
   if (!def.renderDetail) return null;
-  const payload = arrived.payload ?? {};
   const detail = def.renderDetail(payload, ctx);
   if (!detail) return null;
   return <div style={{ marginLeft: 34, marginTop: 4 }}>{detail}</div>;

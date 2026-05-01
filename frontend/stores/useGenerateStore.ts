@@ -57,6 +57,11 @@ export interface GenerateState extends StageSliceState {
   /** AI 프롬프트 보정 (gemma4) 우회 — true 면 prompt 를 preUpgradedPrompt 로 그대로 전송.
    *  사용자가 이미 정제된 영문 프롬프트를 복사해서 붙여넣은 케이스용. default false. */
   skipUpgrade: boolean;
+  /**
+   * gemma4 보강 모드 (Phase 2 · 2026-05-01) — settings.promptEnhanceMode 기본값에서 init.
+   * 페이지 새로고침 시 settings 기본값으로 다시 reset (session-only).
+   */
+  promptMode: "fast" | "precise";
 
   // 실행 상태 (Generate 만의 추가 — Edit/Video 와 발산 지점)
   generating: boolean;
@@ -82,6 +87,8 @@ export interface GenerateState extends StageSliceState {
   setStyleId: (id: string | null) => void;
   /** AI 프롬프트 보정 우회 토글 */
   setSkipUpgrade: (v: boolean) => void;
+  /** gemma4 보강 모드 토글 (Phase 2 · 2026-05-01) */
+  setPromptMode: (v: "fast" | "precise") => void;
 
   // stage slice 액션 (3 store 공통)
   pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
@@ -103,6 +110,10 @@ export const useGenerateStore = create<GenerateState>()(
         lightning: false,
         styleId: null,
         skipUpgrade: false,
+        // Phase 2 (2026-05-01) — settings 의 기본 모드를 그대로 init.
+        // 페이지 진입 시점의 settings 값이 사용되며, 이후 사용자가 패널에서
+        // 토글한 값은 새로고침 후 다시 settings 기본값으로 reset (session-only).
+        promptMode: "fast",
 
         generating: false,
         progress: 0,
@@ -182,6 +193,7 @@ export const useGenerateStore = create<GenerateState>()(
         applyLightning: (on) => set({ lightning: on }),
         setStyleId: (id) => set({ styleId: id }),
         setSkipUpgrade: (v) => set({ skipUpgrade: v }),
+        setPromptMode: (v) => set({ promptMode: v }),
       };
     },
     {
@@ -284,6 +296,8 @@ export const useGenerateInputs = () =>
       setStyleId: s.setStyleId,
       skipUpgrade: s.skipUpgrade,
       setSkipUpgrade: s.setSkipUpgrade,
+      promptMode: s.promptMode,
+      setPromptMode: s.setPromptMode,
     })),
   );
 

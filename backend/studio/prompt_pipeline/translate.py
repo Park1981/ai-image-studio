@@ -59,17 +59,23 @@ async def clarify_edit_intent(
     model: str = "gemma4-un:latest",
     timeout: float = 60.0,
     ollama_url: str | None = None,
+    *,
+    prompt_mode: _c.PromptEnhanceMode | str | None = "fast",
 ) -> str:
     """사용자 자연어 수정 지시 → 영어 1-2 문장 정제 intent.
 
     실패 / 빈 입력 / 모든 예외 경로에서 원문을 그대로 반환 (폴백). 비전 분석이
     원문이라도 받게 해서 전체 파이프라인을 막지 않음.
 
+    Phase 2 (2026-05-01): `prompt_mode="precise"` 시 think=True + num_predict 4096
+    + timeout 하한 120s. 정제 단계는 Edit 품질에 직접 영향이 커서 정밀 모드 후보 (spec §4.3).
+
     Args:
         user_instruction: 한/영 자연어 지시 (빈 문자열 허용)
-        model: gemma4-un (think:False 자동 적용 — _call_ollama_chat 내부)
-        timeout: 60s 권장 (cold start 여유)
+        model: gemma4-un
+        timeout: 60s 권장 (cold start 여유) — precise 시 자동 120s 하한
         ollama_url: 기본 settings.ollama_url
+        prompt_mode: "fast" (기본) | "precise"
 
     Returns:
         정제된 영어 intent (1-2 문장) 또는 폴백 시 원문.
@@ -79,13 +85,16 @@ async def clarify_edit_intent(
         return ""
 
     resolved_url = ollama_url or _c._DEFAULT_OLLAMA_URL
+    opts = _c._resolve_mode_options(prompt_mode, base_timeout=timeout)
     try:
         raw = await _o._call_ollama_chat(
             ollama_url=resolved_url,
             model=model,
             system=SYSTEM_CLARIFY_INTENT,
             user=raw_input,
-            timeout=timeout,
+            timeout=opts["timeout"],
+            think=opts["think"],
+            num_predict=opts["num_predict"],
         )
         cleaned = _c._strip_repeat_noise(raw.strip()).strip()
         if not cleaned:

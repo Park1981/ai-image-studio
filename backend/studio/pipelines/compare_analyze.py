@@ -60,6 +60,9 @@ async def _run_compare_analyze_pipeline(
     history_item_id_raw: Any,
     vision_override: str | None,
     text_override: str | None,
+    # Phase 2 (2026-05-01) — Edit 자동 트리거 시 Edit 의 promptMode 가 그대로 전파.
+    # cache miss 케이스에서만 clarify_edit_intent 호출에 영향. 수동 Compare 는 fast.
+    prompt_mode: str = "fast",
 ) -> None:
     """비교 분석 백그라운드 파이프라인.
 
@@ -115,6 +118,7 @@ async def _run_compare_analyze_pipeline(
                             edit_prompt,
                             model=text_override or "gemma4-un:latest",
                             timeout=60.0,
+                            prompt_mode=prompt_mode,
                         )
                 except GpuBusyError as e:
                     await task.emit(

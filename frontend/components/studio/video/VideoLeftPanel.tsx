@@ -17,8 +17,9 @@
 
 "use client";
 
-import type { RefObject } from "react";
+import { useEffect, useRef, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import {
@@ -35,6 +36,7 @@ import {
   VIDEO_LONGER_EDGE_MIN,
   VIDEO_LONGER_EDGE_STEP,
 } from "@/stores/useVideoStore";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 
 interface Props {
@@ -55,8 +57,18 @@ export default function VideoLeftPanel({
     longerEdge, setLongerEdge,
     lightning, setLightning,
     skipUpgrade, setSkipUpgrade,
+    promptMode, setPromptMode,
   } = useVideoInputs();
   const { running } = useVideoRunning();
+
+  // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store sync.
+  // Codex Phase 4 리뷰 Medium #2 fix — session-only 정책 정합 (settings 변경은 다음 mount 부터 반영).
+  const promptModeInitRef = useRef(false);
+  useEffect(() => {
+    if (promptModeInitRef.current) return;
+    promptModeInitRef.current = true;
+    setPromptMode(useSettingsStore.getState().promptEnhanceMode);
+  }, [setPromptMode]);
 
   const handleSourceChange = (
     image: string,
@@ -189,6 +201,11 @@ export default function VideoLeftPanel({
             : "ON · 이미지 분석 + 한국어 → 영문 정제"
         }
       />
+
+      {/* Phase 2 (2026-05-01) — 보정 모드 (빠른/정밀) · 보정 ON 일 때만 노출 */}
+      {!skipUpgrade && (
+        <PromptModeRadio value={promptMode} onChange={setPromptMode} />
+      )}
 
       {/* ── 영상 해상도 슬라이더 ── */}
       <VideoResolutionSlider

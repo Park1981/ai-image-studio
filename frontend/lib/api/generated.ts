@@ -706,6 +706,11 @@ export interface components {
             /** Prompt */
             prompt: string;
             /**
+             * Promptmode
+             * @default fast
+             */
+            promptMode: string | null;
+            /**
              * Research
              * @default false
              */
@@ -776,6 +781,11 @@ export interface components {
             ollamaModel?: string | null;
             /** Prompt */
             prompt: string;
+            /**
+             * Promptmode
+             * @default fast
+             */
+            promptMode: string | null;
             /**
              * Research
              * @default false

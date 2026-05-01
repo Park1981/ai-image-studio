@@ -89,7 +89,7 @@ cd frontend; npm run gen:types
 - **mock.patch 위치 = lookup 모듈 기준**. re-export 받는 모듈에 patch 해도 호출 site 가 다른 모듈이면 안 가로챔. 함수 분해/이동 시 patch 사이트 명시 갱신 필수. 신규 테스트는 `studio.routes.X` / `studio.pipelines.X` 직접 import 권장.
 - **Edit/Video pipeline 단계별 Ollama unload 필수** (spec 19 옵션 B). 16GB VRAM 환경에서 vision (qwen2.5vl) + text (gemma4) 동시 점유 → swap → ComfyUI sampling 매우 느림. `vision_pipeline` / `video_pipeline` 안에서 모델 전환마다 `ollama_unload.unload_model + asyncio.sleep(1.0)` 호출. ComfyUI dispatch 직전엔 `_dispatch.py` 가 `force_unload_all_loaded_models` 호출 (옵션 A backup).
 - **Ollama keep_alive 호출 형식**. `/api/chat` 은 string `"0"` (deferred 가능) → 명시적 강제 unload 는 반드시 `/api/generate` + int `0` 사용 (`ollama_unload.unload_model` 헬퍼).
-- **gemma4-un 호출 시 `think: false` 필수**. reasoning 모델이라 없으면 content 빈값.
+- **gemma4-un 호출 시 `기본은 think:false`, 명시적 정밀 모드만 예외**. reasoning 모델이라 없으면 content 빈값.
 - **subprocess 호출 시 `shell=False` 필수** + 경로 화이트리스트.
 - **이미지 경로 파라미터는 path traversal 방지 검증 필수**.
 - **CORS**: localhost 만 허용.

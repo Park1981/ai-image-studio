@@ -54,6 +54,12 @@ function _snapshot(): ReadonlySet<string> {
 export interface AnalyzeOptions {
   /** true 면 자동 모드 — VRAM 초과/사용자 작업 중일 때 silent skip */
   silent?: boolean;
+  /**
+   * gemma4 보강 모드 (Phase 2 · 2026-05-01) — Edit 자동 트리거 시 Edit 의 promptMode 전파.
+   * cache miss 케이스에서만 clarify_edit_intent 호출에 영향.
+   * 미전달이면 백엔드 default = "fast" (Vision Compare 메뉴 수동 호출 케이스).
+   */
+  promptMode?: "fast" | "precise";
 }
 
 export function useComparisonAnalysis() {
@@ -128,6 +134,9 @@ export function useComparisonAnalysis() {
           historyItemId: item.id,
           visionModel,
           ollamaModel,
+          // Phase 2 (2026-05-01) — caller (Edit 자동 트리거) 가 지정한 모드 패스스루.
+          // 미전달이면 fallback to backend default (fast).
+          promptMode: opts.promptMode,
         });
         // 이 훅은 Edit context 전용이라 응답이 항상 ComparisonAnalysis (Edit 5축).
         // compareAnalyze 의 응답 union 을 좁혀서 HistoryItem.comparisonAnalysis 에 할당.

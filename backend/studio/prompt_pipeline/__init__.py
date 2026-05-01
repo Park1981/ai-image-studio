@@ -28,8 +28,10 @@ from __future__ import annotations
 
 from ._common import (  # noqa: F401 — facade re-export (production import 호환)
     DEFAULT_TIMEOUT,
+    PromptEnhanceMode,
     UpgradeResult,
     _DEFAULT_OLLAMA_URL,
+    _resolve_mode_options,
     _strip_repeat_noise,
     log,
 )
@@ -64,6 +66,8 @@ from .upgrade import (  # noqa: F401 — facade re-export
 __all__ = [
     # _common
     "UpgradeResult",
+    "PromptEnhanceMode",
+    "_resolve_mode_options",
     "_strip_repeat_noise",
     "_DEFAULT_OLLAMA_URL",
     "DEFAULT_TIMEOUT",

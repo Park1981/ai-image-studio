@@ -84,6 +84,12 @@ export interface VideoState extends StageSliceState {
    *  사용자가 이미 정제된 영문 프롬프트를 복사해서 붙여넣은 케이스용. default false. */
   skipUpgrade: boolean;
 
+  /**
+   * gemma4 보강 모드 (Phase 2 · 2026-05-01) · session-only.
+   * VideoLeftPanel 마운트 시 settings.promptEnhanceMode 로 init sync.
+   */
+  promptMode: "fast" | "precise";
+
   /* 파이프라인 상태 (Video 만의 추가 — stage slice 5 필드는 위에서 inherit) */
   running: boolean;
   pipelineProgress: number; // 0~100
@@ -104,6 +110,8 @@ export interface VideoState extends StageSliceState {
   setLongerEdge: (v: number) => void;
   setLightning: (v: boolean) => void;
   setSkipUpgrade: (v: boolean) => void;
+  /** Phase 2 (2026-05-01): gemma4 보강 모드 토글 */
+  setPromptMode: (v: "fast" | "precise") => void;
   setRunning: (running: boolean) => void;
   setSampling: (step: number | null, total: number | null) => void;
   setPipelineProgress: (progress: number, label?: string) => void;
@@ -126,6 +134,8 @@ export const useVideoStore = create<VideoState>((set) => ({
   // 2026-05-01: default OFF 로 변경 (영상 사용자는 영문 프롬프트 직접 다듬어 쓰는 경향).
   // skipUpgrade=true → AI 보정 우회 (gemma4/vision 호출 X · ~15초 절약).
   skipUpgrade: true,
+  // Phase 2 (2026-05-01) — settings 의 default 가 마운트 시 sync.
+  promptMode: "fast",
 
   running: false,
   pipelineProgress: 0,
@@ -161,6 +171,7 @@ export const useVideoStore = create<VideoState>((set) => ({
   setLightning: (v) => set({ lightning: v }),
 
   setSkipUpgrade: (v) => set({ skipUpgrade: v }),
+  setPromptMode: (v) => set({ promptMode: v }),
 
   setRunning: (running) =>
     set(
@@ -220,6 +231,9 @@ export const useVideoInputs = () =>
       setLightning: s.setLightning,
       skipUpgrade: s.skipUpgrade,
       setSkipUpgrade: s.setSkipUpgrade,
+      // Phase 2 (2026-05-01) — gemma4 보강 모드
+      promptMode: s.promptMode,
+      setPromptMode: s.setPromptMode,
     })),
   );
 

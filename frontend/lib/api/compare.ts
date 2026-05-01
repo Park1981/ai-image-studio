@@ -38,6 +38,11 @@ export interface CompareAnalyzeRequest {
   compareHint?: string;
   /** Phase 6 — stage 이벤트 도착 시 호출 (PipelineTimeline 의 stageHistory 갱신). */
   onStage?: (e: AnalyzeStageEvent) => void;
+  /**
+   * gemma4 보강 모드 (Phase 2 · 2026-05-01) — Edit 자동 트리거 케이스에서만 의미.
+   * cache miss 시 clarify_edit_intent 호출에 영향. Vision Compare 메뉴는 미전달 → fast.
+   */
+  promptMode?: "fast" | "precise";
 }
 
 export interface CompareAnalyzeResponse {
@@ -96,6 +101,11 @@ export async function compareAnalyze(
   if (isCompare) {
     metaPayload.context = "compare";
     metaPayload.compareHint = req.compareHint ?? "";
+  }
+  // Phase 2 (2026-05-01) — Edit 자동 트리거 케이스에서 promptMode 전파.
+  // 미전달이면 백엔드 default fast.
+  if (req.promptMode) {
+    metaPayload.promptMode = req.promptMode;
   }
   form.append("meta", JSON.stringify(metaPayload));
 

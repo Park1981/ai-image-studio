@@ -44,8 +44,13 @@ export interface StageDef {
   type: string;
   /** 사용자 표시용 stage 이름 */
   label: string;
-  /** 모델/엔진 정보 (선택). Edit/Video 의 step 보조 라벨 ("qwen2.5vl:7b" 등) */
-  subLabel?: string;
+  /**
+   * 모델/엔진 정보 (선택). Edit/Video 의 step 보조 라벨 ("qwen2.5vl:7b" 등).
+   *
+   * Phase 2 (2026-05-01) — 콜백 형태도 지원. ctx 의 promptMode 등 동적 값 분기 시 사용.
+   * 정밀 모드일 때 "gemma4-un · 정밀 (30~60초)" 처럼 라벨 변경.
+   */
+  subLabel?: string | ((ctx: PipelineCtx) => string);
   /** 동적 on/off — false 면 timeline 에서 row 자체 안 그림. 미정의 시 항상 표시 (true). */
   enabled?: (ctx: PipelineCtx) => boolean;
   /** stage 가 done 상태일 때 row 아래 보조 박스 렌더 (선택).
@@ -73,7 +78,22 @@ export interface PipelineCtx {
   /** Compare 모드 (Edit context · 캐시 미스 시) refined_intent stage 도착 여부.
    *  Vision Compare 메뉴는 emit 안 함 → row 안 보임. Phase 6 (2026-04-27). */
   intentRefineArrived?: boolean;
+  /**
+   * gemma4 보강 모드 (Phase 2 · 2026-05-01).
+   * 4 stage 의 subLabel 분기에 사용 — generate gemma4-upgrade / edit·video prompt-merge /
+   * compare intent-refine. 정밀 모드일 때 "gemma4-un · 정밀 (30~60초)" 표기.
+   * vision translation stage 는 정책상 항상 fast (spec §4.4) → 분기 X.
+   */
+  promptMode?: "fast" | "precise";
 }
+
+/**
+ * gemma4-un 사용 stage 의 subLabel 콜백 (Phase 2 · 2026-05-01).
+ * 4 stage 가 동일 함수 재사용 — generate.gemma4-upgrade / edit.prompt-merge /
+ * video.prompt-merge / compare.intent-refine.
+ */
+const gemmaSubLabel = (c: PipelineCtx): string =>
+  c.promptMode === "precise" ? "gemma4-un · 정밀 (30~60초)" : "gemma4-un";
 
 /** 백엔드가 SSE 로 보내는 stage event payload — 임의 필드 (mode 별 다름). */
 export type StagePayload = Record<string, unknown>;
@@ -92,7 +112,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       subLabel: "Claude · 최신 팁",
       enabled: (c) => c.research === true,
     },
-    { type: "gemma4-upgrade", label: "프롬프트 강화", subLabel: "gemma4-un" },
+    { type: "gemma4-upgrade", label: "프롬프트 강화", subLabel: gemmaSubLabel },
     { type: "workflow-dispatch", label: "워크플로우 설정" },
     {
       type: "comfyui-warmup",
@@ -147,7 +167,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     {
       type: "prompt-merge",
       label: "프롬프트 통합",
-      subLabel: "gemma4-un",
+      subLabel: gemmaSubLabel,
       renderDetail: (p, c) => {
         if (c.hideEditPrompts) return null;
         const finalPrompt = p.finalPrompt as string | undefined;
@@ -157,7 +177,8 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
           <>
             {finalPrompt && (
               <DetailBox
-                kind={provider === "fallback" ? "warn" : "info"}
+                // Phase 2 (2026-05-01) — fallback / fallback-precise-failed 둘 다 warn 톤
+                kind={provider?.startsWith("fallback") ? "warn" : "info"}
                 title={`최종 프롬프트 (${provider ?? "?"})`}
               >
                 {finalPrompt}
@@ -207,7 +228,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     {
       type: "prompt-merge",
       label: "프롬프트 통합",
-      subLabel: "gemma4-un",
+      subLabel: gemmaSubLabel,
       renderDetail: (p, c) => {
         if (c.hideVideoPrompts) return null;
         const finalPrompt = p.finalPrompt as string | undefined;
@@ -217,7 +238,8 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
           <>
             {finalPrompt && (
               <DetailBox
-                kind={provider === "fallback" ? "warn" : "info"}
+                // Phase 2 (2026-05-01) — fallback / fallback-precise-failed 둘 다 warn 톤
+                kind={provider?.startsWith("fallback") ? "warn" : "info"}
                 title={`LTX 프롬프트 (${provider ?? "?"})`}
               >
                 {finalPrompt}
@@ -263,7 +285,8 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
         if (!summary) return null;
         return (
           <DetailBox
-            kind={provider === "fallback" ? "warn" : "info"}
+            // Phase 2 (2026-05-01) — fallback / fallback-precise-failed 둘 다 warn 톤
+            kind={provider?.startsWith("fallback") ? "warn" : "info"}
             title={`분석 요약 (${provider ?? "?"})`}
           >
             {summary}
@@ -297,7 +320,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       // Vision Compare 메뉴는 이 stage emit 안 함 → enabled 가 false 라 row 안 보임.
       type: "intent-refine",
       label: "수정 의도 정제",
-      subLabel: "gemma4-un",
+      subLabel: gemmaSubLabel,
       enabled: (c) => c.intentRefineArrived === true,
     },
     {
@@ -316,7 +339,8 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
             : `비교 요약 (${provider ?? "?"})`;
         return (
           <DetailBox
-            kind={provider === "fallback" ? "warn" : "info"}
+            // Phase 2 (2026-05-01) — fallback / fallback-precise-failed 둘 다 warn 톤
+            kind={provider?.startsWith("fallback") ? "warn" : "info"}
             title={title}
           >
             {summaryEn ?? "—"}

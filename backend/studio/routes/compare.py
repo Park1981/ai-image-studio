@@ -52,6 +52,12 @@ async def create_compare_analyze_task(
     history_item_id_raw = meta_obj.get("historyItemId")
     vision_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
     text_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
+    # Phase 2 (2026-05-01) — Edit 자동 트리거 케이스에서 Edit 모드 패스스루.
+    # 수동 Compare (Vision Compare 메뉴) 는 promptMode 미전달 → fast.
+    compare_prompt_mode_raw = meta_obj.get("promptMode") or meta_obj.get("prompt_mode")
+    compare_prompt_mode: str = (
+        "precise" if isinstance(compare_prompt_mode_raw, str) and compare_prompt_mode_raw == "precise" else "fast"
+    )
 
     source_bytes = await source.read()
     result_bytes = await result.read()
@@ -75,6 +81,7 @@ async def create_compare_analyze_task(
             history_item_id_raw=history_item_id_raw,
             vision_override=vision_override,
             text_override=text_override,
+            prompt_mode=compare_prompt_mode,
         )
     )
     return TaskCreated(

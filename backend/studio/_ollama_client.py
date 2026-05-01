@@ -68,14 +68,25 @@ async def get_json(
     return data if isinstance(data, dict) else {}
 
 
-def extract_chat_content(data: dict[str, Any]) -> str:
-    """Extract Ollama chat content with thinking-field fallback."""
+def extract_chat_content(
+    data: dict[str, Any],
+    *,
+    allow_thinking_fallback: bool = True,
+) -> str:
+    """Extract Ollama chat content, optionally falling back to the thinking field.
+
+    `allow_thinking_fallback=True` (기본) 는 현재 동작 유지 — content 비면 thinking 사용.
+    `think:true` 호출에서는 호출자가 False 로 명시해 reasoning 누출을 차단해야 한다.
+    """
     msg = data.get("message") or {}
     if not isinstance(msg, dict):
         return ""
     content = msg.get("content", "") or ""
     if isinstance(content, str) and content.strip():
         return content
+    if not allow_thinking_fallback:
+        # think:true 호출은 thinking 을 결과로 인정하지 않음 (spec §5.2)
+        return ""
     thinking = msg.get("thinking", "") or ""
     if isinstance(thinking, str) and thinking.strip():
         log.info("ollama: content empty, using thinking field as fallback")
@@ -88,15 +99,23 @@ async def call_chat_payload(
     ollama_url: str,
     payload: dict[str, Any],
     timeout: float,
+    allow_thinking_fallback: bool = True,
 ) -> str:
-    """POST /api/chat and return stripped message content."""
+    """POST /api/chat and return stripped message content.
+
+    `allow_thinking_fallback` 은 그대로 `extract_chat_content` 로 전달.
+    호출자 (`_call_ollama_chat`) 가 `think` 값에서 자동 derive 한다.
+    """
     data = await post_json(
         ollama_url=ollama_url,
         endpoint="/api/chat",
         payload=payload,
         timeout=timeout,
     )
-    return extract_chat_content(data).strip()
+    return extract_chat_content(
+        data,
+        allow_thinking_fallback=allow_thinking_fallback,
+    ).strip()
 
 
 async def get_ps(

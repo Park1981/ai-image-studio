@@ -96,6 +96,12 @@ export interface EditState extends StageSliceState {
    */
   editVisionAnalysis: EditVisionAnalysis | null;
 
+  /**
+   * gemma4 보강 모드 (Phase 2 · 2026-05-01) · session-only.
+   * EditLeftPanel 마운트 시 settings.promptEnhanceMode 로 init sync.
+   */
+  promptMode: "fast" | "precise";
+
   // actions
   setSource: (
     image: string | null,
@@ -126,6 +132,8 @@ export interface EditState extends StageSliceState {
   pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
   /** Phase 1: step 1 done 에서 받은 구조 분석 저장 (휘발). */
   setEditVisionAnalysis: (analysis: EditVisionAnalysis | null) => void;
+  /** Phase 2 (2026-05-01): gemma4 보강 모드 토글 */
+  setPromptMode: (v: "fast" | "precise") => void;
   resetPipeline: () => void;
   /** ComfyUI 샘플링 스텝 업데이트 */
   setSampling: (step: number | null, total: number | null) => void;
@@ -165,6 +173,9 @@ export const useEditStore = create<EditState>((set) => ({
   compareX: 50,
 
   editVisionAnalysis: null,
+
+  // Phase 2 (2026-05-01) — settings 의 default 가 마운트 시 sync.
+  promptMode: "fast",
 
   setSource: (image, label, w, h) =>
     set({
@@ -216,6 +227,7 @@ export const useEditStore = create<EditState>((set) => ({
     ),
   setCompareX: (v) => set({ compareX: v }),
   setEditVisionAnalysis: (analysis) => set({ editVisionAnalysis: analysis }),
+  setPromptMode: (v) => set({ promptMode: v }),
   setPipelineProgress: (progress, label) =>
     set((s) => ({
       pipelineProgress: progress,
@@ -270,6 +282,9 @@ export const useEditInputs = () =>
       pickedTemplateRef: s.pickedTemplateRef,
       setPickedTemplateId: s.setPickedTemplateId,
       setPickedTemplateRef: s.setPickedTemplateRef,
+      // Phase 2 (2026-05-01) — gemma4 보강 모드
+      promptMode: s.promptMode,
+      setPromptMode: s.setPromptMode,
     })),
   );
 

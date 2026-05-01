@@ -204,6 +204,26 @@ function EditorShell({
           {/* 결과 */}
           {!loading && result && (
             <>
+              {/* Phase 2 (2026-05-01) — 정밀 보강 실패 시 경고 배너.
+               *  자동 빠른-재시도 (옵션 1) 대신 *명시 라벨 + 사용자 재시도* (옵션 2) 채택. */}
+              {result.provider === "fallback-precise-failed" && (
+                <div
+                  role="alert"
+                  style={{
+                    margin: "0 0 12px 0",
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    background: "rgba(245, 158, 11, 0.12)",
+                    border: "1px solid rgba(245, 158, 11, 0.35)",
+                    color: "var(--ink, #fbbf24)",
+                    fontSize: 12.5,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  <strong>⚠️ 정밀 보강 실패</strong> — 원본 프롬프트로 폴백됐어요.
+                  재시도하려면 [재업그레이드] 누르거나 [빠른] 모드로 전환 후 다시 진행해 주세요.
+                </div>
+              )}
               <Section
                 label={`gemma4 업그레이드 결과 (${result.provider}${result.fallback ? " · 폴백" : ""})`}
                 hint="수정하고 [이대로 생성] 누르면 아래 영문 프롬프트로 진행. [재업그레이드] 는 gemma4 를 다시 돌려."
