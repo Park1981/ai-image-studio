@@ -649,20 +649,20 @@ ComfyUI sampling 시 강제 unload (`force_unload_all_loaded_models`) 는 그대
 입력 다듬는 동안) 만 30s 유지하고 ComfyUI dispatch 직전 강제 unload —
 이 경계가 코드 레벨에서 어떻게 구현될지가 plan 핵심.
 
-#### 🟡 M2 — Edit Compare 자동 트리거 + 정밀 모드 UX 정책
+#### ✅ M2 — Edit Compare 자동 트리거 + 정밀 모드 UX 정책 (2026-05-01 결정 + 구현)
 
-사용자가 Edit `[정밀]` 켠 상태에서 결과가 나오면 `useEditPipeline.ts:243` 의
-`analyzeComparison(item, { silent: true, promptMode: editPromptMode })` 가
+사용자가 Edit `[정밀]` 켠 상태에서 결과가 나오면 `useEditPipeline.ts` 가
 *Edit 모드 그대로* 자동 Compare 호출. cache miss 시 `clarify_edit_intent` 도
-`think:true` → **60s+ 추가**. 자동이라 사용자 인지 X.
+`think:true` → 60s+ 추가. 자동이라 사용자 인지 X 였음.
 
-ProgressModal 의 `intent-refine` stage 라벨이 "정밀" 표시는 함 (Phase 4) 이지만
-백그라운드 분석이라 모달 자체가 안 뜸 (Edit 결과 자체는 이미 완료).
+**채택 결정 (2026-05-01)**: **옵션 A + 부분 옵션 C 하이브리드**.
+- 모드 일관성 유지 (자동 Compare 도 Edit 정밀 모드 따라감)
+- *정밀 모드 + 자동 트리거 케이스만* `toast.info("정밀 비교 분석 진행 중", "백그라운드에서 ~60초 소요")` 노출
+- 빠른 모드 자동은 silent 그대로 (자동의 가치 = 무의식 진행 · toast spam 회피)
 
-후속 정책 결정 옵션:
-- (A) 현재 동작 유지 (모드 일관성 우선)
-- (B) 자동 트리거는 *항상 fast* 강제 (속도 우선) — 수동 분석은 모드 따라감
-- (C) 자동 분석 시작 시 toast 안내 ("정밀 분석 진행 중 · ~60초")
+검토했다 기각된 옵션:
+- (B) 자동 트리거는 *항상 fast* 강제 — "정밀" 의미가 자동에선 안 살아남
+- (C 전체) 모든 자동 트리거 토스트 — 빠른 모드도 매번 알림 → spam
 
 #### 🟢 L1 — Mount-time flicker (Settings precise 사용자만)
 

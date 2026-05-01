@@ -251,6 +251,17 @@ export function useEditPipeline({
             ) {
               // Phase 2 (2026-05-01) — Edit 모드 그대로 자동 Compare 에 전파.
               // cache miss 시 clarify_edit_intent 가 동일 모드로 호출.
+              //
+              // M2 보강 (2026-05-01 spec §13.2 후속): 정밀 모드 + 자동 트리거 케이스만
+              // 사용자에게 toast 안내 — silent 분석이라 60s+ 추가 시간을 모르면 사용자가
+              // 다음 작업 시 VRAM 압박 / 응답 지연을 의아해 할 수 있음.
+              // 빠른 모드 자동은 silent 그대로 유지 (자동의 가치 = 무의식 진행).
+              if (promptMode === "precise") {
+                toast.info(
+                  "정밀 비교 분석 진행 중",
+                  "백그라운드에서 ~60초 소요 (정밀 모드)",
+                );
+              }
               void analyzeComparison(e.item, { silent: true, promptMode });
             }
             // v9 (2026-04-29 · Phase B.4): 옛 자동 저장 호출 제거.
