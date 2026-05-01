@@ -124,6 +124,7 @@ export function Toggle({
   align = "left",
   tone = "neutral",
   disabled = false,
+  flat = false,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -133,6 +134,9 @@ export function Toggle({
   tone?: "neutral" | "amber";
   /** 2026-05-01 — 항상 ON 인데 시각적으로 표시만 필요한 케이스 (Edit AI 보정 등). */
   disabled?: boolean;
+  /** 2026-05-01 — 외부 카드 안 inline 으로 들어갈 때 자체 background/border/padding 제거.
+   *  외부 카드 (.ais-magic-prompt-card 등) 가 색 책임. */
+  flat?: boolean;
 }) {
   // tone 별 색깔 매핑
   const toneColors =
@@ -203,10 +207,16 @@ export function Toggle({
         alignItems: "center",
         gap: 10,
         cursor: disabled ? "not-allowed" : "pointer",
-        padding: "8px 10px",
-        borderRadius: "var(--radius-sm)",
-        background: checked ? toneColors.bg : "var(--bg-2)",
-        border: `1px solid ${checked ? toneColors.border : "var(--line)"}`,
+        padding: flat ? 0 : "8px 10px",
+        borderRadius: flat ? 0 : "var(--radius-sm)",
+        background: flat
+          ? "transparent"
+          : checked
+          ? toneColors.bg
+          : "var(--bg-2)",
+        border: flat
+          ? "none"
+          : `1px solid ${checked ? toneColors.border : "var(--line)"}`,
         transition: "all .15s",
         opacity: disabled ? 0.7 : 1,
       }}

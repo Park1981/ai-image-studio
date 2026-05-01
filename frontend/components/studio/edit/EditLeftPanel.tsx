@@ -276,8 +276,9 @@ export default function EditLeftPanel({
        *  Edit 은 보정 우회 옵션 없음 (vision + clarify + upgrade 가 본질) →
        *  토글은 *disabled checked* 로 시각 일관성만 표현, 모드 segmented 는 항상 활성.
        *  clarify_edit_intent 와 upgrade_edit_prompt 양쪽에 promptMode 영향. */}
-      <div className="ais-magic-prompt-card">
+      <div className="ais-magic-prompt-card" data-active="true">
         <Toggle
+          flat
           checked
           disabled
           onChange={() => undefined}

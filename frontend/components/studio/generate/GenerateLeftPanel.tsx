@@ -277,8 +277,9 @@ export default function GenerateLeftPanel({
       {/* AI 보정 카드 — 토글 + (ON 일 때만) instant/thinking segmented 통합.
        *  Phase 2 후속 (2026-05-01) — 옛: Toggle + 별도 PromptModeRadio 카드 두 개 분리.
        *  신: 하나의 카드 wrap 안에 Toggle 위 + segmented 아래 (오빠 디자인 피드백). */}
-      <div className="ais-magic-prompt-card">
+      <div className="ais-magic-prompt-card" data-active={!skipUpgrade}>
         <Toggle
+          flat
           checked={!skipUpgrade}
           onChange={(v) => setSkipUpgrade(!v)}
           align="right"

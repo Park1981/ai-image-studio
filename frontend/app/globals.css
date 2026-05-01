@@ -382,12 +382,21 @@ button {
 }
 
 /* Phase 2 후속 (2026-05-01) — AI 보정 카드 통합 + 모드 segmented control.
- *  Toggle 옆 또는 아래에 instant/thinking 가로 50/50 옵션. 활성 = 흰 배경 + accent.
- *  카드 wrap (.ais-magic-prompt-card) 은 Toggle 자체 카드 패턴 재사용 (ais-toggle-row). */
+ *  카드 wrap 자체가 Toggle 의 background/border 책임 (Toggle flat 사용 — 자체 박스 X).
+ *  data-active 분기로 ON (accent-soft 톤) / OFF (bg-2 회색 톤) 색 자동 전환. */
 .ais-magic-prompt-card {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  transition: background .15s, border-color .15s;
+}
+.ais-magic-prompt-card[data-active="true"] {
+  background: var(--accent-soft);
+  border-color: rgba(74, 158, 255, 0.35);
 }
 .ais-prompt-mode-segmented {
   display: flex;

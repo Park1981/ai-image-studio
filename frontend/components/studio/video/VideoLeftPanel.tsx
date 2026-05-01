@@ -206,8 +206,9 @@ export default function VideoLeftPanel({
       {/* AI 보정 카드 (Phase 2 후속 · 2026-05-01) — Generate/Edit 와 통일 패턴.
        *  Toggle + segmented 를 하나의 카드 wrap. 토글 OFF 면 segmented 미노출.
        *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약 (기본 OFF). */}
-      <div className="ais-magic-prompt-card">
+      <div className="ais-magic-prompt-card" data-active={!skipUpgrade}>
         <Toggle
+          flat
           checked={!skipUpgrade}
           onChange={(v) => setSkipUpgrade(!v)}
           align="right"
