@@ -52,9 +52,36 @@ export default function CompareLeftPanel({
   return (
     <>
       <StudioModeHeader
-        title="Vision Compare"
+        titleKo="비교"
+        titleEn="Compare"
+        eyebrow="MODE · COMPARE"
         description="두 이미지의 차이와 품질을 5축 기준으로 비교합니다."
       />
+
+      {/* Phase 1.5.5 (결정 F · 2026-05-02) — CTA 상단 sticky 로 변경.
+       *  옛: 패널 하단 sticky + flex:1 spacer 로 밀어내림.
+       *  신: StudioModeHeader 직후 .ais-cta-sticky-top (Generate/Edit/Video 와 통일).
+       *  inline style 잔여 0 (V5 시각 대상) — Aurora Glass CTA 자동 적용. */}
+      <div className="ais-cta-sticky-top">
+        <button
+          type="button"
+          onClick={onAnalyze}
+          disabled={!canRun}
+          className="ais-cta-primary"
+        >
+          {running ? (
+            <>
+              <Icon name="refresh" size={14} className="spin" />
+              분석 중…
+            </>
+          ) : (
+            <>
+              <Icon name="sparkle" size={14} />
+              Compare
+            </>
+          )}
+        </button>
+      </div>
 
       {/* 이미지 A 슬롯 */}
       <CompareImageSlot
@@ -135,55 +162,6 @@ export default function CompareLeftPanel({
             </button>
           )}
         </div>
-      </div>
-
-      <div style={{ flex: 1 }} />
-
-      {/* Sticky CTA */}
-      <div
-        style={{
-          position: "sticky",
-          bottom: 12,
-          paddingTop: 10,
-          zIndex: 4,
-          background:
-            "linear-gradient(to bottom, transparent, var(--bg) 45%)",
-        }}
-      >
-        <button
-          type="button"
-          onClick={onAnalyze}
-          disabled={!canRun}
-          style={{
-            all: "unset",
-            cursor: canRun ? "pointer" : "not-allowed",
-            textAlign: "center",
-            background: canRun ? "var(--accent)" : "var(--accent-disabled)",
-            color: "#fff",
-            padding: "14px 20px",
-            borderRadius: "var(--radius-full)",
-            fontSize: 14,
-            fontWeight: 600,
-            width: "100%",
-            boxSizing: "border-box",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            gap: 8,
-          }}
-        >
-          {running ? (
-            <>
-              <Icon name="refresh" size={14} className="spin" />
-              분석 중…
-            </>
-          ) : (
-            <>
-              <Icon name="sparkle" size={14} />
-              비교 분석 시작
-            </>
-          )}
-        </button>
       </div>
     </>
   );

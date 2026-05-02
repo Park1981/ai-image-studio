@@ -80,12 +80,43 @@ export default function VisionPage() {
       <AppHeader />
 
       <StudioWorkspace>
-        {/* ── LEFT: 업로드 + CTA ── */}
+        {/* ── LEFT: 업로드 + CTA (Phase 1.5.6 · V5) ── */}
         <StudioLeftPanel>
           <StudioModeHeader
-            title="Vision Analyze"
+            titleKo="분석"
+            titleEn="Analyze"
+            eyebrow="MODE · ANALYZE"
             description="이미지 한 장의 구도, 분위기, 품질을 분석하고 번역합니다."
           />
+
+          {/* Phase 1.5.6 (결정 H · 2026-05-02) — CTA 상단 sticky 로 변경.
+           *  옛: 패널 하단 sticky + flex:1 spacer + onMouseEnter inline style swap.
+           *  신: StudioModeHeader 직후 .ais-cta-sticky-top + .ais-cta-primary (Aurora Glass).
+           *  inline style 잔여 0 (V5 시각 대상). */}
+          <div className="ais-cta-sticky-top">
+            <button
+              type="button"
+              onClick={analyze}
+              disabled={analyzeDisabled}
+              className="ais-cta-primary"
+            >
+              {analyzing ? (
+                <>
+                  <Spinner /> 분석 중…
+                </>
+              ) : (
+                <>
+                  <Icon name="search" size={15} />
+                  Analyze
+                </>
+              )}
+            </button>
+            <div className="ais-cta-eta">
+              평균 소요 <span className="mono">~8s</span> · 로컬 처리 · 데이터
+              전송 없음
+            </div>
+          </div>
+
           <div>
             <div
               style={{
@@ -121,7 +152,7 @@ export default function VisionPage() {
             />
           </div>
 
-          {/* 안내 배너 — 이 기능의 성격 */}
+          {/* 안내 배너 — 이 기능의 성격 (옛 그대로 유지). */}
           <div
             style={{
               padding: "12px 14px",
@@ -149,79 +180,6 @@ export default function VisionPage() {
             <div>
               40~120 단어 영문 + 한글 번역으로 추출합니다. 결과를 복사해
               <b>생성</b> 페이지 프롬프트에 그대로 붙여 넣어 사용하실 수 있습니다.
-            </div>
-          </div>
-
-          <div style={{ flex: 1 }} />
-
-          {/* Sticky CTA */}
-          <div
-            style={{
-              position: "sticky",
-              bottom: 12,
-              paddingTop: 10,
-              zIndex: 4,
-              background:
-                "linear-gradient(to bottom, transparent, var(--bg) 45%)",
-            }}
-          >
-            <button
-              type="button"
-              onClick={analyze}
-              disabled={analyzeDisabled}
-              style={{
-                all: "unset",
-                cursor: analyzeDisabled ? "not-allowed" : "pointer",
-                textAlign: "center",
-                background: analyzeDisabled ? "var(--accent-disabled)" : "var(--accent)",
-                color: "#fff",
-                padding: "14px 20px",
-                borderRadius: "var(--radius-full)",
-                fontSize: 14,
-                fontWeight: 600,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 8,
-                width: "100%",
-                boxSizing: "border-box",
-                boxShadow: analyzing
-                  ? "none"
-                  : "0 4px 18px rgba(74,158,255,.42), inset 0 1px 0 rgba(255,255,255,.2)",
-                transition: "all .18s",
-              }}
-              onMouseEnter={(e) => {
-                if (!analyzeDisabled)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "var(--accent-ink)";
-              }}
-              onMouseLeave={(e) => {
-                if (!analyzeDisabled)
-                  (e.currentTarget as HTMLButtonElement).style.background =
-                    "var(--accent)";
-              }}
-            >
-              {analyzing ? (
-                <>
-                  <Spinner /> 분석 중…
-                </>
-              ) : (
-                <>
-                  <Icon name="search" size={15} />
-                  분석
-                </>
-              )}
-            </button>
-            <div
-              style={{
-                fontSize: 11,
-                color: "var(--ink-4)",
-                textAlign: "center",
-                marginTop: 6,
-              }}
-            >
-              평균 소요 <span className="mono">~8s</span> · 로컬 처리 · 데이터
-              전송 없음
             </div>
           </div>
         </StudioLeftPanel>
