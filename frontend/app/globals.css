@@ -381,25 +381,8 @@ button {
   to   { transform: rotate(360deg); }
 }
 
-/* Phase 2 후속 (2026-05-01) — AI 보정 카드 통합 + 모드 segmented control.
- *  카드 wrap 자체가 Toggle 의 background/border 책임 (Toggle flat 사용 — 자체 박스 X).
- *  data-active 분기로 ON (accent-soft 톤) / OFF (bg-2 회색 톤) 색 자동 전환. */
-.ais-magic-prompt-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-2);
-  border: 1px solid var(--line-2);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: background .15s, border-color .15s, box-shadow .15s;
-}
-.ais-magic-prompt-card[data-active="true"] {
-  background: var(--accent-soft);
-  border-color: rgba(74, 158, 255, 0.55);
-  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.08);
-}
+/* (Phase 8 cleanup · 2026-05-02) — `.ais-magic-prompt-card` 제거됨.
+ * Phase 1.5 좌측 패널 V5 카드 전환 후 className 사용처 0 (dead CSS). */
 .ais-prompt-mode-segmented {
   position: relative;
   display: inline-flex;
@@ -609,6 +592,12 @@ button {
   background: transparent;
   white-space: nowrap;
   cursor: default;
+  /* (Phase 8 cleanup) button 호환 reset — `<button>` 으로 정통 disclosure 패턴 변경 후
+   * default font/color/margin/text-align inherit 보장 (시각 변화 0). */
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  text-align: inherit;
 }
 
 .ais-metric-cell {
@@ -1072,9 +1061,9 @@ button {
 .ais-video-res-card {
   --ais-range-accent: var(--card-from);
 }
-.ais-size-card-v .ais-range-input {
-  accent-color: var(--card-from);
-}
+/* (Phase 8 cleanup · 2026-05-02) — `.ais-range-input` selector 제거됨.
+ * `--ais-range-accent` CSS variable cascade 채택 후 className 사용처 0 (dead CSS).
+ * Range 컴포넌트는 `var(--ais-range-accent, var(--accent))` 자동 inherit. */
 
 /* ── Section 6: 우측 페어 시안 CSS (.ais-result-* / .ais-archive-* / .ais-history-*) */
 
@@ -1171,6 +1160,10 @@ button {
     0 12px 36px rgba(0,0,0,.18),
     0 4px 12px rgba(0,0,0,.10),
     0 0 0 1px rgba(0,0,0,.06);
+  /* anti-drag: 표준 attribute 둘은 CSS 로 (Codex 2차 nit #2).
+     Webkit 비표준 user-drag 만 inline 잔존. mousedown 은 부모 div 가 받음. */
+  user-select: none;
+  pointer-events: none;
 }
 
 /* Result Hero (Edit 전용) — column · slider 가 비율 가짐 (16:9 override) */
@@ -1251,12 +1244,11 @@ button {
   place-items: center;
   border-radius: var(--radius-full);
   color: #fff;
-  transition: all 0.15s;
+  /* spring 통통 — 옛 inline 시각 보존 (background + transform 분리) */
+  transition: background .18s ease, transform .22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.ais-result-action-btn:hover {
-  background: rgba(255,255,255,0.16);
-  transform: scale(1.06);
-}
+/* hover/focus 시각은 React state 가 [data-active="true"] 로 결정 (Codex 2차 nit #1).
+   옛 inline 패턴과 일관 (SSR 첫 paint jitter 회피 + scale 1.06 → 1.08 통일). */
 .ais-result-action-divider {
   width: 1px;
   height: 18px;
@@ -1536,14 +1528,58 @@ button {
   place-items: center;
   border-radius: var(--radius-full);
   color: #fff;
-  transition: background 0.15s, transform 0.15s;
+  /* spring 통통 — 옛 inline 시각 보존 (background + transform 분리) */
+  transition: background .18s ease, transform .22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.ais-tile-action-btn:hover {
+/* hover/focus 시각은 React state 가 [data-active="true"] 로 결정 (Codex 2차 nit #1).
+   옛 inline 패턴과 일관 + .ais-danger 클래스 dead 였던 것 정리 (data-variant="danger" 가 분기). */
+
+/* ActionBarButton variant/state 분기 — production 의 active scale + variant 별 background + label + focus-visible
+   적용 selector: .ais-result-action-btn (Hero 34×34) / .ais-tile-action-btn (Tile 26×26) 공용.
+   data-attribute 로 React state 전달 — inline style 잔여 0 (Codex Phase 4 finding 1 fix). */
+.ais-result-action-btn[data-has-label="true"],
+.ais-tile-action-btn[data-has-label="true"] {
+  width: auto;
+  height: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+/* active = (hover || focus-visible) && !disabled — 통통 scale + variant 별 hover bg */
+.ais-result-action-btn[data-active="true"],
+.ais-tile-action-btn[data-active="true"] {
   background: rgba(255,255,255,0.16);
   transform: scale(1.08);
 }
-.ais-tile-action-btn.ais-danger:hover {
+.ais-result-action-btn[data-active="true"][data-variant="primary"],
+.ais-tile-action-btn[data-active="true"][data-variant="primary"] {
+  background: rgba(74,158,255,0.85);
+}
+.ais-result-action-btn[data-active="true"][data-variant="danger"],
+.ais-tile-action-btn[data-active="true"][data-variant="danger"] {
   background: rgba(192,57,43,0.92);
+}
+/* focus-visible 강조 outline — 키보드 사용자만 (회귀 위험 #3 보존) */
+.ais-result-action-btn[data-focus-visible="true"],
+.ais-tile-action-btn[data-focus-visible="true"] {
+  outline: 2px solid rgba(74,158,255,0.85);
+  outline-offset: 2px;
+}
+.ais-result-action-btn[data-disabled="true"],
+.ais-tile-action-btn[data-disabled="true"] {
+  cursor: not-allowed;
+  background: rgba(255,255,255,0.06);
+  opacity: 0.45;
+  transform: scale(1);
+}
+.ais-result-action-btn[data-disabled="true"]:hover,
+.ais-tile-action-btn[data-disabled="true"]:hover {
+  background: rgba(255,255,255,0.06);
+  transform: scale(1);
 }
 
 /* ── Section 7: BeforeAfter Slider (Edit/Compare 공용 · production 드래그 유지)
@@ -1587,6 +1623,7 @@ button {
   font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.14em;
+  text-transform: uppercase;
   color: rgba(255,255,255,0.95);
   background: rgba(0,0,0,0.55);
   backdrop-filter: blur(10px) saturate(160%);
@@ -1623,6 +1660,55 @@ button {
   background: linear-gradient(135deg, rgba(245,158,11,0.07), rgba(245,158,11,0.02));
   border: 1px solid rgba(245,158,11,0.24);
   box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  /* 좁은 우측 패널에서 줄바꿈 허용 (옛 CardShell flexWrap 패턴) */
+  flex-wrap: wrap;
+}
+/* state 별 background/border override — filled (default · amber) vs empty/loading/disabled (surface · 옛 톤)
+   분석 결과 *있음* vs *없음* 시각 차별화 (Phase 5 Codex 3차 nit #2 — 옛 시각 의도 보존 + inline 0). */
+.ais-comparison-card[data-state="empty"],
+.ais-comparison-card[data-state="loading"],
+.ais-comparison-card[data-state="disabled"] {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+/* state 별 label · button · icon (자식 inline → CSS 이전) */
+.ais-comparison-card .ais-comp-label {
+  font-size: 12px;
+  color: var(--ink-3);
+  flex: 1;
+}
+.ais-comparison-card[data-state="loading"] .ais-comp-label {
+  color: var(--ink-2);
+}
+.ais-comparison-card[data-state="disabled"] .ais-comp-label {
+  font-size: 11.5px;
+  color: var(--ink-4);
+  line-height: 1.5;
+  flex: 0 1 auto;
+}
+/* empty/loading state Icon — base .ais-comp-icon (amber 박스 · filled 용) reset */
+.ais-comparison-card[data-state="empty"] .ais-comp-icon,
+.ais-comparison-card[data-state="loading"] .ais-comp-icon {
+  background: transparent;
+  width: auto;
+  height: auto;
+  color: var(--ink-3);
+  border-radius: 0;
+}
+.ais-comparison-card .ais-comp-analyze-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  transition: filter .12s;
+}
+.ais-comparison-card .ais-comp-analyze-btn:hover {
+  filter: brightness(1.1);
 }
 .ais-comparison-card .ais-comp-icon {
   display: grid;
@@ -1641,6 +1727,19 @@ button {
   background: var(--green);
   box-shadow: 0 0 0 3px rgba(82,196,26,0.16);
   flex-shrink: 0;
+}
+/* overall score 색 분기 — production 의 scoreColor 매핑 (≥80 green / 50-79 amber / <50 red / null neutral) */
+.ais-comparison-card .ais-comp-dot[data-tone="amber"] {
+  background: var(--amber);
+  box-shadow: 0 0 0 3px rgba(245,158,11,0.16);
+}
+.ais-comparison-card .ais-comp-dot[data-tone="red"] {
+  background: #DC2626;
+  box-shadow: 0 0 0 3px rgba(220,38,38,0.16);
+}
+.ais-comparison-card .ais-comp-dot[data-tone="neutral"] {
+  background: var(--ink-4);
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.06);
 }
 .ais-comparison-card .ais-comp-overall {
   font-size: 13px;
@@ -1668,6 +1767,7 @@ button {
 .ais-comparison-card .ais-axis-dot[data-tone="green"] { background: var(--green); }
 .ais-comparison-card .ais-axis-dot[data-tone="amber"] { background: var(--amber); }
 .ais-comparison-card .ais-axis-dot[data-tone="red"] { background: #DC2626; }
+.ais-comparison-card .ais-axis-dot[data-tone="neutral"] { background: var(--ink-4); }
 .ais-comparison-card .ais-comp-spacer { flex: 1; }
 .ais-comparison-card .ais-comp-detail-btn {
   all: unset;
@@ -1712,6 +1812,32 @@ button {
   flex-direction: column;
   gap: 14px;
   overflow: hidden;
+  min-height: 262px; /* production UX cap (옛 inline · plan §7 시각 cap 보존) */
+}
+/* body wrapper · running/empty/fallback/filled 분기 — overflow auto 로 좁은 우측 패널 스크롤 */
+.ais-cac-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ais-cac-filled {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* fallback 카드 — amber soft (시안 X · 옛 production 시각 보존) */
+.ais-cac-fallback {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--amber-ink);
+  line-height: 1.55;
+}
+.ais-cac-fallback-title {
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 .ais-cac-header {
   display: flex;
@@ -1801,6 +1927,9 @@ button {
   line-height: 1.55;
 }
 .ais-cac-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9.5px;
   color: var(--ink-4);
@@ -1829,6 +1958,41 @@ button {
   color: var(--ink);
   line-height: 1.6;
   margin-top: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* Transform 헤더 행 (eyebrow + contextLabel + 복사 버튼) */
+.ais-tp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  flex-wrap: wrap;
+}
+.ais-tp-context-meta {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  margin-left: 4px;
+  /* 옛 inline 시각 보존 (Codex Phase 7 nit #2) — 긴 contextLabel 시 한 줄 강제 + ellipsis
+     없으면 부모 flex-wrap 으로 헤더 두 줄로 깨짐 + 복사 버튼 다음 줄 떨어짐 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* Transform 영문 sub (textKo+textEn 모두 있을 때 dashed border-top 으로 구분) */
+.ais-tp-en-sub {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  line-height: 1.5;
 }
 
 /* Uncertain Box — 비교 못한 영역 (amber 톤 · 경고적 의미) */
@@ -1910,6 +2074,11 @@ button {
   box-shadow: var(--shadow-sm);
   cursor: default;
 }
+.ais-vs-lang-btn[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  color: var(--ink-4);
+}
 .ais-vs-copy-btn {
   all: unset;
   cursor: pointer;
@@ -1950,6 +2119,11 @@ button {
   font-size: 13.5px;
   letter-spacing: 0;
 }
+.ais-vs-empty {
+  color: var(--ink-4);
+  font-style: italic;
+  font-size: 12px;
+}
 
 /* Prompt Toggle Card — combined/split 토글 보존 + 색 톤만 추가 (positive=green / negative=red) */
 .ais-vision-prompt-toggle {
@@ -1982,6 +2156,87 @@ button {
   word-break: break-word;
   min-height: 56px;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* PromptToggle 자식 — meta · chars · empty · negative label/text · split section */
+.ais-vpt-meta {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 4px;
+}
+.ais-vpt-chars {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
+.ais-vpt-empty {
+  color: var(--ink-4);
+  font-style: italic;
+  font-size: 11.5px;
+}
+.ais-vpt-negative-label {
+  /* V5 톤 통일 — split 모드의 NEGATIVE 섹션 색 (#B8232C) 과 매칭 (Codex Phase 6 nit #2 시각 일관성) */
+  color: #B8232C;
+  font-weight: 600;
+}
+.ais-vpt-negative-text {
+  color: var(--ink-3);
+}
+/* split 모드 두 섹션 — 회귀 #10 보존 (combined/split 토글 + A1111) + V5 색 톤 (POSITIVE green / NEGATIVE red) */
+.ais-vpt-section[data-show-top-border="true"] {
+  border-top: 1px solid var(--line);
+}
+.ais-vpt-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 6px;
+  gap: 8px;
+}
+.ais-vpt-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  min-width: 0;
+}
+.ais-vpt-section[data-kind="positive"] .ais-vpt-section-title {
+  color: #2D7A2D;
+}
+.ais-vpt-section[data-kind="negative"] .ais-vpt-section-title {
+  color: #B8232C;
+}
+.ais-vpt-section-meta {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ais-vpt-section-body {
+  padding: 0 16px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 60px;
+}
+.ais-vpt-section-body[data-kind="negative"] {
+  font-size: 12px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  min-height: 30px;
 }
 
 /* Vision Detail Cards Grid + Card */
@@ -2028,6 +2283,11 @@ button {
   line-height: 1.55;
   color: var(--ink);
 }
+.ais-vd-empty {
+  font-size: 11px;
+  color: var(--ink-4);
+  font-style: italic;
+}
 .ais-vision-detail-card[data-muted="true"] {
   background: var(--bg-2);
   border-color: var(--line-2);
@@ -2035,6 +2295,12 @@ button {
 .ais-vision-detail-card[data-muted="true"] .ais-vd-body {
   color: var(--ink-3);
   font-style: italic;
+}
+/* Vision result 외곽 column flex (RecipeV2View wrapper) */
+.ais-vision-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 /* Vision History Tile (NEW 패턴 · 썸네일 88 + meta + Fraunces italic summary 2-line truncate) */
@@ -2044,6 +2310,7 @@ button {
   gap: 10px;
 }
 .ais-vision-history-tile {
+  position: relative; /* delete 버튼 absolute 앵커 (Phase 6 hover 노출) */
   display: flex;
   gap: 10px;
   padding: 10px;
@@ -2102,6 +2369,100 @@ button {
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin: 0;
+}
+.ais-vht-summary-failed {
+  color: var(--amber-ink);
+  font-style: italic;
+}
+/* Vision history tile delete 버튼 — hover/focus 시 absolute X 노출
+   (`.ais-vision-history-tile` 의 position: relative 가 앵커 — 본체 selector 에 통합) */
+.ais-vht-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 0;
+}
+.ais-vision-history-tile:hover .ais-vht-delete,
+.ais-vision-history-tile:focus-within .ais-vht-delete {
+  opacity: 1;
+}
+.ais-vht-delete:hover {
+  background: rgba(192,57,43,0.92);
+}
+
+/* Vision history 외곽 (헤더 + scroll + empty) — Phase 6 신규 */
+.ais-vision-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ais-vision-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.ais-vision-history-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
+}
+.ais-vision-history-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ais-vision-history-count {
+  font-size: 11px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+}
+.ais-vision-history-clear {
+  all: unset;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ink-4);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  margin-top: 6px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ais-vision-history-clear:hover {
+  color: var(--ink-2);
+  border-color: var(--line-2);
+}
+.ais-vision-history-empty {
+  padding: 20px 16px;
+  background: var(--surface);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--ink-4);
+  font-size: 12px;
+}
+.ais-vision-history-scroll {
+  max-height: 55vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 /* ── Section 11: AppHeader (Phase 1.4 · 결정 M)

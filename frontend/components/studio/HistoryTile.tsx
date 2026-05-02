@@ -8,7 +8,13 @@
  * 2026-04-27 액션바 풀 통일:
  *  - 자체 BarButton 제거 → ResultHoverActionBar + ActionBarButton 사용
  *  - 결과 뷰어와 동일한 글래스 pill + spring 통통 인터랙션
- *  - 호버 시 마운트가 아닌 항상 마운트 + hovered prop 토글 → spring 애니메이션 살림
+ *
+ * 2026-05-02 디자인 V5 Phase 4 격상 (결정 R):
+ *  - inline border/box-shadow 제거 → wrapper className `.ais-history-tile` + data-selected (V5 violet ring 자동)
+ *  - selected 시 흰 ring 2 + violet ring 4 + `● 선택` 칩 (CSS pseudo-element 가 자동 처리)
+ *  - hover 액션바 4 버튼 (자세히 / 복사 / 수정 / 삭제) — 옛 3 버튼에 **복사** 추가
+ *  - onCopy 미지정 시 default = item.prompt 복사 (clipboard + toast)
+ *  - ResultHoverActionBar variant="tile" 명시 (V5 .ais-tile-action-bar 위치 톤)
  *
  * 삭제는 서버에도 전파 (useHistoryStore.remove + api-client.deleteHistoryItem).
  */
@@ -21,6 +27,7 @@ import ResultHoverActionBar, {
   ActionBarButton,
 } from "@/components/studio/ResultHoverActionBar";
 import { deleteHistoryItem } from "@/lib/api/history";
+import { copyText } from "@/lib/image-actions";
 import type { HistoryItem } from "@/lib/api/types";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
@@ -48,6 +55,11 @@ interface Props {
    * 주로 generate 히스토리에서 결과 이미지를 /edit 의 원본으로 보내는 용도.
    */
   onSendToEdit?: () => void;
+  /**
+   * "복사" 콜백 (옵셔널 · V5 Phase 4 신규).
+   * 미지정 시 default = item.prompt 클립보드 복사 (toast 포함).
+   */
+  onCopy?: () => void;
   aspect?: string;
   style?: CSSProperties;
 }
@@ -61,6 +73,7 @@ export default function HistoryTile({
   onDoubleClick,
   onUseAsSource,
   onSendToEdit,
+  onCopy,
   aspect = "1/1",
   style,
 }: Props) {
@@ -70,6 +83,17 @@ export default function HistoryTile({
 
   // onExpand/onDoubleClick 중 정의된 쪽 사용 (하위호환)
   const triggerExpand = onExpand ?? onDoubleClick;
+
+  /** default 복사 — onCopy 미지정 시 prompt 복사. prompt 비어있으면 안내 toast. */
+  const handleCopy =
+    onCopy ??
+    (() => {
+      if (item.prompt) {
+        void copyText(item.prompt, "프롬프트");
+      } else {
+        toast.info("복사할 프롬프트 없음");
+      }
+    });
 
   /**
    * 옵티미스틱 삭제 — 즉시 UI 에서 제거하고 서버 호출.
@@ -94,31 +118,36 @@ export default function HistoryTile({
 
   return (
     <div
-      style={{ position: "relative", ...style }}
+      className="ais-history-tile"
+      data-selected={selected ? "true" : "false"}
+      style={{ aspectRatio: aspect, ...style }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       onDoubleClick={triggerExpand}
     >
+      {/* ImageTile inline border 제거 — V5 wrapper 의 violet ring 이 selected 시각 담당.
+          ImageTile 자체의 radius/overflow 는 그대로 두고 V5 wrapper 가 더 큰 radius cascade. */}
       <ImageTile
         seed={item.imageRef || item.id}
         onClick={onClick}
         aspect={aspect}
         style={{
-          border: selected
-            ? "2px solid var(--accent)"
-            : "2px solid transparent",
-          transition: "transform .15s",
-          boxShadow: selected ? "0 0 0 4px rgba(74,158,255,.15)" : "none",
+          width: "100%",
+          height: "100%",
+          // wrapper 가 radius 처리 — inner ImageTile 은 시각 충돌 회피용 transparent border
+          border: "none",
+          boxShadow: "none",
         }}
       />
 
-      {/* 결과 뷰어와 동일한 글래스 pill — 호버 시 통통 등장 */}
+      {/* 결과 뷰어와 동일한 글래스 pill — 호버 시 통통 등장 (V5 tile variant) */}
       <div onClick={(e) => e.stopPropagation()}>
-        <ResultHoverActionBar hovered={hover}>
+        <ResultHoverActionBar hovered={hover} variant="tile">
           {triggerExpand && (
             <ActionBarButton
               icon="zoom-in"
               title="라이트박스에서 크게 보기"
+              size="tile"
               onClick={() => {
                 // 라이트박스 메타 패널이 "현재 선택된 아이템" 기준이므로
                 // 이 타일을 먼저 선택 → 그 뒤 확장. 아니면 이전 선택의 메타가 보임.
@@ -127,10 +156,18 @@ export default function HistoryTile({
               }}
             />
           )}
+          {/* V5 신규 — 복사 버튼 (4 버튼 시그니처) */}
+          <ActionBarButton
+            icon="copy"
+            title="프롬프트 복사"
+            size="tile"
+            onClick={handleCopy}
+          />
           {onUseAsSource && (
             <ActionBarButton
               icon="edit"
               title="이 이미지를 수정 원본으로"
+              size="tile"
               onClick={onUseAsSource}
             />
           )}
@@ -138,6 +175,7 @@ export default function HistoryTile({
             <ActionBarButton
               icon="edit"
               title="수정으로 이동"
+              size="tile"
               onClick={onSendToEdit}
             />
           )}
@@ -145,6 +183,7 @@ export default function HistoryTile({
             icon="x"
             title="삭제"
             variant="danger"
+            size="tile"
             onClick={handleDelete}
           />
         </ResultHoverActionBar>

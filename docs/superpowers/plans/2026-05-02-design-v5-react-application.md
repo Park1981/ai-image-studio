@@ -388,8 +388,14 @@
 
 - `frontend/components/studio/compare/CompareLeftPanel.tsx`:
   - CTA 상단 sticky (Phase 1.5 에서 이미 처리 — 검증만)
+- `frontend/components/studio/BeforeAfterSlider.tsx` (Phase 5 Codex 3차 nit #1 박제):
+  - **`labelVariant?: "before-after" | "ab"` prop 신규** (기본 "before-after" — Edit/Lightbox 호환)
+  - className 분기:
+    - `"before-after"` → `.ais-ba-label-before` / `.ais-ba-label-after` (V5 검은 톤 default · 현재 적용됨)
+    - `"ab"` → `.ais-ba-label-a` / `.ais-ba-label-b` (V5 violet/amber 그라데이션 시그니처 · `globals.css:1601-1614` 활용)
 - `frontend/components/studio/compare/CompareViewer.tsx`:
-  - BeforeAfter slider 안 **A=violet 그라데이션 / B=amber 그라데이션** 라벨 추가 (badge-ab 패턴 슬라이더 안 적용)
+  - BeforeAfterSlider 호출 시 **`labelVariant="ab"` + `beforeLabel="A"` + `afterLabel="B"`** 명시
+  - V5 시그니처 그라데이션 자동 적용 (globals.css 의 `.ais-ba-label-a` / `-b` 정의 활용)
   - 비율 차이 amber 경고 chip 그대로 유지
 - `frontend/components/studio/compare/CompareAnalysisPanel.tsx`:
   - 종합 chip = violet gradient (`linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04))` + violet text)
@@ -412,6 +418,16 @@
 
 ### Phase 8 — Cleanup + 회귀 테스트 (1-2h)
 
+- [ ] **AxisRow a11y 정통 meter 패턴 검토** (Codex Phase 7 nit #3 박제):
+  - 현재 `.ais-axis-fill` 에 `aria-label="구성 82%"` 박힘 — 시각 fill 자체에 의미 라벨
+  - 정통 a11y 패턴: `role="meter"` + `aria-valuenow={score}` + `aria-valuemin={0}` + `aria-valuemax={100}` + `aria-label={label}`
+  - 시각/기능 영향 0 · 시멘틱 강화만 — Phase 8 시점 한 번에 정리
+- [ ] **VisionHistoryList 헤더 V5 Archive Header 패턴 통일 검토** (Codex Phase 6 nit #3 박제):
+  - 현재 옛 헤더: h3 "최근 분석" + count + 모두 지우기 버튼 (`.ais-vision-history-header`)
+  - Edit/Generate V5 패턴: HistorySectionHeader (eyebrow `IMAGE STUDIO · ARCHIVE` + Fraunces italic bilingual + count chip + sizeBytes chip)
+  - 옵션 A — 통일: HistorySectionHeader 격상 + `titleEn="History"` (sizeBytes 는 vision 전용 X — count 만)
+  - 옵션 B — 그대로 (Vision 전용 작은 헤더 의도 보존 · plan §6 명시 X)
+  - 결정 후보 — Phase 8 시점 시각 비교 후
 - [ ] 5 페이지 수동 검증 (Chrome MCP — 시안 페어 시각 일치 확인)
 - [ ] 회귀 테스트:
   - **`cd backend; pytest tests/` → 405 PASS** (CLAUDE.md 표준 명령 · legacy quarantine 적용)

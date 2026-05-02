@@ -7,6 +7,13 @@
  *   - !analysis: 빈 상태
  *   - analysis.fallback: amber 폴백 카드
  *   - 정상: AxisRow 5개 + 총평 + transform_prompt + uncertain
+ *
+ * 2026-05-02 디자인 V5 Phase 7 격상:
+ *  - 외곽 inline → className `.ais-compare-analysis-card` (surface + border + radius-card + padding 16 + flex column gap 14)
+ *  - 헤더 → `.ais-cac-header` + `.ais-cac-title` + `.ais-cac-overall-chip` (violet gradient + violet text)
+ *  - AxisRow → `.ais-axis-row` + `-head` + `-label` + `-score` + `-bar` + `-fill[data-tone]` + `-comment`
+ *  - Summary 박스 → `.ais-cac-summary` + `.ais-cac-eyebrow`
+ *  - Transform/Uncertain → CompareExtraBoxes V5 격상 (CompareExtraBoxes.tsx)
  */
 
 "use client";
@@ -41,58 +48,29 @@ interface Props {
   analysis: VisionCompareAnalysis | null;
 }
 
+/** 점수 → tone 매핑 (V5 .ais-axis-fill[data-tone] CSS 분기용).
+ *  임계: ≥80 green / ≥60 amber / <60 또는 null gray */
+function scoreTone(score: number | null): "green" | "amber" | "gray" {
+  if (score == null) return "gray";
+  if (score >= 80) return "green";
+  if (score >= 60) return "amber";
+  return "gray";
+}
+
 export default function CompareAnalysisPanel({ running, analysis }: Props) {
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius-lg)",
-        padding: 16,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        minHeight: 262,
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-        }}
-      >
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: "var(--ink-2)",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
+    <div className="ais-compare-analysis-card">
+      <div className="ais-cac-header">
+        <div className="ais-cac-title">
           <Icon name="grid" size={13} />
           5축 비교 분석
         </div>
         {analysis && !analysis.fallback && (
-          <div
-            className="mono"
-            style={{
-              fontSize: 11,
-              color: "var(--ink-3)",
-              padding: "3px 8px",
-              background: "var(--bg-2)",
-              borderRadius: "var(--radius-full)",
-            }}
-          >
-            종합 {analysis.overall}%
-          </div>
+          <div className="ais-cac-overall-chip">종합 {analysis.overall}%</div>
         )}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+      <div className="ais-cac-body">
         {running ? (
           <AnalysisLoading />
         ) : !analysis ? (
@@ -130,18 +108,8 @@ function AnalysisEmpty() {
 
 function AnalysisFallback({ summary }: { summary: string }) {
   return (
-    <div
-      style={{
-        background: "var(--amber-soft)",
-        border: "1px solid var(--amber)",
-        borderRadius: "var(--radius)",
-        padding: "12px 14px",
-        fontSize: 12,
-        color: "var(--amber-ink)",
-        lineHeight: 1.55,
-      }}
-    >
-      <div style={{ fontWeight: 600, marginBottom: 4 }}>분석 부분 실패</div>
+    <div className="ais-cac-fallback">
+      <div className="ais-cac-fallback-title">분석 부분 실패</div>
       {summary || "비전 모델 응답을 파싱하지 못했습니다."}
     </div>
   );
@@ -149,9 +117,9 @@ function AnalysisFallback({ summary }: { summary: string }) {
 
 function AnalysisFilled({ analysis }: { analysis: VisionCompareAnalysis }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className="ais-cac-filled">
       {/* 5축 막대 + 코멘트 */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="ais-axis-rows">
         {AXIS_ORDER.map((axis) => (
           <AxisRow
             key={axis}
@@ -162,32 +130,10 @@ function AnalysisFilled({ analysis }: { analysis: VisionCompareAnalysis }) {
         ))}
       </div>
 
-      {/* 총평 */}
+      {/* 총평 (5축 종합) */}
       {analysis.summary_ko && (
-        <div
-          style={{
-            background: "var(--bg-2)",
-            border: "1px solid var(--line)",
-            borderRadius: "var(--radius)",
-            padding: "10px 12px",
-            fontSize: 12,
-            color: "var(--ink-2)",
-            lineHeight: 1.55,
-          }}
-        >
-          <div
-            className="mono"
-            style={{
-              fontSize: 10,
-              color: "var(--ink-4)",
-              letterSpacing: ".15em",
-              textTransform: "uppercase",
-              marginBottom: 4,
-              fontWeight: 600,
-            }}
-          >
-            Summary
-          </div>
+        <div className="ais-cac-summary">
+          <div className="ais-cac-eyebrow">SUMMARY</div>
           {analysis.summary_ko}
         </div>
       )}
@@ -221,65 +167,32 @@ function AxisRow({
   comment: string;
 }) {
   const pct = score ?? 0;
-  // 점수 색상 — 80+ 초록, 60+ 앰버, 그 미만 회색
-  const barColor =
-    score === null
-      ? "var(--ink-4)"
-      : score >= 80
-        ? "var(--green)"
-        : score >= 60
-          ? "var(--amber)"
-          : "var(--ink-3)";
+  const tone = scoreTone(score);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          fontSize: 12,
-        }}
-      >
-        <span style={{ fontWeight: 600, color: "var(--ink-2)" }}>{label}</span>
-        <span
-          className="mono"
-          style={{
-            color: score === null ? "var(--ink-4)" : "var(--ink-2)",
-            fontWeight: 600,
-          }}
-        >
+    <div className="ais-axis-row">
+      <div className="ais-axis-row-head">
+        <span className="ais-axis-label">{label}</span>
+        <span className="ais-axis-score">
           {score === null ? "—" : `${score}%`}
         </span>
       </div>
-      <div
-        style={{
-          height: 6,
-          background: "var(--bg-2)",
-          borderRadius: "var(--radius-full)",
-          overflow: "hidden",
-        }}
-      >
+      <div className="ais-axis-bar">
         <div
-          style={{
-            width: `${pct}%`,
-            height: "100%",
-            background: barColor,
-            transition: "width .35s ease",
-          }}
+          className="ais-axis-fill"
+          data-tone={tone}
+          style={{ width: `${pct}%` }}
+          role="meter"
+          aria-valuenow={score ?? 0}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={
+            score === null
+              ? `${label} — 분석 안 됨`
+              : `${label} ${score}%`
+          }
         />
       </div>
-      {comment && (
-        <div
-          style={{
-            fontSize: 11.5,
-            color: "var(--ink-3)",
-            lineHeight: 1.5,
-            paddingLeft: 2,
-          }}
-        >
-          {comment}
-        </div>
-      )}
+      {comment && <div className="ais-axis-comment">{comment}</div>}
     </div>
   );
 }

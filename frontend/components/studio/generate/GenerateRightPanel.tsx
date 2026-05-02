@@ -2,12 +2,18 @@
  * GenerateRightPanel — Generate 페이지 우측 결과 + 히스토리 패널.
  *
  * 포함:
- *  - StudioResultHeader
- *  - GenerateResultViewer (선택 아이템) 또는 StudioEmptyState
- *  - HistorySectionHeader (그리드 컬럼 토글)
- *  - HistoryGallery (Masonry)
+ *  - StudioResultHeader (V5 — Fraunces italic bilingual + meta pills)
+ *  - GenerateResultViewer (선택 아이템 · Caption 슬롯 포함) 또는 StudioEmptyState
+ *  - HistorySectionHeader (V5 Archive Header — eyebrow + bilingual + count + size chip)
+ *  - HistoryGallery (Masonry · ResizeObserver 자동 컬럼 보존)
  *
  * 2026-04-26 (task #5): generate/page.tsx 분해 step 3.
+ *
+ * 2026-05-02 디자인 V5 Phase 4 격상:
+ *  - StudioResultHeader: titleEn="Generated" + meta pills (1672×941 violet · PNG · steps · cfg)
+ *  - HistorySectionHeader: titleEn="History" + sizeBytes (useHistoryStats 의 generate.sizeBytes)
+ *  - GenerateResultViewer: download 버튼 제거 → 4 버튼 (자세히/복사/수정/리프레시) — onDownload prop 제거
+ *  - 회귀 위험 #1 보존: HistoryGallery ResizeObserver 자동 컬럼 그대로 (gridCols prop 미주입)
  */
 
 "use client";
@@ -19,12 +25,8 @@ import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
-import {
-  downloadImage,
-  copyText,
-  filenameFromRef,
-  urlToDataUrl,
-} from "@/lib/image-actions";
+import { useHistoryStats } from "@/hooks/useHistoryStats";
+import { copyText, urlToDataUrl } from "@/lib/image-actions";
 import { useEditStore } from "@/stores/useEditStore";
 import {
   useGenerateInputs,
@@ -57,6 +59,10 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
 
   const [viewerHovered, setViewerHovered] = useState(false);
 
+  // V5 Archive Header size chip — generate 모드 디스크 사용량
+  const stats = useHistoryStats();
+  const generateSizeBytes = stats?.byMode.generate.sizeBytes;
+
   /** 결과/히스토리 공용 — 이 이미지를 /edit 의 원본으로 보내고 라우팅. */
   const sendToEdit = async (it: { id: string; imageRef: string; label: string }) => {
     toast.info("수정으로 전송 중…");
@@ -76,14 +82,24 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
     router.push("/edit");
   };
 
+  // V5 result-meta-pills — 첫 violet pill = 해상도, 추가 pill = 모델/Lightning
+  const metaPills = selectedItem ? (
+    <>
+      <span className="ais-result-pill ais-pill-violet mono">
+        {selectedItem.width} × {selectedItem.height}
+      </span>
+      <span className="ais-result-pill mono">PNG</span>
+      {selectedItem.lightning && (
+        <span className="ais-result-pill ais-pill-amber mono">Lightning</span>
+      )}
+    </>
+  ) : (
+    <span className="ais-result-pill mono">PNG</span>
+  );
+
   return (
     <StudioRightPanel>
-      <StudioResultHeader
-        title="생성 결과"
-        meta={
-          selectedItem ? `${selectedItem.width}×${selectedItem.height}` : "PNG"
-        }
-      />
+      <StudioResultHeader title="생성 결과" titleEn="Generated" meta={metaPills} />
 
       {selectedItem ? (
         <GenerateResultViewer
@@ -92,17 +108,8 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
           onEnter={() => setViewerHovered(true)}
           onLeave={() => setViewerHovered(false)}
           onExpand={() => onLightboxOpen(selectedItem.imageRef)}
-          onDownload={() =>
-            downloadImage(
-              selectedItem.imageRef,
-              filenameFromRef(
-                selectedItem.imageRef,
-                `ais-${selectedItem.id}.png`,
-              ),
-            )
-          }
           onCopyPrompt={() =>
-            copyText(selectedItem.prompt || "", "프롬프트")
+            void copyText(selectedItem.prompt || "", "프롬프트")
           }
           onSendToEdit={() => sendToEdit(selectedItem)}
           onReuse={() => {
@@ -126,7 +133,12 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
         </StudioEmptyState>
       )}
 
-      <HistorySectionHeader title="생성 히스토리" count={genItems.length} />
+      <HistorySectionHeader
+        title="보관"
+        titleEn="History"
+        count={genItems.length}
+        sizeBytes={generateSizeBytes}
+      />
 
       <HistoryGallery
         items={genItems}

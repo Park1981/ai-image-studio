@@ -7,12 +7,17 @@
  *  - Before 가 data: URL 이면 실제 <img>, 아니면 seed 기반 ImageTile (placeholder)
  *  - compareX 는 optional props — 없으면 내부 state 로 독립 관리
  *
- * 사용처: /edit 메인 뷰어, ImageLightbox 비교 모드.
+ * 2026-05-02 디자인 V5 Phase 5 격상:
+ *  - wrapper inline → className `.ais-ba-slider` (V5 토큰 cascade)
+ *  - CornerBadge → `.ais-ba-label .ais-ba-label-before/after` (CSS text-transform: uppercase)
+ *  - 회귀 위험 #4 보존: 드래그 핸들 (wrapRef + onMouseDown + window mousemove) 그대로
+ *
+ * 사용처: /edit 메인 뷰어, ImageLightbox 비교 모드, ReferenceLibraryDrawer, /compare.
  */
 
 "use client";
 
-import { useRef, useState, type CSSProperties, type ReactNode } from "react";
+import { useRef, useState } from "react";
 import ImageTile from "@/components/ui/ImageTile";
 import Icon from "@/components/ui/Icon";
 
@@ -41,6 +46,13 @@ interface Props {
    * Lightbox 등 다른 호출자는 prop 안 주면 contain 유지 → 회귀 0.
    */
   beforeFit?: "contain" | "cover";
+  /**
+   * 코너 라벨 시각 variant (Phase 7 — 디자인 V5 시그니처).
+   *  - "before-after" (기본): `.ais-ba-label-before` / `-after` — V5 검은 톤 (Edit/Lightbox 호환)
+   *  - "ab": `.ais-ba-label-a` / `-b` — V5 violet/amber 그라데이션 (Compare 시그니처)
+   * Compare 호출처는 `labelVariant="ab"` + `beforeLabel="A"` + `afterLabel="B"` 명시.
+   */
+  labelVariant?: "before-after" | "ab";
 }
 
 export default function BeforeAfterSlider({
@@ -54,7 +66,13 @@ export default function BeforeAfterSlider({
   beforeLabel = "Before",
   afterLabel = "After",
   beforeFit = "contain",
+  labelVariant = "before-after",
 }: Props) {
+  // Phase 7 — V5 라벨 className 분기 (Compare 시그니처 violet/amber 그라데이션 vs Edit 검은 톤)
+  const beforeLabelClass =
+    labelVariant === "ab" ? "ais-ba-label ais-ba-label-a" : "ais-ba-label ais-ba-label-before";
+  const afterLabelClass =
+    labelVariant === "ab" ? "ais-ba-label ais-ba-label-b" : "ais-ba-label ais-ba-label-after";
   // 비제어 fallback — 부모가 state 안 주면 내부에서 관리 (기본 50%).
   const [internalCompareX, setInternalCompareX] = useState(50);
   const compareX = controlledCompareX ?? internalCompareX;
@@ -126,13 +144,9 @@ export default function BeforeAfterSlider({
   return (
     <div
       ref={wrapRef}
+      className="ais-ba-slider"
       style={{
-        position: "relative",
-        borderRadius: "var(--radius-card)",
-        overflow: "hidden",
-        background: "var(--bg-2)",
-        boxShadow: "var(--shadow-sm)",
-        border: "1px solid var(--line)",
+        // 동적 — 호출처 props (호환 보장)
         aspectRatio,
         maxHeight,
         // 슬라이더 전 영역에서 텍스트·이미지 선택 UI 발생 억제
@@ -175,8 +189,8 @@ export default function BeforeAfterSlider({
         {renderBefore}
       </div>
 
-      <CornerBadge pos="tl">{beforeLabel}</CornerBadge>
-      <CornerBadge pos="tr">{afterLabel}</CornerBadge>
+      <span className={beforeLabelClass}>{beforeLabel}</span>
+      <span className={afterLabelClass}>{afterLabel}</span>
 
       <div
         onMouseDown={startDrag}
@@ -224,36 +238,3 @@ export default function BeforeAfterSlider({
   );
 }
 
-function CornerBadge({
-  pos,
-  children,
-}: {
-  pos: "tl" | "tr" | "bl" | "br";
-  children: ReactNode;
-}) {
-  const p: Record<string, CSSProperties> = {
-    tl: { top: 10, left: 10 },
-    tr: { top: 10, right: 10 },
-    bl: { bottom: 10, left: 10 },
-    br: { bottom: 10, right: 10 },
-  };
-  return (
-    <div
-      className="mono"
-      style={{
-        position: "absolute",
-        ...p[pos],
-        fontSize: 10,
-        letterSpacing: ".08em",
-        textTransform: "uppercase",
-        color: "#fff",
-        background: "rgba(0,0,0,.55)",
-        backdropFilter: "blur(4px)",
-        padding: "3px 8px",
-        borderRadius: 4,
-      }}
-    >
-      {children}
-    </div>
-  );
-}
