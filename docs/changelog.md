@@ -3,6 +3,76 @@
 > 누적 변경 로그 — 완료된 작업의 역사적 기록.
 > 최신 변경 + 활성 정책은 `CLAUDE.md` 참조. 자세한 작업 내역은 git log + memory.
 
+## 2026-05-02
+
+### 디자인 V5 — Phase 0~3 master merge (좌측 패널 + Chrome + Layout)
+
+**master**: `d6b000a` (merge --no-ff · 10 commit + merge commit · 89 files / +21,563 / -847)
+**branch**: `feature/design-v5` 보존 (Phase 4~7 우측 패널 다음 세션 이어서)
+**plan**: `docs/superpowers/plans/2026-05-02-design-v5-react-application.md` (v4 · 541줄 · Codex 1+2차 리뷰 반영)
+
+**Phase 0 — 사전 준비**:
+- branch `feature/design-v5` 분기 (master 영향 0)
+- 16 webp 카드 배경 자산 복사 (`frontend/public/studio/cards/`)
+  - `card-bg-{ai,fast,claude,auto-compare,size,multi-ref,video-res,adult}.webp` × 2 (@2x)
+- framer-motion `^12.38.0` 검증 (이미 설치)
+
+**Phase 1 — Foundation (CSS only · +1709줄)**:
+- V5 시그니처 컬러 토큰 8세트 × 4 var = 32 var (`--card-{from,to,glow,shadow}-X`)
+- 활성 카드 효과 토큰 (padding 14→38 / mask 35→15 / 0.35s spring)
+- `.ais-mode-header` (Fraunces italic 26 bilingual + 점선 border)
+- `.ais-cta-primary` V5 Aurora Glass override (violet→blue + light sweep 0.7s)
+- 8 카드 패턴 (`.ais-toggle-card` 베이스 + `.ais-sig-{ai,fast,claude}` modifier · `.ais-{auto-compare,multi-ref,video-res,adult,size}-card` 단독)
+- 페어 우측 시안 CSS (Result Header/Hero/Caption + Archive Header + History Section/Tile + BeforeAfter Slider + Comparison Card + Compare 5축 + Vision Summary/PromptToggle/Detail)
+- AppHeader CSS (`.ais-app-header` + `.ais-ah-nav` + `.ais-ah-metrics-popover` frosted glass)
+- `.ais-studio-workspace` frame (Phase 3 재설계 — 1024~1279 grid 풀폭 / 1280+ max-width: min(95vw,1600px) 박스)
+- Codex 1차 리뷰 fix: 음수 letter-spacing 10 → 0 / @2x image-set Retina 지원
+
+**Phase 1.5 — 좌측 패널 5 mode 적용 ⭐**:
+- `StudioModeHeader` 새 prop signature (`titleKo`/`titleEn`/`eyebrow` + 옛 `title` alias)
+- Generate 좌측 (3 V5 카드: sig-ai/sig-claude/sig-fast + size-card-v)
+- Edit 좌측 (4 V5 카드 + 카드 순서 결정 A: AI→자동평가→퀄리티→multi-ref · 성인 X · Codex 2차 정정)
+- Video 좌측 (4 V5 카드 + 카드 순서 결정 B: AI→퀄리티→성인→영상해상도 맨 아래 · 속도 chip 4단계 video-res-card 내부 유지)
+- Compare 좌측 (CTA 상단 sticky 결정 F)
+- Vision 좌측 (CTA 상단 sticky 결정 H)
+- 5 패널 CTA shortcut 표시 제거 (결정 K) + CTA 텍스트 영문 통일
+- `V5MotionCard.tsx` 신규 (motion outer + .ais-toggle-card inner 분리 · spring stiffness 320 / damping 26)
+- Codex 2차 리뷰 fix: Range 시그니처 색 (`--ais-range-accent` var fallback) / motion outer/inner 분리 (transform race 회피)
+
+**Phase 2 — Chrome**:
+- `AppHeader` HomeBtn 좌측 제거 → ModeNav 첫 chip 흡수
+- `ModeNav.tsx` 신규 (6 chip · Fraunces italic 13 + spring 통통 + `/vision/compare` exact priority + `/prompt-flow/{generate,edit,video}` mode 매핑)
+- `Chrome` Logo Fraunces italic 14
+- `MetricsPopover.tsx` 신규 (frosted glass dropdown · 4 metric row + VRAM ≥80% breakdown)
+- 접근성 4중 hover-stay-open (:hover / :focus-within / [data-open] / popover :hover) + ::before 10px bridge + close timer 200ms + Esc focus return
+- Codex 3차 리뷰 fix: `/prompt-flow/*` 활성 매핑 + Esc focus return (blur 제거)
+- Codex 4차 리뷰 fix: prompt-flow chip 클릭 시 mode 화면 라우팅 회복
+
+**Phase 3 — Layout (1024 viewport 수학 검증)**:
+- `StudioWorkspace` 에 `.ais-studio-workspace` className 추가
+- 1024 viewport: frame 없이 grid 풀폭 (좌 400 + 우 624 = 1024 정확 fit)
+- 1280 viewport: `min(95vw,1600)` = 1216px > grid 1024 + padding 48 + border 2 = 1074px → 142px 여유
+- 1920+: 1600px cap (28인치 모니터 양 옆 빔 자연)
+
+**검증** (master 회귀 0):
+- TSC clean / ESLint 0 warning
+- pytest 405/405 PASS · vitest 165/165 PASS
+- next build (Turbopack) 14 routes prerendered
+
+**다음 세션** (Phase 4~8):
+- Phase 4 Generate 우측 (Caption + Archive Header + selected ring + 4 버튼 action bar)
+- Phase 5 Edit 우측 (BeforeAfter Hero matt + Comparison Card amber + canPromote 5번째 액션)
+- Phase 6 Vision 우측 (Summary 한/영 분기 + PromptToggle combined/split 보존 · 회귀 #10)
+- Phase 7 Compare 우측 (A/B violet/amber 그라데이션 + 5축 + Transform/Uncertain)
+- Phase 8 cleanup + 회귀 + master merge
+
+**Phase 8 cleanup 후보** (`project_pending_issues.md` 박제):
+- `.ais-magic-prompt-card` dead CSS (Phase 1.5 후 사용처 0)
+- `.ais-range-input` dead selector (`--ais-range-accent` cascade 패턴 채택 후 0)
+- SystemMetrics trigger 정통 disclosure 패턴 (`<button>` + onClick toggle + aria-expanded ESLint 통과)
+
+---
+
 ## 2026-05-01
 
 ### 디자인 V5 — 5 패널 풀 시안 (좌측 패널 리디자인 · 시안 단계 · master 미반영)
