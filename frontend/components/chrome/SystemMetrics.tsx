@@ -94,7 +94,8 @@ export default function SystemMetrics() {
     !!vramMetric && vramMetric.percent >= HIGH_THRESHOLD && !!breakdown;
 
   // Esc 키 닫기 — focus 가 trigger 안 (또는 popover) 에 있을 때만 active.
-  // popover 는 :focus-within / :hover 로 자동 열림이라, Esc 는 명시적 close 이벤트만 처리.
+  // Codex 3차 정책: focus return → trigger 유지 (blur X). 키보드 사용자가 Esc 로 닫아도
+  // Tab 흐름 자연 (trigger 에서 다음 sibling 으로 자연 이동 가능).
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key !== "Escape") return;
@@ -104,10 +105,9 @@ export default function SystemMetrics() {
       if (!root.contains(document.activeElement)) return;
       e.preventDefault();
       setOpen(false);
-      // focus return → trigger root (tabIndex=0) — popover 안 focus 였다면 root 으로 복귀
+      // focus return → trigger root (tabIndex=0). popover 안 focus 였다면 root 으로 복귀.
+      // blur 안 함 — focus 유지. :focus-within 가 다시 popover 열어도 의도 (a11y 정책 매칭).
       root.focus();
-      // blur 시키면 :focus-within 도 풀려 popover 닫힘
-      root.blur();
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
@@ -151,9 +151,11 @@ export default function SystemMetrics() {
       className="ais-metrics"
       role="group"
       aria-label="시스템 자원 사용률"
-      // aria-controls — popover 와의 의미상 연결만 표시 (role="group" 은 aria-expanded 미지원이라 제외).
-      // 노출/닫힘은 :focus-within / :hover / data-open 자동 — popover 가 trigger DOM 자식이라
-      // screen reader 도 트리 순서대로 자연스럽게 popover 콘텐츠 인식.
+      // aria-controls — popover 와의 의미상 연결만 표시.
+      // aria-expanded 는 ESLint jsx-a11y/role-supports-aria-props 가 role="group" 과
+      // 충돌이라 후속 (정통 disclosure: trigger 를 <button> 으로 + onClick toggle 추가).
+      // 현재는 Esc focus return (Codex 3차 핵심) + hover-only + :focus-within 자동.
+      // 사유 박제: project_pending_issues.md → "🟡 Phase 8 cleanup 후보".
       aria-controls={popoverId}
       // P0-5: 키보드 focus 시에도 펼쳐지게 — globals.css `:focus-within` 분기와 페어
       tabIndex={0}

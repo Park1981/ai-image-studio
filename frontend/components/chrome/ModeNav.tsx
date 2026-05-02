@@ -13,6 +13,8 @@
  *   3. `pathname.startsWith("/vision/")` 의 다른 sub-path → Analyze chip 폴백
  *   4. `pathname === "/"` → Home chip
  *   5. `pathname === "/generate" | "/edit" | "/video"` → 각 chip
+ *   6. `pathname.startsWith("/prompt-flow/{generate,edit,video}")` → 각 mode chip 폴백
+ *      (Codex 3차 보강 — 도움말 페이지에서도 mode 정체성 유지)
  *
  * 스타일: globals.css §11 (`.ais-ah-nav` + `.ais-ah-nav-link` + `data-active="true"`).
  *   inline 0 (V5 시각 본체 한정) — 활성/비활성/호버 transition 모두 CSS 책임.
@@ -49,7 +51,12 @@ function resolveActiveHref(pathname: string): string {
   }
   // 2. /vision/{기타} sub-path → Analyze 폴백 (단 /vision/compare 는 위 1 단계에서 잡힘)
   if (pathname.startsWith("/vision/")) return "/vision";
-  // 3. 매칭 없음 — 메인 (/) 으로 표시 (의도하지 않은 chrome 페이지에서도 fallback)
+  // 3. /prompt-flow/{mode} 도움말 페이지 → 해당 mode chip 활성 (Codex 3차 보강)
+  //    PromptFlowShell 도 AppHeader 사용 — 도움말 페이지에서도 mode 정체성 유지.
+  if (pathname.startsWith("/prompt-flow/generate")) return "/generate";
+  if (pathname.startsWith("/prompt-flow/edit")) return "/edit";
+  if (pathname.startsWith("/prompt-flow/video")) return "/video";
+  // 4. 매칭 없음 — 메인 (/) 으로 표시 (의도하지 않은 chrome 페이지에서도 fallback)
   return "/";
 }
 
