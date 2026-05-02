@@ -1119,6 +1119,14 @@ button {
   position: relative;
   z-index: 2;
 }
+/* V5 시그니처 Range slider — primitives.tsx 의 inline accentColor 가 var fallback 패턴이라
+ * 부모 카드의 --ais-range-accent 가 cascade 로 override. */
+.ais-size-card-v {
+  --ais-range-accent: var(--card-from);
+}
+.ais-video-res-card {
+  --ais-range-accent: var(--card-from);
+}
 .ais-size-card-v .ais-range-input {
   accent-color: var(--card-from);
 }

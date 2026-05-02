@@ -4,11 +4,11 @@
  * Why: V5 카드 active 변화 (padding 14 → 38 + adult-card 의 aspect-ratio 16/9) 의 CSS transition
  * 만으로는 다른 카드 밀려남이 점프. framer-motion `layout` prop 으로 형제 카드 reflow 도 spring.
  *
- * 정책 (오빠 결정 + plan v4 §1.5.7):
+ * 정책 (오빠 결정 + plan v4 §1.5.7 + Codex 2차 fix):
+ *  - **outer (motion.div)** = layout spring 만 — children size 변화에 형제 reflow 보간
+ *  - **inner (.ais-toggle-card 등)** = V5 시각 + :hover transform translateY/scale (CSS)
+ *  - 두 transform 이 **다른 element** 에 적용 → race 없음 (Codex 2차 우려 해소)
  *  - stiffness: 320 / damping: 26 (자연 fluid · 1초 미만)
- *  - `layout` prop 만 — children 의 layout shift 까지 자동 보간 (Codex 우려 회피).
- *  - `motion.div` 의 default `transition` 은 layout 만 override, 다른 property (opacity 등) 는
- *    그대로 두어 CSS transition 과 충돌 X.
  *
  * Usage:
  *   <V5MotionCard className="ais-toggle-card ais-sig-ai" data-active={active}>
@@ -29,9 +29,9 @@ const V5_SPRING_TRANSITION = {
 };
 
 interface Props {
-  /** V5 카드 className (.ais-toggle-card .ais-sig-X 등) */
+  /** V5 카드 className (.ais-toggle-card .ais-sig-X 등) — *inner* div 에 적용 */
   className?: string;
-  /** active 상태 (CSS [data-active="true"] selector 매칭) */
+  /** active 상태 (CSS [data-active="true"] selector 매칭) — *inner* div 에 적용 */
   "data-active"?: boolean | "true" | "false";
   /** 카드 내부 콘텐츠 */
   children: ReactNode;
@@ -51,13 +51,12 @@ export default function V5MotionCard({
       : dataActive;
 
   return (
-    <motion.div
-      className={className}
-      data-active={dataActiveStr}
-      layout
-      transition={V5_SPRING_TRANSITION}
-    >
-      {children}
+    // outer: framer-motion layout (transform 사용 — 형제 reflow 보간)
+    <motion.div layout transition={V5_SPRING_TRANSITION}>
+      {/* inner: V5 시각 + :hover transform (CSS) — outer/inner 분리로 transform race 회피 */}
+      <div className={className} data-active={dataActiveStr}>
+        {children}
+      </div>
     </motion.div>
   );
 }

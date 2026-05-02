@@ -424,7 +424,8 @@ function VideoResolutionSlider({
         onChange={(e) => setLongerEdge(Number(e.target.value))}
         style={{
           width: "100%",
-          accentColor: "var(--accent)",
+          // V5 시그니처 (.ais-video-res-card → coral) cascade 활용. 외부 사용처는 fallback var(--accent) 유지.
+          accentColor: "var(--ais-range-accent, var(--accent))",
           cursor: hasSource ? "pointer" : "not-allowed",
         }}
       />

@@ -290,8 +290,10 @@ export function Range({
       onChange={(e) => onChange(Number(e.target.value))}
       style={{
         width: "100%",
-        accentColor: "var(--accent)",
-        background: `linear-gradient(to right, var(--accent) ${pct}%, var(--line) ${pct}%)`,
+        // V5 시그니처 카드 안에선 부모 CSS 의 --ais-range-accent var 가 cascade 로 override
+        // (예: .ais-size-card-v 안에선 var(--card-from) = rose). 외부 사용처는 fallback var(--accent) 유지.
+        accentColor: "var(--ais-range-accent, var(--accent))",
+        background: `linear-gradient(to right, var(--ais-range-accent, var(--accent)) ${pct}%, var(--line) ${pct}%)`,
         opacity: disabled ? 0.45 : 1,
         cursor: disabled ? "not-allowed" : "pointer",
       }}
