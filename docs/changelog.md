@@ -5,6 +5,70 @@
 
 ## 2026-05-02
 
+### 디자인 V5 — Phase 4~8 branch 적용 (우측 패널 + cleanup · master 미반영)
+
+**branch**: `feature/design-v5` (8 commit · master 대비 +9 · master merge 대기)
+**plan**: `docs/superpowers/plans/2026-05-02-design-v5-react-application.md` (v4 · 우측 패널 격상)
+
+**Phase 4 — Generate 우측 (Archive Header + Caption + 4 버튼 + violet ring)**:
+- 공용 5 컴포넌트 격상 (Fraunces italic 26 bilingual + V5 토큰 cascade · `.ais-*` 전환):
+  - StudioResultHeader (eyebrow `IMAGE STUDIO · RESULT` + violet `<strong>` + meta pills)
+  - HistorySectionHeader → Archive Header (점선 border-top + count chip + size chip)
+  - SectionHeader (Fraunces italic bilingual `<strong>오늘</strong> · Today` + KNOWN_EN 매핑 내장)
+  - HistoryTile (violet ring 4 + `● 선택` 칩 + 4 버튼 — 복사 추가 · onCopy default = prompt)
+  - ResultHoverActionBar (variant prop "hero" | "tile" + frosted glass CSS 이전)
+- Generate 전용 + 신규 훅:
+  - GenerateResultViewer (4 버튼 · download 제거 · Caption italic prompt 1줄 truncate)
+  - GenerateRightPanel (titleEn=Generated + Archive sizeBytes + useHistoryStats)
+  - useHistoryStats 신규 (items.length 변화 800ms debounce refetch)
+- Codex 2 라운드 fix: ActionBarButton inline 0 (data-attribute 분기) + Hero `.ais-result-hero` className + `:hover` 룰 정리 + img anti-drag CSS 이전
+- 회귀 보존: HistoryGallery ResizeObserver 자동 컬럼 (#1) / Hero wheel zoom + drag pan (#2) / focus-within 키보드 (#3)
+
+**Phase 5 — Edit 우측 (Hero matt + BEFORE/AFTER + Comparison amber + Caption + canPromote)**:
+- 매트지 Hero `.ais-result-hero .ais-result-hero-edit` className
+- BeforeAfter slider — `.ais-ba-slider` className + `.ais-ba-label-before/-after` (CSS text-transform: uppercase)
+- Action Bar 4 버튼 (download → copy) + canPromote=true 시 5번째 "라이브러리 저장" 보존 (#5)
+- Caption 슬롯 (italic afterItem.prompt 1줄 truncate)
+- ComparisonAnalysisCard filled state V5 amber + data-tone 분기 + score 숫자 제거 (시안 톤)
+- EditRightPanel: titleEn=Edited + meta pills + sizeBytes (useHistoryStats edit)
+- Codex 1 라운드 fix: 모든 state V5 className + 자식 inline → CSS + a11y aria-label (axis "얼굴 92% — 일치")
+- 회귀 보존: BeforeAfter 드래그 핸들 (#4) / canPromote (#5) / sourceRef NULL toast (#7)
+
+**Phase 6 — Vision 우측 (Summary 한/영 분기 + PromptToggle 색 톤 + Detail Cards + 새 history-tile)**:
+- SummaryCard `data-lang` 분기 — 한글 = Pretendard / 영문 = Fraunces italic 13.5
+- **PromptToggle 회귀 #10 보존 ⚠** — combined/split toggle + A1111 호환 `combinedText` (positive\\n\\nNegative prompt: negative) + 통합 모드 복사 버튼 모두 보존. 색 톤만 추가 (POSITIVE green #2D7A2D / NEGATIVE red #B8232C)
+- DetailCard className `.ais-vision-detail-card` + data-muted
+- RecipeV2View grid `.ais-vision-detail-grid` (auto-fit minmax 260)
+- VisionHistoryList: 새 vision-history-tile 패턴 (썸네일 88 + 본문 mono meta + Fraunces italic summary 2-line truncate) · 2-col 고정 grid · gridCols/cycleGrid props 제거
+- vision/page.tsx: titleEn=Analysis + meta pills (해상도 violet + EN+KO mono)
+- LegacyV1View 회귀 #6 보존 (positivePrompt 빈 row 자동 폴백 — VisionResultCard isV2 분기 변경 0)
+- Codex 1 라운드 fix: CSS 중복 정리 + 통합 모드 negative label 색 #B8232C 통일
+
+**Phase 7 — Compare 우측 (A/B 그라데이션 + 5축 + Transform/Uncertain V5)**:
+- BeforeAfterSlider `labelVariant?: "before-after" | "ab"` prop 신규 — Phase 5 nit 박제 활용
+  - "before-after" (default · Edit/Lightbox 호환) → V5 검은 톤
+  - "ab" (Compare) → V5 violet/amber 그라데이션 (`.ais-ba-label-a/-b`)
+- CompareViewer: labelVariant="ab" 명시 → V5 시그니처 자동
+- CompareAnalysisPanel: 외곽 `.ais-compare-analysis-card` + 헤더 `.ais-cac-header / -title / -overall-chip` (violet gradient) + AxisRow `.ais-axis-*` data-tone (≥80 green / ≥60 amber / <60 gray)
+- CompareExtraBoxes: TransformPromptBox V5 violet gradient + UncertainBox V5 amber gradient
+- Codex 1 라운드 fix: uncertain-body className 제거 (cascade 충분) + tp-context-meta ellipsis 추가 + plan §8 박제 (AxisRow role="meter" cleanup 후보)
+
+**Phase 8 — Cleanup + 회귀 (dead CSS 제거 + 정통 disclosure + role="meter")**:
+- A: `.ais-magic-prompt-card` dead CSS 제거 (Phase 1.5 후 사용 0)
+- B: `.ais-range-input` dead selector 제거 (var cascade 채택 후)
+- C: SystemMetrics 정통 disclosure — `<button>` + aria-expanded + onClick toggle (옛 ESLint role="group" 충돌 해소)
+- D: AxisRow role="meter" + aria-valuenow/min/max 정통 a11y
+- E: VisionHistoryList 헤더 V5 Archive Header 통일 — **옵션 B 채택** (Vision 전용 옛 시각 보존 · plan §8 후속 plan 후보 박제)
+
+**검증 (Phase 4~8 누적 회귀 0)**:
+- backend pytest **405 / 405 PASS** (CLAUDE.md 표준)
+- frontend vitest **165 / 165 PASS**
+- TSC clean / ESLint 0 warning
+
+**다음 단계**: master merge `--no-ff` (오빠 승인 후) — Phase 0~3 에 이어 우측 패널 + cleanup 박제.
+
+---
+
 ### 디자인 V5 — Phase 0~3 master merge (좌측 패널 + Chrome + Layout)
 
 **master**: `d6b000a` (merge --no-ff · 10 commit + merge commit · 89 files / +21,563 / -847)
