@@ -1,9 +1,25 @@
 # Design V5 — React 적용 plan (v4 — Codex 2차 리뷰 반영)
 
 **작성**: 2026-05-02 (v1) · v2 (4 페어 + AppHeader 통합) · v3 (Codex 1차 리뷰 반영) · **v4 (Codex 2차 리뷰 반영)**
-**상태**: 시안 픽스 완료 + **결정 5개 확정** (2026-05-02) → Codex 2차 리뷰 반영 끝 → **Codex 3차 리뷰 대기** → 새 세션에서 적용 시작
-**예상**: **18~27h (3~5 작업일)** · Phase 0~8 (Phase 1.5 신설 +3~5h)
+**상태**: ✅ Phase 0~8 모두 master merge 완료 (master `c06a7ee` · 2026-05-02 저녁) → 🔴 **post-merge 사용자 검증 차이점 7건 발견** (다음 세션 fix)
+**예상**: **18~27h (3~5 작업일)** · Phase 0~8 + post-merge fix
 **전제**: 시안에서 결정된 모든 항목 100% 반영. 백엔드 schema 변경 0건.
+
+## 🔴 Post-merge 차이점 7건 (2026-05-02 저녁 · 다음 세션 fix 대상)
+
+오빠 검증 결과 시안↔적용 미일치. 메모리 `project_session_2026_05_02_design_v5_post_merge_issues.md` 참조.
+
+| # | 차이점 | Phase | 우선순위 |
+|---|---|---|---|
+| 1 | 폰트 (한글 + 영어) — Fraunces italic / violet `<strong>` | Phase 1 Foundation | 🔴 Critical |
+| 2 | 토글 카드 토글 스위치 안 빠짐 (시안 = segmented only) | Phase 1.5 좌측 | 🔴 Critical |
+| 3 | framer-motion 카드 확대/축소 움직임 X | Phase 1.5 V5MotionCard | 🟡 Important |
+| 4 | 메인 헤더 아이콘 미일치 | Phase 2 Chrome | 🟡 Important |
+| 5 | 좌측 카드 시그니처 컬러/이미지/라벨 불일치 ("결과 자동평가" / "퀄리티 모드") | Phase 1.5 좌측 | 🔴 Critical |
+| 6 | BeforeAfter slider before 이미지 사이즈 오류 | Phase 5 Edit | 🟡 Important |
+| 7 | Vision 분석 디자인 미일치 | Phase 6 Vision | 🟡 Important |
+
+**Critical 3건** (#1 / #2 / #5) — 5 페이지 좌측 + 폰트 cascade 전체 영향. 사용자 정리 후 phase 별 묶음 fix 진입.
 
 ## v3 → v4 변경 요약 (Codex 2차 리뷰 반영)
 
