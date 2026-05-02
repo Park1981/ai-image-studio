@@ -697,3 +697,1712 @@ button {
      background 변경도 부드럽게 — fill 의 width transition 과 동시 효과 */
   transition: width .35s ease, background .35s ease;
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   Design V5 — Phase 1 Foundation (2026-05-02)
+   ───────────────────────────────────────────────────────────────────
+   plan v4: docs/superpowers/plans/2026-05-02-design-v5-react-application.md
+   pair 시안: docs/design-test/{cards-v2,pair-generate,pair-edit,pair-vision,pair-compare}.html
+   결정: A~R (project_design_v5_pending_decisions.md)
+   ───────────────────────────────────────────────────────────────────
+   네임스페이스: 모두 .ais-* 통일 (Codex 1차 🟡 — 전역 충돌 회피)
+   주의: 기존 .ais-cta-primary (line 503~534 블루 단색) 은 아래 V5
+        Aurora Glass 정의로 cascade override (specificity 동일, 위치 후행).
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Section 1: V5 시그니처 컬러 토큰 (8 시그니처 × 4 var)
+   카드 패턴 (.ais-*) 이 var(--card-from/to/glow/shadow) 참조 → 카드별로
+   토큰 override 만 하면 시그니처 컬러 자동 적용. */
+:root {
+  /* AI 보강 (violet → blue) */
+  --ais-card-from-ai: #8B5CF6;
+  --ais-card-to-ai: #3B82F6;
+  --ais-card-glow-ai: rgba(139,92,246,0.10);
+  --ais-card-shadow-ai: rgba(99,102,241,0.18);
+
+  /* 자동 비교 평가 (amber → orange) — Edit 자동평가 카드 */
+  --ais-card-from-auto-compare: #F59E0B;
+  --ais-card-to-auto-compare: #FB923C;
+  --ais-card-glow-auto-compare: rgba(245,158,11,0.10);
+  --ais-card-shadow-auto-compare: rgba(245,158,11,0.18);
+
+  /* 빠른 모드 / 퀄리티 (lime → cyan) — Lightning Toggle */
+  --ais-card-from-fast: #84CC16;
+  --ais-card-to-fast: #06B6D4;
+  --ais-card-glow-fast: rgba(132,204,22,0.10);
+  --ais-card-shadow-fast: rgba(132,204,22,0.18);
+
+  /* Claude 조사 (amber → orange · auto-compare 와 같은 톤이지만 의미 분리) */
+  --ais-card-from-claude: #F59E0B;
+  --ais-card-to-claude: #FB923C;
+  --ais-card-glow-claude: rgba(245,158,11,0.10);
+  --ais-card-shadow-claude: rgba(245,158,11,0.18);
+
+  /* 사이즈 (rose → pink) */
+  --ais-card-from-size: #F43F5E;
+  --ais-card-to-size: #EC4899;
+  --ais-card-glow-size: rgba(236,72,153,0.08);
+  --ais-card-shadow-size: rgba(236,72,153,0.16);
+
+  /* Multi-ref / 추가 참조 (fuchsia → magenta) — 결정 J: 사이즈 핑크와 hue 분리 */
+  --ais-card-from-multi-ref: #D946EF;
+  --ais-card-to-multi-ref: #C026D3;
+  --ais-card-glow-multi-ref: rgba(217,70,239,0.10);
+  --ais-card-shadow-multi-ref: rgba(192,38,211,0.18);
+
+  /* 영상 해상도 (warm coral → rose) — Video 전용, 사이즈 페어 의도 분리 */
+  --ais-card-from-video-res: #FB923C;
+  --ais-card-to-video-res: #F472B6;
+  --ais-card-glow-video-res: rgba(251,146,60,0.10);
+  --ais-card-shadow-video-res: rgba(244,114,182,0.18);
+
+  /* 성인 (crimson → red) — Video 전용 */
+  --ais-card-from-adult: #DC2626;
+  --ais-card-to-adult: #F87171;
+  --ais-card-glow-adult: rgba(220,38,38,0.10);
+  --ais-card-shadow-adult: rgba(220,38,38,0.18);
+
+  /* output 시그니처 violet — Result Header strong / selected ring (accent-ink 와 분리) */
+  --ais-output-violet: #7C3AED;
+
+  /* spring transition — 결정 ⓓ framer-motion 도입 전제로 CSS fallback 도 spring 톤
+     (cubic-bezier(.34, 1.56, .64, 1) 은 이미 globals.css :root 에 --ais-ease-out-back 로 있음) */
+}
+
+/* ── Section 2: 활성 카드 효과 토큰 (cards-v2.html v5 결정)
+   결정 (오빠 2026-05-01 저녁 v3 비교 후): E padding + B mask
+   - 활성 토글 카드 padding 14px → 38px
+   - 활성 카드 mask 35% → 15% (인물 좌측 더 노출)
+   - 사이즈 카드 mask 22% (정적, 항상 활성)
+   - transition cubic-bezier 0.35s — framer-motion 도입 시 spring 으로 보강 */
+:root {
+  --ais-card-padding-base: 14px 16px;
+  --ais-card-padding-active: 38px 16px 38px 18px;
+  --ais-card-mask-base: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  --ais-card-mask-active: linear-gradient(to right, transparent 0%, transparent 15%, black 95%);
+  --ais-card-mask-size: linear-gradient(to right, transparent 0%, transparent 22%, black 95%);
+  --ais-card-transition: 0.35s cubic-bezier(.4, 0, .2, 1);
+}
+
+/* ── Section 3: .ais-mode-header (Phase 1.2)
+   eyebrow JetBrains Mono 9.5/0.14em + Fraunces italic 26 bilingual + 점선 border-bottom
+   현재 StudioModeHeader 가 이 구조로 전환됨 (Phase 1.5.1) */
+.ais-mode-header {
+  padding: 4px 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.ais-mode-eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.ais-mode-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.ais-mode-title {
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.ais-mode-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+.ais-mode-flow-link {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  display: grid;
+  place-items: center;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.ais-mode-flow-link:hover {
+  border-color: var(--accent-ink);
+  color: var(--accent-ink);
+  background: var(--bg-2);
+  transform: scale(1.05);
+}
+.ais-mode-desc {
+  font-size: 12px;
+  color: var(--ink-3);
+  margin-top: 6px;
+}
+
+/* ── Section 4: V5 Aurora Glass CTA (.ais-cta-primary 재정의 · 결정 ⓒ K)
+   기존 line 503~534 블루 단색 (var(--accent)) → V5 violet→blue Aurora Glass 로 override.
+   light sweep 0.7s pseudo-element keyframe + 호버 시 -2px lift.
+   shortcut (.ais-cta-shortcut) 표시는 컴포넌트 prop 으로 제거 (결정 K · CSS 보존) */
+.ais-cta-primary {
+  all: unset;
+  cursor: pointer;
+  text-align: center;
+  background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+  color: #fff;
+  padding: 14px 22px;
+  border-radius: var(--radius-full);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
+  transition: all 0.25s cubic-bezier(.4, 0, .2, 1);
+  position: relative;
+  overflow: hidden;
+}
+/* 호버 시 좌→우 light sweep 0.7s (Aurora Glass 시그니처) */
+.ais-cta-primary::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.7s cubic-bezier(.4, 0, .2, 1);
+  pointer-events: none;
+}
+.ais-cta-primary:hover:not(:disabled)::before {
+  transform: translateX(100%);
+}
+.ais-cta-primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  /* override: 기존 background: var(--accent-ink) 폐기 (cascade — V5 grad 그대로 유지하며 lift 만) */
+  background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+  box-shadow:
+    0 8px 28px rgba(99,102,241,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.ais-cta-primary:disabled {
+  cursor: not-allowed;
+  background: var(--accent-disabled);
+  box-shadow: none;
+}
+.ais-cta-primary > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Section 5: 카드 패턴 (.ais-* · Phase 1.3)
+   8 카드 모두 같은 base + signature var override 만 다름.
+   base = backdrop blur + 인물 webp 우측 fade + active 시 padding/mask 변화 */
+
+/* base 카드 (.ais-toggle-card · AI 보강 패턴 · 다른 카드도 이 베이스 상속) */
+.ais-toggle-card {
+  position: relative;
+  border-radius: var(--radius-card);
+  padding: var(--ais-card-padding-base);
+  padding-left: 18px; /* 옛 V3c-2 의 padding-left 18px 유지 (스위치 자리 회복) */
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow:
+    0 1px 2px rgba(23,20,14,.04),
+    0 4px 16px rgba(23,20,14,.04);
+  transition:
+    padding var(--ais-card-transition),
+    transform 0.25s cubic-bezier(.4, 0, .2, 1),
+    box-shadow 0.25s cubic-bezier(.4, 0, .2, 1);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ais-toggle-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow:
+    0 4px 8px rgba(23,20,14,.06),
+    0 18px 40px rgba(23,20,14,.10);
+}
+/* 인물 배경 — 시안 V5: opacity 0.28 (비활성) → 1 (활성) + saturate 분기 */
+.ais-toggle-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  border-radius: var(--radius-card);
+  background-image: var(--ais-card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: var(--ais-card-mask-base);
+  mask-image: var(--ais-card-mask-base);
+  opacity: 0.28;
+  filter: saturate(0.4) brightness(0.92);
+  transition: opacity 0.3s, filter 0.3s, mask-image var(--ais-card-transition);
+}
+.ais-toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+  -webkit-mask-image: var(--ais-card-mask-active);
+  mask-image: var(--ais-card-mask-active);
+}
+.ais-toggle-card[data-active="true"] {
+  padding: var(--ais-card-padding-active);
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.85) 35%,
+    rgba(255,255,255,0.45) 60%,
+    rgba(255,255,255,0.15) 100%
+  );
+  border-color: rgba(255,255,255,0.7);
+  box-shadow:
+    0 0 0 1px var(--card-from),
+    0 0 0 4px var(--card-glow),
+    0 8px 28px var(--card-shadow);
+}
+/* 카드 내부 콘텐츠 — z-index 2 (배경 위) */
+.ais-toggle-card > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* 시그니처 컬러 매핑 — 카드별 var override 만 하면 자동 적용 */
+.ais-toggle-card.ais-sig-ai {
+  --card-from: var(--ais-card-from-ai);
+  --card-to: var(--ais-card-to-ai);
+  --card-glow: var(--ais-card-glow-ai);
+  --card-shadow: var(--ais-card-shadow-ai);
+  --ais-card-bg-image: url('/studio/cards/card-bg-ai.webp');
+}
+.ais-toggle-card.ais-sig-fast {
+  --card-from: var(--ais-card-from-fast);
+  --card-to: var(--ais-card-to-fast);
+  --card-glow: var(--ais-card-glow-fast);
+  --card-shadow: var(--ais-card-shadow-fast);
+  --ais-card-bg-image: url('/studio/cards/card-bg-fast.webp');
+}
+.ais-toggle-card.ais-sig-claude {
+  --card-from: var(--ais-card-from-claude);
+  --card-to: var(--ais-card-to-claude);
+  --card-glow: var(--ais-card-glow-claude);
+  --card-shadow: var(--ais-card-shadow-claude);
+  --ais-card-bg-image: url('/studio/cards/card-bg-claude.webp');
+}
+
+/* 자동 비교 평가 카드 (Edit 전용 · 결정 C) */
+.ais-auto-compare-card {
+  --card-from: var(--ais-card-from-auto-compare);
+  --card-to: var(--ais-card-to-auto-compare);
+  --card-glow: var(--ais-card-glow-auto-compare);
+  --card-shadow: var(--ais-card-shadow-auto-compare);
+  --ais-card-bg-image: url('/studio/cards/card-bg-auto-compare.webp');
+}
+
+/* Multi-ref 카드 (Edit 전용 · 결정 J fuchsia 분리) */
+.ais-multi-ref-card {
+  --card-from: var(--ais-card-from-multi-ref);
+  --card-to: var(--ais-card-to-multi-ref);
+  --card-glow: var(--ais-card-glow-multi-ref);
+  --card-shadow: var(--ais-card-shadow-multi-ref);
+  --ais-card-bg-image: url('/studio/cards/card-bg-multi-ref.webp');
+}
+
+/* 영상 해상도 카드 (Video 전용 · 결정 D · warm coral) — 사이즈 카드 패턴 차용
+   속도 chip 4단계는 *내부 포함* — 별도 카드 X (결정 E · v4 명시) */
+.ais-video-res-card {
+  --card-from: var(--ais-card-from-video-res);
+  --card-to: var(--ais-card-to-video-res);
+  --card-glow: var(--ais-card-glow-video-res);
+  --card-shadow: var(--ais-card-shadow-video-res);
+  --ais-card-bg-image: url('/studio/cards/card-bg-video-res.webp');
+}
+
+/* 성인 모드 카드 (Video 전용 · crimson) — 활성 시 16:9 늘어남 (원본 인물 풀 노출) */
+.ais-adult-card {
+  --card-from: var(--ais-card-from-adult);
+  --card-to: var(--ais-card-to-adult);
+  --card-glow: var(--ais-card-glow-adult);
+  --card-shadow: var(--ais-card-shadow-adult);
+  --ais-card-bg-image: url('/studio/cards/card-bg-adult.webp');
+}
+.ais-adult-card[data-active="true"] {
+  aspect-ratio: 16 / 9;
+}
+
+/* 사이즈 카드 (.ais-size-card-v) — 정적 · 항상 활성 톤 (rose-pink) */
+.ais-size-card-v {
+  position: relative;
+  border-radius: var(--radius-card);
+  padding: 22px 16px;
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.88) 50%,
+    rgba(255,255,255,0.4) 80%,
+    rgba(255,255,255,0.15) 100%
+  );
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow:
+    0 1px 2px rgba(23,20,14,.04),
+    0 4px 16px rgba(23,20,14,.04);
+  overflow: hidden;
+  transition: all 0.25s;
+  --card-from: var(--ais-card-from-size);
+  --card-to: var(--ais-card-to-size);
+  --card-glow: var(--ais-card-glow-size);
+  --card-shadow: var(--ais-card-shadow-size);
+  --ais-card-bg-image: url('/studio/cards/card-bg-size.webp');
+}
+.ais-size-card-v::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  background-image: var(--ais-card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: var(--ais-card-mask-size);
+  mask-image: var(--ais-card-mask-size);
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+.ais-size-card-v:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 2px 4px rgba(23,20,14,.04),
+    0 14px 32px rgba(23,20,14,.08);
+}
+.ais-size-card-v > * {
+  position: relative;
+  z-index: 2;
+}
+.ais-size-card-v .ais-range-input {
+  accent-color: var(--card-from);
+}
+
+/* ── Section 6: 우측 페어 시안 CSS (.ais-result-* / .ais-archive-* / .ais-history-*) */
+
+/* Result Header — Fraunces italic 26 + violet output accent + meta pills */
+.ais-result-header {
+  padding: 4px 0 14px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.ais-result-eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.ais-result-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.ais-result-title {
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.ais-result-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ais-output-violet);
+}
+.ais-result-meta-pills {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.ais-result-pill {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  background: var(--bg-2);
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+.ais-result-pill.ais-pill-violet {
+  background: linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04));
+  color: #6D4FE0;
+  border-color: rgba(139,92,246,0.22);
+  font-weight: 600;
+}
+.ais-result-pill.ais-pill-amber {
+  background: linear-gradient(135deg, rgba(245,158,11,0.10), rgba(251,146,60,0.04));
+  color: var(--amber-ink);
+  border-color: rgba(245,158,11,0.22);
+}
+
+/* Result Hero — 16:9 매트지 + dot grid 16px + 인물 contain + isolation */
+.ais-result-hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1672 / 941;
+  background-color: var(--surface);
+  background-image: radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 2px 4px rgba(23,20,14,.04),
+    0 14px 36px rgba(23,20,14,.08);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  box-sizing: border-box;
+  isolation: isolate;
+}
+.ais-result-hero-img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--radius);
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.18),
+    0 4px 12px rgba(0,0,0,.10),
+    0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* Result Hero (Edit 전용) — column · slider 가 비율 가짐 (16:9 override) */
+.ais-result-hero-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 24px;
+  aspect-ratio: auto;
+}
+
+/* SegControl row (Edit Hero 우상단 — 슬라이더/나란히 토글) */
+.ais-hero-seg-row {
+  display: flex;
+  justify-content: flex-end;
+}
+.ais-hero-seg-wrap {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: var(--radius-full);
+}
+.ais-hero-seg-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  border-radius: var(--radius-full);
+  transition: all 0.18s;
+}
+.ais-hero-seg-btn:hover {
+  color: var(--ink-2);
+}
+.ais-hero-seg-btn[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 0 0 0.5px rgba(0,0,0,0.04);
+  cursor: default;
+}
+
+/* Result Action Bar — 어두운 frosted glass + 흰 아이콘 4 버튼 (결정 O · download 제거)
+   Tile action bar 와 동일 톤 (Hero/Tile 시각 일관성) */
+.ais-result-action-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(28,30,38,0.32);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: var(--radius-full);
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.28),
+    0 4px 12px rgba(0,0,0,.14),
+    inset 0 1px 0 rgba(255,255,255,.12);
+  z-index: 5;
+}
+.ais-result-action-btn {
+  all: unset;
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  color: #fff;
+  transition: all 0.15s;
+}
+.ais-result-action-btn:hover {
+  background: rgba(255,255,255,0.16);
+  transform: scale(1.06);
+}
+.ais-result-action-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.22);
+  margin: 0 4px;
+}
+
+/* Result Caption — Hero 아래 italic prompt 1줄 truncate (결정 ⓒ · α 적용) */
+.ais-result-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 6px;
+}
+.ais-result-caption-prompt {
+  flex: 1;
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+  line-height: 1.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.ais-result-caption-prompt::before {
+  content: "\201C"; /* opening curly quote " */
+  color: var(--ink-4);
+  margin-right: 3px;
+  font-size: 1.15em;
+  font-style: normal;
+}
+.ais-result-caption-prompt::after {
+  content: "\201D"; /* closing curly quote " */
+  color: var(--ink-4);
+  margin-left: 3px;
+  font-size: 1.15em;
+  font-style: normal;
+}
+.ais-result-caption-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.ais-result-caption-meta .ais-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+
+/* Archive Header — 결과 ↔ 히스토리 통합 헤더 (결정 Q) */
+.ais-archive-header {
+  padding: 22px 0 14px;
+  border-top: 1px dashed var(--line-2);
+  margin-top: 8px;
+}
+.ais-archive-eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.ais-archive-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.ais-archive-title {
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.ais-archive-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ink); /* neutral — Result 의 violet 과 분리 */
+}
+.ais-archive-meta-pills {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.ais-archive-pill {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  background: var(--bg-2);
+  padding: 4px 11px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line);
+}
+.ais-archive-pill.ais-pill-size {
+  /* 용량 칩 — 살짝 다른 톤 (mono dim) */
+  color: var(--ink-2);
+  background: linear-gradient(135deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02));
+}
+
+/* History Section Header — Fraunces italic bilingual + count chip + chevron (Phase 4) */
+.ais-history-section-header {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: background .15s, border-color .15s, color .15s;
+}
+.ais-history-section-header:hover {
+  background: var(--bg-2);
+}
+.ais-history-section-header[data-closed="true"] {
+  color: var(--ink-3);
+}
+.ais-history-section-header .ais-chev {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.18s;
+  color: var(--ink-2);
+}
+.ais-history-section-header[data-closed="true"] .ais-chev {
+  transform: rotate(-90deg);
+}
+.ais-history-section-header .ais-title {
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.ais-history-section-header .ais-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ink);
+}
+.ais-history-section-header[data-closed="true"] .ais-title strong {
+  color: var(--ink-2);
+}
+.ais-history-section-header .ais-count {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  background: var(--bg-2);
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--line);
+  margin-left: auto;
+}
+
+/* History Grid + Tile (시안 4-col · production 은 ResizeObserver auto-cols 240px min 유지) */
+.ais-history-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr); /* 시안 default · production 은 inline gridTemplateColumns 가 override */
+  gap: 10px;
+}
+.ais-history-tile {
+  position: relative;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(.4, 0, .2, 1);
+}
+.ais-history-tile:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 6px 16px rgba(23,20,14,.10),
+    0 2px 4px rgba(23,20,14,.05);
+}
+.ais-history-tile-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Selected tile — violet ring (output 시그니처) + 칩 라벨 (결정 R · 옛 2px blue 보다 강함) */
+.ais-history-tile.ais-selected,
+.ais-history-tile[data-selected="true"] {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px var(--ais-output-violet),
+    0 8px 24px rgba(139,92,246,0.32);
+  border-color: transparent;
+}
+.ais-history-tile.ais-selected::after,
+.ais-history-tile[data-selected="true"]::after {
+  content: "● 선택";
+  position: absolute;
+  top: 9px;
+  left: 9px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: var(--radius-full);
+  color: #fff;
+  background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+  box-shadow:
+    0 2px 8px rgba(139,92,246,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  z-index: 4;
+}
+
+/* Tile Hover Action Bar — 어두운 frosted glass pill + 흰 아이콘 4 (spring 등장)
+   ResultHoverActionBar.tsx focus-within 키보드 접근성 보존 (회귀 위험 #3) */
+.ais-tile-action-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%) translateY(8px) scale(0.92);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(28,30,38,0.32);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: var(--radius-full);
+  box-shadow:
+    0 8px 28px rgba(0,0,0,0.28),
+    0 2px 6px rgba(0,0,0,0.14),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+  opacity: 0;
+  transition:
+    opacity 0.18s ease,
+    transform 0.26s var(--ais-ease-out-back);
+  pointer-events: none;
+  z-index: 4;
+}
+.ais-history-tile:hover .ais-tile-action-bar,
+.ais-history-tile:focus-within .ais-tile-action-bar {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+  pointer-events: auto;
+}
+.ais-tile-action-btn {
+  all: unset;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-full);
+  color: #fff;
+  transition: background 0.15s, transform 0.15s;
+}
+.ais-tile-action-btn:hover {
+  background: rgba(255,255,255,0.16);
+  transform: scale(1.08);
+}
+.ais-tile-action-btn.ais-danger:hover {
+  background: rgba(192,57,43,0.92);
+}
+
+/* ── Section 7: BeforeAfter Slider (Edit/Compare 공용 · production 드래그 유지)
+   compareX state 가 inline style 로 ba-handle.left + ba-before-clip.width 결정 (동적 계산 허용) */
+.ais-ba-slider {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-dark);
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.18),
+    0 4px 12px rgba(0,0,0,.10),
+    0 0 0 1px rgba(0,0,0,.06);
+}
+.ais-ba-handle-grip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.96);
+  display: grid;
+  place-items: center;
+  cursor: ew-resize;
+  pointer-events: auto;
+  box-shadow:
+    0 6px 18px rgba(0,0,0,0.30),
+    0 2px 6px rgba(0,0,0,0.20),
+    inset 0 1px 0 rgba(255,255,255,0.6);
+  border: 1px solid rgba(0,0,0,0.08);
+  color: var(--ink);
+}
+.ais-ba-label {
+  position: absolute;
+  top: 14px;
+  padding: 4px 10px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.95);
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 3;
+}
+.ais-ba-label-before { left: 14px; }
+.ais-ba-label-after { right: 14px; }
+/* Compare A/B 라벨 (시그니처 컬러 그라데이션 — A=violet/B=amber) */
+.ais-ba-label.ais-ba-label-a {
+  background: linear-gradient(135deg, rgba(139,92,246,0.92), rgba(59,130,246,0.92));
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  padding: 5px 12px;
+}
+.ais-ba-label.ais-ba-label-b {
+  background: linear-gradient(135deg, rgba(245,158,11,0.95), rgba(251,146,60,0.95));
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  padding: 5px 12px;
+}
+
+/* ── Section 8: Edit Comparison Card (filled state · amber 시그니처 · Phase 5) */
+.ais-comparison-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-radius: var(--radius);
+  background: linear-gradient(135deg, rgba(245,158,11,0.07), rgba(245,158,11,0.02));
+  border: 1px solid rgba(245,158,11,0.24);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+}
+.ais-comparison-card .ais-comp-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: rgba(245,158,11,0.14);
+  color: var(--amber-ink);
+  flex-shrink: 0;
+}
+.ais-comparison-card .ais-comp-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(82,196,26,0.16);
+  flex-shrink: 0;
+}
+.ais-comparison-card .ais-comp-overall {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.02em;
+}
+.ais-comparison-card .ais-comp-sep {
+  color: var(--ink-4);
+  font-size: 11px;
+}
+.ais-comparison-card .ais-comp-axis {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.ais-comparison-card .ais-axis-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+.ais-comparison-card .ais-axis-dot[data-tone="green"] { background: var(--green); }
+.ais-comparison-card .ais-axis-dot[data-tone="amber"] { background: var(--amber); }
+.ais-comparison-card .ais-axis-dot[data-tone="red"] { background: #DC2626; }
+.ais-comparison-card .ais-comp-spacer { flex: 1; }
+.ais-comparison-card .ais-comp-detail-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--amber-ink);
+  background: rgba(245,158,11,0.10);
+  border: 1px solid rgba(245,158,11,0.22);
+  border-radius: var(--radius-full);
+  transition: all 0.15s;
+}
+.ais-comparison-card .ais-comp-detail-btn:hover {
+  background: rgba(245,158,11,0.20);
+  color: #8E5A04;
+}
+.ais-comparison-card .ais-comp-refresh-btn {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-sm);
+  color: var(--ink-3);
+  transition: all 0.15s;
+}
+.ais-comparison-card .ais-comp-refresh-btn:hover {
+  background: rgba(0,0,0,0.04);
+  color: var(--ink-2);
+}
+
+/* ── Section 9: Compare 5축 Analysis Card · Transform · Uncertain (Phase 7) */
+.ais-compare-analysis-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+.ais-cac-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.ais-cac-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.ais-cac-overall-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6D4FE0;
+  background: linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04));
+  border: 1px solid rgba(139,92,246,0.22);
+  padding: 4px 12px;
+  border-radius: var(--radius-full);
+}
+.ais-axis-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.ais-axis-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ais-axis-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.ais-axis-label {
+  font-weight: 600;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+}
+.ais-axis-score {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 700;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+.ais-axis-bar {
+  height: 6px;
+  background: var(--bg-2);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+.ais-axis-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.5s cubic-bezier(.4, 0, .2, 1);
+}
+.ais-axis-fill[data-tone="green"] { background: var(--green); }
+.ais-axis-fill[data-tone="amber"] { background: var(--amber); }
+.ais-axis-fill[data-tone="gray"] { background: var(--ink-3); }
+.ais-axis-comment {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  margin-top: 1px;
+}
+
+/* Compare summary 박스 (neutral · 5축 종합) */
+.ais-cac-summary {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.ais-cac-eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+/* Transform Prompt Box — B 만들기 t2i 변형 가이드 (violet 톤) */
+.ais-transform-prompt-box {
+  background: linear-gradient(135deg, rgba(139,92,246,0.06), rgba(139,92,246,0.02));
+  border: 1px solid rgba(139,92,246,0.20);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.ais-transform-prompt-box .ais-cac-eyebrow {
+  color: #6D4FE0;
+}
+.ais-transform-prompt-box .ais-tp-body {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  color: var(--ink);
+  line-height: 1.6;
+  margin-top: 2px;
+}
+
+/* Uncertain Box — 비교 못한 영역 (amber 톤 · 경고적 의미) */
+.ais-uncertain-box {
+  background: linear-gradient(135deg, rgba(245,158,11,0.05), rgba(245,158,11,0.01));
+  border: 1px solid rgba(245,158,11,0.20);
+  border-radius: var(--radius);
+  padding: 11px 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.ais-uncertain-box .ais-cac-eyebrow {
+  color: var(--amber-ink);
+}
+
+/* ── Section 10: Vision Summary · Prompt Toggle · Detail Cards (Phase 6)
+   PromptToggle combined/split + A1111 호환 통합 복사 보존 (회귀 위험 #10) — CSS 는 색 톤만 추가 */
+.ais-vision-summary {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.ais-vs-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ais-vs-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.ais-vs-eyebrow svg {
+  color: var(--ink-3);
+}
+.ais-vs-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ais-vs-lang-tabs,
+.ais-vpt-mode-tabs {
+  display: inline-flex;
+  background: var(--bg-2);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  gap: 2px;
+}
+.ais-vs-lang-btn,
+.ais-vpt-mode-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.ais-vs-lang-btn:hover,
+.ais-vpt-mode-btn:hover {
+  color: var(--ink-2);
+}
+.ais-vs-lang-btn[data-active="true"],
+.ais-vpt-mode-btn[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  cursor: default;
+}
+.ais-vs-copy-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+.ais-vs-copy-btn:hover {
+  background: var(--surface);
+  border-color: var(--line-2);
+  color: var(--ink);
+}
+.ais-vs-body {
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 60px;
+}
+/* 한/영 폰트 분기 — 한글 = Pretendard / 영문 = Fraunces italic 13.5 */
+.ais-vs-body[data-lang="ko"] {
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif;
+}
+.ais-vs-body[data-lang="en"] {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 13.5px;
+  letter-spacing: -0.005em;
+}
+
+/* Prompt Toggle Card — combined/split 토글 보존 + 색 톤만 추가 (positive=green / negative=red) */
+.ais-vision-prompt-toggle {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.ais-vpt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.ais-vpt-mode-btn[data-mode="positive"][data-active="true"] {
+  color: #2D7A2D; /* green tone */
+}
+.ais-vpt-mode-btn[data-mode="negative"][data-active="true"] {
+  color: #B8232C; /* danger red */
+}
+.ais-vpt-body {
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 56px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* Vision Detail Cards Grid + Card */
+.ais-vision-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+.ais-vision-detail-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-height: 86px;
+}
+.ais-vd-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ais-vd-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  background: var(--bg-2);
+  display: grid;
+  place-items: center;
+  color: var(--ink-2);
+  flex-shrink: 0;
+}
+.ais-vd-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.ais-vd-body {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.ais-vision-detail-card[data-muted="true"] {
+  background: var(--bg-2);
+  border-color: var(--line-2);
+}
+.ais-vision-detail-card[data-muted="true"] .ais-vd-body {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* Vision History Tile (NEW 패턴 · 썸네일 88 + meta + Fraunces italic summary 2-line truncate) */
+.ais-vision-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.ais-vision-history-tile {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(.4, 0, .2, 1);
+}
+.ais-vision-history-tile:hover {
+  border-color: var(--line-2);
+  transform: translateY(-2px);
+  box-shadow:
+    0 6px 14px rgba(23,20,14,.08),
+    0 2px 4px rgba(23,20,14,.04);
+}
+.ais-vht-thumb {
+  width: 88px;
+  height: 88px;
+  flex-shrink: 0;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-2);
+}
+.ais-vht-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ais-vht-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 1px 0;
+}
+.ais-vht-meta {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+}
+.ais-vht-summary {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  letter-spacing: -0.005em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* ── Section 11: AppHeader (Phase 1.4 · 결정 M)
+   - HomeBtn 흡수 (제거) → ModeNav 6 chip 중앙
+   - Logo Image Studio 텍스트 → Fraunces italic 14
+   - Settings/Shutdown ghost 톤 통일 */
+.ais-app-header {
+  height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(250,249,247,.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.ais-ah-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.ais-ah-center {
+  display: flex;
+  justify-content: center;
+}
+.ais-ah-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+/* Logo italic — Fraunces 14 + version mono (시안 v5~v7) */
+.ais-ah-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.ais-ah-logo-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.ais-ah-logo-name {
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.ais-ah-logo-version {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  color: var(--ink-3);
+  margin-top: 3px;
+  letter-spacing: .08em;
+}
+
+/* ModeNav segmented (6 chip · Fraunces italic + spring 통통 hover · Codex 1024px 충돌 검증 필요) */
+.ais-ah-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.04);
+}
+.ais-ah-nav-link {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 13px;
+  border-radius: var(--radius-full);
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  position: relative;
+  transition:
+    background .32s var(--ais-ease-out-back),
+    color .2s ease,
+    transform .36s var(--ais-ease-out-back),
+    box-shadow .32s var(--ais-ease-out-back),
+    font-weight .2s ease;
+}
+.ais-ah-nav-link:hover:not([data-active="true"]) {
+  color: var(--ink-2);
+  background: rgba(255,255,255,0.7);
+  transform: scale(1.06);
+}
+.ais-ah-nav-link[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 0 0 0.5px rgba(0,0,0,0.04);
+  cursor: default;
+}
+
+/* SystemMetrics Popover (결정 N · 옵션 A) — frosted glass dropdown
+   기존 .ais-metrics 위에 호버 시 (또는 .ais-metrics:focus-within) 등장
+   Phase 2 에서 컴포넌트가 :focus-within + Esc + close timer 200ms 구현 */
+.ais-ah-metrics-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: -80px; /* 우측 edge = Shutdown 우측 edge (헤더 padding 20 안쪽) */
+  min-width: 320px;
+  padding: 12px 14px;
+  background: rgba(250,249,247,0.94);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: var(--radius);
+  box-shadow:
+    0 14px 40px rgba(0,0,0,0.16),
+    0 4px 12px rgba(0,0,0,0.10),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  z-index: 50;
+  /* default hidden — production 은 hover/focus 시만 등장 */
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s var(--ais-ease-out-back);
+}
+/* hover-stay-open + 키보드 접근성 (Phase 2 보강 · :focus-within + close timer 컴포넌트 구현) */
+.ais-metrics:hover .ais-ah-metrics-popover,
+.ais-metrics:focus-within .ais-ah-metrics-popover,
+.ais-ah-metrics-popover[data-open="true"] {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+/* MetricsPopover row — 4 metric (CPU/GPU/VRAM/RAM) + VRAM breakdown */
+.ais-ah-mp-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.ais-ah-mp-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.04);
+}
+.ais-ah-mp-row[data-tone="cpu"] .ais-ah-mp-dot { background: #06B6D4; box-shadow: 0 0 0 3px rgba(6,182,212,0.12); }
+.ais-ah-mp-row[data-tone="gpu"] .ais-ah-mp-dot { background: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,0.14); }
+.ais-ah-mp-row[data-tone="vram"] .ais-ah-mp-dot { background: #A855F7; box-shadow: 0 0 0 3px rgba(168,85,247,0.14); }
+.ais-ah-mp-row[data-tone="ram"] .ais-ah-mp-dot { background: #4A9EFF; box-shadow: 0 0 0 3px rgba(74,158,255,0.14); }
+.ais-ah-mp-label {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  width: 36px;
+  flex-shrink: 0;
+}
+.ais-ah-mp-usage {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+  width: 72px;
+  flex-shrink: 0;
+}
+/* CPU/GPU 는 usage 빈칸 — 정렬 유지 */
+.ais-ah-mp-row[data-tone="cpu"] .ais-ah-mp-usage,
+.ais-ah-mp-row[data-tone="gpu"] .ais-ah-mp-usage {
+  visibility: hidden;
+}
+.ais-ah-mp-bar {
+  position: relative;
+  height: 6px;
+  flex: 1;
+  min-width: 88px;
+  background: rgba(0,0,0,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ais-ah-mp-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  border-radius: 3px;
+}
+.ais-ah-mp-row[data-tone="cpu"] .ais-ah-mp-fill { background: #06B6D4; }
+.ais-ah-mp-row[data-tone="gpu"] .ais-ah-mp-fill { background: #22C55E; }
+.ais-ah-mp-row[data-tone="vram"] .ais-ah-mp-fill { background: #A855F7; }
+.ais-ah-mp-row[data-tone="ram"] .ais-ah-mp-fill { background: #4A9EFF; }
+.ais-ah-mp-percent {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.ais-ah-mp-divider {
+  height: 1px;
+  background: rgba(0,0,0,0.06);
+  margin: 4px 0 2px;
+}
+.ais-ah-mp-bd-eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-bottom: 2px;
+}
+.ais-ah-mp-bd-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 10.5px;
+}
+.ais-ah-mp-bd-name {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-2);
+  width: 60px;
+  flex-shrink: 0;
+}
+.ais-ah-mp-bd-vram {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #A855F7;
+  width: 50px;
+}
+.ais-ah-mp-bd-models {
+  flex: 1;
+  font-size: 10px;
+  font-style: italic;
+  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Section 12: StudioWorkspace frame (Phase 3 · 결정 L · v4 media query 분기)
+   - 1024~1279px: frame 없이 grid 풀폭 (옛 동작 그대로)
+   - 1280px+: 박스 frame (max-width: min(95vw, 1600px) cap + border + padding)
+   기존 StudioLayout.tsx:45 의 inline grid 그대로 유지 + className 추가만 (Phase 3 작업) */
+.ais-studio-workspace {
+  /* 1024~1279 default: frame 스타일 없음 — grid 만 (inline style 책임) */
+}
+@media (min-width: 1280px) {
+  .ais-studio-workspace {
+    max-width: min(95vw, 1600px);
+    margin: 0 auto;
+    padding: 22px 24px 30px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+  }
+}
