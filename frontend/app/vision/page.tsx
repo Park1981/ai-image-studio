@@ -8,7 +8,6 @@
 
 "use client";
 
-import { useState } from "react";
 import AppHeader from "@/components/chrome/AppHeader";
 import ProgressModal from "@/components/studio/ProgressModal";
 import SourceImageCard from "@/components/studio/SourceImageCard";
@@ -43,11 +42,6 @@ export default function VisionPage() {
   const clearEntries = useVisionStore((s) => s.clearEntries);
   const loadEntry = useVisionStore((s) => s.loadEntry);
 
-
-  /* ── 갤러리 컬럼 토글 (2/3/4) — Generate/Edit 와 동일 ── */
-  const [gridCols, setGridCols] = useState<2 | 3 | 4>(3);
-  const cycleGrid = () =>
-    setGridCols((c) => (c === 2 ? 3 : c === 3 ? 4 : 2));
 
   /* ── 파이프라인 훅 ── */
   const { analyze, analyzing } = useVisionPipeline();
@@ -184,10 +178,24 @@ export default function VisionPage() {
           </div>
         </StudioLeftPanel>
 
-        {/* ── RIGHT: 결과 카드 + 히스토리 ── */}
+        {/* ── RIGHT: 결과 카드 + 히스토리 (V5 Phase 6) ── */}
         <StudioRightPanel>
-          {/* audit R2-9: 공통 StudioResultHeader 로 교체 */}
-          <StudioResultHeader title="분석 결과" meta="EN + KO" />
+          <StudioResultHeader
+            title="분석 결과"
+            titleEn="Analysis"
+            meta={
+              currentWidth && currentHeight ? (
+                <>
+                  <span className="ais-result-pill ais-pill-violet mono">
+                    {currentWidth} × {currentHeight}
+                  </span>
+                  <span className="ais-result-pill mono">EN + KO</span>
+                </>
+              ) : (
+                <span className="ais-result-pill mono">EN + KO</span>
+              )
+            }
+          />
 
           <VisionResultCard result={lastResult} running={analyzing} />
 
@@ -196,8 +204,6 @@ export default function VisionPage() {
             onSelect={loadEntry}
             onDelete={removeEntry}
             onClear={clearEntries}
-            gridCols={gridCols}
-            onCycleGrid={cycleGrid}
             maxEntries={MAX_VISION_HISTORY}
           />
         </StudioRightPanel>

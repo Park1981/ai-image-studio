@@ -4,13 +4,20 @@
  *
  * 통합 모드: A1111 표준 (positive + Negative prompt: negative)
  * 분리 모드: hairline 으로 구분된 두 섹션 (각자 헤더 + 복사 버튼)
+ *
+ * 2026-05-02 디자인 V5 Phase 6 격상 (회귀 위험 #10 보존):
+ *  - combined/split toggle **보존 필수**
+ *  - A1111 호환 `combinedText` (positive + Negative prompt: negative) **보존 필수**
+ *  - 통합 모드 복사 버튼 (`onCopy(combinedText, "통합 프롬프트")`) **보존 필수**
+ *  - 카드 외곽 className `.ais-vision-prompt-toggle` + 헤더 `.ais-vpt-header` + body `.ais-vpt-body`
+ *  - mode tabs className `.ais-vs-actions` + `.ais-vpt-mode-tabs` + `.ais-vpt-mode-btn` data-active
+ *  - 분리 모드 sectionColor 톤만 변경: var(--accent) → #2D7A2D (POSITIVE green) / "#EF4444" → "#B8232C" (NEGATIVE red)
  */
 
 "use client";
 
 import { useState } from "react";
 import Icon from "@/components/ui/Icon";
-import { SmallBtn } from "@/components/ui/primitives";
 import { toast } from "@/stores/useToastStore";
 
 type PromptMode = "combined" | "split";
@@ -20,10 +27,14 @@ interface Props {
   negative: string;
 }
 
+// V5 Phase 6 — split 모드 섹션 색 톤 (plan §6 명시)
+const POSITIVE_COLOR = "#2D7A2D"; // green
+const NEGATIVE_COLOR = "#B8232C"; // red
+
 export default function PromptToggleCard({ positive, negative }: Props) {
   const [mode, setMode] = useState<PromptMode>("combined");
 
-  // A1111 표준: positive 줄 + 빈 줄 + "Negative prompt: " 줄
+  // A1111 표준: positive 줄 + 빈 줄 + "Negative prompt: " 줄 (회귀 #10 보존 필수)
   const combinedText =
     negative.trim() && positive.trim()
       ? `${positive}\n\nNegative prompt: ${negative}`
@@ -43,137 +54,56 @@ export default function PromptToggleCard({ positive, negative }: Props) {
   };
 
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderLeft: "3px solid var(--accent)",
-        borderRadius: "var(--radius-card)",
-        boxShadow: "var(--shadow-sm)",
-        overflow: "hidden",
-      }}
-    >
-      {/* ── 카드 메인 헤더 — 모드 따라 메타 라벨 / chars / 복사 분기 ── */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 14px",
-          borderBottom: "1px solid var(--line)",
-          gap: 8,
-          flexWrap: "wrap",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            color: "var(--accent)",
-            minWidth: 0,
-          }}
-        >
+    <div className="ais-vision-prompt-toggle">
+      {/* 카드 메인 헤더 — 모드 따라 메타 라벨 / chars / 복사 분기 */}
+      <div className="ais-vpt-header">
+        <span className="ais-vs-eyebrow">
           <Icon name="sparkle" size={13} />
-          <span
-            className="mono"
-            style={{
-              fontSize: 11,
-              fontWeight: 700,
-              color: "var(--accent)",
-              letterSpacing: ".08em",
-            }}
-          >
-            PROMPT
-          </span>
-          <span
-            className="mono"
-            style={{
-              fontSize: 10,
-              color: "var(--ink-4)",
-              letterSpacing: ".04em",
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
+          PROMPT
+          <span className="ais-vpt-meta">
             {mode === "combined" ? "· A1111 호환" : "· 분리 보기"}
           </span>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexShrink: 0,
-          }}
-        >
+        </span>
+        <div className="ais-vs-actions">
           <PromptModeToggle mode={mode} onChange={setMode} />
           {mode === "combined" && (
             <>
-              <span
-                className="mono"
-                style={{ fontSize: 10.5, color: "var(--ink-4)" }}
-              >
-                {combinedText.length} chars
-              </span>
-              <SmallBtn
-                icon="copy"
+              <span className="ais-vpt-chars">{combinedText.length} chars</span>
+              <button
+                type="button"
+                className="ais-vs-copy-btn"
                 onClick={() => onCopy(combinedText, "통합 프롬프트")}
               >
+                <Icon name="copy" size={11} />
                 복사
-              </SmallBtn>
+              </button>
             </>
           )}
         </div>
       </div>
 
       {mode === "combined" ? (
-        /* ── 통합 본문 (한 영역) ── */
-        <div
-          style={{
-            padding: "14px 16px",
-            fontSize: 13,
-            lineHeight: 1.6,
-            color: "var(--ink)",
-            whiteSpace: "pre-wrap",
-            wordBreak: "break-word",
-            minHeight: 80,
-          }}
-        >
+        /* 통합 본문 (한 영역) — 회귀 #10 보존: positive + Negative prompt: negative */
+        <div className="ais-vpt-body">
           {positive ? (
             <>
               {positive}
               {negative && (
                 <>
                   {"\n\n"}
-                  <span
-                    style={{
-                      color: "#EF4444",
-                      fontWeight: 600,
-                    }}
-                  >
+                  <span className="ais-vpt-negative-label">
                     Negative prompt:
                   </span>{" "}
-                  <span style={{ color: "var(--ink-3)" }}>{negative}</span>
+                  <span className="ais-vpt-negative-text">{negative}</span>
                 </>
               )}
             </>
           ) : (
-            <span
-              style={{
-                color: "var(--ink-4)",
-                fontStyle: "italic",
-                fontSize: 12,
-              }}
-            >
-              결과 없음
-            </span>
+            <span className="ais-vpt-empty">결과 없음</span>
           )}
         </div>
       ) : (
-        /* ── 분리 본문 (두 섹션 · hairline 으로 구분) ── */
+        /* 분리 본문 (두 섹션) — V5 색 톤 (POSITIVE green / NEGATIVE red) */
         <>
           <PromptSection
             kind="positive"
@@ -194,7 +124,7 @@ export default function PromptToggleCard({ positive, negative }: Props) {
   );
 }
 
-/** 분리 모드의 단일 섹션 (POSITIVE 또는 NEGATIVE) */
+/** 분리 모드의 단일 섹션 (POSITIVE 또는 NEGATIVE) — V5 색 톤 (green / red) */
 function PromptSection({
   kind,
   text,
@@ -209,110 +139,38 @@ function PromptSection({
   const isPositive = kind === "positive";
   const sectionTitle = isPositive ? "POSITIVE" : "NEGATIVE";
   const sectionMeta = isPositive ? "t2i 재생성 입력" : "회피 리스트";
-  const sectionColor = isPositive ? "var(--accent)" : "#EF4444";
   const iconName = isPositive ? "sparkle" : "x";
 
   return (
     <div
-      style={{
-        borderTop: showTopBorder ? "1px solid var(--line)" : undefined,
-      }}
+      className="ais-vpt-section"
+      data-kind={kind}
+      data-show-top-border={showTopBorder ? "true" : "false"}
     >
       {/* 섹션 헤더 */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 14px 6px",
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 7,
-            color: sectionColor,
-            minWidth: 0,
-          }}
-        >
+      <div className="ais-vpt-section-header">
+        <span className="ais-vpt-section-title">
           <Icon name={iconName} size={12} />
-          <span
-            className="mono"
-            style={{
-              fontSize: 10.5,
-              fontWeight: 700,
-              color: sectionColor,
-              letterSpacing: ".08em",
-            }}
-          >
-            {sectionTitle}
-          </span>
-          <span
-            className="mono"
-            style={{
-              fontSize: 10,
-              color: "var(--ink-4)",
-              letterSpacing: ".04em",
-              fontWeight: 500,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            · {sectionMeta}
-          </span>
-        </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            flexShrink: 0,
-          }}
-        >
-          <span
-            className="mono"
-            style={{ fontSize: 10.5, color: "var(--ink-4)" }}
-          >
-            {text.length} chars
-          </span>
-          <SmallBtn icon="copy" onClick={onCopy}>
+          {sectionTitle}
+          <span className="ais-vpt-section-meta">· {sectionMeta}</span>
+        </span>
+        <div className="ais-vs-actions">
+          <span className="ais-vpt-chars">{text.length} chars</span>
+          <button type="button" className="ais-vs-copy-btn" onClick={onCopy}>
+            <Icon name="copy" size={11} />
             복사
-          </SmallBtn>
+          </button>
         </div>
       </div>
       {/* 섹션 본문 */}
-      <div
-        style={{
-          padding: "0 16px 14px",
-          fontSize: isPositive ? 13 : 12,
-          lineHeight: 1.6,
-          color: "var(--ink)",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          fontFamily: isPositive ? "inherit" : "var(--font-mono, monospace)",
-          minHeight: isPositive ? 60 : 30,
-        }}
-      >
-        {text || (
-          <span
-            style={{
-              color: "var(--ink-4)",
-              fontStyle: "italic",
-              fontSize: 11.5,
-            }}
-          >
-            결과 없음
-          </span>
-        )}
+      <div className="ais-vpt-section-body" data-kind={kind}>
+        {text || <span className="ais-vpt-empty">결과 없음</span>}
       </div>
     </div>
   );
 }
 
-/** 통합/분리 segment toggle */
+/** 통합/분리 segment toggle — V5 className 적용 */
 function PromptModeToggle({
   mode,
   onChange,
@@ -324,13 +182,7 @@ function PromptModeToggle({
     <div
       role="tablist"
       aria-label="프롬프트 표시 모드"
-      style={{
-        display: "inline-flex",
-        background: "var(--bg-2)",
-        borderRadius: "var(--radius-sm)",
-        padding: 2,
-        gap: 2,
-      }}
+      className="ais-vpt-mode-tabs"
     >
       {(
         [
@@ -345,19 +197,9 @@ function PromptModeToggle({
             type="button"
             role="tab"
             aria-selected={active}
+            data-active={active ? "true" : "false"}
+            className="ais-vpt-mode-btn"
             onClick={() => onChange(opt.key)}
-            style={{
-              all: "unset",
-              cursor: "pointer",
-              padding: "4px 10px",
-              fontSize: 11,
-              fontWeight: 600,
-              borderRadius: "var(--radius-sm)",
-              color: active ? "var(--ink)" : "var(--ink-3)",
-              background: active ? "var(--surface)" : "transparent",
-              boxShadow: active ? "var(--shadow-sm)" : "none",
-              letterSpacing: 0,
-            }}
           >
             {opt.label}
           </button>
@@ -366,3 +208,8 @@ function PromptModeToggle({
     </div>
   );
 }
+
+// V5 색 톤 export (플랜 §6 명시 · 다른 곳 사용 가능)
+export { POSITIVE_COLOR, NEGATIVE_COLOR };
+
+// SmallBtn 미사용 (V5 className 으로 전환됨) — import 제거

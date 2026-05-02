@@ -1,13 +1,17 @@
 /**
  * vision-result/SummaryCard — 한/영 토글이 가능한 Summary 카드.
  * 2026-04-27 (C2-P1-2): VisionResultCard 분해 — 페이지에서 추출.
+ *
+ * 2026-05-02 디자인 V5 Phase 6 격상:
+ *  - inline → className `.ais-vision-summary` + 자식 `.ais-vs-*`
+ *  - data-lang 분기 — 한글 = Pretendard / 영문 = Fraunces italic 13.5 (CSS 가 fontFamily 자동)
+ *  - 한/영 tab + 복사 버튼 그대로 (회귀 0)
  */
 
 "use client";
 
 import { useState } from "react";
 import Icon from "@/components/ui/Icon";
-import { SmallBtn } from "@/components/ui/primitives";
 import { toast } from "@/stores/useToastStore";
 
 interface Props {
@@ -35,50 +39,14 @@ export default function SummaryCard({ en, ko, koFailed }: Props) {
   };
 
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius-card)",
-        boxShadow: "var(--shadow-sm)",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "10px 14px",
-          borderBottom: "1px solid var(--line)",
-          gap: 8,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <Icon name="sparkle" size={13} style={{ color: "var(--ink-3)" }} />
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--ink-2)",
-              letterSpacing: ".04em",
-              textTransform: "uppercase",
-            }}
-          >
-            요약
-          </span>
-        </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <div
-            role="tablist"
-            style={{
-              display: "inline-flex",
-              background: "var(--bg-2)",
-              borderRadius: "var(--radius-sm)",
-              padding: 2,
-              gap: 2,
-            }}
-          >
+    <div className="ais-vision-summary">
+      <div className="ais-vs-header">
+        <span className="ais-vs-eyebrow">
+          <Icon name="sparkle" size={13} />
+          요약
+        </span>
+        <div className="ais-vs-actions">
+          <div role="tablist" className="ais-vs-lang-tabs" aria-label="요약 언어">
             {(["ko", "en"] as const).map((l) => {
               const active = lang === l;
               const disabled = l === "ko" && koDisabled;
@@ -87,25 +55,12 @@ export default function SummaryCard({ en, ko, koFailed }: Props) {
                   key={l}
                   type="button"
                   role="tab"
+                  className="ais-vs-lang-btn"
                   aria-selected={active}
                   disabled={disabled}
+                  data-active={active ? "true" : "false"}
+                  data-disabled={disabled ? "true" : "false"}
                   onClick={() => !disabled && setLang(l)}
-                  style={{
-                    all: "unset",
-                    cursor: disabled ? "not-allowed" : "pointer",
-                    padding: "4px 10px",
-                    fontSize: 11.5,
-                    fontWeight: 600,
-                    borderRadius: "var(--radius-sm)",
-                    color: active
-                      ? "var(--ink)"
-                      : disabled
-                        ? "var(--ink-4)"
-                        : "var(--ink-3)",
-                    background: active ? "var(--surface)" : "transparent",
-                    boxShadow: active ? "var(--shadow-sm)" : "none",
-                    opacity: disabled ? 0.5 : 1,
-                  }}
                   title={disabled ? "한글 번역 실패" : ""}
                 >
                   {l === "ko" ? "한글" : "영문"}
@@ -113,30 +68,15 @@ export default function SummaryCard({ en, ko, koFailed }: Props) {
               );
             })}
           </div>
-          <SmallBtn icon="copy" onClick={onCopy}>
+          <button type="button" className="ais-vs-copy-btn" onClick={onCopy}>
+            <Icon name="copy" size={11} />
             복사
-          </SmallBtn>
+          </button>
         </div>
       </div>
-      <div
-        style={{
-          padding: "12px 14px",
-          fontSize: 13,
-          lineHeight: 1.6,
-          color: "var(--ink)",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-          minHeight: 60,
-        }}
-      >
+      <div className="ais-vs-body" data-lang={lang}>
         {text || (
-          <span
-            style={{
-              color: "var(--ink-4)",
-              fontStyle: "italic",
-              fontSize: 12,
-            }}
-          >
+          <span className="ais-vs-empty">
             {koDisabled && lang === "ko"
               ? "한글 번역 실패 — 영문 탭에서 확인."
               : "결과 없음"}

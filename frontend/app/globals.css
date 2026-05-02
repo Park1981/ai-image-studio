@@ -2021,6 +2021,11 @@ button {
   box-shadow: var(--shadow-sm);
   cursor: default;
 }
+.ais-vs-lang-btn[data-disabled="true"] {
+  cursor: not-allowed;
+  opacity: 0.5;
+  color: var(--ink-4);
+}
 .ais-vs-copy-btn {
   all: unset;
   cursor: pointer;
@@ -2061,6 +2066,11 @@ button {
   font-size: 13.5px;
   letter-spacing: 0;
 }
+.ais-vs-empty {
+  color: var(--ink-4);
+  font-style: italic;
+  font-size: 12px;
+}
 
 /* Prompt Toggle Card — combined/split 토글 보존 + 색 톤만 추가 (positive=green / negative=red) */
 .ais-vision-prompt-toggle {
@@ -2093,6 +2103,86 @@ button {
   word-break: break-word;
   min-height: 56px;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+/* PromptToggle 자식 — meta · chars · empty · negative label/text · split section */
+.ais-vpt-meta {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-left: 4px;
+}
+.ais-vpt-chars {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
+.ais-vpt-empty {
+  color: var(--ink-4);
+  font-style: italic;
+  font-size: 11.5px;
+}
+.ais-vpt-negative-label {
+  color: #EF4444;
+  font-weight: 600;
+}
+.ais-vpt-negative-text {
+  color: var(--ink-3);
+}
+/* split 모드 두 섹션 — 회귀 #10 보존 (combined/split 토글 + A1111) + V5 색 톤 (POSITIVE green / NEGATIVE red) */
+.ais-vpt-section[data-show-top-border="true"] {
+  border-top: 1px solid var(--line);
+}
+.ais-vpt-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 6px;
+  gap: 8px;
+}
+.ais-vpt-section-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  min-width: 0;
+}
+.ais-vpt-section[data-kind="positive"] .ais-vpt-section-title {
+  color: #2D7A2D;
+}
+.ais-vpt-section[data-kind="negative"] .ais-vpt-section-title {
+  color: #B8232C;
+}
+.ais-vpt-section-meta {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ais-vpt-section-body {
+  padding: 0 16px 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 60px;
+}
+.ais-vpt-section-body[data-kind="negative"] {
+  font-size: 12px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  min-height: 30px;
 }
 
 /* Vision Detail Cards Grid + Card */
@@ -2139,6 +2229,11 @@ button {
   line-height: 1.55;
   color: var(--ink);
 }
+.ais-vd-empty {
+  font-size: 11px;
+  color: var(--ink-4);
+  font-style: italic;
+}
 .ais-vision-detail-card[data-muted="true"] {
   background: var(--bg-2);
   border-color: var(--line-2);
@@ -2146,6 +2241,12 @@ button {
 .ais-vision-detail-card[data-muted="true"] .ais-vd-body {
   color: var(--ink-3);
   font-style: italic;
+}
+/* Vision result 외곽 column flex (RecipeV2View wrapper) */
+.ais-vision-result {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 /* Vision History Tile (NEW 패턴 · 썸네일 88 + meta + Fraunces italic summary 2-line truncate) */
@@ -2213,6 +2314,102 @@ button {
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin: 0;
+}
+.ais-vht-summary-failed {
+  color: var(--amber-ink);
+  font-style: italic;
+}
+/* Vision history tile 내부 — relative wrapper + hover 시 delete 버튼 노출 */
+.ais-vision-history-tile {
+  position: relative;
+}
+.ais-vht-delete {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+  padding: 0;
+}
+.ais-vision-history-tile:hover .ais-vht-delete,
+.ais-vision-history-tile:focus-within .ais-vht-delete {
+  opacity: 1;
+}
+.ais-vht-delete:hover {
+  background: rgba(192,57,43,0.92);
+}
+
+/* Vision history 외곽 (헤더 + scroll + empty) — Phase 6 신규 */
+.ais-vision-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ais-vision-history-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+}
+.ais-vision-history-title-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 10px;
+}
+.ais-vision-history-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ais-vision-history-count {
+  font-size: 11px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+}
+.ais-vision-history-clear {
+  all: unset;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ink-4);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  margin-top: 6px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.ais-vision-history-clear:hover {
+  color: var(--ink-2);
+  border-color: var(--line-2);
+}
+.ais-vision-history-empty {
+  padding: 20px 16px;
+  background: var(--surface);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius);
+  text-align: center;
+  color: var(--ink-4);
+  font-size: 12px;
+}
+.ais-vision-history-scroll {
+  max-height: 55vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
 }
 
 /* ── Section 11: AppHeader (Phase 1.4 · 결정 M)
