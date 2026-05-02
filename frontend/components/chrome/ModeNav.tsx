@@ -77,8 +77,10 @@ export default function ModeNav() {
             data-active={isActive ? "true" : undefined}
             aria-current={isActive ? "page" : undefined}
             onClick={() => {
-              // 이미 활성 페이지면 push 생략 (불필요 라우팅 + cursor:default 시각 일관성)
-              if (isActive) return;
+              // 정확히 같은 pathname 일 때만 push 생략 (Codex 4차 보강).
+              // isActive 는 /prompt-flow/generate → /generate chip 도 active 로 표시하지만,
+              // 클릭 시 실제 모드 화면 (/generate) 으로 이동해야 함 (도움말 → 본 페이지).
+              if (pathname === mode.href) return;
               router.push(mode.href);
             }}
           >
