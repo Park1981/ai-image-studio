@@ -187,11 +187,9 @@ export default function GenerateResultViewer({
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             transformOrigin: "center center",
             transition: isDragging ? "none" : "transform .18s ease-out",
-            // 동적 — anti-drag (CSS 에 없는 비표준 attribute)
+            // 비표준 Webkit user-drag 만 inline (표준 user-select / pointer-events 는 CSS 가 처리)
             // @ts-expect-error — 비표준 Webkit
             WebkitUserDrag: "none",
-            userSelect: "none",
-            pointerEvents: "none", // mousedown 은 부모 div 가 받음
           }}
         />
 

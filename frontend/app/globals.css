@@ -1171,6 +1171,10 @@ button {
     0 12px 36px rgba(0,0,0,.18),
     0 4px 12px rgba(0,0,0,.10),
     0 0 0 1px rgba(0,0,0,.06);
+  /* anti-drag: 표준 attribute 둘은 CSS 로 (Codex 2차 nit #2).
+     Webkit 비표준 user-drag 만 inline 잔존. mousedown 은 부모 div 가 받음. */
+  user-select: none;
+  pointer-events: none;
 }
 
 /* Result Hero (Edit 전용) — column · slider 가 비율 가짐 (16:9 override) */
@@ -1254,10 +1258,8 @@ button {
   /* spring 통통 — 옛 inline 시각 보존 (background + transform 분리) */
   transition: background .18s ease, transform .22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.ais-result-action-btn:hover {
-  background: rgba(255,255,255,0.16);
-  transform: scale(1.06);
-}
+/* hover/focus 시각은 React state 가 [data-active="true"] 로 결정 (Codex 2차 nit #1).
+   옛 inline 패턴과 일관 (SSR 첫 paint jitter 회피 + scale 1.06 → 1.08 통일). */
 .ais-result-action-divider {
   width: 1px;
   height: 18px;
@@ -1540,13 +1542,8 @@ button {
   /* spring 통통 — 옛 inline 시각 보존 (background + transform 분리) */
   transition: background .18s ease, transform .22s cubic-bezier(0.34, 1.56, 0.64, 1);
 }
-.ais-tile-action-btn:hover {
-  background: rgba(255,255,255,0.16);
-  transform: scale(1.08);
-}
-.ais-tile-action-btn.ais-danger:hover {
-  background: rgba(192,57,43,0.92);
-}
+/* hover/focus 시각은 React state 가 [data-active="true"] 로 결정 (Codex 2차 nit #1).
+   옛 inline 패턴과 일관 + .ais-danger 클래스 dead 였던 것 정리 (data-variant="danger" 가 분기). */
 
 /* ActionBarButton variant/state 분기 — production 의 active scale + variant 별 background + label + focus-visible
    적용 selector: .ais-result-action-btn (Hero 34×34) / .ais-tile-action-btn (Tile 26×26) 공용.
