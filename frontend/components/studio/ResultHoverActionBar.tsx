@@ -154,6 +154,9 @@ export default function ResultHoverActionBar({
 /* ─────────────────────────────────
    액션바 전용 아이콘 버튼 — 스타일 통일용
    2026-04-27: pill 그룹 안에 들어가 있으므로 자체 배경 옅게 + outline 제거
+   2026-05-02 V5 Phase 4 codex fix #1: inline style → className `.ais-result-action-btn` /
+     `.ais-tile-action-btn` + data-attribute (variant/active/focus-visible/disabled/has-label).
+     CSS 가 size (34/26) + variant 별 hover bg + spring transform + label padding + focus outline 처리.
    ───────────────────────────────── */
 
 export function ActionBarButton({
@@ -163,6 +166,7 @@ export function ActionBarButton({
   label,
   variant = "neutral",
   disabled,
+  size = "hero",
 }: {
   icon: IconName;
   title: string;
@@ -171,33 +175,27 @@ export function ActionBarButton({
   label?: string;
   variant?: "neutral" | "primary" | "danger";
   disabled?: boolean;
+  /** V5 Phase 4 — Hero (34×34) / Tile (26×26) — 부모 ResultHoverActionBar variant 와 매칭 */
+  size?: "hero" | "tile";
 }) {
   const [hov, setHov] = useState(false);
   // focus-visible 만 추적 (마우스 클릭 시는 표시 안 함 — 키보드 사용자 전용 outline).
   const [focusVisible, setFocusVisible] = useState(false);
-  // 2026-04-27 오빠 피드백: 모든 variant 평소 transparent → 일관성 ↑ + 호버 진입 시 깜빡임 차단.
-  const palette = {
-    neutral: {
-      bg: "transparent",
-      bgHov: "rgba(255,255,255,.16)",
-    },
-    primary: {
-      bg: "transparent",
-      bgHov: "rgba(74,158,255,.85)",
-    },
-    danger: {
-      bg: "transparent",
-      bgHov: "rgba(192,57,43,.92)",
-    },
-  }[variant];
   const active = (hov || focusVisible) && !disabled;
+  const className = size === "tile" ? "ais-tile-action-btn" : "ais-result-action-btn";
 
   return (
     <button
       type="button"
+      className={className}
       title={title}
       onClick={onClick}
       disabled={disabled}
+      data-variant={variant}
+      data-active={active ? "true" : "false"}
+      data-focus-visible={focusVisible ? "true" : "false"}
+      data-disabled={disabled ? "true" : "false"}
+      data-has-label={label ? "true" : "false"}
       onMouseEnter={() => setHov(true)}
       onMouseLeave={() => setHov(false)}
       // matches() 로 :focus-visible 만 분기 — 마우스 클릭 후 스타일 깜빡임 방지.
@@ -210,28 +208,6 @@ export function ActionBarButton({
         }
       }}
       onBlur={() => setFocusVisible(false)}
-      style={{
-        all: "unset",
-        cursor: disabled ? "not-allowed" : "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: label ? 5 : 0,
-        padding: label ? "6px 12px" : "8px 9px",
-        borderRadius: "var(--radius-full)",
-        fontSize: 11.5,
-        fontWeight: 600,
-        letterSpacing: ".01em",
-        color: "#fff",
-        background: disabled ? "rgba(255,255,255,.06)" : active ? palette.bgHov : palette.bg,
-        // focus-visible 시 강조 outline (호버는 outline 없음 — 마우스 트래킹 방해 방지).
-        outline: focusVisible ? "2px solid rgba(74,158,255,.85)" : "none",
-        outlineOffset: focusVisible ? 2 : 0,
-        transition:
-          "background .18s ease, transform .22s cubic-bezier(0.34, 1.56, 0.64, 1)",
-        // 버튼 자체도 살짝 통통 — hover 시 1.06x
-        transform: active ? "scale(1.08)" : "scale(1)",
-        opacity: disabled ? 0.45 : 1,
-      }}
     >
       <Icon name={icon} size={13} stroke={2.2} />
       {label && <span>{label}</span>}

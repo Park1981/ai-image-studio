@@ -147,6 +147,7 @@ export default function HistoryTile({
             <ActionBarButton
               icon="zoom-in"
               title="라이트박스에서 크게 보기"
+              size="tile"
               onClick={() => {
                 // 라이트박스 메타 패널이 "현재 선택된 아이템" 기준이므로
                 // 이 타일을 먼저 선택 → 그 뒤 확장. 아니면 이전 선택의 메타가 보임.
@@ -159,12 +160,14 @@ export default function HistoryTile({
           <ActionBarButton
             icon="copy"
             title="프롬프트 복사"
+            size="tile"
             onClick={handleCopy}
           />
           {onUseAsSource && (
             <ActionBarButton
               icon="edit"
               title="이 이미지를 수정 원본으로"
+              size="tile"
               onClick={onUseAsSource}
             />
           )}
@@ -172,6 +175,7 @@ export default function HistoryTile({
             <ActionBarButton
               icon="edit"
               title="수정으로 이동"
+              size="tile"
               onClick={onSendToEdit}
             />
           )}
@@ -179,6 +183,7 @@ export default function HistoryTile({
             icon="x"
             title="삭제"
             variant="danger"
+            size="tile"
             onClick={handleDelete}
           />
         </ResultHoverActionBar>

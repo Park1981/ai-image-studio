@@ -157,33 +157,17 @@ export default function GenerateResultViewer({
     <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div
         ref={containerRef}
+        className="ais-result-hero"
         onMouseEnter={onEnter}
         onMouseLeave={onLeave}
         onMouseDown={onMouseDown}
         onDoubleClick={onDoubleClick}
         style={{
-          position: "relative",
-          width: "100%",
-          // 결과 뷰어: 원본 비율 유지 + 최대 높이 65vh 제한. contain 으로 레터박스.
+          // 동적 — 원본 비율 유지 + 65vh cap (CSS 의 고정 1672/941 override)
           aspectRatio,
           maxHeight: "65vh",
-          // 2026-04-27: dot grid 배경 (Figma 캔버스 톤) + 흰색 매트 (오빠 피드백 — 더 깔끔)
-          backgroundColor: "var(--surface)",
-          backgroundImage:
-            "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
-          backgroundSize: "16px 16px",
-          borderRadius: "var(--radius-card)",
-          overflow: "hidden",
-          border: "1px solid var(--line)",
-          boxShadow: "var(--shadow-sm)",
-          // 매트지 효과: 카드 안 padding → 이미지가 떠있는 느낌 (미술관 액자).
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: 24,
-          boxSizing: "border-box",
+          // 동적 — zoom 시 cursor 분기 + native 제스처 차단
           cursor,
-          // touchpad pinch zoom 등 native 제스처 차단 (wheel 만 사용)
           touchAction: "none",
         }}
         title={
@@ -194,26 +178,16 @@ export default function GenerateResultViewer({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
+          className="ais-result-hero-img"
           src={item.imageRef}
           alt={item.label}
           draggable={false}
           style={{
-            maxWidth: "100%",
-            maxHeight: "100%",
-            objectFit: "contain",
-            display: "block",
-            // 매트 위 떠있는 사진 효과 — 자체 그림자 + 옅은 테두리
-            borderRadius: "var(--radius-md)",
-            boxShadow:
-              "0 10px 32px rgba(0,0,0,.14), 0 3px 10px rgba(0,0,0,.08)",
-            border: "1px solid rgba(0,0,0,.06)",
-            // zoom + pan transform
+            // 동적 — zoom + pan transform · drag 중엔 transition off
             transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
             transformOrigin: "center center",
-            // drag 중엔 transition 끔 (입력 즉각 반영) · 그 외엔 부드럽게
-            transition: isDragging
-              ? "none"
-              : "transform .18s ease-out",
+            transition: isDragging ? "none" : "transform .18s ease-out",
+            // 동적 — anti-drag (CSS 에 없는 비표준 attribute)
             // @ts-expect-error — 비표준 Webkit
             WebkitUserDrag: "none",
             userSelect: "none",
