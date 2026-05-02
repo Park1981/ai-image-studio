@@ -1988,6 +1988,12 @@ button {
   letter-spacing: 0.04em;
   font-weight: 500;
   margin-left: 4px;
+  /* 옛 inline 시각 보존 (Codex Phase 7 nit #2) — 긴 contextLabel 시 한 줄 강제 + ellipsis
+     없으면 부모 flex-wrap 으로 헤더 두 줄로 깨짐 + 복사 버튼 다음 줄 떨어짐 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 /* Transform 영문 sub (textKo+textEn 모두 있을 때 dashed border-top 으로 구분) */
 .ais-tp-en-sub {

@@ -90,7 +90,8 @@ export function UncertainBox({
         <Icon name="search" size={11} />
         UNCERTAIN · 비교 못한 영역
       </div>
-      <div className="ais-uncertain-body">{text}</div>
+      {/* body — 부모 .ais-uncertain-box cascade (font-size 12.5 / ink-2 / line-height 1.55) 가 처리 */}
+      <div>{text}</div>
     </div>
   );
 }

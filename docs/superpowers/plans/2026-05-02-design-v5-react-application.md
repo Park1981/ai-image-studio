@@ -418,6 +418,10 @@
 
 ### Phase 8 — Cleanup + 회귀 테스트 (1-2h)
 
+- [ ] **AxisRow a11y 정통 meter 패턴 검토** (Codex Phase 7 nit #3 박제):
+  - 현재 `.ais-axis-fill` 에 `aria-label="구성 82%"` 박힘 — 시각 fill 자체에 의미 라벨
+  - 정통 a11y 패턴: `role="meter"` + `aria-valuenow={score}` + `aria-valuemin={0}` + `aria-valuemax={100}` + `aria-label={label}`
+  - 시각/기능 영향 0 · 시멘틱 강화만 — Phase 8 시점 한 번에 정리
 - [ ] **VisionHistoryList 헤더 V5 Archive Header 패턴 통일 검토** (Codex Phase 6 nit #3 박제):
   - 현재 옛 헤더: h3 "최근 분석" + count + 모두 지우기 버튼 (`.ais-vision-history-header`)
   - Edit/Generate V5 패턴: HistorySectionHeader (eyebrow `IMAGE STUDIO · ARCHIVE` + Fraunces italic bilingual + count chip + sizeBytes chip)
