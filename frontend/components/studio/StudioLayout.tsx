@@ -50,7 +50,13 @@ export function StudioWorkspace({
   style?: CSSProperties;
 }) {
   return (
+    // V5 Phase 3 (결정 L · 2026-05-02 plan v4 media query 분기):
+    //   - className `.ais-studio-workspace` — globals.css §Section 12 가 책임
+    //   - 1024~1279px: frame 스타일 없음 (inline grid 만 — 옛 동작 그대로)
+    //   - 1280px+: max-width: min(95vw, 1600px) + 박스 frame (border + padding + shadow)
+    //   inline grid 는 그대로 유지 (className 은 추가 frame 만 책임 · cascade 안 충돌)
     <div
+      className="ais-studio-workspace"
       style={{
         flex: 1,
         display: "grid",
