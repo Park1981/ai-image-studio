@@ -1,0 +1,2114 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio Design Test v2 · V3 Aurora Glass — 3 Variants</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; }
+
+:root {
+  --bg: #FAF9F7;
+  --bg-2: #F4F2EE;
+  --surface: #FFFFFF;
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --accent: #4A9EFF;
+  --accent-ink: #1E7BE0;
+  --accent-soft: #EAF3FF;
+  --accent-disabled: #C8D6E8;
+  --green: #52C41A; --green-soft: #EEF9E4;
+  --amber: #FAAD14; --amber-soft: #FFF7E0; --amber-ink: #B47600;
+  --shadow-sm: 0 1px 2px rgba(23,20,14,.04), 0 2px 8px rgba(23,20,14,.04);
+  --shadow-md: 0 2px 4px rgba(23,20,14,.04), 0 8px 24px rgba(23,20,14,.06);
+  --shadow-lg: 0 4px 10px rgba(23,20,14,.05), 0 20px 48px rgba(23,20,14,.08);
+  --r-sm: 8px; --r-md: 12px; --r-card: 14px; --r-lg: 16px; --r-full: 999px;
+}
+
+html, body {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(74,158,255,0.04), transparent 40%),
+    radial-gradient(circle at 80% 100%, rgba(250,173,20,0.03), transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", -apple-system, system-ui, sans-serif;
+  font-feature-settings: "ss02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px; line-height: 1.6; letter-spacing: 0;
+  min-height: 100vh;
+}
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-feature-settings: "zero"; }
+.display { font-family: "Fraunces", Georgia, serif; font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0; font-feature-settings: "ss01"; }
+
+/* ── Page Header ── */
+.page-header {
+  padding: 28px 40px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
+  position: sticky; top: 0; z-index: 10;
+}
+.page-title { font-size: 24px; font-weight: 600; letter-spacing: -0.012em; }
+.page-title .display { font-style: italic; font-weight: 500; color: var(--accent-ink); }
+.page-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.page-meta { font-size: 11px; color: var(--ink-4); display: flex; gap: 18px; align-items: center; }
+.page-meta .mono { color: var(--ink-3); letter-spacing: 0.02em; }
+.page-meta .pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3); border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+
+/* ── Grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 460px);
+  gap: 28px;
+  padding: 32px 40px 80px;
+  justify-content: center;
+  align-items: start;
+}
+
+/* ── Panel ── */
+.panel {
+  width: 460px;
+  background: linear-gradient(180deg, var(--surface), rgba(255,255,255,0.5));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px 18px 28px;
+  box-shadow: var(--shadow-sm);
+}
+.panel-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0 4px 4px; padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.panel-eyebrow {
+  font-family: "JetBrains Mono", monospace; font-size: 9.5px;
+  color: var(--ink-4); letter-spacing: 0.14em; text-transform: uppercase;
+}
+.panel-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic; font-size: 22px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+.panel-name strong { font-style: normal; font-weight: 700; color: var(--accent-ink); }
+.panel-tag {
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3);
+  border: 1px solid var(--line); letter-spacing: 0.04em;
+}
+.legend {
+  margin: 10px 4px 18px;
+  font-size: 11.5px; color: var(--ink-3); line-height: 1.7;
+}
+.legend strong { color: var(--ink-2); font-weight: 600; }
+
+/* ── Inner Studio Left Panel ── */
+.left-panel {
+  width: 400px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 8px 0;
+}
+
+/* Studio Mode Header — panel-header 스타일 차용 (오빠 결정 2026-05-02 · 디스플레이 타이포그래피 강화)
+ * 옛: 단일 영문 sans 22px → 새: eyebrow monospace + Fraunces italic 한글+영문 mix
+ * 점선 border-bottom 으로 섹션 구분 + 우측 mode-flow-link 그대로 유지 */
+.mode-header {
+  padding: 4px 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.mode-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.mode-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mode-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.mode-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+.mode-flow-link {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface);
+  display: grid; place-items: center; color: var(--ink-3);
+  cursor: pointer; transition: all 0.15s;
+  flex-shrink: 0;
+}
+.mode-flow-link:hover {
+  border-color: var(--accent-ink); color: var(--accent-ink); background: var(--bg-2);
+  transform: scale(1.05);
+}
+.mode-desc { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+
+/* Primary CTA — Aurora Glass Gradient (오빠 결정 2026-05-02 · v3 옵션 B 채택)
+ * violet→blue 시그니처 + glass + 호버 시 left→right light sweep 0.7s
+ * 시스템 카드 (AI 보정) 와 톤 매칭 */
+.cta-primary {
+  all: unset; cursor: pointer; text-align: center;
+  background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+  color: #fff;
+  padding: 14px 22px; border-radius: var(--r-full);
+  font-size: 14px; font-weight: 600;
+  letter-spacing: 0.01em;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; box-sizing: border-box;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.cta-primary::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.7s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
+}
+.cta-primary:hover::before { transform: translateX(100%); }
+.cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 28px rgba(99,102,241,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.cta-primary > * { position: relative; z-index: 1; }
+/* Field label */
+.field-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.field-label {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+  display: inline-flex; align-items: baseline; gap: 8px;
+}
+.accent-bar { width: 3px; height: 12px; background: var(--accent); border-radius: 2px; position: relative; top: 1px; }
+.field-meta-link {
+  font-size: 11px; color: var(--ink-3); cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: none;
+}
+.field-meta-link:hover { color: var(--ink); }
+
+/* Prompt Shell */
+.prompt-shell {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-md); transition: border 0.15s;
+  box-shadow: var(--shadow-sm);
+}
+.prompt-textarea {
+  display: block; width: 100%; border: none; outline: none; resize: none;
+  background: transparent; padding: 14px 48px 44px 16px;
+  font-size: 14px; line-height: 1.6; color: var(--ink);
+  border-radius: var(--r-md); min-height: 110px;
+}
+.prompt-textarea::placeholder { color: var(--ink-4); }
+.prompt-history-btn, .prompt-tool-btn, .prompt-clear-icon {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  color: var(--ink-4); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  transition: all 0.12s;
+}
+.prompt-history-btn:hover, .prompt-tool-btn:hover, .prompt-clear-icon:hover {
+  color: var(--ink); border-color: var(--line-2);
+}
+.prompt-history-btn { position: absolute; top: 10px; right: 10px; }
+.prompt-tools-stack {
+  position: absolute; top: 46px; right: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.prompt-clear-icon { position: absolute; right: 10px; bottom: 10px; }
+
+/* ──────────────────────────────────────────────
+   V3 BASE — Aurora Glass (V3a/V3b/V3c 공유)
+   ────────────────────────────────────────────── */
+.v3 .toggle-card {
+  position: relative;
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 4px 16px rgba(23,20,14,.04);
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.v3 .toggle-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 32px rgba(23,20,14,.08); }
+.v3 .toggle-row {
+  display: flex; align-items: center; gap: 14px;
+  position: relative; z-index: 2;
+}
+.v3 .toggle-row .label-area {
+  display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0;
+}
+.v3 .toggle-row .label-area .label {
+  font-size: 12.5px; font-weight: 500; color: var(--ink-2);
+}
+.v3 .toggle-row .label-area .desc {
+  font-size: 10.5px; color: var(--ink-4);
+}
+.v3 .icon-box {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+  background: rgba(244,242,238,0.85); color: var(--ink-3);
+  font-size: 19px;
+  transition: all 0.25s; border: 1px solid rgba(232,229,223,0.8);
+}
+.v3 .toggle-card[data-active="true"] .icon-box {
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 14px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  border-color: transparent;
+}
+.v3 .toggle-card[data-active="true"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.6));
+  border-color: rgba(255,255,255,0.7);
+  box-shadow:
+    0 0 0 1px var(--card-from),
+    0 0 0 4px var(--card-glow),
+    0 8px 28px var(--card-shadow);
+}
+
+.v3 .toggle-switch {
+  position: relative; flex-shrink: 0;
+  width: 30px; height: 17px; border-radius: var(--r-full);
+  background: var(--line-2); transition: background 0.18s;
+}
+.v3 .toggle-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #fff; transition: left 0.18s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.v3 .toggle-card[data-active="true"] .toggle-switch {
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+}
+.v3 .toggle-card[data-active="true"] .toggle-switch::after { left: 15px; }
+
+/* signature colors */
+.v3 .ai-card { --card-from: #8B5CF6; --card-to: #3B82F6; --card-glow: rgba(139,92,246,0.10); --card-shadow: rgba(99,102,241,0.18); --card-mesh-a: rgba(139,92,246,0.12); --card-mesh-b: rgba(59,130,246,0.10); }
+.v3 .claude-card { --card-from: #F59E0B; --card-to: #FB923C; --card-glow: rgba(245,158,11,0.10); --card-shadow: rgba(245,158,11,0.18); --card-mesh-a: rgba(245,158,11,0.12); --card-mesh-b: rgba(251,146,60,0.10); }
+.v3 .fast-card { --card-from: #84CC16; --card-to: #06B6D4; --card-glow: rgba(132,204,22,0.10); --card-shadow: rgba(132,204,22,0.18); --card-mesh-a: rgba(132,204,22,0.12); --card-mesh-b: rgba(6,182,212,0.10); }
+.v3 .size-card-v {
+  --card-from: #F43F5E; --card-to: #EC4899;
+  --card-shadow: rgba(236,72,153,0.16);
+  --card-glow: rgba(236,72,153,0.08);
+  --card-mesh-a: rgba(244,63,94,0.08);
+  --card-mesh-b: rgba(236,72,153,0.06);
+}
+
+/* size card base */
+.v3 .size-card-v {
+  position: relative;
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 4px 16px rgba(23,20,14,.04);
+  overflow: hidden;
+  transition: all 0.25s;
+}
+.v3 .size-card-v:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 32px rgba(23,20,14,.08); }
+.v3 .size-card-v > * { position: relative; z-index: 2; }
+.v3 .size-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(232,229,223,0.8);
+}
+.v3 .size-header .icon-box {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 14px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  font-size: 19px;
+}
+.v3 .size-header .meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.v3 .size-header .meta .title { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.v3 .size-header .meta .chip { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-3); }
+
+/* segmented */
+.v3 .seg-wrap {
+  position: relative; display: inline-flex; padding: 3px;
+  background: rgba(0,0,0,0.04); border-radius: var(--r-full);
+  align-self: center; width: fit-content;
+  z-index: 2;
+}
+.v3 .seg-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: calc(50% - 3px); height: calc(100% - 6px);
+  background: var(--surface); border-radius: var(--r-full);
+  box-shadow: 0 0 0 0.5px rgba(74,158,255,.18), 0 1px 3px rgba(0,0,0,.06);
+  transition: transform 0.28s cubic-bezier(.32,.72,0,1);
+  pointer-events: none; z-index: 0;
+}
+.v3 .seg-wrap[data-value="precise"] .seg-thumb { transform: translateX(100%); }
+.v3 .toggle-card[data-active="true"] .seg-thumb {
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+}
+.v3 .seg-btn {
+  position: relative; z-index: 1; height: 28px; min-width: 92px; padding: 0 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em;
+  border-radius: var(--r-full); border: none; background: transparent;
+  color: var(--ink-3); transition: all 0.22s;
+}
+.v3 .seg-btn[data-active="true"] { color: var(--accent-ink); font-weight: 600; }
+.v3 .toggle-card[data-active="true"] .seg-btn[data-active="true"] { color: var(--card-from); }
+
+/* size card content */
+.v3 .size-row { display: flex; align-items: center; gap: 8px; }
+.v3 .size-col { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.v3 .dim-input { position: relative; width: 100%; }
+.v3 .dim-input span.label {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  color: var(--ink-4); pointer-events: none; font-weight: 500; letter-spacing: 0.04em;
+}
+.v3 .dim-input input {
+  width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 7px 10px 7px 22px; font-family: "JetBrains Mono", monospace;
+  font-size: 12px; background: rgba(255,255,255,0.7); color: var(--ink); outline: none;
+  text-align: right;
+}
+.v3 .lock-btn {
+  width: 30px; height: 30px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--bg);
+  color: var(--ink-2); display: grid; place-items: center;
+  cursor: pointer; align-self: center; flex-shrink: 0; transition: all 0.15s;
+}
+.v3 .lock-btn[data-locked="true"] {
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04));
+  border-color: var(--card-to); color: var(--card-to);
+}
+.v3 .range-input { width: 100%; accent-color: var(--accent); }
+.v3 .aspect-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 6px; margin-top: 8px;
+}
+.v3 .aspect-card {
+  all: unset; cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 4px 8px; height: 70px; box-sizing: border-box;
+  border: 1.5px solid var(--line); border-radius: var(--r-md);
+  background: rgba(255,255,255,0.7); transition: all 0.15s;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.v3 .aspect-card:hover { background: rgba(244,242,238,0.85); border-color: var(--line-2); }
+.v3 .aspect-card[data-active="true"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.7));
+  border-color: var(--card-from);
+}
+.v3 .aspect-card .mini-box { border: 1.5px solid var(--ink-3); border-radius: 2px; }
+.v3 .aspect-card[data-active="true"] .mini-box { border-color: var(--card-from); }
+.v3 .aspect-card .a-label {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.02em; color: var(--ink-2);
+}
+.v3 .aspect-card[data-active="true"] .a-label { color: var(--card-from); }
+
+/* ──────────────────────────────────────────────
+   V3a — Mesh gradient (이미지 X)
+   ────────────────────────────────────────────── */
+.v3a .toggle-card::after, .v3a .size-card-v::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, var(--card-mesh-a, transparent), transparent 55%),
+    radial-gradient(circle at 85% 100%, var(--card-mesh-b, transparent), transparent 55%);
+  opacity: 0; transition: opacity 0.35s; z-index: 1;
+}
+.v3a .toggle-card[data-active="true"]::after { opacity: 1; }
+.v3a .size-card-v::after { opacity: 0.6; }
+
+/* ──────────────────────────────────────────────
+   V3b — 이미지 배경 (우측 fade) · 토글 스위치 유지
+   ────────────────────────────────────────────── */
+.v3b .toggle-card::before, .v3b .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.55;
+  filter: saturate(0.55) brightness(0.95);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3b .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3b .size-card-v::before {
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+.v3b .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3b .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3b .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3b .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+/* V3b 활성 카드는 좌측 텍스트 영역에 더 강한 surface 톤 — 가독성 보호 */
+.v3b .toggle-card[data-active="true"] {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.85) 35%,
+    rgba(255,255,255,0.45) 60%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+.v3b .size-card-v {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.88) 50%,
+    rgba(255,255,255,0.4) 80%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+
+/* ──────────────────────────────────────────────
+   V3c — 이미지 배경 + 토글 스위치 X · 카드 전체 클릭
+       active indicator: 좌측 4px 시그니처 그라데이션 bar
+   ────────────────────────────────────────────── */
+.v3c .toggle-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.55;
+  filter: saturate(0.55) brightness(0.95);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3c .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3c .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3c .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3c .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3c .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+.v3c .toggle-card[data-active="true"] {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.85) 35%,
+    rgba(255,255,255,0.45) 60%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+.v3c .size-card-v {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.88) 50%,
+    rgba(255,255,255,0.4) 80%,
+    rgba(255,255,255,0.15) 100%
+  );
+  position: relative;
+}
+.v3c .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+/* 토글 스위치 숨김 */
+.v3c .toggle-card .toggle-switch { display: none; }
+
+/* 좌측 시그니처 bar (active indicator) */
+.v3c .toggle-card .card-bar {
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 0 3px 3px 0;
+  background: var(--ink-4);
+  transition: all 0.25s;
+  z-index: 2;
+}
+.v3c .toggle-card[data-active="true"] .card-bar {
+  background: linear-gradient(180deg, var(--card-from), var(--card-to));
+  box-shadow: 0 0 12px var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.4) inset;
+  width: 5px;
+}
+
+/* 카드 클릭 영역 명확화 — hover 시 살짝 더 lift */
+.v3c .toggle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 36px rgba(23,20,14,.10);
+}
+.v3c .toggle-card:active {
+  transform: translateY(0);
+  transition: transform 0.08s;
+}
+
+/* 카드 안 padding 약간 더 (스위치 자리 확보 → 텍스트 더 시원) */
+.v3c .toggle-card { padding-left: 18px; }
+
+/* ──────────────────────────────────────────────
+   V3c-2 — V3c 베이스 + 활성 카드 텍스트/버튼 강화
+   활성 시: 텍스트 진한 ink + 600 굵기 / segmented 불투명 chip 화
+   ────────────────────────────────────────────── */
+.v3c2 .toggle-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  border-radius: var(--r-card);
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.28;
+  filter: saturate(0.4) brightness(0.92);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3c2 .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3c2 .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3c2 .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3c2 .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3c2 .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+.v3c2 .toggle-card[data-active="true"] {
+  background: linear-gradient(100deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.85) 35%, rgba(255,255,255,0.45) 60%, rgba(255,255,255,0.15) 100%);
+}
+.v3c2 .size-card-v {
+  background: linear-gradient(100deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.88) 50%, rgba(255,255,255,0.4) 80%, rgba(255,255,255,0.15) 100%);
+  position: relative;
+}
+.v3c2 .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  border-radius: var(--r-card);
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+.v3c2 .toggle-card .toggle-switch { display: none; }
+.v3c2 .toggle-card .card-bar {
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 0 3px 3px 0;
+  background: var(--ink-4);
+  transition: all 0.25s;
+  z-index: 2;
+}
+.v3c2 .toggle-card[data-active="true"] .card-bar {
+  background: linear-gradient(180deg, var(--card-from), var(--card-to));
+  box-shadow: 0 0 12px var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.4) inset;
+  width: 5px;
+}
+.v3c2 .toggle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 36px rgba(23,20,14,.10);
+}
+.v3c2 .toggle-card:active {
+  transform: translateY(0);
+  transition: transform 0.08s;
+}
+.v3c2 .toggle-card { padding-left: 18px; }
+
+/* ── V3c-2 ONLY: 활성 카드 콘텐츠 강화 ── */
+
+/* 활성 카드 텍스트 → 진한 검정 (ink) + 600 굵기 */
+.v3c2 .toggle-card[data-active="true"] .label-area .label {
+  color: var(--ink);
+  font-weight: 600;
+}
+.v3c2 .toggle-card[data-active="true"] .label-area .desc {
+  color: var(--ink-2);
+}
+.v3c2 .size-card-v .meta .title {
+  color: var(--ink);
+  font-weight: 600;
+}
+.v3c2 .size-card-v .meta .chip {
+  color: var(--ink-2);
+}
+
+/* 활성 카드 segmented — 살짝 반투명 흰 box (비율 카드와 같은 톤 · 회색 dim 톤 회피) */
+.v3c2 .toggle-card[data-active="true"] .seg-wrap {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04);
+}
+.v3c2 .toggle-card[data-active="true"] .seg-thumb {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 0.5px var(--card-from),
+    0 2px 6px rgba(0,0,0,0.10),
+    0 1px 2px rgba(0,0,0,0.06);
+}
+.v3c2 .toggle-card[data-active="true"] .seg-btn[data-active="true"] {
+  color: var(--card-from);
+  font-weight: 600;
+}
+.v3c2 .toggle-card[data-active="true"] .seg-btn:not([data-active="true"]) {
+  color: var(--ink-2);
+}
+
+/* 사이즈 카드 안 input — 솔리드 흰색 (이미지 위에서 또렷이) */
+.v3c2 .size-card-v .dim-input input {
+  background: var(--surface);
+  border-color: var(--line-2);
+}
+
+/* 사이즈 카드 비율 카드 — active 시 더 또렷한 chip */
+.v3c2 .aspect-card .a-label { font-weight: 600; }
+.v3c2 .aspect-card[data-active="true"] {
+  background: var(--surface);
+  box-shadow: 0 0 0 0.5px var(--card-from), 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* ── V3c-2 미세조정 (오빠 피드백 · 2026-05-01) ── */
+/* 세로 bar 제거 — boder + glow + bg fade 만으로 활성 표시 */
+.v3c2 .toggle-card .card-bar { display: none; }
+/* 비활성 카드의 segmented 숨김 — 카드 활성 시에만 instant/thinking 노출 */
+.v3c2 .toggle-card[data-active="false"] .seg-wrap { display: none; }
+
+/* ── desc 텍스트 제거 + hover 툴팁 (오빠 피드백 · 2026-05-01) ── */
+.v3c2 .toggle-card .label-area .desc { display: none; }
+.v3c2 .toggle-card { overflow: visible; }
+.v3c2 .toggle-card[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  animation: ais-tooltip-in 0.18s ease;
+}
+@keyframes ais-tooltip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ──────────────────────────────────────────────
+   V5 — V4 (V3c-2) + 미세조정 3개 (오빠 피드백 · 2026-05-01)
+   비활성 아이콘박스 시그니처 컬러 tint · 사이즈 fade 35% → 42% · cursor hint
+   ────────────────────────────────────────────── */
+
+/* 1) 비활성 아이콘박스 — 시그니처 컬러 30% tint (회색 → 살짝 컬러 hint) */
+.v5 .ai-card .icon-box {
+  background: linear-gradient(135deg, rgba(139,92,246,0.14), rgba(59,130,246,0.08));
+  color: #6D4FE0;
+  border-color: rgba(139,92,246,0.20);
+}
+.v5 .claude-card .icon-box {
+  background: linear-gradient(135deg, rgba(245,158,11,0.14), rgba(251,146,60,0.08));
+  color: #B47600;
+  border-color: rgba(245,158,11,0.22);
+}
+.v5 .fast-card .icon-box {
+  background: linear-gradient(135deg, rgba(132,204,22,0.14), rgba(6,182,212,0.08));
+  color: #4D8C12;
+  border-color: rgba(132,204,22,0.22);
+}
+/* 활성 시는 V3 base 그대로 (그라데이션 fill — specificity 더 높음) */
+
+/* 2) 사이즈 카드 fade 35% → 22% (오빠 결정 2026-05-01 저녁 · v3 비교 후 B mask 채택)
+ *  사이즈 카드는 항상 활성이라 인물 좌측 22% 까지 노출 → 핑크 톤 + 인물 임팩트 모두. */
+.v5 .size-card-v::before {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 22%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 22%, black 95%);
+}
+
+/* 사이즈 카드 안 — slider + 자물쇠 핑크 시그니처 매칭 (옛 blue/indigo 잔재 제거) */
+.v5 .size-card-v .range-input {
+  accent-color: var(--card-from);
+}
+.v5 .size-card-v .lock-btn[data-locked="true"] {
+  background: linear-gradient(135deg, rgba(244,63,94,0.14), rgba(236,72,153,0.04));
+  border-color: var(--card-to);
+  color: var(--card-from);
+}
+
+/* 3) cursor hint — hover 시 살짝 더 lift + 미세 scale (클릭 명시) */
+.v5 .toggle-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 40px rgba(23,20,14,.10);
+}
+
+/* ──────────────────────────────────────────────
+   4) 활성 카드 효과 (오빠 결정 2026-05-01 저녁 · v3 비교 후 E padding + B mask 채택)
+   - 활성 토글 카드: padding 14px → 26px (E 옵션 — 미세 점프 거의 안 보임)
+   - 활성 카드 mask: 35% → 15% (B 옵션 — 인물 좌측 더 노출)
+   - transition cubic-bezier 0.35s — 자연스러운 ease (React 적용 시 framer-motion 으로 진짜 부드럽게)
+   - 사이즈 카드 padding 14px → 22px (정적 — 활성 개념 X)
+   ────────────────────────────────────────────── */
+.v5 .toggle-card {
+  transition: padding 0.35s cubic-bezier(.4,0,.2,1),
+              transform 0.25s cubic-bezier(.4,0,.2,1),
+              box-shadow 0.25s cubic-bezier(.4,0,.2,1);
+}
+.v5 .toggle-card[data-active="true"] {
+  padding: 38px 16px 38px 18px;
+}
+.v5 .toggle-card[data-active="true"]::before {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 15%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 15%, black 95%);
+}
+.v5 .size-card-v {
+  padding: 22px 16px;
+}
+
+/* ──────────────────────────────────────────────
+   수정 패널 — 원본 이미지 카드 (NEW · V5 톤 매칭)
+   16:9 풀 thumbnail + 그라데이션 오버레이 + 변경 버튼 + 메타
+   ────────────────────────────────────────────── */
+.edit-source-card {
+  position: relative;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+}
+.edit-source-card:hover {
+  transform: translateY(-1px) scale(1.005);
+  box-shadow: var(--shadow-md);
+}
+.edit-source-card .es-bg {
+  position: absolute; inset: 0;
+  background-image: url('assets/card-bg-ai.webp');
+  background-size: cover;
+  background-position: center;
+}
+.edit-source-card .es-grad {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%);
+}
+.edit-source-card .es-change-btn {
+  position: absolute; top: 10px; right: 10px;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.edit-source-card .es-change-btn:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+.edit-source-card .es-meta-bottom {
+  position: absolute; left: 16px; right: 56px; bottom: 12px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  color: #fff;
+  font-size: 11px;
+  z-index: 2;
+}
+.edit-source-card .es-meta-bottom .label {
+  font-weight: 600; font-size: 12.5px; letter-spacing: -0.01em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+.edit-source-card .es-meta-bottom .info {
+  opacity: 0.92; font-size: 10.5px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+/* ──────────────────────────────────────────────
+   수정 패널 — Multi-reference 토글 카드 (V5 톤 + slate/indigo 시그니처)
+   토글 ON 시 카드 *안*에 image2 thumbnail + crop overlay 펼쳐짐
+   ────────────────────────────────────────────── */
+
+/* Multi-ref 카드 시그니처 컬러 (fuchsia/magenta · 2026-05-02 갱신 · 핑크 가족 안 변별력 확보)
+ * 옛 rose-pink 와 hue 분리 — curator 패브릭 swatch 이미지 톤 매칭 */
+.v5 .multi-ref-card {
+  --card-from: #D946EF;
+  --card-to: #C026D3;
+  --card-glow: rgba(217,70,239,0.10);
+  --card-shadow: rgba(192,38,211,0.18);
+  --card-mesh-a: rgba(217,70,239,0.10);
+  --card-mesh-b: rgba(192,38,211,0.08);
+  --card-bg-image: url('assets/card-bg-multi-ref.webp');  /* fuchsia · curator + magenta swatch */
+}
+/* V5 비활성 아이콘박스 — fuchsia tint */
+.v5 .multi-ref-card .icon-box {
+  background: linear-gradient(135deg, rgba(217,70,239,0.14), rgba(192,38,211,0.08));
+  color: #A21CAF;
+  border-color: rgba(217,70,239,0.22);
+}
+
+/* 참조 이미지 영역 — 토글 ON 시 카드 안에 펼쳐지는 image2 슬롯 */
+.v5 .multi-ref-card .ref-image-area {
+  display: none;
+}
+.v5 .multi-ref-card[data-active="true"] .ref-image-area {
+  display: block;
+  margin-top: 4px;
+  position: relative;
+  z-index: 2;
+}
+.v5 .multi-ref-card .ref-image-thumb {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.v5 .multi-ref-card .ref-crop-frame {
+  position: absolute;
+  top: 14%; left: 15%; right: 15%; bottom: 30%;
+  border: 2px dashed rgba(255,255,255,0.85);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.22);
+}
+.v5 .multi-ref-card .ref-crop-label {
+  position: absolute;
+  top: 8px; left: 10px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 9.5px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  z-index: 3;
+}
+.v5 .multi-ref-card .ref-remove-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 3;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.10);
+}
+.v5 .multi-ref-card .ref-remove-btn:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+.v5 .multi-ref-card .ref-meta-bottom {
+  position: absolute;
+  left: 12px; right: 12px; bottom: 8px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  color: #fff;
+  font-size: 11px;
+  z-index: 2;
+}
+.v5 .multi-ref-card .ref-meta-bottom .label {
+  font-weight: 600; font-size: 11.5px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+.v5 .multi-ref-card .ref-meta-bottom .info {
+  opacity: 0.9; font-size: 10px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+/* ──────────────────────────────────────────────
+   자동 비교 분석 카드 (V5 톤 · teal → emerald · 5번째 시그니처)
+   "수정 후 자동 비교 분석" 토글 — 결과 완료 시 백그라운드 5축 평가
+   ────────────────────────────────────────────── */
+.v5 .auto-compare-card {
+  --card-from: #F59E0B;
+  --card-to: #FB923C;
+  --card-glow: rgba(245,158,11,0.10);
+  --card-shadow: rgba(245,158,11,0.18);
+  --card-mesh-a: rgba(245,158,11,0.12);
+  --card-mesh-b: rgba(251,146,60,0.10);
+  --card-bg-image: url('assets/card-bg-claude.webp');  /* 임시 — Claude 이미지 재사용 (새 amber evaluator 대기) */
+}
+.v5 .auto-compare-card .icon-box {
+  background: linear-gradient(135deg, rgba(245,158,11,0.14), rgba(251,146,60,0.08));
+  color: #B47600;
+  border-color: rgba(245,158,11,0.22);
+}
+
+/* ──────────────────────────────────────────────
+   참조 이미지 sub-section (multi-ref ON 시 카드 외부 별도 영역)
+   실제 EditLeftPanel.tsx + ReferenceImageBox.tsx 구조 그대로:
+   비율 chip 4 + 320px Cropper + zoom slider + 도움말 + 역할 chip 5
+   ────────────────────────────────────────────── */
+.reference-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+.accent-bar.accent-violet { background: #8B5CF6; }
+.field-label .ref-size {
+  font-size: 11px;
+  color: var(--ink-4);
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+/* 비율 chips (자유/1:1/4:3/9:16) */
+.aspect-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.aspect-chip {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 13px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.aspect-chip:hover { border-color: var(--line-2); background: var(--bg-2); }
+.aspect-chip[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* 320px crop UI (react-easy-crop 시각 시뮬레이션) */
+.ref-crop-area {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #0a0a0c;
+}
+.ref-crop-image {
+  position: absolute; inset: 0;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.ref-crop-handles {
+  position: absolute;
+  top: 14%; left: 14%; right: 14%; bottom: 14%;
+  border: 1px solid rgba(255,255,255,0.95);
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);
+  background: transparent;
+  cursor: move;
+}
+.ref-handle { position: absolute; width: 14px; height: 14px; }
+.ref-handle-tl { top: -1px; left: -1px; border-top: 2px solid #fff; border-left: 2px solid #fff; }
+.ref-handle-tr { top: -1px; right: -1px; border-top: 2px solid #fff; border-right: 2px solid #fff; }
+.ref-handle-bl { bottom: -1px; left: -1px; border-bottom: 2px solid #fff; border-left: 2px solid #fff; }
+.ref-handle-br { bottom: -1px; right: -1px; border-bottom: 2px solid #fff; border-right: 2px solid #fff; }
+.ref-crop-remove {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s;
+}
+.ref-crop-remove:hover { background: rgba(0,0,0,0.85); }
+
+/* zoom slider */
+.ref-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.ref-zoom-label { width: 40px; }
+.ref-zoom-input { flex: 1; accent-color: var(--accent); }
+.ref-zoom-val { width: 50px; text-align: right; font-size: 10.5px; }
+
+/* 도움말 */
+.ref-help {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  line-height: 1.6;
+}
+.ref-warn { color: #C08400; }
+
+/* 역할 선택 (face / outfit / style / background / custom) */
+.ref-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ref-roles-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ref-roles-hint {
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ink-4);
+  margin-left: 6px;
+}
+.ref-roles-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.role-chip {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.role-chip:hover { border-color: var(--line-2); background: var(--bg-2); }
+.role-chip[data-active="true"] {
+  border-color: #8B5CF6;
+  background: #EDE9FE;
+  color: #6D4FE0;
+  font-weight: 600;
+}
+
+/* ──────────────────────────────────────────────
+   분석 패널 (Vision Analyze) — 안내 배너
+   ────────────────────────────────────────────── */
+.info-banner {
+  padding: 14px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.55;
+}
+.info-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.info-banner-body { color: var(--ink-3); }
+.info-banner-body strong { color: var(--ink-2); font-weight: 600; }
+
+/* ──────────────────────────────────────────────
+   비교 패널 (Vision Compare) — A/B 배지 + 스왑 버튼
+   ────────────────────────────────────────────── */
+.badge-ab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+.badge-ab.badge-b { background: linear-gradient(135deg, #F59E0B, #FB923C); }
+
+/* compare-slot 카드 active 시 시그니처 컬러 (옵션) */
+.compare-slot-a { /* A 슬롯 — violet 톤 살짝 */ }
+.compare-slot-b { /* B 슬롯 — amber 톤 살짝 */ }
+
+.swap-btn-wrap {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0 -4px;
+}
+.swap-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.swap-btn:hover {
+  background: var(--surface);
+  border-color: var(--line-2);
+  transform: scale(1.02);
+}
+
+.optional-hint {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* ──────────────────────────────────────────────
+   영상 패널 (Video) — 해상도 슬라이더 + 성인 모드 시그니처
+   ────────────────────────────────────────────── */
+.video-res-section {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.vrs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.vrs-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.vrs-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* video-res-card (사이즈 카드 패턴 재사용) — actions 우측 정렬 + 슬라이더 위 여백 */
+.video-res-card .vrs-actions {
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+.vrs-original {
+  all: unset;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--ink-2);
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.vrs-original:hover { background: var(--surface); border-color: var(--line-2); }
+
+.vrs-speed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.vrs-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+/* 속도 톤 — fast (cyan) / standard (amber) / quality (rose) */
+.vrs-speed-fast {
+  background: rgba(6,182,212,0.10);
+  border: 1px solid rgba(6,182,212,0.32);
+  color: #0E7490;
+}
+.vrs-speed-fast .vrs-dot { background: #06B6D4; }
+
+.vrs-input {
+  width: 100%;
+  accent-color: #F43F5E;  /* 사이즈 시그니처 rose/pink 매칭 */
+  cursor: pointer;
+}
+.vrs-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--ink-4);
+  margin-top: 2px;
+}
+.vrs-ticks .vrs-current {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.vrs-info {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+.vrs-info .vrs-out {
+  color: #BE185D;  /* 사이즈 시그니처 pink-ink 매칭 */
+  font-weight: 600;
+}
+.vrs-info .vrs-ratio { color: var(--ink-4); }
+
+/* 성인 모드 카드 — 새 시그니처 crimson (경고/restricted 톤) */
+.v5 .adult-card {
+  --card-from: #DC2626;
+  --card-to: #F87171;
+  --card-glow: rgba(220,38,38,0.10);
+  --card-shadow: rgba(220,38,38,0.18);
+  --card-mesh-a: rgba(220,38,38,0.10);
+  --card-mesh-b: rgba(248,113,113,0.08);
+  --card-bg-image: url('assets/card-bg-adult.webp');  /* crimson · sultry editorial */
+}
+.v5 .adult-card .icon-box {
+  background: linear-gradient(135deg, rgba(220,38,38,0.14), rgba(248,113,113,0.08));
+  color: #B91C1C;
+  border-color: rgba(220,38,38,0.20);
+}
+
+/* 성인 모드 — 활성 시 16:9 비율로 카드 늘어남 (원본 인물 풀 노출 + 추후 문구 자리 확보)
+ *  aspect-ratio 16/9 → 카드 width 400px 기준 height ≈ 225px
+ *  다른 활성 카드는 padding 38px 만 (~100px 높이) — adult 만 차별화
+ *  transition 도 16/9 변화 자연스럽게 — aspect-ratio 는 transition 안 되지만
+ *  padding/box 변화로 점진 확장 효과 */
+.v5 .adult-card[data-active="true"] {
+  aspect-ratio: 16 / 9;
+}
+
+/* 영상 해상도 카드 시그니처 (warm coral · 2026-05-02 분리 · 사이즈 페어 의도 깨고 변별력 우선)
+ * .size-card-v 의 rose-pink 변수를 specificity 더 높은 .video-res-card 에서 override
+ * cinematographer + 클래퍼보드 이미지 톤 (warm coral/peach) 매칭 */
+.v5 .video-res-card {
+  --card-from: #FB923C;
+  --card-to: #F472B6;
+  --card-glow: rgba(251,146,60,0.10);
+  --card-shadow: rgba(244,114,182,0.18);
+  --card-mesh-a: rgba(251,146,60,0.10);
+  --card-mesh-b: rgba(244,114,182,0.08);
+  --card-bg-image: url('assets/card-bg-video-res.webp');  /* warm coral · cinematographer + 클래퍼보드 */
+}
+
+/* ── Spec Footer ── */
+.spec-footer {
+  margin: 22px 4px 0 4px;
+  padding: 14px 14px 12px;
+  background: rgba(0,0,0,0.025);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  font-size: 11px; color: var(--ink-3); line-height: 1.7;
+}
+.spec-footer h4 {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-4); margin-bottom: 6px; font-weight: 500;
+}
+.spec-footer code {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+  background: rgba(0,0,0,0.04); padding: 1px 5px; border-radius: 3px;
+  color: var(--ink-2);
+}
+
+.global-note {
+  max-width: 1380px; margin: 0 auto;
+  padding: 24px 40px 60px;
+  font-size: 12px; color: var(--ink-3); line-height: 1.8;
+  border-top: 1px dashed var(--line);
+}
+.global-note h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic; font-weight: 500; font-size: 18px; color: var(--ink);
+  letter-spacing: -0.01em; margin-bottom: 10px;
+}
+.global-note ul { padding-left: 20px; margin: 8px 0; }
+.global-note code {
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  background: var(--bg-2); padding: 2px 6px; border-radius: 4px;
+  color: var(--ink-2);
+}
+
+.ic { width: 14px; height: 14px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+.ic-lg { width: 18px; height: 18px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <div>
+    <h1 class="page-title"><span class="display">Studio</span> Design Test <span class="display" style="font-size:18px; color:var(--ink-3); margin-left:8px;">v2</span></h1>
+    <p class="page-sub">V5 톤 5 패널 풀 시안 — 생성 · 수정 · 분석 · 비교 · 영상</p>
+  </div>
+  <div class="page-meta">
+    <span class="pill">cards-v2</span>
+    <span><span class="mono">2026-05-01</span></span>
+    <span>좌측 패널 너비 <span class="mono">400px</span></span>
+  </div>
+</header>
+
+<main class="grid">
+
+  <!-- ════════════════════════ 생성 (V5 · final fix) ════════════════════════ -->
+  <section class="panel v3 v3c2 v5">
+    <div class="legend">
+      <strong>이미지 생성 모드</strong> &nbsp;프롬프트 → ComfyUI Qwen Image · AI 보정 (instant/thinking) · Claude 조사 · 빠른 모드 · 사이즈
+    </div>
+
+    <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-eyebrow">IMAGE STUDIO · GENERATE</div>
+        <div class="mode-title-row">
+          <h2 class="mode-title"><strong>생성</strong> · Generate</h2>
+          <button class="mode-flow-link"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+        </div>
+        <p class="mode-desc">프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다.</p>
+      </div>
+
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          Generate
+        </button>
+      </div>
+
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>프롬프트</span>
+          <button class="field-meta-link"><svg class="ic" viewBox="0 0 24 24" style="width:11px;height:11px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>라이브러리에서 선택</button>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <div class="prompt-tools-stack">
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+          </div>
+          <textarea class="prompt-textarea" rows="3" placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."></textarea>
+        </div>
+      </div>
+
+      <div class="toggle-card ai-card" data-active="true">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9z"/></svg></span>
+          <span class="label-area">
+            <span class="label">🪄 AI 프롬프트 보정</span>
+            <span class="desc">ON · 한국어/자연어 → 영문 정제 (기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+        <div class="seg-wrap" data-value="fast">
+          <span class="seg-thumb"></span>
+          <button class="seg-btn" data-value="fast" data-active="true">instant</button>
+          <button class="seg-btn" data-value="precise" data-active="false">thinking</button>
+        </div>
+      </div>
+
+      <div class="toggle-card claude-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+          <span class="label-area">
+            <span class="label">🔍 Claude 프롬프트 조사</span>
+            <span class="desc">Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <div class="toggle-card fast-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M2 9h20"/><path d="M9 9l3-6 3 6"/></svg></span>
+          <span class="label-area">
+            <span class="label">💎 퀄리티 모드</span>
+            <span class="desc">ON 시 Lightning 4-step 끄고 풀 디테일 · 약 4배 느림</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <div class="size-card-v">
+        <div class="size-header">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M9 3v18"/></svg></span>
+          <span class="meta">
+            <span class="title">사이즈</span>
+            <span class="chip">1328×744 · 16:9</span>
+          </span>
+        </div>
+        <div class="size-row">
+          <div class="size-col">
+            <div class="dim-input"><span class="label">W</span><input type="text" value="1328" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="1328">
+          </div>
+          <button class="lock-btn" data-locked="true"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+          <div class="size-col">
+            <div class="dim-input"><span class="label">H</span><input type="text" value="744" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="744" disabled>
+          </div>
+        </div>
+        <div class="aspect-grid">
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:38px"></span><span class="a-label">1:1</span></button>
+          <button class="aspect-card" data-active="true"><span class="mini-box" style="width:38px;height:21px"></span><span class="a-label">16:9</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:21px;height:38px"></span><span class="a-label">9:16</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:28.5px"></span><span class="a-label">4:3</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · 생성 패널 (V5 · final fix)</h4>
+      카드 클릭 = ON/OFF · desc 제거 + hover 툴팁 · segmented 활성 시만 노출<br>
+      비활성 아이콘박스 → <code>시그니처 컬러 tint</code> (violet/amber/cyan/slate)<br>
+      사이즈 카드 fade <code>42%</code> · 인물 우측 (컨트롤 영역 보호)<br>
+      hover lift + scale 1.005 (클릭 명시) · 비활성 이미지 <code>opacity 0.28</code><br>
+      가독성 <code>★★★★★</code> · 시각 임팩트 <code>★★★★★</code> · 정체성 <code>★★★★★</code>
+    </div>
+  </section>
+
+  <!-- ════════════════════════ 수정 패널 (V5 톤 · 실제 EditLeftPanel.tsx 구조 충실) ════════════════════════ -->
+  <section class="panel v3 v3c2 v5">
+    <div class="legend">
+      <strong>실제 EditLeftPanel.tsx 구조 매칭</strong> &nbsp;카드 6개 + (참조 ON 시) <strong>카드 외부 별도 sub-section</strong> (4 비율 chip + 320px crop UI + zoom + 도움말 + 역할 5 chip)
+    </div>
+
+    <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-eyebrow">IMAGE STUDIO · EDIT</div>
+        <div class="mode-title-row">
+          <h2 class="mode-title"><strong>수정</strong> · Edit</h2>
+          <button class="mode-flow-link"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+        </div>
+        <p class="mode-desc">원본 이미지와 수정 지시로 새로운 결과 이미지를 만듭니다.</p>
+      </div>
+
+      <!-- 1. CTA -->
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          Edit
+        </button>
+      </div>
+
+      <!-- 2. 원본 이미지 -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>원본 이미지</span>
+          <button class="field-meta-link"><svg class="ic" viewBox="0 0 24 24" style="width:11px;height:11px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>히스토리에서 선택</button>
+        </div>
+        <div class="edit-source-card">
+          <div class="es-bg"></div>
+          <div class="es-grad"></div>
+          <button class="es-change-btn" title="이미지 변경"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+          <div class="es-meta-bottom">
+            <span class="label">portrait_violet.png</span>
+            <span class="info mono">1672 × 941 · PNG</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 수정 지시 -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>수정 지시</span>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <div class="prompt-tools-stack">
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+          </div>
+          <textarea class="prompt-textarea" rows="3" placeholder="어떻게 수정할까요? 예: 배경을 바다로 바꿔주세요"></textarea>
+        </div>
+      </div>
+
+      <!-- 4. AI 보정 (V5 violet/blue · Edit 필수 · disabled checked · segmented 항상 노출) -->
+      <div class="toggle-card ai-card" data-active="true">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9z"/></svg></span>
+          <span class="label-area">
+            <span class="label">🪄 AI 프롬프트 보정</span>
+            <span class="desc">ON · 한국어/자연어 → 영문 정제 (Edit 필수)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+        <div class="seg-wrap" data-value="fast">
+          <span class="seg-thumb"></span>
+          <button class="seg-btn" data-value="fast" data-active="true">instant</button>
+          <button class="seg-btn" data-value="precise" data-active="false">thinking</button>
+        </div>
+      </div>
+
+      <!-- 5. 자동 비교 분석 (V5 teal/emerald · AI 도구 그룹 다음) -->
+      <div class="toggle-card auto-compare-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v3l2 1"/></svg></span>
+          <span class="label-area">
+            <span class="label">📊 결과 자동 평가</span>
+            <span class="desc">결과 완료 시 5축 자동 평가 (VRAM&gt;13GB 시 자동 skip)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 6. 퀄리티 모드 (생성과 동일 패턴 · OFF 기본 = Lightning 4-step ON · ON = Lightning OFF 풀 퀄리티) -->
+      <div class="toggle-card fast-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M2 9h20"/><path d="M9 9l3-6 3 6"/></svg></span>
+          <span class="label-area">
+            <span class="label">💎 퀄리티 모드</span>
+            <span class="desc">ON 시 Lightning 4-step 끄고 풀 디테일 · 약 4배 느림</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 7. 추가 참조 이미지 (multi-ref 토글) — OFF 시 하단 참조 영역 비노출 -->
+      <div class="toggle-card multi-ref-card" data-active="true">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.5-3.5L11 18"/></svg></span>
+          <span class="label-area">
+            <span class="label">🖼️ 추가 참조 이미지</span>
+            <span class="desc">두 번째 이미지로 의상 / 배경 / 스타일 참조</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 8. (참조 ON 시) 참조 이미지 sub-section — 카드 외부 별도 영역 (실제 EditLeftPanel.tsx 의 구조 그대로) -->
+      <div class="reference-section">
+        <div class="field-header">
+          <span class="field-label">
+            <span class="accent-bar accent-violet"></span>참조 이미지
+            <span class="ref-size mono">1672×941</span>
+          </span>
+          <button class="field-meta-link"><svg class="ic" viewBox="0 0 24 24" style="width:11px;height:11px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>라이브러리에서 선택</button>
+        </div>
+
+        <!-- 비율 chips (자유/1:1/4:3/9:16) -->
+        <div class="aspect-chips">
+          <button class="aspect-chip" data-active="true">자유</button>
+          <button class="aspect-chip" data-active="false">1:1</button>
+          <button class="aspect-chip" data-active="false">4:3</button>
+          <button class="aspect-chip" data-active="false">9:16</button>
+        </div>
+
+        <!-- 320px crop UI (이미지 + 외부 dim + crop frame + corner handles + 제거 버튼) -->
+        <div class="ref-crop-area">
+          <div class="ref-crop-image" style="background-image: url('assets/card-bg-claude.webp');"></div>
+          <div class="ref-crop-handles" title="드래그로 영역 이동">
+            <span class="ref-handle ref-handle-tl"></span>
+            <span class="ref-handle ref-handle-tr"></span>
+            <span class="ref-handle ref-handle-bl"></span>
+            <span class="ref-handle ref-handle-br"></span>
+          </div>
+          <button class="ref-crop-remove" title="참조 해제"><svg class="ic" viewBox="0 0 24 24" style="width:14px;height:14px"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+        </div>
+
+        <!-- zoom slider -->
+        <div class="ref-zoom-row">
+          <span class="ref-zoom-label">zoom</span>
+          <input type="range" class="ref-zoom-input" min="1" max="3" step="0.05" value="1.20">
+          <span class="ref-zoom-val mono">1.20x</span>
+        </div>
+
+        <!-- 도움말 (실제 ReferenceImageBox 의 도움말 그대로) -->
+        <div class="ref-help">
+          드래그로 영역 이동 · 휠/슬라이더로 확대<br>
+          <span class="ref-warn">⚠ 256px 미만 영역은 자동 무효 — 원본 이미지가 그대로 전송됩니다</span>
+        </div>
+
+        <!-- 역할 선택 (face/outfit/style/background/custom — ReferenceRoleSelect) -->
+        <div class="ref-roles">
+          <div class="ref-roles-label">참조 역할 <span class="ref-roles-hint">— 가장 명확한 의도 선택</span></div>
+          <div class="ref-roles-chips">
+            <button class="role-chip" data-active="false">얼굴 (face)</button>
+            <button class="role-chip" data-active="true">의상 (outfit)</button>
+            <button class="role-chip" data-active="false">스타일 (style)</button>
+            <button class="role-chip" data-active="false">배경 (background)</button>
+            <button class="role-chip" data-active="false">커스텀</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · 수정 패널 (실제 EditLeftPanel.tsx 구조)</h4>
+      카드 순서: <code>원본 → 수정지시 → AI 보정 → 자동평가 → 퀄리티 → 추가참조</code><br>
+      AI 보정 → <strong>Edit 필수</strong> (disabled checked · segmented 항상 노출)<br>
+      자동 평가 → Claude 와 동일 <strong>amber/orange</strong> 시그니처 (분석 도구 그룹)<br>
+      참조 ON 시 → <strong>카드 외부 별도 sub-section</strong>: 비율 chip 4 + 320px crop UI + zoom slider + 도움말 + 역할 chip 5<br>
+      카드 일관성 <code>★★★★★</code>
+    </div>
+  </section>
+
+  <!-- ════════════════════════ 분석 패널 (Vision Analyze · V5 톤) ════════════════════════ -->
+  <section class="panel v3 v3c2 v5">
+    <div class="legend">
+      <strong>이미지 분석 모드</strong> &nbsp;단일 이미지 → 프롬프트 엔지니어 어조 설명 (40~120 단어 영문 + 한글 번역) · qwen2.5vl
+    </div>
+
+    <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-eyebrow">IMAGE STUDIO · ANALYZE</div>
+        <div class="mode-title-row">
+          <h2 class="mode-title"><strong>분석</strong> · Vision</h2>
+        </div>
+        <p class="mode-desc">이미지 한 장의 구도, 분위기, 품질을 분석하고 번역합니다.</p>
+      </div>
+
+      <!-- 1. CTA (상단 — 시각 통일) -->
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          Analyze
+        </button>
+      </div>
+
+      <!-- 2. 원본 이미지 -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>원본 이미지</span>
+        </div>
+        <div class="edit-source-card">
+          <div class="es-bg" style="background-image: url('assets/card-bg-fast.webp');"></div>
+          <div class="es-grad"></div>
+          <button class="es-change-btn" title="이미지 변경"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+          <div class="es-meta-bottom">
+            <span class="label">portrait_cyan.png</span>
+            <span class="info mono">1672 × 941 · PNG</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 안내 배너 (Vision 기능 설명) -->
+      <div class="info-banner">
+        <div class="info-banner-title">
+          <svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          이미지 → 프롬프트 엔지니어 어조 설명
+        </div>
+        <div class="info-banner-body">
+          40~120 단어 <strong>영문 + 한글 번역</strong>으로 추출합니다. 결과를 복사해 <strong>생성</strong> 페이지 프롬프트에 그대로 붙여 넣어 사용하실 수 있습니다.
+        </div>
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · 분석 패널 (Vision Analyze)</h4>
+      카드 매우 간소: <code>이미지 + CTA + 안내 배너</code> 만 (옵션 X)<br>
+      qwen2.5vl 단일 호출 · ~8s 소요 · 결과 복사 → 생성 페이지 프롬프트로 활용<br>
+      카드 일관성 <code>★★★★★</code>
+    </div>
+  </section>
+
+  <!-- ════════════════════════ 비교 패널 (Vision Compare · V5 톤) ════════════════════════ -->
+  <section class="panel v3 v3c2 v5">
+    <div class="legend">
+      <strong>이미지 비교 모드</strong> &nbsp;두 이미지 A·B → 5축 비교 분석 (구도/색감/디테일/조명/분위기) · qwen2.5vl
+    </div>
+
+    <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-eyebrow">IMAGE STUDIO · COMPARE</div>
+        <div class="mode-title-row">
+          <h2 class="mode-title"><strong>비교</strong> · Compare</h2>
+        </div>
+        <p class="mode-desc">두 이미지의 차이와 품질을 5축 기준으로 비교합니다.</p>
+      </div>
+
+      <!-- 1. CTA (상단 — 5 패널 통일) -->
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          Compare
+        </button>
+      </div>
+
+      <!-- 2. 이미지 A 슬롯 -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>이미지 A <span class="badge-ab">A</span></span>
+        </div>
+        <div class="edit-source-card compare-slot-a">
+          <div class="es-bg" style="background-image: url('assets/card-bg-ai.webp');"></div>
+          <div class="es-grad"></div>
+          <button class="es-change-btn" title="이미지 변경"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+          <div class="es-meta-bottom">
+            <span class="label">image_violet.png</span>
+            <span class="info mono">1672 × 941 · PNG</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- A↔B 스왑 -->
+      <div class="swap-btn-wrap">
+        <button class="swap-btn">
+          <svg class="ic" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M7 16V4M3 8l4-4 4 4M17 8v12M21 16l-4 4-4-4"/></svg>
+          A ↔ B 자리 바꾸기
+        </button>
+      </div>
+
+      <!-- 3. 이미지 B 슬롯 -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>이미지 B <span class="badge-ab badge-b">B</span></span>
+        </div>
+        <div class="edit-source-card compare-slot-b">
+          <div class="es-bg" style="background-image: url('assets/card-bg-claude.webp');"></div>
+          <div class="es-grad"></div>
+          <button class="es-change-btn" title="이미지 변경"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+          <div class="es-meta-bottom">
+            <span class="label">image_amber.png</span>
+            <span class="info mono">1672 × 941 · PNG</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. 비교 지시 (선택) -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>비교 지시 <span class="optional-hint">(선택)</span></span>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <textarea class="prompt-textarea" rows="3" placeholder="예: 의상 차이에 집중해 주세요 / 색감 변화 위주로 비교"></textarea>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · 비교 패널 (Vision Compare)</h4>
+      <strong>CTA 상단 통일</strong> + 이미지 A/B 두 슬롯 + A↔B 스왑 버튼 + 비교 지시 (선택)<br>
+      A/B 배지로 슬롯 시각 구분 (badge violet/amber)<br>
+      qwen2.5vl 5축 평가: 구도 · 색감 · 디테일 · 조명 · 분위기
+    </div>
+  </section>
+
+  <!-- ════════════════════════ 영상 생성 패널 (Video Generate · V5 톤) ════════════════════════ -->
+  <section class="panel v3 v3c2 v5">
+    <div class="legend">
+      <strong>영상 생성 모드</strong> &nbsp;원본 이미지 + 영상 지시 → 5초 MP4 (LTX-2.3 i2v · 16GB VRAM)
+    </div>
+
+    <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-eyebrow">IMAGE STUDIO · VIDEO</div>
+        <div class="mode-title-row">
+          <h2 class="mode-title"><strong>영상</strong> · Video</h2>
+          <button class="mode-flow-link"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+        </div>
+        <p class="mode-desc">원본 이미지와 영상 지시로 5초 MP4를 생성합니다.</p>
+      </div>
+
+      <!-- 1. CTA (sticky 상단) -->
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          Render
+        </button>
+      </div>
+
+      <!-- 2. 원본 이미지 -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>원본 이미지</span>
+        </div>
+        <div class="edit-source-card">
+          <div class="es-bg" style="background-image: url('assets/card-bg-size.webp');"></div>
+          <div class="es-grad"></div>
+          <button class="es-change-btn" title="이미지 변경"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+          <div class="es-meta-bottom">
+            <span class="label">portrait_pink.png</span>
+            <span class="info mono">1672 × 941 · PNG</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. 영상 지시 -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>영상 지시</span>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <div class="prompt-tools-stack">
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+          </div>
+          <textarea class="prompt-textarea" rows="3" placeholder="어떤 움직임/카메라/분위기? 예: 느린 달리 인, 창가 빛 변화..."></textarea>
+        </div>
+      </div>
+
+      <!-- 4. AI 보정 (V5 violet · OFF default 영상) -->
+      <div class="toggle-card ai-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9z"/></svg></span>
+          <span class="label-area">
+            <span class="label">🪄 AI 프롬프트 보정</span>
+            <span class="desc">OFF · 정제된 영문 그대로 (~15초 절약 · 기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 5. 퀄리티 모드 (V5 lime/cyan) -->
+      <div class="toggle-card fast-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M2 9h20"/><path d="M9 9l3-6 3 6"/></svg></span>
+          <span class="label-area">
+            <span class="label">💎 퀄리티 모드</span>
+            <span class="desc">Lightning 4-step · 약 5분 · 얼굴 변할 수 있음 (기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 6. 성인 모드 (V5 crimson · 새 시그니처) -->
+      <div class="toggle-card adult-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M9 9h.01M15 9h.01M9 15c1 1 2 1.5 3 1.5s2-.5 3-1.5"/></svg></span>
+          <span class="label-area">
+            <span class="label">🔞 성인 모드</span>
+            <span class="desc">SFW 프롬프트 · 얼굴 보존 안정 (OFF 기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 7. 영상 해상도 (맨 아래 · .size-card-v 패턴 · 핑크 시그니처 + 이미지 · 사이즈 카드와 동일 톤) -->
+      <div class="size-card-v video-res-card">
+        <div class="size-header">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M9 3v18"/></svg></span>
+          <span class="meta">
+            <span class="title">영상 해상도</span>
+            <span class="chip">긴 변 1024px · 16:9</span>
+          </span>
+        </div>
+
+        <div class="vrs-actions">
+          <button class="vrs-original">📐 원본 크기</button>
+          <span class="vrs-speed-chip vrs-speed-fast">
+            <span class="vrs-dot"></span>빠름
+          </span>
+        </div>
+
+        <input type="range" class="vrs-input" min="512" max="1536" step="128" value="1024">
+
+        <div class="vrs-ticks mono">
+          <span>512</span>
+          <span class="vrs-current">긴 변 1024px</span>
+          <span>1536</span>
+        </div>
+
+        <div class="vrs-info">
+          원본 <span class="mono">1672×941</span> → 출력 <span class="mono vrs-out">1024×576</span> <span class="vrs-ratio">(16:9)</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · 영상 패널 (Video Generate · LTX-2.3 i2v)</h4>
+      카드 순서: <code>원본 → 영상지시 → AI 보정 → 해상도 → 퀄리티 → 성인</code><br>
+      AI 보정 → <strong>OFF 기본</strong> (Video 는 ~15초 절약 · 옵션) · 다른 패널과 패턴 동일<br>
+      해상도 슬라이더: <code>512~1536px</code> 긴 변 · 원본 비율 유지 · 속도 chip (빠름/표준/고품질)<br>
+      성인 모드 → <strong>NEW crimson 시그니처</strong> (#DC2626 → #F87171 · 경고 톤) · 6번째 색
+    </div>
+  </section>
+
+</main>
+
+<aside class="global-note">
+  <h3>V5 톤 5 패널 풀 시안</h3>
+  <p>모든 패널 V5 Aurora Glass 톤 · 시그니처 컬러 6종 · 카드 전체 클릭 · hover 툴팁 · 카드 일관성.</p>
+  <ul>
+    <li><strong>생성 (Generate)</strong> — 프롬프트 → Qwen Image · AI 보정 · Claude 조사 · 퀄리티 모드 · 사이즈</li>
+    <li><strong>수정 (Edit)</strong> — 원본 + 수정 지시 → Qwen Image Edit · AI 보정 (필수) · 자동 평가 · 퀄리티 · 추가 참조 (참조 ON 시 sub-section)</li>
+    <li><strong>분석 (Vision Analyze)</strong> — 단일 이미지 → 영문/한글 설명 (40~120 단어) · 매우 간소 (이미지 + CTA)</li>
+    <li><strong>비교 (Vision Compare)</strong> — 이미지 A·B → 5축 비교 · A↔B 스왑 + 비교 지시 (선택)</li>
+    <li><strong>영상 (Video Generate)</strong> — 원본 + 영상 지시 → 5초 MP4 (LTX-2.3 i2v) · AI 보정 · 해상도 슬라이더 · 퀄리티 · 성인 모드 (NEW crimson 시그니처)</li>
+  </ul>
+  <p style="margin-top:14px;"><strong>시그니처 컬러 6종</strong> — AI=violet/blue · Claude/자동평가=amber/orange · 퀄리티=lime/cyan · 사이즈/추가참조=rose/pink · 성인=crimson/red.</p>
+  <p style="margin-top:14px;"><strong>인터랙션 데모</strong> — 모든 변형:</p>
+  <ul>
+    <li>카드 클릭 → ON/OFF 토글 (V3a/V3b 는 스위치 클릭과 동일 / V3c 는 유일한 클릭 방법)</li>
+    <li>instant/thinking 클릭 → 카드 토글 영향 없이 thumb 슬라이드 (<code>e.stopPropagation()</code>)</li>
+    <li>비율 카드 클릭 → 4 가운데 active 변경</li>
+    <li>비율잠금 클릭 → 잠금/해제 (e.stopPropagation 으로 사이즈 카드 영향 X)</li>
+  </ul>
+  <p style="margin-top:14px; color:var(--ink-4); font-size:11px;">
+    💡 <strong>다음 단계</strong> — 결정된 변형으로 React 코드 적용:<br>
+    <code>frontend/app/globals.css</code> · <code>frontend/components/studio/generate/GenerateLeftPanel.tsx</code> · <code>frontend/components/studio/generate/SizeCard.tsx</code> · <code>frontend/components/ui/primitives.tsx</code> (Toggle flat prop)
+  </p>
+</aside>
+
+<script>
+// 카드 클릭 → ON/OFF 토글 (segmented/aspect/lock 클릭은 stopPropagation 으로 제외)
+document.querySelectorAll('.toggle-card').forEach(card => {
+  card.addEventListener('click', e => {
+    if (e.target.closest('.seg-btn')) return;  // segmented stopPropagation 으로도 막혀있지만 이중 안전
+    const active = card.dataset.active === 'true';
+    card.dataset.active = !active;
+  });
+});
+
+// Segmented (instant/thinking) → thumb 슬라이드 (카드 토글 차단)
+document.querySelectorAll('.seg-wrap').forEach(wrap => {
+  wrap.addEventListener('click', e => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    const value = btn.dataset.value;
+    wrap.dataset.value = value;
+    wrap.querySelectorAll('.seg-btn').forEach(b => {
+      b.dataset.active = (b.dataset.value === value);
+    });
+  });
+});
+
+// 비율 카드 → active 전환
+document.querySelectorAll('.aspect-grid').forEach(grid => {
+  grid.addEventListener('click', e => {
+    const card = e.target.closest('.aspect-card');
+    if (!card) return;
+    e.stopPropagation();
+    grid.querySelectorAll('.aspect-card').forEach(c => c.dataset.active = "false");
+    card.dataset.active = "true";
+  });
+});
+
+// 비율잠금 토글
+document.querySelectorAll('.lock-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const locked = btn.dataset.locked === 'true';
+    btn.dataset.locked = !locked;
+  });
+});
+
+// V3c-2 hover 툴팁 — desc 텍스트 제거 후 카드 hover 시 검정 pill 으로 표시
+const V3C2_TIPS = {
+  'ai-card':           'ON · 한국어/자연어 → 영문 정제',
+  'claude-card':       'Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s',
+  'fast-card':         'ON 시 Lightning 4-step 끄고 풀 디테일 · 약 4배 느림',
+  'multi-ref-card':    '두 번째 이미지로 의상 / 배경 / 스타일 참조',
+  'auto-compare-card': '결과 완료 시 5축 자동 평가 (VRAM>13GB 시 자동 skip)',
+  'adult-card':        'NSFW LoRA + 에로틱 모션 · OFF=SFW + 얼굴 보존',
+};
+document.querySelectorAll('.v3c2 .toggle-card').forEach(card => {
+  for (const cls in V3C2_TIPS) {
+    if (card.classList.contains(cls)) {
+      card.dataset.tooltip = V3C2_TIPS[cls];
+      break;
+    }
+  }
+});
+
+// 비율 chip 클릭 (참조 영역 안 · 자유/1:1/4:3/9:16)
+document.querySelectorAll('.aspect-chips').forEach(group => {
+  group.addEventListener('click', e => {
+    const chip = e.target.closest('.aspect-chip');
+    if (!chip) return;
+    e.stopPropagation();
+    group.querySelectorAll('.aspect-chip').forEach(c => c.dataset.active = "false");
+    chip.dataset.active = "true";
+  });
+});
+
+// 역할 chip 클릭 (참조 영역 안 · face/outfit/style/background/custom)
+document.querySelectorAll('.ref-roles-chips').forEach(group => {
+  group.addEventListener('click', e => {
+    const chip = e.target.closest('.role-chip');
+    if (!chip) return;
+    e.stopPropagation();
+    group.querySelectorAll('.role-chip').forEach(c => c.dataset.active = "false");
+    chip.dataset.active = "true";
+  });
+});
+
+// 참조 영역 (crop area / remove btn / zoom slider) 클릭 시 stopPropagation 보호
+document.querySelectorAll('.ref-crop-area, .ref-crop-remove, .ref-zoom-input').forEach(el => {
+  el.addEventListener('click', e => e.stopPropagation());
+});
+</script>
+</body>
+</html>

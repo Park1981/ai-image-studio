@@ -1,0 +1,3470 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio Design Test v2 · V3 Aurora Glass — 3 Variants</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; }
+
+:root {
+  --bg: #FAF9F7;
+  --bg-2: #F4F2EE;
+  --surface: #FFFFFF;
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --accent: #4A9EFF;
+  --accent-ink: #1E7BE0;
+  --accent-soft: #EAF3FF;
+  --accent-disabled: #C8D6E8;
+  --green: #52C41A; --green-soft: #EEF9E4;
+  --amber: #FAAD14; --amber-soft: #FFF7E0; --amber-ink: #B47600;
+  --shadow-sm: 0 1px 2px rgba(23,20,14,.04), 0 2px 8px rgba(23,20,14,.04);
+  --shadow-md: 0 2px 4px rgba(23,20,14,.04), 0 8px 24px rgba(23,20,14,.06);
+  --shadow-lg: 0 4px 10px rgba(23,20,14,.05), 0 20px 48px rgba(23,20,14,.08);
+  --r-sm: 8px; --r-md: 12px; --r-card: 14px; --r-lg: 16px; --r-full: 999px;
+}
+
+html, body {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(74,158,255,0.04), transparent 40%),
+    radial-gradient(circle at 80% 100%, rgba(250,173,20,0.03), transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", -apple-system, system-ui, sans-serif;
+  font-feature-settings: "ss02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px; line-height: 1.6; letter-spacing: 0;
+  min-height: 100vh;
+}
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-feature-settings: "zero"; }
+.display { font-family: "Fraunces", Georgia, serif; font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0; font-feature-settings: "ss01"; }
+
+/* ── Mockup Meta Strip — pair-generate.html 의 시안 라벨 (얇은 스트립 · production X)
+ *  실 production AppHeader 와 헷갈리지 않게 위에 별도 분리 · `--accent` 점선 underline · mono ── */
+.mockup-meta-strip {
+  padding: 6px 20px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.10em;
+  color: var(--ink-4);
+  background: rgba(0,0,0,0.02);
+  border-bottom: 1px dashed var(--line-2);
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+  text-transform: uppercase;
+}
+.mockup-meta-strip .label-strong { color: var(--ink-3); font-weight: 600; }
+.mockup-meta-strip .label-version { color: var(--accent-ink); }
+
+/* ── App Header Mock — production `AppHeader.tsx` + `Chrome.TopBar` 1:1 (오빠 결정 2026-05-02 · 헤더 정리용) ──
+ *  진짜 그대로 옮긴 후 시안에서 다듬기. height 52 · sticky · backdrop blur. */
+.app-header-mock {
+  height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(250,249,247,.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.ah-left { display: flex; align-items: center; gap: 14px; }
+.ah-center { display: flex; justify-content: center; }
+.ah-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+
+/* ── Center Nav — 5 모드 직접 이동 segmented (v5 NEW · 오빠 결정 2026-05-02)
+ *  iOS 스타일 segmented container · 활성 = 흰 surface + 그림자 살짝 · 비활성 = ghost
+ *  옛 production 은 중앙 비어있음 (옛 ModelBadge 자리) → 5 모드 빠른 이동 + 비대칭 해소 */
+.ah-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-full);
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.04);
+}
+/* v6 (2026-05-02): 폰트 Pretendard 12px → Fraunces italic 13px
+ *  좌측 mode-header `생성 · Generate` 의 italic 부분과 페어 + Logo italic 과 일직선 (editorial 톤 통일)
+ * v7 (2026-05-02): hover 효과 spring 통통 (cubic-bezier(0.34, 1.56, 0.64, 1) overshoot)
+ *  ResultHoverActionBar.tsx 와 동일한 spring 곡선 — 진입/해제 양쪽 자연스러운 왔다갔다 */
+.ah-nav-link {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 13px;
+  border-radius: var(--r-full);
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  position: relative;
+  transition:
+    background .32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color .2s ease,
+    transform .36s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow .32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    font-weight .2s ease;
+}
+/* 비활성 chip 호버: spring 살짝 통통 + bg 페이드 (활성 chip 은 이미 고정 surface 라 hover X) */
+.ah-nav-link:hover:not([data-active="true"]) {
+  color: var(--ink-2);
+  background: rgba(255,255,255,0.7);
+  transform: scale(1.06);
+}
+.ah-nav-link[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 0 0 0.5px rgba(0,0,0,0.04);
+  cursor: default;
+}
+
+/* HomeBtn (메인으로) — v5 (오빠 결정 2026-05-02): Settings/Shutdown 과 같은 ghost 패턴으로 통일
+ *  옛: outlined surface (시각 위계 좌우 비대칭) → 새: ghost border:transparent + hover bg 만 */
+.ah-home-btn {
+  all: unset; cursor: pointer;
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
+  display: grid; place-items: center;
+  transition: all .15s;
+}
+.ah-home-btn:hover {
+  background: var(--bg-2);
+  color: var(--ink);
+}
+
+/* Logo — 잉크 사각 + 액센트 점 + 프로덕트명 + version */
+.ah-logo { display: flex; align-items: center; gap: 8px; }
+.ah-logo-mark {
+  width: 22px; height: 22px;
+  border-radius: var(--r-sm);
+  background: var(--ink);
+  display: grid; place-items: center;
+  position: relative;
+}
+.ah-logo-mark-inner {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.ah-logo-mark-dot {
+  position: absolute;
+  right: -2px; bottom: -2px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+}
+.ah-logo-text { display: flex; flex-direction: column; line-height: 1; }
+/* v5 (오빠 결정 2026-05-02): Image Studio 텍스트 → Fraunces italic 으로 좌측 mode-header 톤 연결
+ *  마크는 그대로 (잉크 정사각 + 액센트 점 — 정체성 유지) · 버전은 mono 그대로 · 두 톤 contrast 매력 */
+.ah-logo-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.ah-logo-version {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px; color: var(--ink-3);
+  margin-top: 3px;
+  letter-spacing: .08em;
+}
+
+/* MockBadge — USE_MOCK=true 시만 노출 (시안용 항상 표시) */
+.ah-mock-badge {
+  display: flex; align-items: center;
+  height: 26px; padding: 0 9px;
+  border-radius: var(--r-full);
+  border: 1px solid rgba(245,158,11,.42);
+  background: rgba(245,158,11,.10);
+  color: var(--amber-ink);
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+/* SystemStatusChip — ComfyUI 가동 상태. running grace 시 "준비 완료" + 자동 fade out (시안용 그대로 표시) */
+.ah-status-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 10px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.ah-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(82,196,26,.18);
+  flex-shrink: 0;
+}
+.ah-status-label { font-weight: 500; color: var(--ink-2); }
+
+/* SystemMetrics 4-bar (collapsed state · production 매칭 — globals.css `.ais-metrics`)
+ *  4 가로 막대 한 줄 (각 44×6 · 좌→우 fill) · gap 6 · CPU(cyan)/GPU(green)/VRAM(purple)/RAM(blue)
+ *  v2 (오빠 결정 2026-05-02): 옛 inline expand → **호버 팝오버** (bars 정지 + 아래 frosted glass dropdown)
+ *  이유: 옛 inline 펼치기 ~1100px 폭 → 중앙 nav 와 충돌. 팝오버는 다른 element 안 밀어냄. */
+.ah-metrics {
+  position: relative;  /* popover anchor */
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-radius: var(--r-full);
+  border: 1px solid transparent;
+}
+.ah-metric-bar {
+  width: 44px;
+  height: 6px;
+  background: var(--bg-2);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.ah-metric-bar::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: calc(var(--m-pct) * 1%);
+  background: var(--m-color);
+  border-radius: 3px;
+}
+.ah-metric-bar[data-metric="cpu"]  { --m-color: #06B6D4; }
+.ah-metric-bar[data-metric="gpu"]  { --m-color: #22C55E; }
+.ah-metric-bar[data-metric="vram"] { --m-color: #A855F7; }
+.ah-metric-bar[data-metric="ram"]  { --m-color: #4A9EFF; }
+
+/* ── Metrics Popover — 호버 시 bars 아래로 frosted glass dropdown (NEW · 2026-05-02 옵션 A) ──
+ *  옛 inline expand 가 ~1100px 폭으로 중앙 nav 와 충돌 → popover 로 분리
+ *  4 metric rows (dot · label · usage · % · long bar) + 80%↑ VRAM breakdown */
+.ah-metrics-popover {
+  position: absolute;
+  top: calc(100% + 10px);
+  /* v3 (2026-05-02 오빠 피드백): right -80 — popover 우측 edge 를 Shutdown 우측 edge 에 정렬
+   * = 헤더 우측 padding (20px) 안쪽 끝선과 일치 → 가장자리 시각 안정
+   * 80 = gap 8 + Settings 32 + gap 8 + Shutdown 32 (.ah-metrics 와 Shutdown 사이 거리) */
+  right: -80px;
+  min-width: 320px;
+  padding: 12px 14px;
+  background: rgba(250,249,247,0.94);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: var(--r-md);
+  box-shadow:
+    0 14px 40px rgba(0,0,0,0.16),
+    0 4px 12px rgba(0,0,0,0.10),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  z-index: 50;
+
+  /* default hidden — production 은 hover 시만 등장 */
+  opacity: 0;
+  transform: translateY(-4px);
+  pointer-events: none;
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.ah-metrics:hover .ah-metrics-popover,
+.ah-metrics:focus-within .ah-metrics-popover,
+.ah-metrics-popover.demo-show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.ah-mp-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.ah-mp-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 3px rgba(0,0,0,0.04);
+}
+.ah-mp-row[data-tone="cpu"]  .ah-mp-dot { background: #06B6D4; box-shadow: 0 0 0 3px rgba(6,182,212,0.12); }
+.ah-mp-row[data-tone="gpu"]  .ah-mp-dot { background: #22C55E; box-shadow: 0 0 0 3px rgba(34,197,94,0.14); }
+.ah-mp-row[data-tone="vram"] .ah-mp-dot { background: #A855F7; box-shadow: 0 0 0 3px rgba(168,85,247,0.14); }
+.ah-mp-row[data-tone="ram"]  .ah-mp-dot { background: #4A9EFF; box-shadow: 0 0 0 3px rgba(74,158,255,0.14); }
+
+.ah-mp-label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  width: 36px;
+  flex-shrink: 0;
+}
+.ah-mp-usage {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-3);
+  letter-spacing: 0.02em;
+  width: 72px;
+  flex-shrink: 0;
+}
+/* CPU/GPU 는 usage 없음 — 자리는 차지 (정렬 유지) */
+.ah-mp-row[data-tone="cpu"] .ah-mp-usage,
+.ah-mp-row[data-tone="gpu"] .ah-mp-usage {
+  visibility: hidden;
+}
+
+.ah-mp-bar {
+  position: relative;
+  height: 6px;
+  flex: 1;
+  min-width: 88px;
+  background: rgba(0,0,0,0.06);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.ah-mp-fill {
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  border-radius: 3px;
+}
+.ah-mp-row[data-tone="cpu"]  .ah-mp-fill { background: #06B6D4; }
+.ah-mp-row[data-tone="gpu"]  .ah-mp-fill { background: #22C55E; }
+.ah-mp-row[data-tone="vram"] .ah-mp-fill { background: #A855F7; }
+.ah-mp-row[data-tone="ram"]  .ah-mp-fill { background: #4A9EFF; }
+
+.ah-mp-percent {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink);
+  letter-spacing: 0.02em;
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* VRAM 80%+ breakdown (production: VRAM percent ≥ 80% + breakdown 데이터 있을 때만) */
+.ah-mp-divider {
+  height: 1px;
+  background: rgba(0,0,0,0.06);
+  margin: 4px 0 2px;
+}
+.ah-mp-bd-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-bottom: 2px;
+}
+.ah-mp-bd-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 10.5px;
+}
+.ah-mp-bd-name {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-2);
+  width: 60px;
+  flex-shrink: 0;
+}
+.ah-mp-bd-vram {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #A855F7;
+  width: 50px;
+}
+.ah-mp-bd-models {
+  flex: 1;
+  font-size: 10px;
+  font-style: italic;
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  color: var(--ink-3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* IconBtn (Settings · Shutdown) */
+.ah-icon-btn {
+  all: unset; cursor: pointer;
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  color: var(--ink-2);
+  display: grid; place-items: center;
+  transition: all .15s;
+}
+.ah-icon-btn:hover { background: var(--bg-2); }
+
+/* ── Page Header (시안용 메타 라벨 — 옛 cards-v2 패턴 · pair-generate 에선 사용 X) ── */
+.page-header {
+  padding: 28px 40px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
+  position: sticky; top: 0; z-index: 10;
+}
+.page-title { font-size: 24px; font-weight: 600; letter-spacing: -0.012em; }
+.page-title .display { font-style: italic; font-weight: 500; color: var(--accent-ink); }
+.page-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.page-meta { font-size: 11px; color: var(--ink-4); display: flex; gap: 18px; align-items: center; }
+.page-meta .mono { color: var(--ink-3); letter-spacing: 0.02em; }
+.page-meta .pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3); border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+
+/* ── Grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 460px);
+  gap: 28px;
+  padding: 32px 40px 80px;
+  justify-content: center;
+  align-items: start;
+}
+
+/* ── Panel ── */
+.panel {
+  width: 460px;
+  background: linear-gradient(180deg, var(--surface), rgba(255,255,255,0.5));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px 18px 28px;
+  box-shadow: var(--shadow-sm);
+}
+.panel-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0 4px 4px; padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.panel-eyebrow {
+  font-family: "JetBrains Mono", monospace; font-size: 9.5px;
+  color: var(--ink-4); letter-spacing: 0.14em; text-transform: uppercase;
+}
+.panel-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic; font-size: 22px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+.panel-name strong { font-style: normal; font-weight: 700; color: var(--accent-ink); }
+.panel-tag {
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3);
+  border: 1px solid var(--line); letter-spacing: 0.04em;
+}
+.legend {
+  margin: 10px 4px 18px;
+  font-size: 11.5px; color: var(--ink-3); line-height: 1.7;
+}
+.legend strong { color: var(--ink-2); font-weight: 600; }
+
+/* ── Inner Studio Left Panel ── */
+.left-panel {
+  width: 400px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 8px 0;
+}
+
+/* Studio Mode Header — panel-header 스타일 차용 (오빠 결정 2026-05-02 · 디스플레이 타이포그래피 강화)
+ * 옛: 단일 영문 sans 22px → 새: eyebrow monospace + Fraunces italic 한글+영문 mix
+ * 점선 border-bottom 으로 섹션 구분 + 우측 mode-flow-link 그대로 유지 */
+.mode-header {
+  padding: 4px 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.mode-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.mode-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mode-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.mode-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+.mode-flow-link {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface);
+  display: grid; place-items: center; color: var(--ink-3);
+  cursor: pointer; transition: all 0.15s;
+  flex-shrink: 0;
+}
+.mode-flow-link:hover {
+  border-color: var(--accent-ink); color: var(--accent-ink); background: var(--bg-2);
+  transform: scale(1.05);
+}
+.mode-desc { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+
+/* Primary CTA — Aurora Glass Gradient (오빠 결정 2026-05-02 · v3 옵션 B 채택)
+ * violet→blue 시그니처 + glass + 호버 시 left→right light sweep 0.7s
+ * 시스템 카드 (AI 보정) 와 톤 매칭 */
+.cta-primary {
+  all: unset; cursor: pointer; text-align: center;
+  background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+  color: #fff;
+  padding: 14px 22px; border-radius: var(--r-full);
+  font-size: 14px; font-weight: 600;
+  letter-spacing: 0.01em;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; box-sizing: border-box;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.cta-primary::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.7s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
+}
+.cta-primary:hover::before { transform: translateX(100%); }
+.cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 28px rgba(99,102,241,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.cta-primary > * { position: relative; z-index: 1; }
+/* Field label */
+.field-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.field-label {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+  display: inline-flex; align-items: baseline; gap: 8px;
+}
+.accent-bar { width: 3px; height: 12px; background: var(--accent); border-radius: 2px; position: relative; top: 1px; }
+.field-meta-link {
+  font-size: 11px; color: var(--ink-3); cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: none;
+}
+.field-meta-link:hover { color: var(--ink); }
+
+/* Prompt Shell */
+.prompt-shell {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-md); transition: border 0.15s;
+  box-shadow: var(--shadow-sm);
+}
+.prompt-textarea {
+  display: block; width: 100%; border: none; outline: none; resize: none;
+  background: transparent; padding: 14px 48px 44px 16px;
+  font-size: 14px; line-height: 1.6; color: var(--ink);
+  border-radius: var(--r-md); min-height: 110px;
+}
+.prompt-textarea::placeholder { color: var(--ink-4); }
+.prompt-history-btn, .prompt-tool-btn, .prompt-clear-icon {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  color: var(--ink-4); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  transition: all 0.12s;
+}
+.prompt-history-btn:hover, .prompt-tool-btn:hover, .prompt-clear-icon:hover {
+  color: var(--ink); border-color: var(--line-2);
+}
+.prompt-history-btn { position: absolute; top: 10px; right: 10px; }
+.prompt-tools-stack {
+  position: absolute; top: 46px; right: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.prompt-clear-icon { position: absolute; right: 10px; bottom: 10px; }
+
+/* ──────────────────────────────────────────────
+   V3 BASE — Aurora Glass (V3a/V3b/V3c 공유)
+   ────────────────────────────────────────────── */
+.v3 .toggle-card {
+  position: relative;
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 4px 16px rgba(23,20,14,.04);
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.v3 .toggle-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 32px rgba(23,20,14,.08); }
+.v3 .toggle-row {
+  display: flex; align-items: center; gap: 14px;
+  position: relative; z-index: 2;
+}
+.v3 .toggle-row .label-area {
+  display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0;
+}
+.v3 .toggle-row .label-area .label {
+  font-size: 12.5px; font-weight: 500; color: var(--ink-2);
+}
+.v3 .toggle-row .label-area .desc {
+  font-size: 10.5px; color: var(--ink-4);
+}
+.v3 .icon-box {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+  background: rgba(244,242,238,0.85); color: var(--ink-3);
+  font-size: 19px;
+  transition: all 0.25s; border: 1px solid rgba(232,229,223,0.8);
+}
+.v3 .toggle-card[data-active="true"] .icon-box {
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 14px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  border-color: transparent;
+}
+.v3 .toggle-card[data-active="true"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.6));
+  border-color: rgba(255,255,255,0.7);
+  box-shadow:
+    0 0 0 1px var(--card-from),
+    0 0 0 4px var(--card-glow),
+    0 8px 28px var(--card-shadow);
+}
+
+.v3 .toggle-switch {
+  position: relative; flex-shrink: 0;
+  width: 30px; height: 17px; border-radius: var(--r-full);
+  background: var(--line-2); transition: background 0.18s;
+}
+.v3 .toggle-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #fff; transition: left 0.18s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.v3 .toggle-card[data-active="true"] .toggle-switch {
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+}
+.v3 .toggle-card[data-active="true"] .toggle-switch::after { left: 15px; }
+
+/* signature colors */
+.v3 .ai-card { --card-from: #8B5CF6; --card-to: #3B82F6; --card-glow: rgba(139,92,246,0.10); --card-shadow: rgba(99,102,241,0.18); --card-mesh-a: rgba(139,92,246,0.12); --card-mesh-b: rgba(59,130,246,0.10); }
+.v3 .claude-card { --card-from: #F59E0B; --card-to: #FB923C; --card-glow: rgba(245,158,11,0.10); --card-shadow: rgba(245,158,11,0.18); --card-mesh-a: rgba(245,158,11,0.12); --card-mesh-b: rgba(251,146,60,0.10); }
+.v3 .fast-card { --card-from: #84CC16; --card-to: #06B6D4; --card-glow: rgba(132,204,22,0.10); --card-shadow: rgba(132,204,22,0.18); --card-mesh-a: rgba(132,204,22,0.12); --card-mesh-b: rgba(6,182,212,0.10); }
+.v3 .size-card-v {
+  --card-from: #F43F5E; --card-to: #EC4899;
+  --card-shadow: rgba(236,72,153,0.16);
+  --card-glow: rgba(236,72,153,0.08);
+  --card-mesh-a: rgba(244,63,94,0.08);
+  --card-mesh-b: rgba(236,72,153,0.06);
+}
+
+/* size card base */
+.v3 .size-card-v {
+  position: relative;
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 4px 16px rgba(23,20,14,.04);
+  overflow: hidden;
+  transition: all 0.25s;
+}
+.v3 .size-card-v:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 32px rgba(23,20,14,.08); }
+.v3 .size-card-v > * { position: relative; z-index: 2; }
+.v3 .size-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(232,229,223,0.8);
+}
+.v3 .size-header .icon-box {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 14px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  font-size: 19px;
+}
+.v3 .size-header .meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.v3 .size-header .meta .title { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.v3 .size-header .meta .chip { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-3); }
+
+/* segmented */
+.v3 .seg-wrap {
+  position: relative; display: inline-flex; padding: 3px;
+  background: rgba(0,0,0,0.04); border-radius: var(--r-full);
+  align-self: center; width: fit-content;
+  z-index: 2;
+}
+.v3 .seg-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: calc(50% - 3px); height: calc(100% - 6px);
+  background: var(--surface); border-radius: var(--r-full);
+  box-shadow: 0 0 0 0.5px rgba(74,158,255,.18), 0 1px 3px rgba(0,0,0,.06);
+  transition: transform 0.28s cubic-bezier(.32,.72,0,1);
+  pointer-events: none; z-index: 0;
+}
+.v3 .seg-wrap[data-value="precise"] .seg-thumb { transform: translateX(100%); }
+.v3 .toggle-card[data-active="true"] .seg-thumb {
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+}
+.v3 .seg-btn {
+  position: relative; z-index: 1; height: 28px; min-width: 92px; padding: 0 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em;
+  border-radius: var(--r-full); border: none; background: transparent;
+  color: var(--ink-3); transition: all 0.22s;
+}
+.v3 .seg-btn[data-active="true"] { color: var(--accent-ink); font-weight: 600; }
+.v3 .toggle-card[data-active="true"] .seg-btn[data-active="true"] { color: var(--card-from); }
+
+/* size card content */
+.v3 .size-row { display: flex; align-items: center; gap: 8px; }
+.v3 .size-col { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.v3 .dim-input { position: relative; width: 100%; }
+.v3 .dim-input span.label {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  color: var(--ink-4); pointer-events: none; font-weight: 500; letter-spacing: 0.04em;
+}
+.v3 .dim-input input {
+  width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 7px 10px 7px 22px; font-family: "JetBrains Mono", monospace;
+  font-size: 12px; background: rgba(255,255,255,0.7); color: var(--ink); outline: none;
+  text-align: right;
+}
+.v3 .lock-btn {
+  width: 30px; height: 30px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--bg);
+  color: var(--ink-2); display: grid; place-items: center;
+  cursor: pointer; align-self: center; flex-shrink: 0; transition: all 0.15s;
+}
+.v3 .lock-btn[data-locked="true"] {
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04));
+  border-color: var(--card-to); color: var(--card-to);
+}
+.v3 .range-input { width: 100%; accent-color: var(--accent); }
+.v3 .aspect-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 6px; margin-top: 8px;
+}
+.v3 .aspect-card {
+  all: unset; cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 4px 8px; height: 70px; box-sizing: border-box;
+  border: 1.5px solid var(--line); border-radius: var(--r-md);
+  background: rgba(255,255,255,0.7); transition: all 0.15s;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.v3 .aspect-card:hover { background: rgba(244,242,238,0.85); border-color: var(--line-2); }
+.v3 .aspect-card[data-active="true"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.7));
+  border-color: var(--card-from);
+}
+.v3 .aspect-card .mini-box { border: 1.5px solid var(--ink-3); border-radius: 2px; }
+.v3 .aspect-card[data-active="true"] .mini-box { border-color: var(--card-from); }
+.v3 .aspect-card .a-label {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.02em; color: var(--ink-2);
+}
+.v3 .aspect-card[data-active="true"] .a-label { color: var(--card-from); }
+
+/* ──────────────────────────────────────────────
+   V3a — Mesh gradient (이미지 X)
+   ────────────────────────────────────────────── */
+.v3a .toggle-card::after, .v3a .size-card-v::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, var(--card-mesh-a, transparent), transparent 55%),
+    radial-gradient(circle at 85% 100%, var(--card-mesh-b, transparent), transparent 55%);
+  opacity: 0; transition: opacity 0.35s; z-index: 1;
+}
+.v3a .toggle-card[data-active="true"]::after { opacity: 1; }
+.v3a .size-card-v::after { opacity: 0.6; }
+
+/* ──────────────────────────────────────────────
+   V3b — 이미지 배경 (우측 fade) · 토글 스위치 유지
+   ────────────────────────────────────────────── */
+.v3b .toggle-card::before, .v3b .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.55;
+  filter: saturate(0.55) brightness(0.95);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3b .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3b .size-card-v::before {
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+.v3b .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3b .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3b .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3b .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+/* V3b 활성 카드는 좌측 텍스트 영역에 더 강한 surface 톤 — 가독성 보호 */
+.v3b .toggle-card[data-active="true"] {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.85) 35%,
+    rgba(255,255,255,0.45) 60%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+.v3b .size-card-v {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.88) 50%,
+    rgba(255,255,255,0.4) 80%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+
+/* ──────────────────────────────────────────────
+   V3c — 이미지 배경 + 토글 스위치 X · 카드 전체 클릭
+       active indicator: 좌측 4px 시그니처 그라데이션 bar
+   ────────────────────────────────────────────── */
+.v3c .toggle-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.55;
+  filter: saturate(0.55) brightness(0.95);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3c .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3c .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3c .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3c .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3c .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+.v3c .toggle-card[data-active="true"] {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.85) 35%,
+    rgba(255,255,255,0.45) 60%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+.v3c .size-card-v {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.88) 50%,
+    rgba(255,255,255,0.4) 80%,
+    rgba(255,255,255,0.15) 100%
+  );
+  position: relative;
+}
+.v3c .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+/* 토글 스위치 숨김 */
+.v3c .toggle-card .toggle-switch { display: none; }
+
+/* 좌측 시그니처 bar (active indicator) */
+.v3c .toggle-card .card-bar {
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 0 3px 3px 0;
+  background: var(--ink-4);
+  transition: all 0.25s;
+  z-index: 2;
+}
+.v3c .toggle-card[data-active="true"] .card-bar {
+  background: linear-gradient(180deg, var(--card-from), var(--card-to));
+  box-shadow: 0 0 12px var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.4) inset;
+  width: 5px;
+}
+
+/* 카드 클릭 영역 명확화 — hover 시 살짝 더 lift */
+.v3c .toggle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 36px rgba(23,20,14,.10);
+}
+.v3c .toggle-card:active {
+  transform: translateY(0);
+  transition: transform 0.08s;
+}
+
+/* 카드 안 padding 약간 더 (스위치 자리 확보 → 텍스트 더 시원) */
+.v3c .toggle-card { padding-left: 18px; }
+
+/* ──────────────────────────────────────────────
+   V3c-2 — V3c 베이스 + 활성 카드 텍스트/버튼 강화
+   활성 시: 텍스트 진한 ink + 600 굵기 / segmented 불투명 chip 화
+   ────────────────────────────────────────────── */
+.v3c2 .toggle-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  border-radius: var(--r-card);
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.28;
+  filter: saturate(0.4) brightness(0.92);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3c2 .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3c2 .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3c2 .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3c2 .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3c2 .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+.v3c2 .toggle-card[data-active="true"] {
+  background: linear-gradient(100deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.85) 35%, rgba(255,255,255,0.45) 60%, rgba(255,255,255,0.15) 100%);
+}
+.v3c2 .size-card-v {
+  background: linear-gradient(100deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.88) 50%, rgba(255,255,255,0.4) 80%, rgba(255,255,255,0.15) 100%);
+  position: relative;
+}
+.v3c2 .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  border-radius: var(--r-card);
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+.v3c2 .toggle-card .toggle-switch { display: none; }
+.v3c2 .toggle-card .card-bar {
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 0 3px 3px 0;
+  background: var(--ink-4);
+  transition: all 0.25s;
+  z-index: 2;
+}
+.v3c2 .toggle-card[data-active="true"] .card-bar {
+  background: linear-gradient(180deg, var(--card-from), var(--card-to));
+  box-shadow: 0 0 12px var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.4) inset;
+  width: 5px;
+}
+.v3c2 .toggle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 36px rgba(23,20,14,.10);
+}
+.v3c2 .toggle-card:active {
+  transform: translateY(0);
+  transition: transform 0.08s;
+}
+.v3c2 .toggle-card { padding-left: 18px; }
+
+/* ── V3c-2 ONLY: 활성 카드 콘텐츠 강화 ── */
+
+/* 활성 카드 텍스트 → 진한 검정 (ink) + 600 굵기 */
+.v3c2 .toggle-card[data-active="true"] .label-area .label {
+  color: var(--ink);
+  font-weight: 600;
+}
+.v3c2 .toggle-card[data-active="true"] .label-area .desc {
+  color: var(--ink-2);
+}
+.v3c2 .size-card-v .meta .title {
+  color: var(--ink);
+  font-weight: 600;
+}
+.v3c2 .size-card-v .meta .chip {
+  color: var(--ink-2);
+}
+
+/* 활성 카드 segmented — 살짝 반투명 흰 box (비율 카드와 같은 톤 · 회색 dim 톤 회피) */
+.v3c2 .toggle-card[data-active="true"] .seg-wrap {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04);
+}
+.v3c2 .toggle-card[data-active="true"] .seg-thumb {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 0.5px var(--card-from),
+    0 2px 6px rgba(0,0,0,0.10),
+    0 1px 2px rgba(0,0,0,0.06);
+}
+.v3c2 .toggle-card[data-active="true"] .seg-btn[data-active="true"] {
+  color: var(--card-from);
+  font-weight: 600;
+}
+.v3c2 .toggle-card[data-active="true"] .seg-btn:not([data-active="true"]) {
+  color: var(--ink-2);
+}
+
+/* 사이즈 카드 안 input — 솔리드 흰색 (이미지 위에서 또렷이) */
+.v3c2 .size-card-v .dim-input input {
+  background: var(--surface);
+  border-color: var(--line-2);
+}
+
+/* 사이즈 카드 비율 카드 — active 시 더 또렷한 chip */
+.v3c2 .aspect-card .a-label { font-weight: 600; }
+.v3c2 .aspect-card[data-active="true"] {
+  background: var(--surface);
+  box-shadow: 0 0 0 0.5px var(--card-from), 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* ── V3c-2 미세조정 (오빠 피드백 · 2026-05-01) ── */
+/* 세로 bar 제거 — boder + glow + bg fade 만으로 활성 표시 */
+.v3c2 .toggle-card .card-bar { display: none; }
+/* 비활성 카드의 segmented 숨김 — 카드 활성 시에만 instant/thinking 노출 */
+.v3c2 .toggle-card[data-active="false"] .seg-wrap { display: none; }
+
+/* ── desc 텍스트 제거 + hover 툴팁 (오빠 피드백 · 2026-05-01) ── */
+.v3c2 .toggle-card .label-area .desc { display: none; }
+.v3c2 .toggle-card { overflow: visible; }
+.v3c2 .toggle-card[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  animation: ais-tooltip-in 0.18s ease;
+}
+@keyframes ais-tooltip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ──────────────────────────────────────────────
+   V5 — V4 (V3c-2) + 미세조정 3개 (오빠 피드백 · 2026-05-01)
+   비활성 아이콘박스 시그니처 컬러 tint · 사이즈 fade 35% → 42% · cursor hint
+   ────────────────────────────────────────────── */
+
+/* 1) 비활성 아이콘박스 — 시그니처 컬러 30% tint (회색 → 살짝 컬러 hint) */
+.v5 .ai-card .icon-box {
+  background: linear-gradient(135deg, rgba(139,92,246,0.14), rgba(59,130,246,0.08));
+  color: #6D4FE0;
+  border-color: rgba(139,92,246,0.20);
+}
+.v5 .claude-card .icon-box {
+  background: linear-gradient(135deg, rgba(245,158,11,0.14), rgba(251,146,60,0.08));
+  color: #B47600;
+  border-color: rgba(245,158,11,0.22);
+}
+.v5 .fast-card .icon-box {
+  background: linear-gradient(135deg, rgba(132,204,22,0.14), rgba(6,182,212,0.08));
+  color: #4D8C12;
+  border-color: rgba(132,204,22,0.22);
+}
+/* 활성 시는 V3 base 그대로 (그라데이션 fill — specificity 더 높음) */
+
+/* 2) 사이즈 카드 fade 35% → 22% (오빠 결정 2026-05-01 저녁 · v3 비교 후 B mask 채택)
+ *  사이즈 카드는 항상 활성이라 인물 좌측 22% 까지 노출 → 핑크 톤 + 인물 임팩트 모두. */
+.v5 .size-card-v::before {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 22%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 22%, black 95%);
+}
+
+/* 사이즈 카드 안 — slider + 자물쇠 핑크 시그니처 매칭 (옛 blue/indigo 잔재 제거) */
+.v5 .size-card-v .range-input {
+  accent-color: var(--card-from);
+}
+.v5 .size-card-v .lock-btn[data-locked="true"] {
+  background: linear-gradient(135deg, rgba(244,63,94,0.14), rgba(236,72,153,0.04));
+  border-color: var(--card-to);
+  color: var(--card-from);
+}
+
+/* 3) cursor hint — hover 시 살짝 더 lift + 미세 scale (클릭 명시) */
+.v5 .toggle-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 40px rgba(23,20,14,.10);
+}
+
+/* ──────────────────────────────────────────────
+   4) 활성 카드 효과 (오빠 결정 2026-05-01 저녁 · v3 비교 후 E padding + B mask 채택)
+   - 활성 토글 카드: padding 14px → 26px (E 옵션 — 미세 점프 거의 안 보임)
+   - 활성 카드 mask: 35% → 15% (B 옵션 — 인물 좌측 더 노출)
+   - transition cubic-bezier 0.35s — 자연스러운 ease (React 적용 시 framer-motion 으로 진짜 부드럽게)
+   - 사이즈 카드 padding 14px → 22px (정적 — 활성 개념 X)
+   ────────────────────────────────────────────── */
+.v5 .toggle-card {
+  transition: padding 0.35s cubic-bezier(.4,0,.2,1),
+              transform 0.25s cubic-bezier(.4,0,.2,1),
+              box-shadow 0.25s cubic-bezier(.4,0,.2,1);
+}
+.v5 .toggle-card[data-active="true"] {
+  padding: 38px 16px 38px 18px;
+}
+.v5 .toggle-card[data-active="true"]::before {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 15%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 15%, black 95%);
+}
+.v5 .size-card-v {
+  padding: 22px 16px;
+}
+
+/* ──────────────────────────────────────────────
+   수정 패널 — 원본 이미지 카드 (NEW · V5 톤 매칭)
+   16:9 풀 thumbnail + 그라데이션 오버레이 + 변경 버튼 + 메타
+   ────────────────────────────────────────────── */
+.edit-source-card {
+  position: relative;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+}
+.edit-source-card:hover {
+  transform: translateY(-1px) scale(1.005);
+  box-shadow: var(--shadow-md);
+}
+.edit-source-card .es-bg {
+  position: absolute; inset: 0;
+  background-image: url('assets/card-bg-ai.webp');
+  background-size: cover;
+  background-position: center;
+}
+.edit-source-card .es-grad {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%);
+}
+.edit-source-card .es-change-btn {
+  position: absolute; top: 10px; right: 10px;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.edit-source-card .es-change-btn:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+.edit-source-card .es-meta-bottom {
+  position: absolute; left: 16px; right: 56px; bottom: 12px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  color: #fff;
+  font-size: 11px;
+  z-index: 2;
+}
+.edit-source-card .es-meta-bottom .label {
+  font-weight: 600; font-size: 12.5px; letter-spacing: -0.01em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+.edit-source-card .es-meta-bottom .info {
+  opacity: 0.92; font-size: 10.5px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+/* ──────────────────────────────────────────────
+   수정 패널 — Multi-reference 토글 카드 (V5 톤 + slate/indigo 시그니처)
+   토글 ON 시 카드 *안*에 image2 thumbnail + crop overlay 펼쳐짐
+   ────────────────────────────────────────────── */
+
+/* Multi-ref 카드 시그니처 컬러 (fuchsia/magenta · 2026-05-02 갱신 · 핑크 가족 안 변별력 확보)
+ * 옛 rose-pink 와 hue 분리 — curator 패브릭 swatch 이미지 톤 매칭 */
+.v5 .multi-ref-card {
+  --card-from: #D946EF;
+  --card-to: #C026D3;
+  --card-glow: rgba(217,70,239,0.10);
+  --card-shadow: rgba(192,38,211,0.18);
+  --card-mesh-a: rgba(217,70,239,0.10);
+  --card-mesh-b: rgba(192,38,211,0.08);
+  --card-bg-image: url('assets/card-bg-multi-ref.webp');  /* fuchsia · curator + magenta swatch */
+}
+/* V5 비활성 아이콘박스 — fuchsia tint */
+.v5 .multi-ref-card .icon-box {
+  background: linear-gradient(135deg, rgba(217,70,239,0.14), rgba(192,38,211,0.08));
+  color: #A21CAF;
+  border-color: rgba(217,70,239,0.22);
+}
+
+/* 참조 이미지 영역 — 토글 ON 시 카드 안에 펼쳐지는 image2 슬롯 */
+.v5 .multi-ref-card .ref-image-area {
+  display: none;
+}
+.v5 .multi-ref-card[data-active="true"] .ref-image-area {
+  display: block;
+  margin-top: 4px;
+  position: relative;
+  z-index: 2;
+}
+.v5 .multi-ref-card .ref-image-thumb {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.v5 .multi-ref-card .ref-crop-frame {
+  position: absolute;
+  top: 14%; left: 15%; right: 15%; bottom: 30%;
+  border: 2px dashed rgba(255,255,255,0.85);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.22);
+}
+.v5 .multi-ref-card .ref-crop-label {
+  position: absolute;
+  top: 8px; left: 10px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 9.5px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  z-index: 3;
+}
+.v5 .multi-ref-card .ref-remove-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 3;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.10);
+}
+.v5 .multi-ref-card .ref-remove-btn:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+.v5 .multi-ref-card .ref-meta-bottom {
+  position: absolute;
+  left: 12px; right: 12px; bottom: 8px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  color: #fff;
+  font-size: 11px;
+  z-index: 2;
+}
+.v5 .multi-ref-card .ref-meta-bottom .label {
+  font-weight: 600; font-size: 11.5px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+.v5 .multi-ref-card .ref-meta-bottom .info {
+  opacity: 0.9; font-size: 10px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+/* ──────────────────────────────────────────────
+   자동 비교 분석 카드 (V5 톤 · teal → emerald · 5번째 시그니처)
+   "수정 후 자동 비교 분석" 토글 — 결과 완료 시 백그라운드 5축 평가
+   ────────────────────────────────────────────── */
+.v5 .auto-compare-card {
+  --card-from: #F59E0B;
+  --card-to: #FB923C;
+  --card-glow: rgba(245,158,11,0.10);
+  --card-shadow: rgba(245,158,11,0.18);
+  --card-mesh-a: rgba(245,158,11,0.12);
+  --card-mesh-b: rgba(251,146,60,0.10);
+  --card-bg-image: url('assets/card-bg-claude.webp');  /* 임시 — Claude 이미지 재사용 (새 amber evaluator 대기) */
+}
+.v5 .auto-compare-card .icon-box {
+  background: linear-gradient(135deg, rgba(245,158,11,0.14), rgba(251,146,60,0.08));
+  color: #B47600;
+  border-color: rgba(245,158,11,0.22);
+}
+
+/* ──────────────────────────────────────────────
+   참조 이미지 sub-section (multi-ref ON 시 카드 외부 별도 영역)
+   실제 EditLeftPanel.tsx + ReferenceImageBox.tsx 구조 그대로:
+   비율 chip 4 + 320px Cropper + zoom slider + 도움말 + 역할 chip 5
+   ────────────────────────────────────────────── */
+.reference-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+.accent-bar.accent-violet { background: #8B5CF6; }
+.field-label .ref-size {
+  font-size: 11px;
+  color: var(--ink-4);
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+/* 비율 chips (자유/1:1/4:3/9:16) */
+.aspect-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.aspect-chip {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 13px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.aspect-chip:hover { border-color: var(--line-2); background: var(--bg-2); }
+.aspect-chip[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* 320px crop UI (react-easy-crop 시각 시뮬레이션) */
+.ref-crop-area {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #0a0a0c;
+}
+.ref-crop-image {
+  position: absolute; inset: 0;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.ref-crop-handles {
+  position: absolute;
+  top: 14%; left: 14%; right: 14%; bottom: 14%;
+  border: 1px solid rgba(255,255,255,0.95);
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);
+  background: transparent;
+  cursor: move;
+}
+.ref-handle { position: absolute; width: 14px; height: 14px; }
+.ref-handle-tl { top: -1px; left: -1px; border-top: 2px solid #fff; border-left: 2px solid #fff; }
+.ref-handle-tr { top: -1px; right: -1px; border-top: 2px solid #fff; border-right: 2px solid #fff; }
+.ref-handle-bl { bottom: -1px; left: -1px; border-bottom: 2px solid #fff; border-left: 2px solid #fff; }
+.ref-handle-br { bottom: -1px; right: -1px; border-bottom: 2px solid #fff; border-right: 2px solid #fff; }
+.ref-crop-remove {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s;
+}
+.ref-crop-remove:hover { background: rgba(0,0,0,0.85); }
+
+/* zoom slider */
+.ref-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.ref-zoom-label { width: 40px; }
+.ref-zoom-input { flex: 1; accent-color: var(--accent); }
+.ref-zoom-val { width: 50px; text-align: right; font-size: 10.5px; }
+
+/* 도움말 */
+.ref-help {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  line-height: 1.6;
+}
+.ref-warn { color: #C08400; }
+
+/* 역할 선택 (face / outfit / style / background / custom) */
+.ref-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ref-roles-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ref-roles-hint {
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ink-4);
+  margin-left: 6px;
+}
+.ref-roles-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.role-chip {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.role-chip:hover { border-color: var(--line-2); background: var(--bg-2); }
+.role-chip[data-active="true"] {
+  border-color: #8B5CF6;
+  background: #EDE9FE;
+  color: #6D4FE0;
+  font-weight: 600;
+}
+
+/* ──────────────────────────────────────────────
+   분석 패널 (Vision Analyze) — 안내 배너
+   ────────────────────────────────────────────── */
+.info-banner {
+  padding: 14px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.55;
+}
+.info-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.info-banner-body { color: var(--ink-3); }
+.info-banner-body strong { color: var(--ink-2); font-weight: 600; }
+
+/* ──────────────────────────────────────────────
+   비교 패널 (Vision Compare) — A/B 배지 + 스왑 버튼
+   ────────────────────────────────────────────── */
+.badge-ab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+.badge-ab.badge-b { background: linear-gradient(135deg, #F59E0B, #FB923C); }
+
+/* compare-slot 카드 active 시 시그니처 컬러 (옵션) */
+.compare-slot-a { /* A 슬롯 — violet 톤 살짝 */ }
+.compare-slot-b { /* B 슬롯 — amber 톤 살짝 */ }
+
+.swap-btn-wrap {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0 -4px;
+}
+.swap-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.swap-btn:hover {
+  background: var(--surface);
+  border-color: var(--line-2);
+  transform: scale(1.02);
+}
+
+.optional-hint {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* ──────────────────────────────────────────────
+   영상 패널 (Video) — 해상도 슬라이더 + 성인 모드 시그니처
+   ────────────────────────────────────────────── */
+.video-res-section {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.vrs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.vrs-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.vrs-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* video-res-card (사이즈 카드 패턴 재사용) — actions 우측 정렬 + 슬라이더 위 여백 */
+.video-res-card .vrs-actions {
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+.vrs-original {
+  all: unset;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--ink-2);
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.vrs-original:hover { background: var(--surface); border-color: var(--line-2); }
+
+.vrs-speed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.vrs-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+/* 속도 톤 — fast (cyan) / standard (amber) / quality (rose) */
+.vrs-speed-fast {
+  background: rgba(6,182,212,0.10);
+  border: 1px solid rgba(6,182,212,0.32);
+  color: #0E7490;
+}
+.vrs-speed-fast .vrs-dot { background: #06B6D4; }
+
+.vrs-input {
+  width: 100%;
+  accent-color: #F43F5E;  /* 사이즈 시그니처 rose/pink 매칭 */
+  cursor: pointer;
+}
+.vrs-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--ink-4);
+  margin-top: 2px;
+}
+.vrs-ticks .vrs-current {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.vrs-info {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+.vrs-info .vrs-out {
+  color: #BE185D;  /* 사이즈 시그니처 pink-ink 매칭 */
+  font-weight: 600;
+}
+.vrs-info .vrs-ratio { color: var(--ink-4); }
+
+/* 성인 모드 카드 — 새 시그니처 crimson (경고/restricted 톤) */
+.v5 .adult-card {
+  --card-from: #DC2626;
+  --card-to: #F87171;
+  --card-glow: rgba(220,38,38,0.10);
+  --card-shadow: rgba(220,38,38,0.18);
+  --card-mesh-a: rgba(220,38,38,0.10);
+  --card-mesh-b: rgba(248,113,113,0.08);
+  --card-bg-image: url('assets/card-bg-adult.webp');  /* crimson · sultry editorial */
+}
+.v5 .adult-card .icon-box {
+  background: linear-gradient(135deg, rgba(220,38,38,0.14), rgba(248,113,113,0.08));
+  color: #B91C1C;
+  border-color: rgba(220,38,38,0.20);
+}
+
+/* 성인 모드 — 활성 시 16:9 비율로 카드 늘어남 (원본 인물 풀 노출 + 추후 문구 자리 확보)
+ *  aspect-ratio 16/9 → 카드 width 400px 기준 height ≈ 225px
+ *  다른 활성 카드는 padding 38px 만 (~100px 높이) — adult 만 차별화
+ *  transition 도 16/9 변화 자연스럽게 — aspect-ratio 는 transition 안 되지만
+ *  padding/box 변화로 점진 확장 효과 */
+.v5 .adult-card[data-active="true"] {
+  aspect-ratio: 16 / 9;
+}
+
+/* 영상 해상도 카드 시그니처 (warm coral · 2026-05-02 분리 · 사이즈 페어 의도 깨고 변별력 우선)
+ * .size-card-v 의 rose-pink 변수를 specificity 더 높은 .video-res-card 에서 override
+ * cinematographer + 클래퍼보드 이미지 톤 (warm coral/peach) 매칭 */
+.v5 .video-res-card {
+  --card-from: #FB923C;
+  --card-to: #F472B6;
+  --card-glow: rgba(251,146,60,0.10);
+  --card-shadow: rgba(244,114,182,0.18);
+  --card-mesh-a: rgba(251,146,60,0.10);
+  --card-mesh-b: rgba(244,114,182,0.08);
+  --card-bg-image: url('assets/card-bg-video-res.webp');  /* warm coral · cinematographer + 클래퍼보드 */
+}
+
+/* ── Spec Footer ── */
+.spec-footer {
+  margin: 22px 4px 0 4px;
+  padding: 14px 14px 12px;
+  background: rgba(0,0,0,0.025);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  font-size: 11px; color: var(--ink-3); line-height: 1.7;
+}
+.spec-footer h4 {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-4); margin-bottom: 6px; font-weight: 500;
+}
+.spec-footer code {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+  background: rgba(0,0,0,0.04); padding: 1px 5px; border-radius: 3px;
+  color: var(--ink-2);
+}
+
+.global-note {
+  max-width: 1380px; margin: 0 auto;
+  padding: 24px 40px 60px;
+  font-size: 12px; color: var(--ink-3); line-height: 1.8;
+  border-top: 1px dashed var(--line);
+}
+.global-note h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic; font-weight: 500; font-size: 18px; color: var(--ink);
+  letter-spacing: -0.01em; margin-bottom: 10px;
+}
+.global-note ul { padding-left: 20px; margin: 8px 0; }
+.global-note code {
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  background: var(--bg-2); padding: 2px 6px; border-radius: 4px;
+  color: var(--ink-2);
+}
+
+/* ══════════════════════════════════════════════════════════
+   PAIR STAGE — 좌+우 페어 그리드 (NEW · 2026-05-02 · pair-generate)
+   400px (left mode-header) + 32px gap + 880px (right result+history) = 1312px
+   ══════════════════════════════════════════════════════════ */
+.pair-stage {
+  padding: 32px 40px 80px;
+  display: flex;
+  justify-content: center;
+}
+.pair-section {
+  /* width = grid 1312px + horizontal padding 24*2 = 1360px (오버플로 fix · 2026-05-02)
+   * 옛: 1312px → grid 와 같아서 padding 만큼 우측 잘림 */
+  width: 1360px;
+  max-width: 100%;
+  background: linear-gradient(180deg, var(--surface), rgba(255,255,255,0.5));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 22px 24px 30px;
+  box-shadow: var(--shadow-sm);
+}
+.pair-section .legend { margin: 0 4px 18px; }
+.pair-grid {
+  display: grid;
+  grid-template-columns: 400px 880px;
+  gap: 32px;
+  align-items: start;
+}
+/* 페어 안 좌측 패널 — width auto-margin 제거 (그리드 첫 칸에 고정) */
+.pair-grid .left-panel { margin: 0; }
+
+/* ── 우측 패널 — Studio Result + History (NEW) ── */
+.right-panel {
+  width: 880px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 8px 0;
+}
+
+/* Result Header — left mode-header 와 동일 톤 + violet (output) accent */
+.result-header {
+  padding: 4px 0 14px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.result-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.result-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.result-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.result-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: #7C3AED;  /* output 시그니처 violet — accent-ink 와 분리 */
+}
+.result-meta-pills {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.result-pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  background: var(--bg-2);
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+.result-pill.pill-violet {
+  background: linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04));
+  color: #6D4FE0;
+  border-color: rgba(139,92,246,0.22);
+  font-weight: 600;
+}
+.result-pill.pill-amber {
+  background: linear-gradient(135deg, rgba(245,158,11,0.10), rgba(251,146,60,0.04));
+  color: #B47600;
+  border-color: rgba(245,158,11,0.22);
+}
+
+/* ── Result Hero — 16:9 매트지 + dot grid + 인물 + 떠있는 glass action bar ── */
+.result-hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1672 / 941;  /* production Qwen 16:9 결과 비율 */
+  background-color: var(--surface);
+  background-image: radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 2px 4px rgba(23,20,14,.04),
+    0 14px 36px rgba(23,20,14,.08);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  box-sizing: border-box;
+  isolation: isolate;
+}
+.result-hero-img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--r-md);
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.18),
+    0 4px 12px rgba(0,0,0,.10),
+    0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* Glass Action Bar — Tile 액션바와 같은 어두운 frosted glass 톤 (v4 · 2026-05-02 · 오빠 피드백 통일)
+ *  v3 의 밝은 흰 글래스가 너무 불투명해 보였음 → tile 톤 (rgba(28,30,38,.32)) 으로 통일
+ *  Hero·Tile 두 액션바가 같은 frosted dark glass + 흰 아이콘 → 시각 일관성 ★ */
+.result-action-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(28,30,38,0.32);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: var(--r-full);
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.28),
+    0 4px 12px rgba(0,0,0,.14),
+    inset 0 1px 0 rgba(255,255,255,.12);
+  z-index: 5;
+}
+.result-action-btn {
+  all: unset;
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  color: #fff;
+  transition: all 0.15s;
+}
+.result-action-btn:hover {
+  background: rgba(255,255,255,0.16);
+  transform: scale(1.06);
+}
+.result-action-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.22);
+  margin: 0 4px;
+}
+
+/* ── Result Caption — hero 아래 1줄 (NEW 제안 · editorial 미니 캡션) ── */
+.result-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 6px;
+}
+.result-caption-prompt {
+  flex: 1;
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+  line-height: 1.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.result-caption-prompt::before {
+  content: "“";
+  color: var(--ink-4);
+  margin-right: 3px;
+  font-size: 1.15em;
+  font-style: normal;
+}
+.result-caption-prompt::after {
+  content: "”";
+  color: var(--ink-4);
+  margin-left: 3px;
+  font-size: 1.15em;
+  font-style: normal;
+}
+.result-caption-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.result-caption-meta .dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+
+/* ── History Section Header — V5 톤 (Fraunces italic + bilingual + chip) ── */
+.history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-section-header {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: background .15s, border-color .15s, color .15s;
+}
+.history-section-header:hover { background: var(--bg-2); }
+.history-section-header[data-closed="true"] { color: var(--ink-3); }
+.history-section-header .chev {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.18s;
+  color: var(--ink-2);
+}
+.history-section-header[data-closed="true"] .chev { transform: rotate(-90deg); }
+.history-section-header .title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.history-section-header .title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ink);
+}
+.history-section-header[data-closed="true"] .title strong { color: var(--ink-2); }
+.history-section-header .count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  background: var(--bg-2);
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  margin-left: auto;
+}
+
+/* ── History Tiles — 4-col grid · 비율 mix · hover lift + meta bar ── */
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.history-section[data-closed="true"] .history-grid { display: none; }
+
+.history-tile {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(.4,0,.2,1);
+}
+.history-tile:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 6px 16px rgba(23,20,14,.10),
+    0 2px 4px rgba(23,20,14,.05);
+}
+.history-tile-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.history-tile.aspect-16-9 { aspect-ratio: 16 / 9; }
+.history-tile.aspect-4-5  { aspect-ratio: 4 / 5; }
+.history-tile.aspect-1-1  { aspect-ratio: 1 / 1; }
+.history-tile.aspect-3-4  { aspect-ratio: 3 / 4; }
+
+/* 선택된 tile — violet ring (output 시그니처) + 칩 라벨 */
+.history-tile.selected {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px #8B5CF6,
+    0 8px 24px rgba(139,92,246,0.32);
+  border-color: transparent;
+}
+.history-tile.selected::after {
+  content: "● 선택";
+  position: absolute;
+  top: 9px; left: 9px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  color: #fff;
+  background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+  box-shadow:
+    0 2px 8px rgba(139,92,246,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  z-index: 4;
+}
+
+/* Tile Hover Action Bar — 옛 PROD ResultHoverActionBar 패턴 매칭 (오빠 결정 2026-05-02)
+ *  어두운 frosted glass pill + 흰 아이콘 3 (zoom-in / edit / delete) + spring 등장
+ *  ResultHoverActionBar.tsx + ActionBarButton 의 .danger variant 동일 톤 */
+.tile-action-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%) translateY(8px) scale(0.92);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(28,30,38,0.32);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: var(--r-full);
+  box-shadow:
+    0 8px 28px rgba(0,0,0,0.28),
+    0 2px 6px rgba(0,0,0,0.14),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+  opacity: 0;
+  transition:
+    opacity 0.18s ease,
+    transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: 4;
+}
+.history-tile:hover .tile-action-bar {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+  pointer-events: auto;
+}
+.tile-action-btn {
+  all: unset;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  color: #fff;
+  transition: background 0.15s, transform 0.15s;
+}
+.tile-action-btn:hover {
+  background: rgba(255,255,255,0.16);
+  transform: scale(1.08);
+}
+.tile-action-btn.danger:hover {
+  background: rgba(192,57,43,0.92);
+}
+
+/* ══════════════════════════════════════════════════════════
+   EDIT 우측 패널 전용 — BeforeAfter Slider · SegControl · Comparison Card
+   (NEW · 2026-05-02 · pair-edit.html v1)
+   ══════════════════════════════════════════════════════════ */
+
+/* Result Hero — Edit 변형 (column layout · 위 SegControl row + 가운데 slider) */
+.result-hero-edit {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 24px;
+  aspect-ratio: auto;  /* 기본 1672/941 override — slider 안쪽이 비율 가짐 */
+}
+
+/* SegControl row (top-right) — 슬라이더 / 나란히 mode 토글 */
+.hero-seg-row {
+  display: flex;
+  justify-content: flex-end;
+}
+.hero-seg-wrap {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.06);
+  border-radius: var(--r-full);
+}
+.hero-seg-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-3);
+  border-radius: var(--r-full);
+  transition: all 0.18s;
+}
+.hero-seg-btn:hover { color: var(--ink-2); }
+.hero-seg-btn[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 0 0 0.5px rgba(0,0,0,0.04);
+  cursor: default;
+}
+
+/* BeforeAfter Slider — production BeforeAfterSlider 1:1 시각 (정적 시안 · 핸들 50% 고정) */
+.ba-wrap { display: flex; justify-content: center; }
+.ba-slider {
+  position: relative;
+  width: 100%;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #0a0a0c;
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.18),
+    0 4px 12px rgba(0,0,0,.10),
+    0 0 0 1px rgba(0,0,0,.06);
+}
+.ba-after, .ba-before {
+  display: block;
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.ba-before-clip {
+  position: absolute;
+  top: 0; left: 0;
+  bottom: 0;
+  overflow: hidden;
+  /* width inline (slider 비율 50%) */
+}
+.ba-handle {
+  position: absolute;
+  top: 0; bottom: 0;
+  width: 2px;
+  background: rgba(255,255,255,0.92);
+  box-shadow: 0 0 0 0.5px rgba(0,0,0,0.25);
+  pointer-events: none;
+  /* left inline (slider 비율 50%) */
+  transform: translateX(-50%);
+  z-index: 3;
+}
+.ba-handle-grip {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.96);
+  display: grid; place-items: center;
+  cursor: ew-resize;
+  pointer-events: auto;
+  box-shadow:
+    0 6px 18px rgba(0,0,0,0.30),
+    0 2px 6px rgba(0,0,0,0.20),
+    inset 0 1px 0 rgba(255,255,255,0.6);
+  border: 1px solid rgba(0,0,0,0.08);
+  color: var(--ink);
+}
+.ba-label {
+  position: absolute;
+  top: 14px;
+  padding: 4px 10px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: rgba(255,255,255,0.95);
+  background: rgba(0,0,0,0.55);
+  backdrop-filter: blur(10px) saturate(160%);
+  -webkit-backdrop-filter: blur(10px) saturate(160%);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 3;
+}
+.ba-label-before { left: 14px; }
+.ba-label-after { right: 14px; }
+
+/* ── Comparison Analysis Card — filled state (amber 시그니처 · Claude 분석 도구 페어) ── */
+.comparison-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 16px;
+  border-radius: var(--r-md);
+  background: linear-gradient(135deg, rgba(245,158,11,0.07), rgba(245,158,11,0.02));
+  border: 1px solid rgba(245,158,11,0.24);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+}
+.comparison-card .comp-icon {
+  display: grid; place-items: center;
+  width: 24px; height: 24px;
+  border-radius: var(--r-sm);
+  background: rgba(245,158,11,0.14);
+  color: #B47600;
+  flex-shrink: 0;
+}
+.comparison-card .comp-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(82,196,26,0.16);
+  flex-shrink: 0;
+}
+.comparison-card .comp-overall {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0.02em;
+}
+.comparison-card .comp-sep { color: var(--ink-4); font-size: 11px; }
+.comparison-card .comp-axis {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--ink-2);
+}
+.comparison-card .comp-axis .axis-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+}
+.comparison-card .comp-axis .axis-dot[data-tone="green"] { background: var(--green); }
+.comparison-card .comp-axis .axis-dot[data-tone="amber"] { background: var(--amber); }
+.comparison-card .comp-axis .axis-dot[data-tone="red"]   { background: #DC2626; }
+.comparison-card .comp-spacer { flex: 1; }
+.comparison-card .comp-detail-btn {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #B47600;
+  background: rgba(245,158,11,0.10);
+  border: 1px solid rgba(245,158,11,0.22);
+  border-radius: var(--r-full);
+  transition: all 0.15s;
+}
+.comparison-card .comp-detail-btn:hover {
+  background: rgba(245,158,11,0.20);
+  color: #8E5A04;
+}
+.comparison-card .comp-refresh-btn {
+  all: unset;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  width: 26px; height: 26px;
+  border-radius: var(--r-sm);
+  color: var(--ink-3);
+  transition: all 0.15s;
+}
+.comparison-card .comp-refresh-btn:hover {
+  background: rgba(0,0,0,0.04);
+  color: var(--ink-2);
+}
+
+/* ══════════════════════════════════════════════════════════
+   VISION ANALYZE 우측 패널 전용 — Summary · Prompt Toggle · 6 Detail Cards
+   (NEW · 2026-05-02 · pair-vision.html v1)
+   ══════════════════════════════════════════════════════════ */
+
+/* ── Summary Card — 한/영 toggle + 복사 + 본문 (production SummaryCard 1:1) ── */
+.vision-summary {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.vs-header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+.vs-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11.5px; font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.vs-eyebrow svg { color: var(--ink-3); }
+.vs-actions { display: flex; align-items: center; gap: 8px; }
+
+.vs-lang-tabs,
+.vpt-mode-tabs {
+  display: inline-flex;
+  background: var(--bg-2);
+  border-radius: var(--r-sm);
+  padding: 2px;
+  gap: 2px;
+}
+.vs-lang-btn,
+.vpt-mode-btn {
+  all: unset; cursor: pointer;
+  padding: 4px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-3);
+  border-radius: var(--r-sm);
+  transition: all 0.15s;
+}
+.vs-lang-btn:hover,
+.vpt-mode-btn:hover { color: var(--ink-2); }
+.vs-lang-btn[data-active="true"],
+.vpt-mode-btn[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  cursor: default;
+}
+
+.vs-copy-btn {
+  all: unset; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  transition: all 0.15s;
+}
+.vs-copy-btn:hover { background: var(--surface); border-color: var(--line-2); color: var(--ink); }
+
+.vs-body {
+  padding: 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 60px;
+}
+/* 한글 본문 — Pretendard · 영문 본문 — Fraunces italic (좌측 mode-header italic 일관) */
+.vs-body[data-lang="ko"] {
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", sans-serif;
+}
+.vs-body[data-lang="en"] {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 13.5px;
+  letter-spacing: -0.005em;
+}
+
+/* ── Prompt Toggle Card — PROMPT (positive) / NEGATIVE 토글 ── */
+.vision-prompt-toggle {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+.vpt-header {
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* PROMPT (positive) 모드 활성 — green tint */
+.vpt-mode-btn[data-mode="positive"][data-active="true"] { color: #2D7A2D; }
+/* NEGATIVE 모드 활성 — danger red */
+.vpt-mode-btn[data-mode="negative"][data-active="true"] { color: #B8232C; }
+
+.vpt-body {
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink);
+  white-space: pre-wrap;
+  word-break: break-word;
+  min-height: 56px;
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* ── Detail Cards Grid — 6 cards (구도/피사체/의상·재질/환경/조명·카메라/불확실) ── */
+.vision-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+.vision-detail-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  padding: 12px 14px;
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  display: flex; flex-direction: column; gap: 7px;
+  min-height: 86px;
+}
+.vd-header {
+  display: flex; align-items: center; gap: 8px;
+}
+.vd-icon {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: var(--bg-2);
+  display: grid; place-items: center;
+  color: var(--ink-2);
+  flex-shrink: 0;
+}
+.vd-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.vd-body {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink);
+}
+.vision-detail-card[data-muted="true"] {
+  background: var(--bg-2);
+  border-color: var(--line-2);
+}
+.vision-detail-card[data-muted="true"] .vd-body {
+  color: var(--ink-3);
+  font-style: italic;
+}
+
+/* ══════════════════════════════════════════════════════════
+   COMPARE 우측 패널 전용 — 5축 Analysis · Transform · Uncertain
+   (NEW · 2026-05-02 · pair-compare.html v1)
+   ══════════════════════════════════════════════════════════ */
+
+/* Compare Viewer 헤더 — 비율 차이 경고 amber chip */
+.compare-viewer-warn {
+  font-size: 10px;
+  color: var(--amber-ink);
+  font-weight: 500;
+  background: var(--amber-soft);
+  padding: 2px 7px;
+  border-radius: 4px;
+  border: 1px solid rgba(245,158,11,0.30);
+  letter-spacing: 0.02em;
+}
+
+/* BeforeAfter slider 의 A/B 라벨 (옛 BEFORE/AFTER 자리) — 시그니처 색 분리 */
+.ba-label.ba-label-a {
+  background: linear-gradient(135deg, rgba(139,92,246,0.92), rgba(59,130,246,0.92));
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  padding: 5px 12px;
+}
+.ba-label.ba-label-b {
+  background: linear-gradient(135deg, rgba(245,158,11,0.95), rgba(251,146,60,0.95));
+  color: #fff;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  padding: 5px 12px;
+}
+
+/* ── 5축 Analysis Card — 종합 점수 + AxisRow 5 + Summary + Transform + Uncertain ── */
+.compare-analysis-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-sm);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+.cac-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.cac-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink-2);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.cac-overall-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6D4FE0;
+  background: linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04));
+  border: 1px solid rgba(139,92,246,0.22);
+  padding: 4px 12px;
+  border-radius: var(--r-full);
+}
+
+.axis-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+.axis-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.axis-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+}
+.axis-label {
+  font-weight: 600;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+}
+.axis-score {
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 700;
+  color: var(--ink-2);
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+}
+.axis-bar {
+  height: 6px;
+  background: var(--bg-2);
+  border-radius: var(--r-full);
+  overflow: hidden;
+}
+.axis-fill {
+  height: 100%;
+  border-radius: var(--r-full);
+  transition: width 0.5s cubic-bezier(.4,0,.2,1);
+}
+.axis-fill[data-tone="green"]  { background: var(--green); }
+.axis-fill[data-tone="amber"]  { background: var(--amber); }
+.axis-fill[data-tone="gray"]   { background: var(--ink-3); }
+.axis-comment {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  margin-top: 1px;
+}
+
+/* Summary — 총평 (5축 종합) */
+.cac-summary {
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  padding: 11px 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.cac-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  font-weight: 700;
+  margin-bottom: 5px;
+}
+
+/* Transform Prompt Box — B 만들기 t2i 변형 가이드 (violet 톤) */
+.transform-prompt-box {
+  background: linear-gradient(135deg, rgba(139,92,246,0.06), rgba(139,92,246,0.02));
+  border: 1px solid rgba(139,92,246,0.20);
+  border-radius: var(--r-md);
+  padding: 11px 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.transform-prompt-box .cac-eyebrow {
+  color: #6D4FE0;
+}
+.transform-prompt-box .tp-body {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  color: var(--ink);
+  line-height: 1.6;
+  margin-top: 2px;
+}
+
+/* Uncertain Box — 비교 못한 영역 (amber 톤 · 경고적 의미) */
+.uncertain-box {
+  background: linear-gradient(135deg, rgba(245,158,11,0.05), rgba(245,158,11,0.01));
+  border: 1px solid rgba(245,158,11,0.20);
+  border-radius: var(--r-md);
+  padding: 11px 14px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.55;
+}
+.uncertain-box .cac-eyebrow {
+  color: #B47600;
+}
+
+/* ── Vision History Tile — 썸네일 + 본문 (시간·해상도·요약 2줄) · 2-col grid ── */
+.vision-history-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.vision-history-tile {
+  display: flex;
+  gap: 10px;
+  padding: 10px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
+}
+.vision-history-tile:hover {
+  border-color: var(--line-2);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(23,20,14,.08), 0 2px 4px rgba(23,20,14,.04);
+}
+.vht-thumb {
+  width: 88px; height: 88px;
+  flex-shrink: 0;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--bg-2);
+}
+.vht-thumb img {
+  width: 100%; height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vht-body {
+  flex: 1;
+  display: flex; flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  padding: 1px 0;
+}
+.vht-meta {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+}
+.vht-summary {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  letter-spacing: -0.005em;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* Archive Header — 결과 ↔ 히스토리 영역 통합 헤더 (v3 · 2026-05-02 오빠 피드백 격상)
+ *  v2: 작게 (12.5px sans) → v3: result-header 와 동일 톤 (Fraunces italic 26px + eyebrow + count chip)
+ *  Archive 시그니처: neutral (var(--ink)) — Result 의 violet 과 색 분리, 위계 동등 */
+.archive-header {
+  padding: 22px 0 14px;
+  border-top: 1px dashed var(--line-2);
+  margin-top: 8px;
+}
+.archive-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.archive-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.archive-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.archive-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ink);  /* neutral — Result 의 violet 과 분리 */
+}
+.archive-meta-pills {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.archive-pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  background: var(--bg-2);
+  padding: 4px 11px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+}
+.archive-pill.pill-size {
+  /* 용량 칩 — 살짝 다른 톤으로 변별 (mono dim) */
+  color: var(--ink-2);
+  background: linear-gradient(135deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02));
+}
+
+.ic { width: 14px; height: 14px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+.ic-lg { width: 18px; height: 18px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+</style>
+</head>
+<body>
+
+<!-- ── Mockup Meta Strip — 이게 시안 파일이라는 표시 (얇게) ── -->
+<div class="mockup-meta-strip">
+  <span><span class="label-strong">DESIGN MOCKUP</span> · pair-compare.html · Vision Compare 페어 좌+우</span>
+  <span><span class="label-version">v1</span> · 2026-05-02 · A/B 슬롯 + 5축 Analysis + Transform + Uncertain</span>
+</div>
+
+<!-- ── App Header Mock — 실 production AppHeader (`Chrome.TopBar` + AppHeader.tsx) 1:1 ──
+     좌: HomeBtn + Logo · 우: MockBadge + StatusChip + SystemMetrics(4-bar) + Settings + Shutdown -->
+<header class="app-header-mock">
+  <div class="ah-left">
+    <div class="ah-logo">
+      <div class="ah-logo-mark">
+        <div class="ah-logo-mark-inner"></div>
+        <div class="ah-logo-mark-dot"></div>
+      </div>
+      <div class="ah-logo-text">
+        <div class="ah-logo-name">Image Studio</div>
+        <div class="ah-logo-version">LOCAL · v1.2.4</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ah-center">
+    <!-- v6: HomeBtn 좌측에서 빠지고 중앙 nav 첫 항목으로 흡수 · 6 모드 영문 라벨 (오빠 결정 2026-05-02)
+         홈 / 생성 / 수정 / 영상 / 분석 / 비교 → Home / Generate / Edit / Video / Analyze / Compare
+         폰트: Fraunces italic — 좌측 mode-header `생성 · Generate` 영문 italic 페어 + Logo italic 과 일직선 -->
+    <nav class="ah-nav" aria-label="모드 선택">
+      <button class="ah-nav-link" title="메인 페이지">Home</button>
+      <button class="ah-nav-link" title="이미지 생성">Generate</button>
+      <button class="ah-nav-link" title="이미지 수정">Edit</button>
+      <button class="ah-nav-link" title="영상 생성 (LTX-2.3 i2v)">Video</button>
+      <button class="ah-nav-link" title="이미지 분석 (Vision)">Analyze</button>
+      <button class="ah-nav-link" data-active="true" title="이미지 비교 (5축)">Compare</button>
+    </nav>
+  </div>
+
+  <div class="ah-right">
+    <!-- MockBadge (USE_MOCK=true 시만 production 노출 · 시안 항상 표시) -->
+    <div class="ah-mock-badge" title="NEXT_PUBLIC_USE_MOCK=true">MOCK</div>
+
+    <!-- SystemStatusChip — running grace "준비 완료" 시각 (idle 시 production 자동 hidden) -->
+    <div class="ah-status-chip" title="모든 시스템 준비 완료">
+      <span class="ah-status-dot"></span>
+      <span class="ah-status-label">준비 완료</span>
+    </div>
+
+    <!-- SystemMetrics 4-bar (collapsed) — CPU=cyan / GPU=green / VRAM=purple / RAM=blue
+         v2 (2026-05-02 옵션 A): 호버 시 팝오버 dropdown (옛 inline expand 폐기 — 중앙 nav 충돌)
+         시안 .demo-show 클래스로 항상 노출 — production 에선 :hover/:focus-within 시만 -->
+    <div class="ah-metrics" role="group" aria-label="시스템 자원 사용률" tabindex="0">
+      <div class="ah-metric-bar" data-metric="cpu" style="--m-pct:42" title="CPU 42%"></div>
+      <div class="ah-metric-bar" data-metric="gpu" style="--m-pct:64" title="GPU 64%"></div>
+      <div class="ah-metric-bar" data-metric="vram" style="--m-pct:78" title="VRAM 12.5/16G · 78%"></div>
+      <div class="ah-metric-bar" data-metric="ram" style="--m-pct:55" title="RAM 35.4/64G · 55%"></div>
+
+      <!-- Hover Popover — bars 아래로 frosted glass dropdown · 시안 항상 노출 (.demo-show) -->
+      <div class="ah-metrics-popover demo-show">
+        <div class="ah-mp-row" data-tone="cpu">
+          <span class="ah-mp-dot"></span>
+          <span class="ah-mp-label">CPU</span>
+          <span class="ah-mp-usage"></span>
+          <div class="ah-mp-bar"><div class="ah-mp-fill" style="width:42%"></div></div>
+          <span class="ah-mp-percent">42%</span>
+        </div>
+        <div class="ah-mp-row" data-tone="gpu">
+          <span class="ah-mp-dot"></span>
+          <span class="ah-mp-label">GPU</span>
+          <span class="ah-mp-usage"></span>
+          <div class="ah-mp-bar"><div class="ah-mp-fill" style="width:64%"></div></div>
+          <span class="ah-mp-percent">64%</span>
+        </div>
+        <div class="ah-mp-row" data-tone="vram">
+          <span class="ah-mp-dot"></span>
+          <span class="ah-mp-label">VRAM</span>
+          <span class="ah-mp-usage">12.5 / 16G</span>
+          <div class="ah-mp-bar"><div class="ah-mp-fill" style="width:78%"></div></div>
+          <span class="ah-mp-percent">78%</span>
+        </div>
+        <div class="ah-mp-row" data-tone="ram">
+          <span class="ah-mp-dot"></span>
+          <span class="ah-mp-label">RAM</span>
+          <span class="ah-mp-usage">35.4 / 64G</span>
+          <div class="ah-mp-bar"><div class="ah-mp-fill" style="width:55%"></div></div>
+          <span class="ah-mp-percent">55%</span>
+        </div>
+
+        <!-- VRAM 80%+ breakdown (시안용 더미 데모 · 실 production 은 percent ≥ 80% + breakdown 데이터 있을 때만) -->
+        <div class="ah-mp-divider"></div>
+        <div class="ah-mp-bd-eyebrow">VRAM Breakdown</div>
+        <div class="ah-mp-bd-row">
+          <span class="ah-mp-bd-name">ComfyUI</span>
+          <span class="ah-mp-bd-vram">9.2 GB</span>
+          <span class="ah-mp-bd-models">qwen-image-2512 · edit</span>
+        </div>
+        <div class="ah-mp-bd-row">
+          <span class="ah-mp-bd-name">Ollama</span>
+          <span class="ah-mp-bd-vram">3.3 GB</span>
+          <span class="ah-mp-bd-models">qwen2.5vl · gemma4-un</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SettingsButton — gear icon (⌘,) -->
+    <button class="ah-icon-btn" title="설정 (⌘,)">
+      <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+
+    <!-- ShutdownButton — power icon (Launcher v2 Hidden 모드 · ENABLE_LOCAL_SHUTDOWN=true 시만) -->
+    <button class="ah-icon-btn" title="스튜디오 종료">
+      <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12 2v10"/><path d="M5.5 7.5a8 8 0 1 0 13 0"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="pair-stage">
+
+  <!-- ════════════════════════ Compare 페어 시안 v1 (2026-05-02) ════════════════════════ -->
+  <section class="pair-section v3 v3c2 v5">
+    <div class="legend">
+      <strong>Compare 페어 (좌+우)</strong> &nbsp;좌측 mode-header + CTA + 이미지 A/B 두 슬롯 + A↔B 스왑 + 비교 지시 (선택) · 우측 비교 뷰어 (BeforeAfter slider · A=violet/B=amber 라벨) + 5축 Analysis Card (구성/색감/피사체/분위기/품질) + Transform Prompt + Uncertain + Vision History
+    </div>
+
+    <div class="pair-grid">
+      <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-eyebrow">IMAGE STUDIO · COMPARE</div>
+        <div class="mode-title-row">
+          <h2 class="mode-title"><strong>비교</strong> · Compare</h2>
+          <button class="mode-flow-link"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+        </div>
+        <p class="mode-desc">두 이미지의 차이와 품질을 5축 기준으로 비교합니다.</p>
+      </div>
+
+      <!-- 1. CTA (상단 — 시안 옵션 F · 5 패널 통일) -->
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          Compare
+        </button>
+      </div>
+
+      <!-- 2. 이미지 A 슬롯 (violet/blue 시그니처) -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>이미지 A <span class="badge-ab">A</span></span>
+        </div>
+        <div class="edit-source-card compare-slot-a">
+          <div class="es-bg" style="background-image: url('assets/card-bg-ai.webp');"></div>
+          <div class="es-grad"></div>
+          <button class="es-change-btn" title="이미지 변경"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+          <div class="es-meta-bottom">
+            <span class="label">image_violet.png</span>
+            <span class="info mono">1672 × 941 · PNG</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- A↔B 자리 바꾸기 -->
+      <div class="swap-btn-wrap">
+        <button class="swap-btn">
+          <svg class="ic" viewBox="0 0 24 24" style="width:12px;height:12px"><path d="M7 16V4M3 8l4-4 4 4M17 8v12M21 16l-4 4-4-4"/></svg>
+          A ↔ B 자리 바꾸기
+        </button>
+      </div>
+
+      <!-- 3. 이미지 B 슬롯 (amber/orange 시그니처) -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>이미지 B <span class="badge-ab badge-b">B</span></span>
+        </div>
+        <div class="edit-source-card compare-slot-b">
+          <div class="es-bg" style="background-image: url('assets/card-bg-claude.webp');"></div>
+          <div class="es-grad"></div>
+          <button class="es-change-btn" title="이미지 변경"><svg class="ic" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg></button>
+          <div class="es-meta-bottom">
+            <span class="label">image_amber.png</span>
+            <span class="info mono">1672 × 941 · PNG</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. 비교 지시 (선택) -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>비교 지시 <span class="optional-hint">(선택)</span></span>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <textarea class="prompt-textarea" rows="3" placeholder="예: 의상 차이에 집중해 주세요 / 색감 변화 위주로 비교"></textarea>
+        </div>
+      </div>
+      </div>
+
+      <!-- ── 우측 패널 — Result + History (NEW · 페어 시안 v1) ── -->
+      <div class="right-panel">
+
+        <!-- Result Header — Compare (비교 결과 · Result · 종합 87% chip · 5축 평가) -->
+        <div class="result-header">
+          <div class="result-eyebrow">IMAGE STUDIO · RESULT</div>
+          <div class="result-title-row">
+            <h2 class="result-title"><strong>비교 결과</strong> · Result</h2>
+            <div class="result-meta-pills">
+              <span class="result-pill pill-violet">A → B 비교</span>
+              <span class="result-pill">qwen2.5vl · 7B</span>
+              <span class="result-pill pill-amber">5축 + 종합</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Compare Viewer — matt + SegControl row + BeforeAfter slider (A=violet/B=amber 라벨) -->
+        <div class="result-hero result-hero-edit">
+
+          <!-- SegControl row + 비율 차이 경고 (옵션 · 비율 10%↑ 차이 시 노출) -->
+          <div class="hero-seg-row" style="justify-content: space-between;">
+            <span class="compare-viewer-warn" title="비율 차이 ≥10% — 나란히 보기 권장">
+              ⚠ 비율이 다름 — 나란히 권장
+            </span>
+            <div class="hero-seg-wrap" data-value="slider">
+              <button class="hero-seg-btn" data-value="slider" data-active="true">슬라이더</button>
+              <button class="hero-seg-btn" data-value="sidebyside" data-active="false">나란히</button>
+            </div>
+          </div>
+
+          <!-- BeforeAfter Slider (A=좌측 violet · B=우측 amber 라벨) -->
+          <div class="ba-wrap">
+            <div class="ba-slider" style="aspect-ratio: 1672 / 941;">
+              <img class="ba-after" src="assets/card-bg-claude.webp" alt="이미지 B (amber)">
+              <div class="ba-before-clip" style="width: 50%;">
+                <img class="ba-before" src="assets/card-bg-ai.webp" alt="이미지 A (violet)">
+              </div>
+              <div class="ba-handle" style="left: 50%;">
+                <div class="ba-handle-grip" title="드래그로 비교 (A↔B)">
+                  <svg class="ic" viewBox="0 0 24 24" style="width:18px;height:18px"><path d="m9 7-5 5 5 5"/><path d="m15 17 5-5-5-5"/></svg>
+                </div>
+              </div>
+              <span class="ba-label ba-label-a">A</span>
+              <span class="ba-label ba-label-b">B</span>
+
+              <!-- Glass Action Bar — Compare 4 버튼 (자세히 / 스왑 / 라이트박스 / 리프레시) -->
+              <div class="result-action-bar">
+                <button class="result-action-btn" title="자세히 (라이트박스)">
+                  <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>
+                </button>
+                <span class="result-action-divider"></span>
+                <button class="result-action-btn" title="A ↔ B 자리 바꾸기">
+                  <svg class="ic" viewBox="0 0 24 24"><path d="M7 16V4M3 8l4-4 4 4M17 8v12M21 16l-4 4-4-4"/></svg>
+                </button>
+                <button class="result-action-btn" title="비교 지시 복사">
+                  <svg class="ic" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+                </button>
+                <button class="result-action-btn" title="재분석">
+                  <svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.3"/><path d="M21 12a9 9 0 0 1-15.5 6.3"/><path d="M18 3v5h-5"/><path d="M6 21v-5h5"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 5축 Analysis Card — 종합 87% + 5 AxisRow + 총평 + Transform Prompt + Uncertain -->
+        <div class="compare-analysis-card">
+          <div class="cac-header">
+            <div class="cac-title">
+              <svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M9 3v18"/></svg>
+              5축 비교 분석
+            </div>
+            <div class="cac-overall-chip">종합 87%</div>
+          </div>
+
+          <div class="axis-rows">
+            <!-- 1. 구성 -->
+            <div class="axis-row">
+              <div class="axis-row-head"><span class="axis-label">구성</span><span class="axis-score">82%</span></div>
+              <div class="axis-bar"><div class="axis-fill" data-tone="green" style="width: 82%"></div></div>
+              <div class="axis-comment">A 는 황금분할 (얼굴 우측 1/3) · B 는 중심 정렬. A 의 구도가 시선 흐름 더 자연스러움.</div>
+            </div>
+            <!-- 2. 색감 -->
+            <div class="axis-row">
+              <div class="axis-row-head"><span class="axis-label">색감</span><span class="axis-score">95%</span></div>
+              <div class="axis-bar"><div class="axis-fill" data-tone="green" style="width: 95%"></div></div>
+              <div class="axis-comment">두 이미지 모두 따뜻한 톤 일관 · A=violet · B=amber/golden — 의도된 톤 변주.</div>
+            </div>
+            <!-- 3. 피사체 -->
+            <div class="axis-row">
+              <div class="axis-row-head"><span class="axis-label">피사체</span><span class="axis-score">88%</span></div>
+              <div class="axis-bar"><div class="axis-fill" data-tone="green" style="width: 88%"></div></div>
+              <div class="axis-comment">동일 인물성 · 헤어 길이/스타일 거의 일치 · 의상 톤만 다름 (white vs warm).</div>
+            </div>
+            <!-- 4. 분위기 -->
+            <div class="axis-row">
+              <div class="axis-row-head"><span class="axis-label">분위기</span><span class="axis-score">73%</span></div>
+              <div class="axis-bar"><div class="axis-fill" data-tone="amber" style="width: 73%"></div></div>
+              <div class="axis-comment">A 는 mystical · 환상적 · B 는 contemplative · 명상적. 다른 mood 의도.</div>
+            </div>
+            <!-- 5. 품질 -->
+            <div class="axis-row">
+              <div class="axis-row-head"><span class="axis-label">품질</span><span class="axis-score">94%</span></div>
+              <div class="axis-bar"><div class="axis-fill" data-tone="green" style="width: 94%"></div></div>
+              <div class="axis-comment">두 이미지 모두 sharp · 디테일 충분 · 노이즈 미미. 동급 품질.</div>
+            </div>
+          </div>
+
+          <!-- 총평 (5축 종합) -->
+          <div class="cac-summary">
+            <div class="cac-eyebrow">SUMMARY</div>
+            동일 인물·동일 헤어·유사 구도이나, 색감과 분위기가 의도적으로 분리됨. A 는 환상적 violet 마법 톤, B 는 따뜻한 골든아워 톤. 5축 평균 종합 87% — 두 이미지가 "같은 인물의 다른 스타일링" 으로 잘 페어가 됨.
+          </div>
+
+          <!-- Transform Prompt Box — B 만들기 t2i 변형 가이드 -->
+          <div class="transform-prompt-box">
+            <div class="cac-eyebrow">TRANSFORM (A → B 가이드)</div>
+            <div class="tp-body">replace violet ethereal sparkles with warm golden hour amber backlight, soften mood from mystical to contemplative, keep face & hair structure identical, shift outfit tone from cool to warm minimal white</div>
+          </div>
+
+          <!-- Uncertain Box — 비교 못한 영역 -->
+          <div class="uncertain-box">
+            <div class="cac-eyebrow">UNCERTAIN</div>
+            정확한 촬영 location 비교 불가 (둘 다 보케 배경이라 환경 비교 어려움). 헤어 길이의 미세 차이는 측면 각도 차이 때문일 수 있음.
+          </div>
+        </div>
+
+        <!-- Archive Header — Compare 히스토리 (useVisionCompareStore localStorage · MAX cap · A→B 페어 단위) -->
+        <div class="archive-header">
+          <div class="archive-eyebrow">IMAGE STUDIO · ARCHIVE</div>
+          <div class="archive-title-row">
+            <h2 class="archive-title"><strong>최근 비교</strong> · History</h2>
+            <div class="archive-meta-pills">
+              <span class="archive-pill">12 / 30</span>
+              <span class="archive-pill pill-size">localStorage</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- History — 오늘 (펼침) · Vision 전용 썸네일+본문 카드 -->
+        <div class="history-section">
+          <button class="history-section-header" data-closed="false">
+            <span class="chev"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+            <span class="title"><strong>오늘</strong> · Today</span>
+            <span class="count">4</span>
+          </button>
+          <div class="vision-history-grid">
+            <div class="vision-history-tile">
+              <div class="vht-thumb"><img src="assets/card-bg-ai.webp" alt=""></div>
+              <div class="vht-body">
+                <div class="vht-meta">5/2 14:20 · A↔B · <strong style="color: #6D4FE0">종합 87%</strong></div>
+                <p class="vht-summary">violet 환상 톤 (A) vs amber 골든아워 (B) — 동일 인물·다른 mood. 색감 95 / 분위기 73 / 품질 94.</p>
+              </div>
+            </div>
+            <div class="vision-history-tile">
+              <div class="vht-thumb"><img src="assets/card-bg-fast.webp" alt=""></div>
+              <div class="vht-body">
+                <div class="vht-meta">5/2 11:48 · A↔B · <strong style="color: #6D4FE0">종합 79%</strong></div>
+                <p class="vht-summary">cyan holographic outfit (A) vs golden editorial (B) — 같은 모델·다른 컨셉. 의상/조명 차이 큼.</p>
+              </div>
+            </div>
+            <div class="vision-history-tile">
+              <div class="vht-thumb"><img src="assets/card-bg-size.webp" alt=""></div>
+              <div class="vht-body">
+                <div class="vht-meta">5/2 09:15 · A↔B · <strong style="color: #B47600">종합 64%</strong></div>
+                <p class="vht-summary">pink architect (A) vs warm coral cinematographer (B) — 분위기 분리. 피사체 동일성 낮음.</p>
+              </div>
+            </div>
+            <div class="vision-history-tile">
+              <div class="vht-thumb"><img src="assets/card-bg-multi-ref.webp" alt=""></div>
+              <div class="vht-body">
+                <div class="vht-meta">5/2 08:30 · A↔B · <strong style="color: #6D4FE0">종합 91%</strong></div>
+                <p class="vht-summary">fuchsia curator (A) vs same model 편집 (B) — 의상 swap 변주, 정체성 보존.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History — 어제 (접힘 · 시각 시뮬레이션) -->
+        <div class="history-section" data-closed="true">
+          <button class="history-section-header" data-closed="true">
+            <span class="chev"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+            <span class="title"><strong>어제</strong> · Yesterday</span>
+            <span class="count">3</span>
+          </button>
+          <div class="vision-history-grid"></div>
+        </div>
+
+        <!-- History — 이번 주 (펼침) -->
+        <div class="history-section">
+          <button class="history-section-header" data-closed="false">
+            <span class="chev"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+            <span class="title"><strong>이번 주</strong> · This week</span>
+            <span class="count">2</span>
+          </button>
+          <div class="vision-history-grid">
+            <div class="vision-history-tile">
+              <div class="vht-thumb"><img src="assets/card-bg-adult.webp" alt=""></div>
+              <div class="vht-body">
+                <div class="vht-meta">5/1 22:42 · A↔B · <strong style="color: #6D4FE0">종합 84%</strong></div>
+                <p class="vht-summary">crimson silk (A) vs amber editorial (B) — sultry vs warm 톤 비교. 동일 모델·다른 lighting.</p>
+              </div>
+            </div>
+            <div class="vision-history-tile">
+              <div class="vht-thumb"><img src="assets/card-bg-auto-compare.webp" alt=""></div>
+              <div class="vht-body">
+                <div class="vht-meta">5/1 18:05 · A↔B · <strong style="color: #B47600">종합 58%</strong></div>
+                <p class="vht-summary">teal evaluator (A) vs violet mystic (B) — 색감/분위기 모두 분리. 다른 컨셉 비교.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · Compare 페어 시안 v1 (2026-05-02)</h4>
+      <strong>Left Panel 4 항목:</strong> CTA `Compare` (상단 · 시안 옵션 F — 옛 production 하단 sticky 변경) · 이미지 A 슬롯 (badge violet) · A↔B 자리 바꾸기 swap 버튼 · 이미지 B 슬롯 (badge amber) · 비교 지시 textarea (선택 · placeholder)<br>
+      <strong>Right Panel 4 섹션:</strong> Result Header (A→B 비교 · qwen2.5vl · 5축+종합) · <strong>Compare Viewer</strong> (matt + SegControl 슬라이더/나란히 + 비율 차이 경고 amber chip + BeforeAfter slider + A=violet · B=amber 라벨 + Glass action bar) · <strong>5축 Analysis Card</strong> (종합 87% chip + 5 AxisRow 구성/색감/피사체/분위기/품질 + 총평 + Transform Prompt + Uncertain) · Compare History<br>
+      <strong>5축 AxisRow:</strong> 라벨 + 점수 mono + bar (80+ green / 60+ amber / 미만 gray) + 한국어 코멘트 1-2줄<br>
+      <strong>Transform Prompt Box:</strong> violet 톤 frosted (rgba(139,92,246,0.06)) · A → B 변형 가이드 mono body — 사용자가 B 같은 결과 만들고 싶을 때 t2i prompt 로 활용<br>
+      <strong>Uncertain Box:</strong> amber 톤 (경고 의미) · 비교 못한 영역 솔직 명시 — qwen2.5vl 의 신뢰도 한계 표현<br>
+      <strong>Hero Action Bar (Compare 4 버튼):</strong> 자세히 / A↔B 자리 바꾸기 / 비교 지시 복사 / 재분석<br>
+      <strong>Compare History Tile:</strong> Vision tile 패턴 재사용 (썸네일 88 + 본문) — meta 에 `A↔B · 종합 N%` 형식 (점수 컬러 violet 80+ / amber 60+) · summary 는 비교 결과 1-2줄<br>
+      <strong>Archive:</strong> useVisionCompareStore localStorage · `12 / 30` count/maxEntries · `localStorage` size pill<br>
+      <strong>너비 정책 (옵션 D · 동일):</strong> 시안 고정 1312/1360 · 실 React = 박스 유지 + <code>max-width: min(95vw, 1600px)</code> cap · Right=<code>1fr</code> auto<br>
+      <strong>React 적용 시 추가 유지:</strong> BeforeAfterSlider 드래그 핸들 · slider/sidebyside 모드 토글 · 비율 10%↑ 차이 자동 amber 경고 · transform_prompt 한/영 토글 (CompareExtraBoxes) · uncertain 한/영 토글 · CTA 상단 sticky (옛 hidden bottom 변경 항목 F)<br>
+      <strong>다음 단계 (남음):</strong> Video 페어 (생성/수정과 비슷 · 옵션) + cards-v2 → React 적용 plan 갱신
+    </div>
+  </section>
+
+</main>
+
+<aside class="global-note">
+  <h3>Generate 페어 시안 v1 — 좌+우 한 쌍</h3>
+  <p>좌측 패널 V5 (cards-v2.html 픽스 완료) + 우측 결과/히스토리 패널 (NEW). 페어로 봐서 비율·리듬·간격 검증.</p>
+
+  <ul>
+    <li><strong>좌측 (Left · 400px)</strong> — V5 mode-header (eyebrow + Fraunces italic <code>생성 · Generate</code>) + Aurora Glass CTA + 프롬프트 + 카드 4종 (AI/Claude/퀄리티/사이즈)</li>
+    <li><strong>우측 (Right · 880px)</strong> — Result Header (violet output 시그니처) + Result Hero (16:9 매트 + dot grid + Glass action bar) + Caption (NEW) + History 섹션 masonry</li>
+  </ul>
+
+  <p style="margin-top:14px;"><strong>그리드</strong> — <code>400px + 32px gap + 880px = 1312px</code> (React 의 <code>grid: "400px minmax(624px, 1fr)"</code> 매칭)</p>
+
+  <p style="margin-top:14px;"><strong>인터랙션 데모</strong></p>
+  <ul>
+    <li>좌측: 카드 클릭 ON/OFF · segmented 클릭 · 비율 카드 · 비율잠금 (cards-v2 와 동일)</li>
+    <li>우측: history-section-header 클릭 → 섹션 접힘/펼침 토글 + 화살표 회전</li>
+    <li>우측 history-tile 호버 → lift + <strong>옛 PROD 액션 바</strong> (어두운 글래스 pill · zoom/edit/delete 3 버튼) spring 통통 등장</li>
+  </ul>
+
+  <p style="margin-top:14px; color:var(--ink-4); font-size:11px;">
+    💡 <strong>다음 단계</strong> — 픽스 후:<br>
+    1) Empty State 변형 (선택 결과 없음 시) — 별도 시안 추가 가능<br>
+    2) 다른 4 모드 페어 (Edit / Video / Vision / Compare) — 같은 패턴으로 복제<br>
+    3) React 적용 plan 갱신 (<code>docs/superpowers/plans/2026-05-02-design-v5-react-application.md</code>)
+  </p>
+</aside>
+
+<script>
+// 카드 클릭 → ON/OFF 토글 (segmented/aspect/lock 클릭은 stopPropagation 으로 제외)
+document.querySelectorAll('.toggle-card').forEach(card => {
+  card.addEventListener('click', e => {
+    if (e.target.closest('.seg-btn')) return;  // segmented stopPropagation 으로도 막혀있지만 이중 안전
+    const active = card.dataset.active === 'true';
+    card.dataset.active = !active;
+  });
+});
+
+// Segmented (instant/thinking) → thumb 슬라이드 (카드 토글 차단)
+document.querySelectorAll('.seg-wrap').forEach(wrap => {
+  wrap.addEventListener('click', e => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    const value = btn.dataset.value;
+    wrap.dataset.value = value;
+    wrap.querySelectorAll('.seg-btn').forEach(b => {
+      b.dataset.active = (b.dataset.value === value);
+    });
+  });
+});
+
+// 비율 카드 → active 전환
+document.querySelectorAll('.aspect-grid').forEach(grid => {
+  grid.addEventListener('click', e => {
+    const card = e.target.closest('.aspect-card');
+    if (!card) return;
+    e.stopPropagation();
+    grid.querySelectorAll('.aspect-card').forEach(c => c.dataset.active = "false");
+    card.dataset.active = "true";
+  });
+});
+
+// 비율잠금 토글
+document.querySelectorAll('.lock-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const locked = btn.dataset.locked === 'true';
+    btn.dataset.locked = !locked;
+  });
+});
+
+// V3c-2 hover 툴팁 — desc 텍스트 제거 후 카드 hover 시 검정 pill 으로 표시
+//   pair-generate.html 은 Generate 모드만 → 4 카드만 매핑 (multi-ref/auto-compare/adult 제외)
+const V3C2_TIPS = {
+  'ai-card':     'ON · 한국어/자연어 → 영문 정제',
+  'claude-card': 'Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s',
+  'fast-card':   'ON 시 Lightning 4-step 끄고 풀 디테일 · 약 4배 느림',
+};
+document.querySelectorAll('.v3c2 .toggle-card').forEach(card => {
+  for (const cls in V3C2_TIPS) {
+    if (card.classList.contains(cls)) {
+      card.dataset.tooltip = V3C2_TIPS[cls];
+      break;
+    }
+  }
+});
+
+// History Section Header — 클릭 시 접힘/펼침 토글
+//   data-closed 속성을 헤더 + 부모 .history-section 양쪽에 동기화
+//   (CSS 가 .history-section[data-closed="true"] .history-grid 를 display:none 처리)
+document.querySelectorAll('.history-section-header').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const closed = btn.dataset.closed === 'true';
+    const next = (!closed).toString();
+    btn.dataset.closed = next;
+    const section = btn.closest('.history-section');
+    if (section) section.dataset.closed = next;
+  });
+});
+
+// History Action Bar 버튼 클릭 시 placeholder (시안 — 실 동작 없음 · stopPropagation 만)
+document.querySelectorAll('.result-action-btn').forEach(btn => {
+  btn.addEventListener('click', e => e.stopPropagation());
+});
+
+// AppHeader 중앙 nav — 클릭 시 active 전환 (시안 데모 · 실 React 는 router.push)
+document.querySelectorAll('.ah-nav-link').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ah-nav-link').forEach(b => b.dataset.active = "false");
+    btn.dataset.active = "true";
+  });
+});
+
+// Compare/Edit Hero SegControl — 슬라이더 / 나란히 토글 (시안 데모)
+document.querySelectorAll('.hero-seg-wrap').forEach(group => {
+  group.addEventListener('click', e => {
+    const btn = e.target.closest('.hero-seg-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    const value = btn.dataset.value;
+    group.dataset.value = value;
+    group.querySelectorAll('.hero-seg-btn').forEach(b => {
+      b.dataset.active = (b.dataset.value === value).toString();
+    });
+  });
+});
+
+// Vision Summary 한/영 toggle — 본문 swap + 폰트 분기
+const VS_TEXT = {
+  ko: '골든아워의 따스한 호박빛이 비추는 야외 공간에서 검은 머리의 동양 여성이 카메라에 옆얼굴을 보이는 인물 사진. 머리카락이 빛에 의해 살짝 빛나며 분위기는 차분하고 명상적입니다. 의상은 미니멀한 화이트 셔츠 스타일이며, 시선은 프레임 밖 우측을 향합니다. 50mm 표준 렌즈, 얕은 심도, vogue korea editorial 톤.',
+  en: 'An outdoor portrait of an East Asian woman with dark hair, photographed in warm amber golden hour light. She is shown in 3/4 profile with her face turned away from the camera, hair softly lit from behind, evoking a contemplative editorial mood. Wearing a minimal white shirt style, eyes directed off-frame to the right. Shot on 50mm with shallow depth of field, vogue korea editorial tone.',
+};
+document.querySelectorAll('.vs-lang-tabs').forEach(tabs => {
+  tabs.addEventListener('click', e => {
+    const btn = e.target.closest('.vs-lang-btn');
+    if (!btn) return;
+    const lang = btn.dataset.lang;
+    tabs.querySelectorAll('.vs-lang-btn').forEach(b => b.dataset.active = (b === btn).toString());
+    const card = tabs.closest('.vision-summary');
+    const body = card && card.querySelector('.vs-body');
+    if (body) {
+      body.dataset.lang = lang;
+      body.textContent = VS_TEXT[lang] || '';
+    }
+  });
+});
+
+// Vision Prompt PROMPT/NEGATIVE toggle — 본문 swap
+const VPT_TEXT = {
+  positive: 'young East Asian woman, side profile, golden hour, warm amber backlight, dark flowing hair softly lit, minimal white cotton shirt, editorial portrait, 3/4 view, contemplative mood, 50mm lens, shallow depth of field, vogue korea aesthetic, soft natural lighting',
+  negative: 'blurry, low quality, distorted face, harsh direct lighting, oversaturated colors, plastic skin texture, multiple faces, extra limbs, watermark, text overlay, low resolution, jpeg artifacts',
+};
+document.querySelectorAll('.vpt-mode-tabs').forEach(tabs => {
+  tabs.addEventListener('click', e => {
+    const btn = e.target.closest('.vpt-mode-btn');
+    if (!btn) return;
+    const mode = btn.dataset.mode;
+    tabs.querySelectorAll('.vpt-mode-btn').forEach(b => b.dataset.active = (b === btn).toString());
+    const card = tabs.closest('.vision-prompt-toggle');
+    const body = card && card.querySelector('.vpt-body');
+    if (body) {
+      body.dataset.mode = mode;
+      body.textContent = VPT_TEXT[mode] || '';
+    }
+  });
+});
+</script>
+</body>
+</html>

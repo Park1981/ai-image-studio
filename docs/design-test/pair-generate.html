@@ -1,0 +1,2568 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio Design Test v2 · V3 Aurora Glass — 3 Variants</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; }
+
+:root {
+  --bg: #FAF9F7;
+  --bg-2: #F4F2EE;
+  --surface: #FFFFFF;
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --accent: #4A9EFF;
+  --accent-ink: #1E7BE0;
+  --accent-soft: #EAF3FF;
+  --accent-disabled: #C8D6E8;
+  --green: #52C41A; --green-soft: #EEF9E4;
+  --amber: #FAAD14; --amber-soft: #FFF7E0; --amber-ink: #B47600;
+  --shadow-sm: 0 1px 2px rgba(23,20,14,.04), 0 2px 8px rgba(23,20,14,.04);
+  --shadow-md: 0 2px 4px rgba(23,20,14,.04), 0 8px 24px rgba(23,20,14,.06);
+  --shadow-lg: 0 4px 10px rgba(23,20,14,.05), 0 20px 48px rgba(23,20,14,.08);
+  --r-sm: 8px; --r-md: 12px; --r-card: 14px; --r-lg: 16px; --r-full: 999px;
+}
+
+html, body {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(74,158,255,0.04), transparent 40%),
+    radial-gradient(circle at 80% 100%, rgba(250,173,20,0.03), transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", -apple-system, system-ui, sans-serif;
+  font-feature-settings: "ss02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px; line-height: 1.6; letter-spacing: 0;
+  min-height: 100vh;
+}
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-feature-settings: "zero"; }
+.display { font-family: "Fraunces", Georgia, serif; font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0; font-feature-settings: "ss01"; }
+
+/* ── Mockup Meta Strip — pair-generate.html 의 시안 라벨 (얇은 스트립 · production X)
+ *  실 production AppHeader 와 헷갈리지 않게 위에 별도 분리 · `--accent` 점선 underline · mono ── */
+.mockup-meta-strip {
+  padding: 6px 20px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.10em;
+  color: var(--ink-4);
+  background: rgba(0,0,0,0.02);
+  border-bottom: 1px dashed var(--line-2);
+  display: flex; justify-content: space-between; align-items: center; gap: 14px;
+  text-transform: uppercase;
+}
+.mockup-meta-strip .label-strong { color: var(--ink-3); font-weight: 600; }
+.mockup-meta-strip .label-version { color: var(--accent-ink); }
+
+/* ── App Header Mock — production `AppHeader.tsx` + `Chrome.TopBar` 1:1 (오빠 결정 2026-05-02 · 헤더 정리용) ──
+ *  진짜 그대로 옮긴 후 시안에서 다듬기. height 52 · sticky · backdrop blur. */
+.app-header-mock {
+  height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(250,249,247,.85);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+}
+.ah-left { display: flex; align-items: center; gap: 14px; }
+.ah-center { display: flex; justify-content: center; }
+.ah-right { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+
+/* ── Center Nav — 5 모드 직접 이동 segmented (v5 NEW · 오빠 결정 2026-05-02)
+ *  iOS 스타일 segmented container · 활성 = 흰 surface + 그림자 살짝 · 비활성 = ghost
+ *  옛 production 은 중앙 비어있음 (옛 ModelBadge 자리) → 5 모드 빠른 이동 + 비대칭 해소 */
+.ah-nav {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--r-full);
+  background: rgba(0,0,0,0.04);
+  border: 1px solid rgba(0,0,0,0.04);
+}
+/* v6 (2026-05-02): 폰트 Pretendard 12px → Fraunces italic 13px
+ *  좌측 mode-header `생성 · Generate` 의 italic 부분과 페어 + Logo italic 과 일직선 (editorial 톤 통일)
+ * v7 (2026-05-02): hover 효과 spring 통통 (cubic-bezier(0.34, 1.56, 0.64, 1) overshoot)
+ *  ResultHoverActionBar.tsx 와 동일한 spring 곡선 — 진입/해제 양쪽 자연스러운 왔다갔다 */
+.ah-nav-link {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 13px;
+  border-radius: var(--r-full);
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink-3);
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  position: relative;
+  transition:
+    background .32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    color .2s ease,
+    transform .36s cubic-bezier(0.34, 1.56, 0.64, 1),
+    box-shadow .32s cubic-bezier(0.34, 1.56, 0.64, 1),
+    font-weight .2s ease;
+}
+/* 비활성 chip 호버: spring 살짝 통통 + bg 페이드 (활성 chip 은 이미 고정 surface 라 hover X) */
+.ah-nav-link:hover:not([data-active="true"]) {
+  color: var(--ink-2);
+  background: rgba(255,255,255,0.7);
+  transform: scale(1.06);
+}
+.ah-nav-link[data-active="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.06),
+    0 0 0 0.5px rgba(0,0,0,0.04);
+  cursor: default;
+}
+
+/* HomeBtn (메인으로) — v5 (오빠 결정 2026-05-02): Settings/Shutdown 과 같은 ghost 패턴으로 통일
+ *  옛: outlined surface (시각 위계 좌우 비대칭) → 새: ghost border:transparent + hover bg 만 */
+.ah-home-btn {
+  all: unset; cursor: pointer;
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--ink-2);
+  display: grid; place-items: center;
+  transition: all .15s;
+}
+.ah-home-btn:hover {
+  background: var(--bg-2);
+  color: var(--ink);
+}
+
+/* Logo — 잉크 사각 + 액센트 점 + 프로덕트명 + version */
+.ah-logo { display: flex; align-items: center; gap: 8px; }
+.ah-logo-mark {
+  width: 22px; height: 22px;
+  border-radius: var(--r-sm);
+  background: var(--ink);
+  display: grid; place-items: center;
+  position: relative;
+}
+.ah-logo-mark-inner {
+  width: 10px; height: 10px;
+  border-radius: 2px;
+  background: var(--bg);
+  box-shadow: inset 0 0 0 1.5px var(--ink);
+}
+.ah-logo-mark-dot {
+  position: absolute;
+  right: -2px; bottom: -2px;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 2px solid var(--bg);
+}
+.ah-logo-text { display: flex; flex-direction: column; line-height: 1; }
+/* v5 (오빠 결정 2026-05-02): Image Studio 텍스트 → Fraunces italic 으로 좌측 mode-header 톤 연결
+ *  마크는 그대로 (잉크 정사각 + 액센트 점 — 정체성 유지) · 버전은 mono 그대로 · 두 톤 contrast 매력 */
+.ah-logo-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+.ah-logo-version {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px; color: var(--ink-3);
+  margin-top: 3px;
+  letter-spacing: .08em;
+}
+
+/* MockBadge — USE_MOCK=true 시만 노출 (시안용 항상 표시) */
+.ah-mock-badge {
+  display: flex; align-items: center;
+  height: 26px; padding: 0 9px;
+  border-radius: var(--r-full);
+  border: 1px solid rgba(245,158,11,.42);
+  background: rgba(245,158,11,.10);
+  color: var(--amber-ink);
+  font-size: 10.5px; font-weight: 700;
+  letter-spacing: .06em;
+  white-space: nowrap;
+}
+
+/* SystemStatusChip — ComfyUI 가동 상태. running grace 시 "준비 완료" + 자동 fade out (시안용 그대로 표시) */
+.ah-status-chip {
+  display: flex; align-items: center; gap: 8px;
+  padding: 5px 12px 5px 10px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.ah-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(82,196,26,.18);
+  flex-shrink: 0;
+}
+.ah-status-label { font-weight: 500; color: var(--ink-2); }
+
+/* SystemMetrics 4-bar (collapsed state · production 매칭 — globals.css `.ais-metrics`)
+ *  4 가로 막대 한 줄 (각 44×6 · 좌→우 fill) · gap 6 · CPU(cyan)/GPU(green)/VRAM(purple)/RAM(blue)
+ *  hover 시 펼침 (gap 6→12 · padding · 라벨/usage/% 슬라이드 등장) — 시안엔 collapsed 만 그림 */
+.ah-metrics {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 4px;
+  border-radius: var(--r-full);
+  border: 1px solid transparent;
+}
+.ah-metric-bar {
+  width: 44px;
+  height: 6px;
+  background: var(--bg-2);
+  border-radius: 3px;
+  overflow: hidden;
+  position: relative;
+  flex-shrink: 0;
+}
+.ah-metric-bar::after {
+  content: "";
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: calc(var(--m-pct) * 1%);
+  background: var(--m-color);
+  border-radius: 3px;
+}
+.ah-metric-bar[data-metric="cpu"]  { --m-color: #06B6D4; }
+.ah-metric-bar[data-metric="gpu"]  { --m-color: #22C55E; }
+.ah-metric-bar[data-metric="vram"] { --m-color: #A855F7; }
+.ah-metric-bar[data-metric="ram"]  { --m-color: #4A9EFF; }
+
+/* IconBtn (Settings · Shutdown) */
+.ah-icon-btn {
+  all: unset; cursor: pointer;
+  width: 32px; height: 32px;
+  border-radius: var(--r-sm);
+  border: 1px solid transparent;
+  color: var(--ink-2);
+  display: grid; place-items: center;
+  transition: all .15s;
+}
+.ah-icon-btn:hover { background: var(--bg-2); }
+
+/* ── Page Header (시안용 메타 라벨 — 옛 cards-v2 패턴 · pair-generate 에선 사용 X) ── */
+.page-header {
+  padding: 28px 40px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
+  position: sticky; top: 0; z-index: 10;
+}
+.page-title { font-size: 24px; font-weight: 600; letter-spacing: -0.012em; }
+.page-title .display { font-style: italic; font-weight: 500; color: var(--accent-ink); }
+.page-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.page-meta { font-size: 11px; color: var(--ink-4); display: flex; gap: 18px; align-items: center; }
+.page-meta .mono { color: var(--ink-3); letter-spacing: 0.02em; }
+.page-meta .pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3); border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+
+/* ── Grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 460px);
+  gap: 28px;
+  padding: 32px 40px 80px;
+  justify-content: center;
+  align-items: start;
+}
+
+/* ── Panel ── */
+.panel {
+  width: 460px;
+  background: linear-gradient(180deg, var(--surface), rgba(255,255,255,0.5));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px 18px 28px;
+  box-shadow: var(--shadow-sm);
+}
+.panel-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0 4px 4px; padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.panel-eyebrow {
+  font-family: "JetBrains Mono", monospace; font-size: 9.5px;
+  color: var(--ink-4); letter-spacing: 0.14em; text-transform: uppercase;
+}
+.panel-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic; font-size: 22px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+.panel-name strong { font-style: normal; font-weight: 700; color: var(--accent-ink); }
+.panel-tag {
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3);
+  border: 1px solid var(--line); letter-spacing: 0.04em;
+}
+.legend {
+  margin: 10px 4px 18px;
+  font-size: 11.5px; color: var(--ink-3); line-height: 1.7;
+}
+.legend strong { color: var(--ink-2); font-weight: 600; }
+
+/* ── Inner Studio Left Panel ── */
+.left-panel {
+  width: 400px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 8px 0;
+}
+
+/* Studio Mode Header — panel-header 스타일 차용 (오빠 결정 2026-05-02 · 디스플레이 타이포그래피 강화)
+ * 옛: 단일 영문 sans 22px → 새: eyebrow monospace + Fraunces italic 한글+영문 mix
+ * 점선 border-bottom 으로 섹션 구분 + 우측 mode-flow-link 그대로 유지 */
+.mode-header {
+  padding: 4px 0 12px;
+  margin-bottom: 4px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.mode-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.mode-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mode-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.mode-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--accent-ink);
+}
+.mode-flow-link {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface);
+  display: grid; place-items: center; color: var(--ink-3);
+  cursor: pointer; transition: all 0.15s;
+  flex-shrink: 0;
+}
+.mode-flow-link:hover {
+  border-color: var(--accent-ink); color: var(--accent-ink); background: var(--bg-2);
+  transform: scale(1.05);
+}
+.mode-desc { font-size: 12px; color: var(--ink-3); margin-top: 6px; }
+
+/* Primary CTA — Aurora Glass Gradient (오빠 결정 2026-05-02 · v3 옵션 B 채택)
+ * violet→blue 시그니처 + glass + 호버 시 left→right light sweep 0.7s
+ * 시스템 카드 (AI 보정) 와 톤 매칭 */
+.cta-primary {
+  all: unset; cursor: pointer; text-align: center;
+  background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+  color: #fff;
+  padding: 14px 22px; border-radius: var(--r-full);
+  font-size: 14px; font-weight: 600;
+  letter-spacing: 0.01em;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; box-sizing: border-box;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  position: relative;
+  overflow: hidden;
+}
+.cta-primary::before {
+  content: "";
+  position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.7s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
+}
+.cta-primary:hover::before { transform: translateX(100%); }
+.cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 28px rgba(99,102,241,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.cta-primary > * { position: relative; z-index: 1; }
+/* Field label */
+.field-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.field-label {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+  display: inline-flex; align-items: baseline; gap: 8px;
+}
+.accent-bar { width: 3px; height: 12px; background: var(--accent); border-radius: 2px; position: relative; top: 1px; }
+.field-meta-link {
+  font-size: 11px; color: var(--ink-3); cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: none;
+}
+.field-meta-link:hover { color: var(--ink); }
+
+/* Prompt Shell */
+.prompt-shell {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-md); transition: border 0.15s;
+  box-shadow: var(--shadow-sm);
+}
+.prompt-textarea {
+  display: block; width: 100%; border: none; outline: none; resize: none;
+  background: transparent; padding: 14px 48px 44px 16px;
+  font-size: 14px; line-height: 1.6; color: var(--ink);
+  border-radius: var(--r-md); min-height: 110px;
+}
+.prompt-textarea::placeholder { color: var(--ink-4); }
+.prompt-history-btn, .prompt-tool-btn, .prompt-clear-icon {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  color: var(--ink-4); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  transition: all 0.12s;
+}
+.prompt-history-btn:hover, .prompt-tool-btn:hover, .prompt-clear-icon:hover {
+  color: var(--ink); border-color: var(--line-2);
+}
+.prompt-history-btn { position: absolute; top: 10px; right: 10px; }
+.prompt-tools-stack {
+  position: absolute; top: 46px; right: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.prompt-clear-icon { position: absolute; right: 10px; bottom: 10px; }
+
+/* ──────────────────────────────────────────────
+   V3 BASE — Aurora Glass (V3a/V3b/V3c 공유)
+   ────────────────────────────────────────────── */
+.v3 .toggle-card {
+  position: relative;
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 4px 16px rgba(23,20,14,.04);
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+  cursor: pointer;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.v3 .toggle-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 32px rgba(23,20,14,.08); }
+.v3 .toggle-row {
+  display: flex; align-items: center; gap: 14px;
+  position: relative; z-index: 2;
+}
+.v3 .toggle-row .label-area {
+  display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0;
+}
+.v3 .toggle-row .label-area .label {
+  font-size: 12.5px; font-weight: 500; color: var(--ink-2);
+}
+.v3 .toggle-row .label-area .desc {
+  font-size: 10.5px; color: var(--ink-4);
+}
+.v3 .icon-box {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+  background: rgba(244,242,238,0.85); color: var(--ink-3);
+  font-size: 19px;
+  transition: all 0.25s; border: 1px solid rgba(232,229,223,0.8);
+}
+.v3 .toggle-card[data-active="true"] .icon-box {
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 14px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  border-color: transparent;
+}
+.v3 .toggle-card[data-active="true"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.6));
+  border-color: rgba(255,255,255,0.7);
+  box-shadow:
+    0 0 0 1px var(--card-from),
+    0 0 0 4px var(--card-glow),
+    0 8px 28px var(--card-shadow);
+}
+
+.v3 .toggle-switch {
+  position: relative; flex-shrink: 0;
+  width: 30px; height: 17px; border-radius: var(--r-full);
+  background: var(--line-2); transition: background 0.18s;
+}
+.v3 .toggle-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #fff; transition: left 0.18s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.v3 .toggle-card[data-active="true"] .toggle-switch {
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+}
+.v3 .toggle-card[data-active="true"] .toggle-switch::after { left: 15px; }
+
+/* signature colors */
+.v3 .ai-card { --card-from: #8B5CF6; --card-to: #3B82F6; --card-glow: rgba(139,92,246,0.10); --card-shadow: rgba(99,102,241,0.18); --card-mesh-a: rgba(139,92,246,0.12); --card-mesh-b: rgba(59,130,246,0.10); }
+.v3 .claude-card { --card-from: #F59E0B; --card-to: #FB923C; --card-glow: rgba(245,158,11,0.10); --card-shadow: rgba(245,158,11,0.18); --card-mesh-a: rgba(245,158,11,0.12); --card-mesh-b: rgba(251,146,60,0.10); }
+.v3 .fast-card { --card-from: #84CC16; --card-to: #06B6D4; --card-glow: rgba(132,204,22,0.10); --card-shadow: rgba(132,204,22,0.18); --card-mesh-a: rgba(132,204,22,0.12); --card-mesh-b: rgba(6,182,212,0.10); }
+.v3 .size-card-v {
+  --card-from: #F43F5E; --card-to: #EC4899;
+  --card-shadow: rgba(236,72,153,0.16);
+  --card-glow: rgba(236,72,153,0.08);
+  --card-mesh-a: rgba(244,63,94,0.08);
+  --card-mesh-b: rgba(236,72,153,0.06);
+}
+
+/* size card base */
+.v3 .size-card-v {
+  position: relative;
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 4px 16px rgba(23,20,14,.04);
+  overflow: hidden;
+  transition: all 0.25s;
+}
+.v3 .size-card-v:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 32px rgba(23,20,14,.08); }
+.v3 .size-card-v > * { position: relative; z-index: 2; }
+.v3 .size-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(232,229,223,0.8);
+}
+.v3 .size-header .icon-box {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 14px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  font-size: 19px;
+}
+.v3 .size-header .meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.v3 .size-header .meta .title { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.v3 .size-header .meta .chip { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-3); }
+
+/* segmented */
+.v3 .seg-wrap {
+  position: relative; display: inline-flex; padding: 3px;
+  background: rgba(0,0,0,0.04); border-radius: var(--r-full);
+  align-self: center; width: fit-content;
+  z-index: 2;
+}
+.v3 .seg-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: calc(50% - 3px); height: calc(100% - 6px);
+  background: var(--surface); border-radius: var(--r-full);
+  box-shadow: 0 0 0 0.5px rgba(74,158,255,.18), 0 1px 3px rgba(0,0,0,.06);
+  transition: transform 0.28s cubic-bezier(.32,.72,0,1);
+  pointer-events: none; z-index: 0;
+}
+.v3 .seg-wrap[data-value="precise"] .seg-thumb { transform: translateX(100%); }
+.v3 .toggle-card[data-active="true"] .seg-thumb {
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+}
+.v3 .seg-btn {
+  position: relative; z-index: 1; height: 28px; min-width: 92px; padding: 0 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em;
+  border-radius: var(--r-full); border: none; background: transparent;
+  color: var(--ink-3); transition: all 0.22s;
+}
+.v3 .seg-btn[data-active="true"] { color: var(--accent-ink); font-weight: 600; }
+.v3 .toggle-card[data-active="true"] .seg-btn[data-active="true"] { color: var(--card-from); }
+
+/* size card content */
+.v3 .size-row { display: flex; align-items: center; gap: 8px; }
+.v3 .size-col { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.v3 .dim-input { position: relative; width: 100%; }
+.v3 .dim-input span.label {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  color: var(--ink-4); pointer-events: none; font-weight: 500; letter-spacing: 0.04em;
+}
+.v3 .dim-input input {
+  width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 7px 10px 7px 22px; font-family: "JetBrains Mono", monospace;
+  font-size: 12px; background: rgba(255,255,255,0.7); color: var(--ink); outline: none;
+  text-align: right;
+}
+.v3 .lock-btn {
+  width: 30px; height: 30px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--bg);
+  color: var(--ink-2); display: grid; place-items: center;
+  cursor: pointer; align-self: center; flex-shrink: 0; transition: all 0.15s;
+}
+.v3 .lock-btn[data-locked="true"] {
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04));
+  border-color: var(--card-to); color: var(--card-to);
+}
+.v3 .range-input { width: 100%; accent-color: var(--accent); }
+.v3 .aspect-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 6px; margin-top: 8px;
+}
+.v3 .aspect-card {
+  all: unset; cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 4px 8px; height: 70px; box-sizing: border-box;
+  border: 1.5px solid var(--line); border-radius: var(--r-md);
+  background: rgba(255,255,255,0.7); transition: all 0.15s;
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.v3 .aspect-card:hover { background: rgba(244,242,238,0.85); border-color: var(--line-2); }
+.v3 .aspect-card[data-active="true"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.7));
+  border-color: var(--card-from);
+}
+.v3 .aspect-card .mini-box { border: 1.5px solid var(--ink-3); border-radius: 2px; }
+.v3 .aspect-card[data-active="true"] .mini-box { border-color: var(--card-from); }
+.v3 .aspect-card .a-label {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.02em; color: var(--ink-2);
+}
+.v3 .aspect-card[data-active="true"] .a-label { color: var(--card-from); }
+
+/* ──────────────────────────────────────────────
+   V3a — Mesh gradient (이미지 X)
+   ────────────────────────────────────────────── */
+.v3a .toggle-card::after, .v3a .size-card-v::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, var(--card-mesh-a, transparent), transparent 55%),
+    radial-gradient(circle at 85% 100%, var(--card-mesh-b, transparent), transparent 55%);
+  opacity: 0; transition: opacity 0.35s; z-index: 1;
+}
+.v3a .toggle-card[data-active="true"]::after { opacity: 1; }
+.v3a .size-card-v::after { opacity: 0.6; }
+
+/* ──────────────────────────────────────────────
+   V3b — 이미지 배경 (우측 fade) · 토글 스위치 유지
+   ────────────────────────────────────────────── */
+.v3b .toggle-card::before, .v3b .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.55;
+  filter: saturate(0.55) brightness(0.95);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3b .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3b .size-card-v::before {
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+.v3b .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3b .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3b .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3b .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+/* V3b 활성 카드는 좌측 텍스트 영역에 더 강한 surface 톤 — 가독성 보호 */
+.v3b .toggle-card[data-active="true"] {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.85) 35%,
+    rgba(255,255,255,0.45) 60%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+.v3b .size-card-v {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.88) 50%,
+    rgba(255,255,255,0.4) 80%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+
+/* ──────────────────────────────────────────────
+   V3c — 이미지 배경 + 토글 스위치 X · 카드 전체 클릭
+       active indicator: 좌측 4px 시그니처 그라데이션 bar
+   ────────────────────────────────────────────── */
+.v3c .toggle-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.55;
+  filter: saturate(0.55) brightness(0.95);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3c .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3c .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3c .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3c .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3c .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+.v3c .toggle-card[data-active="true"] {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.85) 35%,
+    rgba(255,255,255,0.45) 60%,
+    rgba(255,255,255,0.15) 100%
+  );
+}
+.v3c .size-card-v {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0.96) 0%,
+    rgba(255,255,255,0.88) 50%,
+    rgba(255,255,255,0.4) 80%,
+    rgba(255,255,255,0.15) 100%
+  );
+  position: relative;
+}
+.v3c .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+/* 토글 스위치 숨김 */
+.v3c .toggle-card .toggle-switch { display: none; }
+
+/* 좌측 시그니처 bar (active indicator) */
+.v3c .toggle-card .card-bar {
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 0 3px 3px 0;
+  background: var(--ink-4);
+  transition: all 0.25s;
+  z-index: 2;
+}
+.v3c .toggle-card[data-active="true"] .card-bar {
+  background: linear-gradient(180deg, var(--card-from), var(--card-to));
+  box-shadow: 0 0 12px var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.4) inset;
+  width: 5px;
+}
+
+/* 카드 클릭 영역 명확화 — hover 시 살짝 더 lift */
+.v3c .toggle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 36px rgba(23,20,14,.10);
+}
+.v3c .toggle-card:active {
+  transform: translateY(0);
+  transition: transform 0.08s;
+}
+
+/* 카드 안 padding 약간 더 (스위치 자리 확보 → 텍스트 더 시원) */
+.v3c .toggle-card { padding-left: 18px; }
+
+/* ──────────────────────────────────────────────
+   V3c-2 — V3c 베이스 + 활성 카드 텍스트/버튼 강화
+   활성 시: 텍스트 진한 ink + 600 굵기 / segmented 불투명 chip 화
+   ────────────────────────────────────────────── */
+.v3c2 .toggle-card::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  border-radius: var(--r-card);
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.28;
+  filter: saturate(0.4) brightness(0.92);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.v3c2 .toggle-card[data-active="true"]::before {
+  opacity: 1;
+  filter: saturate(1.05);
+}
+.v3c2 .ai-card { --card-bg-image: url('assets/card-bg-ai.webp'); }
+.v3c2 .claude-card { --card-bg-image: url('assets/card-bg-claude.webp'); }
+.v3c2 .fast-card { --card-bg-image: url('assets/card-bg-fast.webp'); }
+.v3c2 .size-card-v { --card-bg-image: url('assets/card-bg-size.webp'); }
+
+.v3c2 .toggle-card[data-active="true"] {
+  background: linear-gradient(100deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.85) 35%, rgba(255,255,255,0.45) 60%, rgba(255,255,255,0.15) 100%);
+}
+.v3c2 .size-card-v {
+  background: linear-gradient(100deg, rgba(255,255,255,0.96) 0%, rgba(255,255,255,0.88) 50%, rgba(255,255,255,0.4) 80%, rgba(255,255,255,0.15) 100%);
+  position: relative;
+}
+.v3c2 .size-card-v::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  border-radius: var(--r-card);
+  background-image: var(--card-bg-image);
+  background-size: cover;
+  background-position: right 15%;
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 35%, black 95%);
+  opacity: 0.85;
+  filter: saturate(0.95);
+}
+
+.v3c2 .toggle-card .toggle-switch { display: none; }
+.v3c2 .toggle-card .card-bar {
+  position: absolute; left: 0; top: 14px; bottom: 14px;
+  width: 4px; border-radius: 0 3px 3px 0;
+  background: var(--ink-4);
+  transition: all 0.25s;
+  z-index: 2;
+}
+.v3c2 .toggle-card[data-active="true"] .card-bar {
+  background: linear-gradient(180deg, var(--card-from), var(--card-to));
+  box-shadow: 0 0 12px var(--card-shadow), 0 0 0 1px rgba(255,255,255,0.4) inset;
+  width: 5px;
+}
+.v3c2 .toggle-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 36px rgba(23,20,14,.10);
+}
+.v3c2 .toggle-card:active {
+  transform: translateY(0);
+  transition: transform 0.08s;
+}
+.v3c2 .toggle-card { padding-left: 18px; }
+
+/* ── V3c-2 ONLY: 활성 카드 콘텐츠 강화 ── */
+
+/* 활성 카드 텍스트 → 진한 검정 (ink) + 600 굵기 */
+.v3c2 .toggle-card[data-active="true"] .label-area .label {
+  color: var(--ink);
+  font-weight: 600;
+}
+.v3c2 .toggle-card[data-active="true"] .label-area .desc {
+  color: var(--ink-2);
+}
+.v3c2 .size-card-v .meta .title {
+  color: var(--ink);
+  font-weight: 600;
+}
+.v3c2 .size-card-v .meta .chip {
+  color: var(--ink-2);
+}
+
+/* 활성 카드 segmented — 살짝 반투명 흰 box (비율 카드와 같은 톤 · 회색 dim 톤 회피) */
+.v3c2 .toggle-card[data-active="true"] .seg-wrap {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(0,0,0,0.04);
+}
+.v3c2 .toggle-card[data-active="true"] .seg-thumb {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 0.5px var(--card-from),
+    0 2px 6px rgba(0,0,0,0.10),
+    0 1px 2px rgba(0,0,0,0.06);
+}
+.v3c2 .toggle-card[data-active="true"] .seg-btn[data-active="true"] {
+  color: var(--card-from);
+  font-weight: 600;
+}
+.v3c2 .toggle-card[data-active="true"] .seg-btn:not([data-active="true"]) {
+  color: var(--ink-2);
+}
+
+/* 사이즈 카드 안 input — 솔리드 흰색 (이미지 위에서 또렷이) */
+.v3c2 .size-card-v .dim-input input {
+  background: var(--surface);
+  border-color: var(--line-2);
+}
+
+/* 사이즈 카드 비율 카드 — active 시 더 또렷한 chip */
+.v3c2 .aspect-card .a-label { font-weight: 600; }
+.v3c2 .aspect-card[data-active="true"] {
+  background: var(--surface);
+  box-shadow: 0 0 0 0.5px var(--card-from), 0 2px 6px rgba(0,0,0,0.08);
+}
+
+/* ── V3c-2 미세조정 (오빠 피드백 · 2026-05-01) ── */
+/* 세로 bar 제거 — boder + glow + bg fade 만으로 활성 표시 */
+.v3c2 .toggle-card .card-bar { display: none; }
+/* 비활성 카드의 segmented 숨김 — 카드 활성 시에만 instant/thinking 노출 */
+.v3c2 .toggle-card[data-active="false"] .seg-wrap { display: none; }
+
+/* ── desc 텍스트 제거 + hover 툴팁 (오빠 피드백 · 2026-05-01) ── */
+.v3c2 .toggle-card .label-area .desc { display: none; }
+.v3c2 .toggle-card { overflow: visible; }
+.v3c2 .toggle-card[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  animation: ais-tooltip-in 0.18s ease;
+}
+@keyframes ais-tooltip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ──────────────────────────────────────────────
+   V5 — V4 (V3c-2) + 미세조정 3개 (오빠 피드백 · 2026-05-01)
+   비활성 아이콘박스 시그니처 컬러 tint · 사이즈 fade 35% → 42% · cursor hint
+   ────────────────────────────────────────────── */
+
+/* 1) 비활성 아이콘박스 — 시그니처 컬러 30% tint (회색 → 살짝 컬러 hint) */
+.v5 .ai-card .icon-box {
+  background: linear-gradient(135deg, rgba(139,92,246,0.14), rgba(59,130,246,0.08));
+  color: #6D4FE0;
+  border-color: rgba(139,92,246,0.20);
+}
+.v5 .claude-card .icon-box {
+  background: linear-gradient(135deg, rgba(245,158,11,0.14), rgba(251,146,60,0.08));
+  color: #B47600;
+  border-color: rgba(245,158,11,0.22);
+}
+.v5 .fast-card .icon-box {
+  background: linear-gradient(135deg, rgba(132,204,22,0.14), rgba(6,182,212,0.08));
+  color: #4D8C12;
+  border-color: rgba(132,204,22,0.22);
+}
+/* 활성 시는 V3 base 그대로 (그라데이션 fill — specificity 더 높음) */
+
+/* 2) 사이즈 카드 fade 35% → 22% (오빠 결정 2026-05-01 저녁 · v3 비교 후 B mask 채택)
+ *  사이즈 카드는 항상 활성이라 인물 좌측 22% 까지 노출 → 핑크 톤 + 인물 임팩트 모두. */
+.v5 .size-card-v::before {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 22%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 22%, black 95%);
+}
+
+/* 사이즈 카드 안 — slider + 자물쇠 핑크 시그니처 매칭 (옛 blue/indigo 잔재 제거) */
+.v5 .size-card-v .range-input {
+  accent-color: var(--card-from);
+}
+.v5 .size-card-v .lock-btn[data-locked="true"] {
+  background: linear-gradient(135deg, rgba(244,63,94,0.14), rgba(236,72,153,0.04));
+  border-color: var(--card-to);
+  color: var(--card-from);
+}
+
+/* 3) cursor hint — hover 시 살짝 더 lift + 미세 scale (클릭 명시) */
+.v5 .toggle-card:hover {
+  transform: translateY(-2px) scale(1.005);
+  box-shadow: 0 4px 8px rgba(23,20,14,.06), 0 18px 40px rgba(23,20,14,.10);
+}
+
+/* ──────────────────────────────────────────────
+   4) 활성 카드 효과 (오빠 결정 2026-05-01 저녁 · v3 비교 후 E padding + B mask 채택)
+   - 활성 토글 카드: padding 14px → 26px (E 옵션 — 미세 점프 거의 안 보임)
+   - 활성 카드 mask: 35% → 15% (B 옵션 — 인물 좌측 더 노출)
+   - transition cubic-bezier 0.35s — 자연스러운 ease (React 적용 시 framer-motion 으로 진짜 부드럽게)
+   - 사이즈 카드 padding 14px → 22px (정적 — 활성 개념 X)
+   ────────────────────────────────────────────── */
+.v5 .toggle-card {
+  transition: padding 0.35s cubic-bezier(.4,0,.2,1),
+              transform 0.25s cubic-bezier(.4,0,.2,1),
+              box-shadow 0.25s cubic-bezier(.4,0,.2,1);
+}
+.v5 .toggle-card[data-active="true"] {
+  padding: 38px 16px 38px 18px;
+}
+.v5 .toggle-card[data-active="true"]::before {
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, transparent 15%, black 95%);
+          mask-image: linear-gradient(to right, transparent 0%, transparent 15%, black 95%);
+}
+.v5 .size-card-v {
+  padding: 22px 16px;
+}
+
+/* ──────────────────────────────────────────────
+   수정 패널 — 원본 이미지 카드 (NEW · V5 톤 매칭)
+   16:9 풀 thumbnail + 그라데이션 오버레이 + 변경 버튼 + 메타
+   ────────────────────────────────────────────── */
+.edit-source-card {
+  position: relative;
+  border-radius: var(--r-card);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+}
+.edit-source-card:hover {
+  transform: translateY(-1px) scale(1.005);
+  box-shadow: var(--shadow-md);
+}
+.edit-source-card .es-bg {
+  position: absolute; inset: 0;
+  background-image: url('assets/card-bg-ai.webp');
+  background-size: cover;
+  background-position: center;
+}
+.edit-source-card .es-grad {
+  position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0) 50%, rgba(0,0,0,0.55) 100%);
+}
+.edit-source-card .es-change-btn {
+  position: absolute; top: 10px; right: 10px;
+  width: 32px; height: 32px;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.9);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.6);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 2;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+.edit-source-card .es-change-btn:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+.edit-source-card .es-meta-bottom {
+  position: absolute; left: 16px; right: 56px; bottom: 12px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  color: #fff;
+  font-size: 11px;
+  z-index: 2;
+}
+.edit-source-card .es-meta-bottom .label {
+  font-weight: 600; font-size: 12.5px; letter-spacing: -0.01em;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+.edit-source-card .es-meta-bottom .info {
+  opacity: 0.92; font-size: 10.5px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+/* ──────────────────────────────────────────────
+   수정 패널 — Multi-reference 토글 카드 (V5 톤 + slate/indigo 시그니처)
+   토글 ON 시 카드 *안*에 image2 thumbnail + crop overlay 펼쳐짐
+   ────────────────────────────────────────────── */
+
+/* Multi-ref 카드 시그니처 컬러 (fuchsia/magenta · 2026-05-02 갱신 · 핑크 가족 안 변별력 확보)
+ * 옛 rose-pink 와 hue 분리 — curator 패브릭 swatch 이미지 톤 매칭 */
+.v5 .multi-ref-card {
+  --card-from: #D946EF;
+  --card-to: #C026D3;
+  --card-glow: rgba(217,70,239,0.10);
+  --card-shadow: rgba(192,38,211,0.18);
+  --card-mesh-a: rgba(217,70,239,0.10);
+  --card-mesh-b: rgba(192,38,211,0.08);
+  --card-bg-image: url('assets/card-bg-multi-ref.webp');  /* fuchsia · curator + magenta swatch */
+}
+/* V5 비활성 아이콘박스 — fuchsia tint */
+.v5 .multi-ref-card .icon-box {
+  background: linear-gradient(135deg, rgba(217,70,239,0.14), rgba(192,38,211,0.08));
+  color: #A21CAF;
+  border-color: rgba(217,70,239,0.22);
+}
+
+/* 참조 이미지 영역 — 토글 ON 시 카드 안에 펼쳐지는 image2 슬롯 */
+.v5 .multi-ref-card .ref-image-area {
+  display: none;
+}
+.v5 .multi-ref-card[data-active="true"] .ref-image-area {
+  display: block;
+  margin-top: 4px;
+  position: relative;
+  z-index: 2;
+}
+.v5 .multi-ref-card .ref-image-thumb {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  aspect-ratio: 16 / 9;
+  background-size: cover;
+  background-position: center;
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+}
+.v5 .multi-ref-card .ref-crop-frame {
+  position: absolute;
+  top: 14%; left: 15%; right: 15%; bottom: 30%;
+  border: 2px dashed rgba(255,255,255,0.85);
+  border-radius: 4px;
+  pointer-events: none;
+  z-index: 1;
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.22);
+}
+.v5 .multi-ref-card .ref-crop-label {
+  position: absolute;
+  top: 8px; left: 10px;
+  background: rgba(0,0,0,0.7);
+  color: #fff;
+  font-size: 9.5px;
+  padding: 3px 7px;
+  border-radius: 4px;
+  letter-spacing: 0.04em;
+  z-index: 3;
+}
+.v5 .multi-ref-card .ref-remove-btn {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 24px; height: 24px;
+  display: grid; place-items: center;
+  background: rgba(255,255,255,0.92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border: none;
+  border-radius: var(--r-sm);
+  color: var(--ink);
+  cursor: pointer;
+  z-index: 3;
+  transition: all 0.15s;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.10);
+}
+.v5 .multi-ref-card .ref-remove-btn:hover {
+  background: #fff;
+  transform: scale(1.05);
+}
+.v5 .multi-ref-card .ref-meta-bottom {
+  position: absolute;
+  left: 12px; right: 12px; bottom: 8px;
+  display: flex; justify-content: space-between; align-items: baseline; gap: 12px;
+  color: #fff;
+  font-size: 11px;
+  z-index: 2;
+}
+.v5 .multi-ref-card .ref-meta-bottom .label {
+  font-weight: 600; font-size: 11.5px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+.v5 .multi-ref-card .ref-meta-bottom .info {
+  opacity: 0.9; font-size: 10px;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.6);
+}
+
+/* ──────────────────────────────────────────────
+   자동 비교 분석 카드 (V5 톤 · teal → emerald · 5번째 시그니처)
+   "수정 후 자동 비교 분석" 토글 — 결과 완료 시 백그라운드 5축 평가
+   ────────────────────────────────────────────── */
+.v5 .auto-compare-card {
+  --card-from: #F59E0B;
+  --card-to: #FB923C;
+  --card-glow: rgba(245,158,11,0.10);
+  --card-shadow: rgba(245,158,11,0.18);
+  --card-mesh-a: rgba(245,158,11,0.12);
+  --card-mesh-b: rgba(251,146,60,0.10);
+  --card-bg-image: url('assets/card-bg-claude.webp');  /* 임시 — Claude 이미지 재사용 (새 amber evaluator 대기) */
+}
+.v5 .auto-compare-card .icon-box {
+  background: linear-gradient(135deg, rgba(245,158,11,0.14), rgba(251,146,60,0.08));
+  color: #B47600;
+  border-color: rgba(245,158,11,0.22);
+}
+
+/* ──────────────────────────────────────────────
+   참조 이미지 sub-section (multi-ref ON 시 카드 외부 별도 영역)
+   실제 EditLeftPanel.tsx + ReferenceImageBox.tsx 구조 그대로:
+   비율 chip 4 + 320px Cropper + zoom slider + 도움말 + 역할 chip 5
+   ────────────────────────────────────────────── */
+.reference-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 4px 0 8px;
+}
+.accent-bar.accent-violet { background: #8B5CF6; }
+.field-label .ref-size {
+  font-size: 11px;
+  color: var(--ink-4);
+  font-weight: 400;
+  margin-left: 6px;
+}
+
+/* 비율 chips (자유/1:1/4:3/9:16) */
+.aspect-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.aspect-chip {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 13px;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.aspect-chip:hover { border-color: var(--line-2); background: var(--bg-2); }
+.aspect-chip[data-active="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+}
+
+/* 320px crop UI (react-easy-crop 시각 시뮬레이션) */
+.ref-crop-area {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: #0a0a0c;
+}
+.ref-crop-image {
+  position: absolute; inset: 0;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.ref-crop-handles {
+  position: absolute;
+  top: 14%; left: 14%; right: 14%; bottom: 14%;
+  border: 1px solid rgba(255,255,255,0.95);
+  box-shadow: 0 0 0 9999px rgba(0,0,0,0.55);
+  background: transparent;
+  cursor: move;
+}
+.ref-handle { position: absolute; width: 14px; height: 14px; }
+.ref-handle-tl { top: -1px; left: -1px; border-top: 2px solid #fff; border-left: 2px solid #fff; }
+.ref-handle-tr { top: -1px; right: -1px; border-top: 2px solid #fff; border-right: 2px solid #fff; }
+.ref-handle-bl { bottom: -1px; left: -1px; border-bottom: 2px solid #fff; border-left: 2px solid #fff; }
+.ref-handle-br { bottom: -1px; right: -1px; border-bottom: 2px solid #fff; border-right: 2px solid #fff; }
+.ref-crop-remove {
+  position: absolute;
+  top: 8px; right: 8px;
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  background: rgba(0,0,0,0.65);
+  color: #fff;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s;
+}
+.ref-crop-remove:hover { background: rgba(0,0,0,0.85); }
+
+/* zoom slider */
+.ref-zoom-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.ref-zoom-label { width: 40px; }
+.ref-zoom-input { flex: 1; accent-color: var(--accent); }
+.ref-zoom-val { width: 50px; text-align: right; font-size: 10.5px; }
+
+/* 도움말 */
+.ref-help {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  line-height: 1.6;
+}
+.ref-warn { color: #C08400; }
+
+/* 역할 선택 (face / outfit / style / background / custom) */
+.ref-roles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+.ref-roles-label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.ref-roles-hint {
+  font-size: 10.5px;
+  font-weight: 400;
+  color: var(--ink-4);
+  margin-left: 6px;
+}
+.ref-roles-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.role-chip {
+  all: unset;
+  cursor: pointer;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.role-chip:hover { border-color: var(--line-2); background: var(--bg-2); }
+.role-chip[data-active="true"] {
+  border-color: #8B5CF6;
+  background: #EDE9FE;
+  color: #6D4FE0;
+  font-weight: 600;
+}
+
+/* ──────────────────────────────────────────────
+   분석 패널 (Vision Analyze) — 안내 배너
+   ────────────────────────────────────────────── */
+.info-banner {
+  padding: 14px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-size: 12px;
+  color: var(--ink-3);
+  line-height: 1.55;
+}
+.info-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.info-banner-body { color: var(--ink-3); }
+.info-banner-body strong { color: var(--ink-2); font-weight: 600; }
+
+/* ──────────────────────────────────────────────
+   비교 패널 (Vision Compare) — A/B 배지 + 스왑 버튼
+   ────────────────────────────────────────────── */
+.badge-ab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+.badge-ab.badge-b { background: linear-gradient(135deg, #F59E0B, #FB923C); }
+
+/* compare-slot 카드 active 시 시그니처 컬러 (옵션) */
+.compare-slot-a { /* A 슬롯 — violet 톤 살짝 */ }
+.compare-slot-b { /* B 슬롯 — amber 톤 살짝 */ }
+
+.swap-btn-wrap {
+  display: flex;
+  justify-content: center;
+  margin: -4px 0 -4px;
+}
+.swap-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-full);
+  font-size: 11.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+  transition: all 0.15s;
+}
+.swap-btn:hover {
+  background: var(--surface);
+  border-color: var(--line-2);
+  transform: scale(1.02);
+}
+
+.optional-hint {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  font-weight: 400;
+  margin-left: 4px;
+}
+
+/* ──────────────────────────────────────────────
+   영상 패널 (Video) — 해상도 슬라이더 + 성인 모드 시그니처
+   ────────────────────────────────────────────── */
+.video-res-section {
+  padding: 12px 14px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+.vrs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.vrs-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.vrs-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* video-res-card (사이즈 카드 패턴 재사용) — actions 우측 정렬 + 슬라이더 위 여백 */
+.video-res-card .vrs-actions {
+  justify-content: flex-end;
+  margin-bottom: 10px;
+}
+.vrs-original {
+  all: unset;
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  background: var(--bg-2);
+  color: var(--ink-2);
+  transition: all 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.vrs-original:hover { background: var(--surface); border-color: var(--line-2); }
+
+.vrs-speed-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+.vrs-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+/* 속도 톤 — fast (cyan) / standard (amber) / quality (rose) */
+.vrs-speed-fast {
+  background: rgba(6,182,212,0.10);
+  border: 1px solid rgba(6,182,212,0.32);
+  color: #0E7490;
+}
+.vrs-speed-fast .vrs-dot { background: #06B6D4; }
+
+.vrs-input {
+  width: 100%;
+  accent-color: #F43F5E;  /* 사이즈 시그니처 rose/pink 매칭 */
+  cursor: pointer;
+}
+.vrs-ticks {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--ink-4);
+  margin-top: 2px;
+}
+.vrs-ticks .vrs-current {
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.vrs-info {
+  margin-top: 6px;
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.5;
+}
+.vrs-info .vrs-out {
+  color: #BE185D;  /* 사이즈 시그니처 pink-ink 매칭 */
+  font-weight: 600;
+}
+.vrs-info .vrs-ratio { color: var(--ink-4); }
+
+/* 성인 모드 카드 — 새 시그니처 crimson (경고/restricted 톤) */
+.v5 .adult-card {
+  --card-from: #DC2626;
+  --card-to: #F87171;
+  --card-glow: rgba(220,38,38,0.10);
+  --card-shadow: rgba(220,38,38,0.18);
+  --card-mesh-a: rgba(220,38,38,0.10);
+  --card-mesh-b: rgba(248,113,113,0.08);
+  --card-bg-image: url('assets/card-bg-adult.webp');  /* crimson · sultry editorial */
+}
+.v5 .adult-card .icon-box {
+  background: linear-gradient(135deg, rgba(220,38,38,0.14), rgba(248,113,113,0.08));
+  color: #B91C1C;
+  border-color: rgba(220,38,38,0.20);
+}
+
+/* 성인 모드 — 활성 시 16:9 비율로 카드 늘어남 (원본 인물 풀 노출 + 추후 문구 자리 확보)
+ *  aspect-ratio 16/9 → 카드 width 400px 기준 height ≈ 225px
+ *  다른 활성 카드는 padding 38px 만 (~100px 높이) — adult 만 차별화
+ *  transition 도 16/9 변화 자연스럽게 — aspect-ratio 는 transition 안 되지만
+ *  padding/box 변화로 점진 확장 효과 */
+.v5 .adult-card[data-active="true"] {
+  aspect-ratio: 16 / 9;
+}
+
+/* 영상 해상도 카드 시그니처 (warm coral · 2026-05-02 분리 · 사이즈 페어 의도 깨고 변별력 우선)
+ * .size-card-v 의 rose-pink 변수를 specificity 더 높은 .video-res-card 에서 override
+ * cinematographer + 클래퍼보드 이미지 톤 (warm coral/peach) 매칭 */
+.v5 .video-res-card {
+  --card-from: #FB923C;
+  --card-to: #F472B6;
+  --card-glow: rgba(251,146,60,0.10);
+  --card-shadow: rgba(244,114,182,0.18);
+  --card-mesh-a: rgba(251,146,60,0.10);
+  --card-mesh-b: rgba(244,114,182,0.08);
+  --card-bg-image: url('assets/card-bg-video-res.webp');  /* warm coral · cinematographer + 클래퍼보드 */
+}
+
+/* ── Spec Footer ── */
+.spec-footer {
+  margin: 22px 4px 0 4px;
+  padding: 14px 14px 12px;
+  background: rgba(0,0,0,0.025);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  font-size: 11px; color: var(--ink-3); line-height: 1.7;
+}
+.spec-footer h4 {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-4); margin-bottom: 6px; font-weight: 500;
+}
+.spec-footer code {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+  background: rgba(0,0,0,0.04); padding: 1px 5px; border-radius: 3px;
+  color: var(--ink-2);
+}
+
+.global-note {
+  max-width: 1380px; margin: 0 auto;
+  padding: 24px 40px 60px;
+  font-size: 12px; color: var(--ink-3); line-height: 1.8;
+  border-top: 1px dashed var(--line);
+}
+.global-note h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic; font-weight: 500; font-size: 18px; color: var(--ink);
+  letter-spacing: -0.01em; margin-bottom: 10px;
+}
+.global-note ul { padding-left: 20px; margin: 8px 0; }
+.global-note code {
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  background: var(--bg-2); padding: 2px 6px; border-radius: 4px;
+  color: var(--ink-2);
+}
+
+/* ══════════════════════════════════════════════════════════
+   PAIR STAGE — 좌+우 페어 그리드 (NEW · 2026-05-02 · pair-generate)
+   400px (left mode-header) + 32px gap + 880px (right result+history) = 1312px
+   ══════════════════════════════════════════════════════════ */
+.pair-stage {
+  padding: 32px 40px 80px;
+  display: flex;
+  justify-content: center;
+}
+.pair-section {
+  /* width = grid 1312px + horizontal padding 24*2 = 1360px (오버플로 fix · 2026-05-02)
+   * 옛: 1312px → grid 와 같아서 padding 만큼 우측 잘림 */
+  width: 1360px;
+  max-width: 100%;
+  background: linear-gradient(180deg, var(--surface), rgba(255,255,255,0.5));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 22px 24px 30px;
+  box-shadow: var(--shadow-sm);
+}
+.pair-section .legend { margin: 0 4px 18px; }
+.pair-grid {
+  display: grid;
+  grid-template-columns: 400px 880px;
+  gap: 32px;
+  align-items: start;
+}
+/* 페어 안 좌측 패널 — width auto-margin 제거 (그리드 첫 칸에 고정) */
+.pair-grid .left-panel { margin: 0; }
+
+/* ── 우측 패널 — Studio Result + History (NEW) ── */
+.right-panel {
+  width: 880px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 8px 0;
+}
+
+/* Result Header — left mode-header 와 동일 톤 + violet (output) accent */
+.result-header {
+  padding: 4px 0 14px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.result-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.result-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.result-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.result-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: #7C3AED;  /* output 시그니처 violet — accent-ink 와 분리 */
+}
+.result-meta-pills {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.result-pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  padding: 4px 10px;
+  border-radius: var(--r-full);
+  background: var(--bg-2);
+  color: var(--ink-3);
+  border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+.result-pill.pill-violet {
+  background: linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04));
+  color: #6D4FE0;
+  border-color: rgba(139,92,246,0.22);
+  font-weight: 600;
+}
+.result-pill.pill-amber {
+  background: linear-gradient(135deg, rgba(245,158,11,0.10), rgba(251,146,60,0.04));
+  color: #B47600;
+  border-color: rgba(245,158,11,0.22);
+}
+
+/* ── Result Hero — 16:9 매트지 + dot grid + 인물 + 떠있는 glass action bar ── */
+.result-hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1672 / 941;  /* production Qwen 16:9 결과 비율 */
+  background-color: var(--surface);
+  background-image: radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border-radius: var(--r-card);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 2px 4px rgba(23,20,14,.04),
+    0 14px 36px rgba(23,20,14,.08);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+  box-sizing: border-box;
+  isolation: isolate;
+}
+.result-hero-img {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: var(--r-md);
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.18),
+    0 4px 12px rgba(0,0,0,.10),
+    0 0 0 1px rgba(0,0,0,.06);
+}
+
+/* Glass Action Bar — Tile 액션바와 같은 어두운 frosted glass 톤 (v4 · 2026-05-02 · 오빠 피드백 통일)
+ *  v3 의 밝은 흰 글래스가 너무 불투명해 보였음 → tile 톤 (rgba(28,30,38,.32)) 으로 통일
+ *  Hero·Tile 두 액션바가 같은 frosted dark glass + 흰 아이콘 → 시각 일관성 ★ */
+.result-action-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: rgba(28,30,38,0.32);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: var(--r-full);
+  box-shadow:
+    0 12px 36px rgba(0,0,0,.28),
+    0 4px 12px rgba(0,0,0,.14),
+    inset 0 1px 0 rgba(255,255,255,.12);
+  z-index: 5;
+}
+.result-action-btn {
+  all: unset;
+  cursor: pointer;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  color: #fff;
+  transition: all 0.15s;
+}
+.result-action-btn:hover {
+  background: rgba(255,255,255,0.16);
+  transform: scale(1.06);
+}
+.result-action-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255,255,255,0.22);
+  margin: 0 4px;
+}
+
+/* ── Result Caption — hero 아래 1줄 (NEW 제안 · editorial 미니 캡션) ── */
+.result-caption {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 6px;
+}
+.result-caption-prompt {
+  flex: 1;
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 14.5px;
+  font-weight: 400;
+  color: var(--ink-2);
+  letter-spacing: -0.005em;
+  line-height: 1.55;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.result-caption-prompt::before {
+  content: "“";
+  color: var(--ink-4);
+  margin-right: 3px;
+  font-size: 1.15em;
+  font-style: normal;
+}
+.result-caption-prompt::after {
+  content: "”";
+  color: var(--ink-4);
+  margin-left: 3px;
+  font-size: 1.15em;
+  font-style: normal;
+}
+.result-caption-meta {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.result-caption-meta .dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--line-2);
+}
+
+/* ── History Section Header — V5 톤 (Fraunces italic + bilingual + chip) ── */
+.history-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.history-section-header {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition: background .15s, border-color .15s, color .15s;
+}
+.history-section-header:hover { background: var(--bg-2); }
+.history-section-header[data-closed="true"] { color: var(--ink-3); }
+.history-section-header .chev {
+  display: inline-flex;
+  align-items: center;
+  transition: transform 0.18s;
+  color: var(--ink-2);
+}
+.history-section-header[data-closed="true"] .chev { transform: rotate(-90deg); }
+.history-section-header .title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+.history-section-header .title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ink);
+}
+.history-section-header[data-closed="true"] .title strong { color: var(--ink-2); }
+.history-section-header .count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  background: var(--bg-2);
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+  margin-left: auto;
+}
+
+/* ── History Tiles — 4-col grid · 비율 mix · hover lift + meta bar ── */
+.history-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+.history-section[data-closed="true"] .history-grid { display: none; }
+
+.history-tile {
+  position: relative;
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  cursor: pointer;
+  transition: all 0.22s cubic-bezier(.4,0,.2,1);
+}
+.history-tile:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    0 6px 16px rgba(23,20,14,.10),
+    0 2px 4px rgba(23,20,14,.05);
+}
+.history-tile-img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.history-tile.aspect-16-9 { aspect-ratio: 16 / 9; }
+.history-tile.aspect-4-5  { aspect-ratio: 4 / 5; }
+.history-tile.aspect-1-1  { aspect-ratio: 1 / 1; }
+.history-tile.aspect-3-4  { aspect-ratio: 3 / 4; }
+
+/* 선택된 tile — violet ring (output 시그니처) + 칩 라벨 */
+.history-tile.selected {
+  box-shadow:
+    0 0 0 2px #fff,
+    0 0 0 4px #8B5CF6,
+    0 8px 24px rgba(139,92,246,0.32);
+  border-color: transparent;
+}
+.history-tile.selected::after {
+  content: "● 선택";
+  position: absolute;
+  top: 9px; left: 9px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  padding: 3px 9px;
+  border-radius: var(--r-full);
+  color: #fff;
+  background: linear-gradient(135deg, #8B5CF6, #3B82F6);
+  box-shadow:
+    0 2px 8px rgba(139,92,246,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  z-index: 4;
+}
+
+/* Tile Hover Action Bar — 옛 PROD ResultHoverActionBar 패턴 매칭 (오빠 결정 2026-05-02)
+ *  어두운 frosted glass pill + 흰 아이콘 3 (zoom-in / edit / delete) + spring 등장
+ *  ResultHoverActionBar.tsx + ActionBarButton 의 .danger variant 동일 톤 */
+.tile-action-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  transform: translateX(-50%) translateY(8px) scale(0.92);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  background: rgba(28,30,38,0.32);
+  backdrop-filter: blur(18px) saturate(180%);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: var(--r-full);
+  box-shadow:
+    0 8px 28px rgba(0,0,0,0.28),
+    0 2px 6px rgba(0,0,0,0.14),
+    inset 0 1px 0 rgba(255,255,255,0.12);
+  opacity: 0;
+  transition:
+    opacity 0.18s ease,
+    transform 0.26s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+  z-index: 4;
+}
+.history-tile:hover .tile-action-bar {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0) scale(1);
+  pointer-events: auto;
+}
+.tile-action-btn {
+  all: unset;
+  cursor: pointer;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--r-full);
+  color: #fff;
+  transition: background 0.15s, transform 0.15s;
+}
+.tile-action-btn:hover {
+  background: rgba(255,255,255,0.16);
+  transform: scale(1.08);
+}
+.tile-action-btn.danger:hover {
+  background: rgba(192,57,43,0.92);
+}
+
+/* Archive Header — 결과 ↔ 히스토리 영역 통합 헤더 (v3 · 2026-05-02 오빠 피드백 격상)
+ *  v2: 작게 (12.5px sans) → v3: result-header 와 동일 톤 (Fraunces italic 26px + eyebrow + count chip)
+ *  Archive 시그니처: neutral (var(--ink)) — Result 의 violet 과 색 분리, 위계 동등 */
+.archive-header {
+  padding: 22px 0 14px;
+  border-top: 1px dashed var(--line-2);
+  margin-top: 8px;
+}
+.archive-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.archive-title-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.archive-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+  font-size: 26px;
+  font-weight: 500;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.archive-title strong {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ink);  /* neutral — Result 의 violet 과 분리 */
+}
+.archive-meta-pills {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.archive-pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  background: var(--bg-2);
+  padding: 4px 11px;
+  border-radius: var(--r-full);
+  border: 1px solid var(--line);
+}
+.archive-pill.pill-size {
+  /* 용량 칩 — 살짝 다른 톤으로 변별 (mono dim) */
+  color: var(--ink-2);
+  background: linear-gradient(135deg, rgba(0,0,0,0.04), rgba(0,0,0,0.02));
+}
+
+.ic { width: 14px; height: 14px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+.ic-lg { width: 18px; height: 18px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+</style>
+</head>
+<body>
+
+<!-- ── Mockup Meta Strip — 이게 시안 파일이라는 표시 (얇게) ── -->
+<div class="mockup-meta-strip">
+  <span><span class="label-strong">DESIGN MOCKUP</span> · pair-generate.html · Generate 페어 좌+우</span>
+  <span><span class="label-version">v7</span> · 2026-05-02 · nav hover spring 통통 · cubic-bezier overshoot</span>
+</div>
+
+<!-- ── App Header Mock — 실 production AppHeader (`Chrome.TopBar` + AppHeader.tsx) 1:1 ──
+     좌: HomeBtn + Logo · 우: MockBadge + StatusChip + SystemMetrics(4-bar) + Settings + Shutdown -->
+<header class="app-header-mock">
+  <div class="ah-left">
+    <div class="ah-logo">
+      <div class="ah-logo-mark">
+        <div class="ah-logo-mark-inner"></div>
+        <div class="ah-logo-mark-dot"></div>
+      </div>
+      <div class="ah-logo-text">
+        <div class="ah-logo-name">Image Studio</div>
+        <div class="ah-logo-version">LOCAL · v1.2.4</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="ah-center">
+    <!-- v6: HomeBtn 좌측에서 빠지고 중앙 nav 첫 항목으로 흡수 · 6 모드 영문 라벨 (오빠 결정 2026-05-02)
+         홈 / 생성 / 수정 / 영상 / 분석 / 비교 → Home / Generate / Edit / Video / Analyze / Compare
+         폰트: Fraunces italic — 좌측 mode-header `생성 · Generate` 영문 italic 페어 + Logo italic 과 일직선 -->
+    <nav class="ah-nav" aria-label="모드 선택">
+      <button class="ah-nav-link" title="메인 페이지">Home</button>
+      <button class="ah-nav-link" data-active="true" title="이미지 생성">Generate</button>
+      <button class="ah-nav-link" title="이미지 수정">Edit</button>
+      <button class="ah-nav-link" title="영상 생성 (LTX-2.3 i2v)">Video</button>
+      <button class="ah-nav-link" title="이미지 분석 (Vision)">Analyze</button>
+      <button class="ah-nav-link" title="이미지 비교 (5축)">Compare</button>
+    </nav>
+  </div>
+
+  <div class="ah-right">
+    <!-- MockBadge (USE_MOCK=true 시만 production 노출 · 시안 항상 표시) -->
+    <div class="ah-mock-badge" title="NEXT_PUBLIC_USE_MOCK=true">MOCK</div>
+
+    <!-- SystemStatusChip — running grace "준비 완료" 시각 (idle 시 production 자동 hidden) -->
+    <div class="ah-status-chip" title="모든 시스템 준비 완료">
+      <span class="ah-status-dot"></span>
+      <span class="ah-status-label">준비 완료</span>
+    </div>
+
+    <!-- SystemMetrics 4-bar (collapsed) — CPU=cyan / GPU=green / VRAM=purple / RAM=blue · hover 펼침 -->
+    <div class="ah-metrics" role="group" aria-label="시스템 자원 사용률" tabindex="0">
+      <div class="ah-metric-bar" data-metric="cpu" style="--m-pct:42" title="CPU 42%"></div>
+      <div class="ah-metric-bar" data-metric="gpu" style="--m-pct:64" title="GPU 64%"></div>
+      <div class="ah-metric-bar" data-metric="vram" style="--m-pct:78" title="VRAM 12.5/16G · 78%"></div>
+      <div class="ah-metric-bar" data-metric="ram" style="--m-pct:55" title="RAM 35.4/64G · 55%"></div>
+    </div>
+
+    <!-- SettingsButton — gear icon (⌘,) -->
+    <button class="ah-icon-btn" title="설정 (⌘,)">
+      <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </button>
+
+    <!-- ShutdownButton — power icon (Launcher v2 Hidden 모드 · ENABLE_LOCAL_SHUTDOWN=true 시만) -->
+    <button class="ah-icon-btn" title="스튜디오 종료">
+      <svg class="ic" viewBox="0 0 24 24" style="width:16px;height:16px"><path d="M12 2v10"/><path d="M5.5 7.5a8 8 0 1 0 13 0"/></svg>
+    </button>
+  </div>
+</header>
+
+<main class="pair-stage">
+
+  <!-- ════════════════════════ Generate 페어 시안 v1 (2026-05-02) ════════════════════════ -->
+  <section class="pair-section v3 v3c2 v5">
+    <div class="legend">
+      <strong>Generate 페어 (좌+우)</strong> &nbsp;좌측 V5 mode-header + 카드 4종 (cards-v2 와 동일) · 우측 Result Hero (16:9 매트 + dot grid + glass action bar) + Caption + History 섹션 masonry · React 그리드 <code>400 + 32 + 880</code> 매칭
+    </div>
+
+    <div class="pair-grid">
+      <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-eyebrow">IMAGE STUDIO · GENERATE</div>
+        <div class="mode-title-row">
+          <h2 class="mode-title"><strong>생성</strong> · Generate</h2>
+          <button class="mode-flow-link"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+        </div>
+        <p class="mode-desc">프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다.</p>
+      </div>
+
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          Generate
+        </button>
+      </div>
+
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>프롬프트</span>
+          <button class="field-meta-link"><svg class="ic" viewBox="0 0 24 24" style="width:11px;height:11px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>라이브러리에서 선택</button>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <div class="prompt-tools-stack">
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+          </div>
+          <textarea class="prompt-textarea" rows="3" placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."></textarea>
+        </div>
+      </div>
+
+      <div class="toggle-card ai-card" data-active="true">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9z"/></svg></span>
+          <span class="label-area">
+            <span class="label">🪄 AI 프롬프트 보정</span>
+            <span class="desc">ON · 한국어/자연어 → 영문 정제 (기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+        <div class="seg-wrap" data-value="fast">
+          <span class="seg-thumb"></span>
+          <button class="seg-btn" data-value="fast" data-active="true">instant</button>
+          <button class="seg-btn" data-value="precise" data-active="false">thinking</button>
+        </div>
+      </div>
+
+      <div class="toggle-card claude-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg></span>
+          <span class="label-area">
+            <span class="label">🔍 Claude 프롬프트 조사</span>
+            <span class="desc">Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <div class="toggle-card fast-card" data-active="false">
+        <span class="card-bar"></span>
+        <div class="toggle-row">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><path d="M6 3h12l4 6-10 13L2 9Z"/><path d="M2 9h20"/><path d="M9 9l3-6 3 6"/></svg></span>
+          <span class="label-area">
+            <span class="label">💎 퀄리티 모드</span>
+            <span class="desc">ON 시 Lightning 4-step 끄고 풀 디테일 · 약 4배 느림</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <div class="size-card-v">
+        <div class="size-header">
+          <span class="icon-box"><svg class="ic-lg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M9 3v18"/></svg></span>
+          <span class="meta">
+            <span class="title">사이즈</span>
+            <span class="chip">1328×744 · 16:9</span>
+          </span>
+        </div>
+        <div class="size-row">
+          <div class="size-col">
+            <div class="dim-input"><span class="label">W</span><input type="text" value="1328" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="1328">
+          </div>
+          <button class="lock-btn" data-locked="true"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+          <div class="size-col">
+            <div class="dim-input"><span class="label">H</span><input type="text" value="744" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="744" disabled>
+          </div>
+        </div>
+        <div class="aspect-grid">
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:38px"></span><span class="a-label">1:1</span></button>
+          <button class="aspect-card" data-active="true"><span class="mini-box" style="width:38px;height:21px"></span><span class="a-label">16:9</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:21px;height:38px"></span><span class="a-label">9:16</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:28.5px"></span><span class="a-label">4:3</span></button>
+        </div>
+      </div>
+      </div>
+
+      <!-- ── 우측 패널 — Result + History (NEW · 페어 시안 v1) ── -->
+      <div class="right-panel">
+
+        <!-- Result Header — V5 mode-header 톤 + violet (output) accent -->
+        <div class="result-header">
+          <div class="result-eyebrow">IMAGE STUDIO · RESULT</div>
+          <div class="result-title-row">
+            <h2 class="result-title"><strong>결과</strong> · Latest</h2>
+            <div class="result-meta-pills">
+              <span class="result-pill pill-violet">1672 × 941</span>
+              <span class="result-pill">PNG</span>
+              <span class="result-pill">28 steps · 7 cfg</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Result Hero — 매트지 + dot grid + 인물 + Glass action bar -->
+        <div class="result-hero">
+          <img class="result-hero-img" src="assets/card-bg-ai.webp" alt="결과 이미지 — violet 마법 인물">
+
+          <!-- Glass Action Bar — v4 4 버튼 (자세히 / 복사 / 수정 / 리프레시 · download 제거) -->
+          <div class="result-action-bar">
+            <button class="result-action-btn" title="자세히 (라이트박스)">
+              <svg class="ic" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg>
+            </button>
+            <span class="result-action-divider"></span>
+            <button class="result-action-btn" title="프롬프트 복사">
+              <svg class="ic" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>
+            </button>
+            <button class="result-action-btn" title="수정으로">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg>
+            </button>
+            <button class="result-action-btn" title="재생성 (파라미터 복원)">
+              <svg class="ic" viewBox="0 0 24 24"><path d="M3 12a9 9 0 0 1 15.5-6.3"/><path d="M21 12a9 9 0 0 1-15.5 6.3"/><path d="M18 3v5h-5"/><path d="M6 21v-5h5"/></svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Result Caption — hero 아래 prompt 1줄 (오빠 결정 v3 · model/seed 제거 — Result Header pills 과 중복) -->
+        <div class="result-caption">
+          <p class="result-caption-prompt">a young woman in violet ethereal light, magical sparkles drifting in the air, vogue editorial portrait, 3/4 side, late afternoon</p>
+        </div>
+
+        <!-- Archive Header — 결과 ↔ 히스토리 통합 헤더 (v4 · count + 용량 chip 2종)
+             count = HistoryStats.count · size = HistoryStats.byMode.generate.sizeBytes (실 저장된 stats API) -->
+        <div class="archive-header">
+          <div class="archive-eyebrow">IMAGE STUDIO · ARCHIVE</div>
+          <div class="archive-title-row">
+            <h2 class="archive-title"><strong>보관</strong> · History</h2>
+            <div class="archive-meta-pills">
+              <span class="archive-pill">13 items</span>
+              <span class="archive-pill pill-size">248 MB</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- History — 오늘 (펼침) -->
+        <div class="history-section">
+          <button class="history-section-header" data-closed="false">
+            <span class="chev"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+            <span class="title"><strong>오늘</strong> · Today</span>
+            <span class="count">4</span>
+          </button>
+          <div class="history-grid">
+            <div class="history-tile aspect-16-9 selected">
+              <img class="history-tile-img" src="assets/card-bg-ai.webp" alt="">
+              <div class="tile-action-bar">
+                <button class="tile-action-btn" title="자세히 (라이트박스)"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg></button>
+                <button class="tile-action-btn" title="프롬프트 복사"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+                <button class="tile-action-btn" title="수정으로"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg></button>
+                <button class="tile-action-btn danger" title="삭제"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </div>
+            <div class="history-tile aspect-4-5">
+              <img class="history-tile-img" src="assets/card-bg-claude.webp" alt="" style="object-position: center 30%;">
+              <div class="tile-action-bar">
+                <button class="tile-action-btn" title="자세히 (라이트박스)"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg></button>
+                <button class="tile-action-btn" title="프롬프트 복사"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+                <button class="tile-action-btn" title="수정으로"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg></button>
+                <button class="tile-action-btn danger" title="삭제"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </div>
+            <div class="history-tile aspect-1-1">
+              <img class="history-tile-img" src="assets/card-bg-fast.webp" alt="" style="object-position: center 30%;">
+              <div class="tile-action-bar">
+                <button class="tile-action-btn" title="자세히 (라이트박스)"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg></button>
+                <button class="tile-action-btn" title="프롬프트 복사"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+                <button class="tile-action-btn" title="수정으로"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg></button>
+                <button class="tile-action-btn danger" title="삭제"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </div>
+            <div class="history-tile aspect-16-9">
+              <img class="history-tile-img" src="assets/card-bg-multi-ref.webp" alt="">
+              <div class="tile-action-bar">
+                <button class="tile-action-btn" title="자세히 (라이트박스)"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg></button>
+                <button class="tile-action-btn" title="프롬프트 복사"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+                <button class="tile-action-btn" title="수정으로"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg></button>
+                <button class="tile-action-btn danger" title="삭제"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- History — 어제 (접힘 · 시각 시뮬레이션) -->
+        <div class="history-section" data-closed="true">
+          <button class="history-section-header" data-closed="true">
+            <span class="chev"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+            <span class="title"><strong>어제</strong> · Yesterday</span>
+            <span class="count">5</span>
+          </button>
+          <div class="history-grid"></div>
+        </div>
+
+        <!-- History — 이번 주 (펼침) -->
+        <div class="history-section">
+          <button class="history-section-header" data-closed="false">
+            <span class="chev"><svg class="ic" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"/></svg></span>
+            <span class="title"><strong>이번 주</strong> · This week</span>
+            <span class="count">4</span>
+          </button>
+          <div class="history-grid">
+            <div class="history-tile aspect-3-4">
+              <img class="history-tile-img" src="assets/card-bg-size.webp" alt="" style="object-position: 35% center;">
+              <div class="tile-action-bar">
+                <button class="tile-action-btn" title="자세히 (라이트박스)"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg></button>
+                <button class="tile-action-btn" title="프롬프트 복사"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+                <button class="tile-action-btn" title="수정으로"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg></button>
+                <button class="tile-action-btn danger" title="삭제"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </div>
+            <div class="history-tile aspect-16-9">
+              <img class="history-tile-img" src="assets/card-bg-video-res.webp" alt="">
+              <div class="tile-action-bar">
+                <button class="tile-action-btn" title="자세히 (라이트박스)"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg></button>
+                <button class="tile-action-btn" title="프롬프트 복사"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+                <button class="tile-action-btn" title="수정으로"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg></button>
+                <button class="tile-action-btn danger" title="삭제"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </div>
+            <div class="history-tile aspect-1-1">
+              <img class="history-tile-img" src="assets/card-bg-adult.webp" alt="" style="object-position: center 25%;">
+              <div class="tile-action-bar">
+                <button class="tile-action-btn" title="자세히 (라이트박스)"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg></button>
+                <button class="tile-action-btn" title="프롬프트 복사"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+                <button class="tile-action-btn" title="수정으로"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg></button>
+                <button class="tile-action-btn danger" title="삭제"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </div>
+            <div class="history-tile aspect-4-5">
+              <img class="history-tile-img" src="assets/card-bg-auto-compare.webp" alt="" style="object-position: center 30%;">
+              <div class="tile-action-bar">
+                <button class="tile-action-btn" title="자세히 (라이트박스)"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/><path d="M11 8v6M8 11h6"/></svg></button>
+                <button class="tile-action-btn" title="프롬프트 복사"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg></button>
+                <button class="tile-action-btn" title="수정으로"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M14 4l6 6-10 10H4v-6z"/><path d="M14 4l6 6"/></svg></button>
+                <button class="tile-action-btn danger" title="삭제"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · Generate 페어 시안 v4 (2026-05-02)</h4>
+      <strong>Right Panel 5 섹션:</strong> Result Header · Result Hero · Result Caption · Archive Header · History 섹션 masonry<br>
+      <strong>Hero:</strong> aspect <code>1672/941</code> · padding 28 · 매트지 + dot grid 16px · 이미지 자체 그림자 + 1px 테두리<br>
+      <strong>Hero Action Bar (v4 어두운 톤 통일):</strong> Tile 과 같은 어두운 frosted glass (<code>rgba(28,30,38,.32)</code> + 흰 아이콘) · <strong>4 버튼 (자세히 / 복사 / 수정 / 리프레시)</strong> + 1 divider · 가운데 정렬 · 시안용 항상 노출 (실 production hover-only) — download 제거<br>
+      <strong>Result Header pills (v4):</strong> 3 칩 (size · format · steps/cfg) — <strong>21.4s 시간 칩 제거</strong> (생성 duration 은 현재 schema 미저장)<br>
+      <strong>Caption:</strong> Fraunces italic 큰따옴표 prompt 1줄 truncate (메타 없음) — 한번 가다가 나중에 빼서 비교<br>
+      <strong>Archive Header:</strong> 점선 border-top + eyebrow <code>IMAGE STUDIO · ARCHIVE</code> + Fraunces italic <code>보관 · History</code> 26px + 2 chip (count + size · <code>HistoryStats.byMode.generate</code>)<br>
+      <strong>Section Header:</strong> Fraunces italic <code>오늘 · Today</code> + count chip + chevron · 박스 카드<br>
+      <strong>Tile Action Bar (v4):</strong> 어두운 frosted glass + <strong>4 버튼 (자세히 / 복사 / 수정 / 삭제)</strong> · spring 등장 · selected = violet ring + 칩 라벨<br>
+      <strong>너비 정책 (오빠 결정 · 옵션 D · 2026-05-02):</strong> 시안 = 고정 (1312/1360 · 검증 편의) · <strong>실 React 적용 = 박스 유지 + <code>max-width: min(95vw, 1600px)</code> cap</strong> (28인치+ 모니터에서 양 옆 빔 + 박스 임팩트 보존). Right 우측 패널 = <code>1fr</code> + history auto-cols 2~6<br>
+      <strong>React 적용 시 추가 유지:</strong> HistoryGallery 자동 컬럼 (240px min · 2~6) · Hero wheel zoom + drag pan + dbl-click reset · ActionBar focus-within 키보드 접근성<br>
+      <strong>다음 단계:</strong> 픽스 후 → Empty State 변형 + 다른 4 모드 (Edit / Video / Vision / Compare) 페어
+    </div>
+  </section>
+
+</main>
+
+<aside class="global-note">
+  <h3>Generate 페어 시안 v1 — 좌+우 한 쌍</h3>
+  <p>좌측 패널 V5 (cards-v2.html 픽스 완료) + 우측 결과/히스토리 패널 (NEW). 페어로 봐서 비율·리듬·간격 검증.</p>
+
+  <ul>
+    <li><strong>좌측 (Left · 400px)</strong> — V5 mode-header (eyebrow + Fraunces italic <code>생성 · Generate</code>) + Aurora Glass CTA + 프롬프트 + 카드 4종 (AI/Claude/퀄리티/사이즈)</li>
+    <li><strong>우측 (Right · 880px)</strong> — Result Header (violet output 시그니처) + Result Hero (16:9 매트 + dot grid + Glass action bar) + Caption (NEW) + History 섹션 masonry</li>
+  </ul>
+
+  <p style="margin-top:14px;"><strong>그리드</strong> — <code>400px + 32px gap + 880px = 1312px</code> (React 의 <code>grid: "400px minmax(624px, 1fr)"</code> 매칭)</p>
+
+  <p style="margin-top:14px;"><strong>인터랙션 데모</strong></p>
+  <ul>
+    <li>좌측: 카드 클릭 ON/OFF · segmented 클릭 · 비율 카드 · 비율잠금 (cards-v2 와 동일)</li>
+    <li>우측: history-section-header 클릭 → 섹션 접힘/펼침 토글 + 화살표 회전</li>
+    <li>우측 history-tile 호버 → lift + <strong>옛 PROD 액션 바</strong> (어두운 글래스 pill · zoom/edit/delete 3 버튼) spring 통통 등장</li>
+  </ul>
+
+  <p style="margin-top:14px; color:var(--ink-4); font-size:11px;">
+    💡 <strong>다음 단계</strong> — 픽스 후:<br>
+    1) Empty State 변형 (선택 결과 없음 시) — 별도 시안 추가 가능<br>
+    2) 다른 4 모드 페어 (Edit / Video / Vision / Compare) — 같은 패턴으로 복제<br>
+    3) React 적용 plan 갱신 (<code>docs/superpowers/plans/2026-05-02-design-v5-react-application.md</code>)
+  </p>
+</aside>
+
+<script>
+// 카드 클릭 → ON/OFF 토글 (segmented/aspect/lock 클릭은 stopPropagation 으로 제외)
+document.querySelectorAll('.toggle-card').forEach(card => {
+  card.addEventListener('click', e => {
+    if (e.target.closest('.seg-btn')) return;  // segmented stopPropagation 으로도 막혀있지만 이중 안전
+    const active = card.dataset.active === 'true';
+    card.dataset.active = !active;
+  });
+});
+
+// Segmented (instant/thinking) → thumb 슬라이드 (카드 토글 차단)
+document.querySelectorAll('.seg-wrap').forEach(wrap => {
+  wrap.addEventListener('click', e => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    e.stopPropagation();
+    const value = btn.dataset.value;
+    wrap.dataset.value = value;
+    wrap.querySelectorAll('.seg-btn').forEach(b => {
+      b.dataset.active = (b.dataset.value === value);
+    });
+  });
+});
+
+// 비율 카드 → active 전환
+document.querySelectorAll('.aspect-grid').forEach(grid => {
+  grid.addEventListener('click', e => {
+    const card = e.target.closest('.aspect-card');
+    if (!card) return;
+    e.stopPropagation();
+    grid.querySelectorAll('.aspect-card').forEach(c => c.dataset.active = "false");
+    card.dataset.active = "true";
+  });
+});
+
+// 비율잠금 토글
+document.querySelectorAll('.lock-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const locked = btn.dataset.locked === 'true';
+    btn.dataset.locked = !locked;
+  });
+});
+
+// V3c-2 hover 툴팁 — desc 텍스트 제거 후 카드 hover 시 검정 pill 으로 표시
+//   pair-generate.html 은 Generate 모드만 → 4 카드만 매핑 (multi-ref/auto-compare/adult 제외)
+const V3C2_TIPS = {
+  'ai-card':     'ON · 한국어/자연어 → 영문 정제',
+  'claude-card': 'Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s',
+  'fast-card':   'ON 시 Lightning 4-step 끄고 풀 디테일 · 약 4배 느림',
+};
+document.querySelectorAll('.v3c2 .toggle-card').forEach(card => {
+  for (const cls in V3C2_TIPS) {
+    if (card.classList.contains(cls)) {
+      card.dataset.tooltip = V3C2_TIPS[cls];
+      break;
+    }
+  }
+});
+
+// History Section Header — 클릭 시 접힘/펼침 토글
+//   data-closed 속성을 헤더 + 부모 .history-section 양쪽에 동기화
+//   (CSS 가 .history-section[data-closed="true"] .history-grid 를 display:none 처리)
+document.querySelectorAll('.history-section-header').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const closed = btn.dataset.closed === 'true';
+    const next = (!closed).toString();
+    btn.dataset.closed = next;
+    const section = btn.closest('.history-section');
+    if (section) section.dataset.closed = next;
+  });
+});
+
+// History Action Bar 버튼 클릭 시 placeholder (시안 — 실 동작 없음 · stopPropagation 만)
+document.querySelectorAll('.result-action-btn').forEach(btn => {
+  btn.addEventListener('click', e => e.stopPropagation());
+});
+
+// AppHeader 중앙 nav — 클릭 시 active 전환 (시안 데모 · 실 React 는 router.push)
+document.querySelectorAll('.ah-nav-link').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.ah-nav-link').forEach(b => b.dataset.active = "false");
+    btn.dataset.active = "true";
+  });
+});
+</script>
+</body>
+</html>

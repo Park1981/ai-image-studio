@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio Design Test v3 · CTA 디자인 변형 비교</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+button { font-family: inherit; cursor: pointer; }
+
+:root {
+  --bg: #FAF9F7;
+  --bg-2: #F4F2EE;
+  --surface: #FFFFFF;
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --accent: #4A9EFF;
+  --accent-ink: #1E7BE0;
+  --gold: #B8860B;
+  --gold-light: #D4AF37;
+  --r-sm: 8px; --r-md: 12px; --r-card: 14px; --r-lg: 16px; --r-full: 999px;
+}
+
+html, body {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(74,158,255,0.04), transparent 40%),
+    radial-gradient(circle at 80% 100%, rgba(139,92,246,0.04), transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", -apple-system, system-ui, sans-serif;
+  font-feature-settings: "ss02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px; line-height: 1.6;
+  min-height: 100vh;
+}
+.mono { font-family: "JetBrains Mono", ui-monospace, monospace; font-feature-settings: "zero"; }
+.display { font-family: "Fraunces", Georgia, serif; font-variation-settings: "opsz" 144, "SOFT" 50; font-style: italic; }
+
+/* ── Page Header ── */
+.page-header {
+  padding: 28px 40px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
+  position: sticky; top: 0; z-index: 10;
+}
+.page-title { font-size: 24px; font-weight: 600; letter-spacing: -0.012em; }
+.page-title .display { font-style: italic; font-weight: 500; color: var(--accent-ink); }
+.page-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.page-meta { font-size: 11px; color: var(--ink-4); display: flex; gap: 18px; align-items: center; }
+.page-meta .pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3); border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+
+/* ── Grid ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, 460px);
+  gap: 28px;
+  padding: 32px 40px 80px;
+  justify-content: center;
+  align-items: start;
+}
+
+/* ── Variant Card (각 CTA 변형 컨테이너) ── */
+.variant {
+  width: 460px;
+  background: linear-gradient(180deg, var(--surface), rgba(255,255,255,0.5));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 28px 28px 22px;
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 8px 24px rgba(23,20,14,.04);
+}
+.variant-meta {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 6px; padding-bottom: 12px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.variant-eyebrow {
+  font-family: "JetBrains Mono", monospace; font-size: 9.5px;
+  color: var(--ink-4); letter-spacing: 0.16em; text-transform: uppercase;
+}
+.variant-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144;
+  font-style: italic; font-size: 22px; font-weight: 500;
+  color: var(--ink); margin-top: 4px;
+}
+.variant-name strong { font-style: normal; font-weight: 700; color: var(--accent-ink); }
+.variant-id {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px; padding: 4px 10px; border-radius: 999px;
+  background: var(--ink); color: #fff;
+  letter-spacing: 0.08em; font-weight: 600;
+}
+.variant-cta-area {
+  padding: 26px 0 14px;
+  display: flex; align-items: center; justify-content: center;
+}
+.variant-spec {
+  font-size: 11px; color: var(--ink-3); line-height: 1.7;
+  border-top: 1px dashed var(--line-2);
+  padding-top: 12px; margin-top: 8px;
+}
+.variant-spec strong { color: var(--ink-2); font-weight: 600; }
+.variant-spec code {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+  background: rgba(0,0,0,0.04); padding: 1px 5px; border-radius: 3px;
+  color: var(--ink-2);
+}
+
+/* ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   CTA Variants — 모두 width 100% 기본 + 라이트 BG 환경
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ */
+
+.cta-base {
+  all: unset; cursor: pointer; text-align: center;
+  display: inline-flex; align-items: center; justify-content: center;
+  gap: 10px;
+  width: 100%; box-sizing: border-box;
+  padding: 14px 22px;
+  border-radius: var(--r-full);
+  font-size: 14px; font-weight: 600;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  position: relative; overflow: hidden;
+}
+
+/* ─────────────────────────────────────────────
+   A — Editorial Magazine (Vogue 스타일)
+   검정 + 흰 + Fraunces italic + 골드 라인
+   ───────────────────────────────────────────── */
+.cta-a {
+  background: linear-gradient(180deg, #1a1a1a 0%, #0a0a0a 100%);
+  color: #fff;
+  padding: 16px 28px;
+  border-radius: 4px;
+  border: 1px solid rgba(255,255,255,0.1);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.08);
+  letter-spacing: 0.02em;
+}
+.cta-a::before {
+  content: ""; position: absolute;
+  top: 50%; left: 14px; transform: translateY(-50%);
+  width: 18px; height: 1px; background: linear-gradient(90deg, var(--gold-light), transparent);
+}
+.cta-a::after {
+  content: ""; position: absolute;
+  top: 50%; right: 14px; transform: translateY(-50%);
+  width: 18px; height: 1px; background: linear-gradient(-90deg, var(--gold-light), transparent);
+}
+.cta-a .ko { font-weight: 600; font-size: 14px; }
+.cta-a .en {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic; font-weight: 400;
+  color: var(--gold-light);
+  font-size: 14.5px;
+  margin-left: -2px;
+}
+.cta-a .sep { color: rgba(255,255,255,0.3); margin: 0 -4px; }
+.cta-a .sc {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; opacity: 0.5;
+  margin-left: 4px;
+}
+.cta-a:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.1);
+}
+.cta-a:hover .en { color: #fff; }
+
+/* ─────────────────────────────────────────────
+   B — Aurora Glass Gradient (시스템 매칭)
+   violet→blue + glass + 호버 light sweep
+   ───────────────────────────────────────────── */
+.cta-b {
+  background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+  color: #fff;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,0.45),
+    inset 0 1px 0 rgba(255,255,255,0.25),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
+}
+.cta-b::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.25), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.7s cubic-bezier(.4,0,.2,1);
+}
+.cta-b:hover::before { transform: translateX(100%); }
+.cta-b:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 28px rgba(99,102,241,0.6),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+}
+.cta-b .ico { width: 16px; height: 16px; stroke-width: 2; }
+.cta-b .sc {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px; font-weight: 500;
+  padding: 2px 7px; border-radius: 4px;
+  background: rgba(255,255,255,0.18);
+  margin-left: 4px;
+}
+
+/* ─────────────────────────────────────────────
+   C — Holographic Shimmer
+   다중 컬러 + 메탈릭 시머 애니메이션
+   ───────────────────────────────────────────── */
+.cta-c {
+  background:
+    linear-gradient(110deg,
+      #8B5CF6 0%,
+      #EC4899 25%,
+      #F59E0B 50%,
+      #06B6D4 75%,
+      #8B5CF6 100%);
+  background-size: 200% 100%;
+  color: #fff;
+  font-weight: 700;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  box-shadow:
+    0 4px 20px rgba(236,72,153,0.35),
+    0 4px 20px rgba(139,92,246,0.25),
+    inset 0 1px 0 rgba(255,255,255,0.4);
+  animation: shimmer-c 4s linear infinite;
+}
+@keyframes shimmer-c {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+.cta-c::before {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(180deg, rgba(255,255,255,0.15), transparent 60%);
+  pointer-events: none;
+}
+.cta-c:hover {
+  transform: translateY(-2px) scale(1.01);
+  animation-duration: 1.5s;
+  box-shadow:
+    0 8px 32px rgba(236,72,153,0.5),
+    0 8px 32px rgba(139,92,246,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.cta-c .ico {
+  width: 16px; height: 16px;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+.cta-c .sc {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px; font-weight: 600;
+  padding: 2px 7px; border-radius: 4px;
+  background: rgba(0,0,0,0.2);
+  margin-left: 4px;
+  text-shadow: none;
+}
+
+/* ─────────────────────────────────────────────
+   D — Spotlight Pulse (radial + sparkle)
+   ───────────────────────────────────────────── */
+.cta-d {
+  background:
+    radial-gradient(circle at center, #6366F1 0%, #4338CA 60%, #312E81 100%);
+  color: #fff;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow:
+    0 0 0 1px rgba(99,102,241,0.3),
+    0 4px 24px rgba(99,102,241,0.4),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+  font-weight: 600;
+}
+.cta-d::before {
+  content: ""; position: absolute;
+  width: 200%; height: 200%; top: -50%; left: -50%;
+  background: radial-gradient(circle, rgba(255,255,255,0.18) 0%, transparent 30%);
+  animation: spotlight-pulse 3.5s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes spotlight-pulse {
+  0%, 100% { transform: translate(-25%, -25%) scale(1); opacity: 0.6; }
+  50% { transform: translate(25%, 25%) scale(1.2); opacity: 1; }
+}
+.cta-d::after {
+  content: "✦";
+  position: absolute;
+  top: 8px; right: 12px;
+  color: rgba(255,255,255,0.7);
+  font-size: 11px;
+  animation: sparkle-d 2s ease-in-out infinite;
+}
+@keyframes sparkle-d {
+  0%, 100% { opacity: 0.4; transform: rotate(0deg) scale(1); }
+  50% { opacity: 1; transform: rotate(180deg) scale(1.2); }
+}
+.cta-d:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 0 0 2px rgba(99,102,241,0.4),
+    0 8px 36px rgba(99,102,241,0.55),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.cta-d .ico { width: 16px; height: 16px; }
+.cta-d .sc {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  padding: 2px 7px; border-radius: 4px;
+  background: rgba(0,0,0,0.25);
+  margin-left: 4px;
+}
+
+/* ─────────────────────────────────────────────
+   E — Editorial Serif Display
+   Fraunces + 한글 강조 + 흰 배경 + 검정 라인
+   ───────────────────────────────────────────── */
+.cta-e {
+  background: #fefcf7;
+  color: var(--ink);
+  border: 1.5px solid var(--ink);
+  border-radius: 0;
+  padding: 18px 32px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  box-shadow: 4px 4px 0 var(--ink);
+  transition: all 0.18s cubic-bezier(.4,0,.2,1);
+}
+.cta-e .ko {
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: -0.01em;
+}
+.cta-e .en {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 17px;
+  color: var(--gold);
+}
+.cta-e .sep {
+  color: var(--ink-4);
+  font-weight: 300;
+}
+.cta-e .sc {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-3);
+  margin-left: 6px;
+  border: 1px solid var(--line);
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #fff;
+}
+.cta-e:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 var(--ink);
+}
+.cta-e:active {
+  transform: translate(2px, 2px);
+  box-shadow: 0 0 0 var(--ink);
+}
+
+/* ─────────────────────────────────────────────
+   F — Signature Bar Pill
+   좌 시그니처 bar + bilingual + 우 모노 shortcut
+   ───────────────────────────────────────────── */
+.cta-f {
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  padding: 0;
+  height: 56px;
+  border-radius: var(--r-full);
+  box-shadow: 0 2px 8px rgba(23,20,14,.06), 0 8px 24px rgba(23,20,14,.04);
+  display: flex; align-items: stretch;
+  overflow: hidden;
+}
+.cta-f .bar {
+  width: 8px; flex-shrink: 0;
+  background: linear-gradient(180deg, #8B5CF6 0%, #3B82F6 100%);
+  transition: width 0.3s cubic-bezier(.4,0,.2,1);
+}
+.cta-f .body {
+  flex: 1;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 0 22px;
+}
+.cta-f .ko {
+  font-weight: 700; font-size: 15px;
+  letter-spacing: -0.01em;
+}
+.cta-f .en {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic; font-weight: 500;
+  font-size: 16px;
+  color: #6366F1;
+}
+.cta-f .sep { color: var(--ink-4); }
+.cta-f .sc-area {
+  border-left: 1px dashed var(--line);
+  padding: 0 16px;
+  display: flex; align-items: center;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px; font-weight: 600;
+  color: var(--ink-3);
+  letter-spacing: 0.06em;
+}
+.cta-f:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(99,102,241,0.15), 0 18px 36px rgba(23,20,14,0.1);
+  border-color: rgba(99,102,241,0.3);
+}
+.cta-f:hover .bar { width: 14px; }
+.cta-f:hover .sc-area { color: var(--ink-2); }
+
+/* ── icon ── */
+.ico { width: 14px; height: 14px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+
+/* ── global note ── */
+.global-note {
+  max-width: 1380px; margin: 0 auto;
+  padding: 24px 40px 60px;
+  font-size: 12px; color: var(--ink-3); line-height: 1.8;
+  border-top: 1px dashed var(--line);
+}
+.global-note h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic; font-weight: 500; font-size: 18px; color: var(--ink);
+  margin-bottom: 10px;
+}
+.global-note ul { padding-left: 20px; margin: 8px 0; }
+.global-note code {
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  background: var(--bg-2); padding: 2px 6px; border-radius: 4px;
+  color: var(--ink-2);
+}
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <div>
+    <h1 class="page-title"><span class="display">Studio</span> Design Test <span class="display" style="font-size:18px; color:var(--ink-3); margin-left:8px;">v3</span></h1>
+    <p class="page-sub">CTA 디자인 변형 비교 — 6 컨셉 (호버해서 모션 확인)</p>
+  </div>
+  <div class="page-meta">
+    <span class="pill">cards-v3</span>
+    <span><span class="mono">2026-05-02</span></span>
+    <span>Aurora Glass · K-pop AI Studio</span>
+  </div>
+</header>
+
+<main class="grid">
+
+  <!-- A — Editorial Magazine -->
+  <section class="variant">
+    <div class="variant-meta">
+      <div>
+        <div class="variant-eyebrow">Variant · Editorial</div>
+        <div class="variant-name"><strong>옵션 A</strong> · Magazine</div>
+      </div>
+      <div class="variant-id">A</div>
+    </div>
+    <div class="variant-cta-area">
+      <button class="cta-base cta-a">
+        <span class="ko">생성</span>
+        <span class="sep">·</span>
+        <span class="en">Generate</span>
+        <span class="sc">⇧↵</span>
+      </button>
+    </div>
+    <div class="variant-spec">
+      <strong>Editorial Magazine</strong> — 검정 + 흰 + Fraunces italic + 골드 라인 액센트<br>
+      Vogue Korea 톤 · 미니멀 + 럭셔리 · 호버 시 골드 → 흰 전환<br>
+      <code>linear-gradient #1a1a1a → #0a0a0a</code> · <code>border-radius: 4px</code>
+    </div>
+  </section>
+
+  <!-- B — Aurora Glass Gradient -->
+  <section class="variant">
+    <div class="variant-meta">
+      <div>
+        <div class="variant-eyebrow">Variant · Aurora</div>
+        <div class="variant-name"><strong>옵션 B</strong> · Glass Gradient</div>
+      </div>
+      <div class="variant-id">B</div>
+    </div>
+    <div class="variant-cta-area">
+      <button class="cta-base cta-b">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+        생성
+        <span class="sc">⇧↵</span>
+      </button>
+    </div>
+    <div class="variant-spec">
+      <strong>Aurora Glass Gradient</strong> — violet→blue 시그니처 + glass + light sweep<br>
+      시스템 카드 (AI 보정) 와 톤 매칭 · 호버 시 빛 sweep 0.7s · inset 1px highlight<br>
+      <code>linear-gradient 135deg #8B5CF6 → #3B82F6</code> · <code>shadow rgba(99,102,241,0.45)</code>
+    </div>
+  </section>
+
+  <!-- C — Holographic Shimmer -->
+  <section class="variant">
+    <div class="variant-meta">
+      <div>
+        <div class="variant-eyebrow">Variant · Holographic</div>
+        <div class="variant-name"><strong>옵션 C</strong> · Shimmer</div>
+      </div>
+      <div class="variant-id">C</div>
+    </div>
+    <div class="variant-cta-area">
+      <button class="cta-base cta-c">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+        생성
+        <span class="sc">⇧↵</span>
+      </button>
+    </div>
+    <div class="variant-spec">
+      <strong>Holographic Shimmer</strong> — 5색 그라데이션 + 무한 시머 애니메이션<br>
+      maximalist 톤 · 마법/AI 정체성 강조 · 호버 시 시머 4s → 1.5s 가속<br>
+      <code>linear-gradient violet → pink → amber → cyan → violet</code> · <code>animation 4s linear infinite</code>
+    </div>
+  </section>
+
+  <!-- D — Spotlight Pulse -->
+  <section class="variant">
+    <div class="variant-meta">
+      <div>
+        <div class="variant-eyebrow">Variant · Spotlight</div>
+        <div class="variant-name"><strong>옵션 D</strong> · Pulse</div>
+      </div>
+      <div class="variant-id">D</div>
+    </div>
+    <div class="variant-cta-area">
+      <button class="cta-base cta-d">
+        <svg class="ico" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+        생성
+        <span class="sc">⇧↵</span>
+      </button>
+    </div>
+    <div class="variant-spec">
+      <strong>Spotlight Pulse</strong> — radial gradient + 스포트라이트 펄스 + sparkle 회전<br>
+      indigo deep → violet · ambient pulse 3.5s 무한 · 우상단 ✦ 회전 sparkle<br>
+      <code>radial-gradient #6366F1 → #4338CA → #312E81</code> · <code>2 animation infinite</code>
+    </div>
+  </section>
+
+  <!-- E — Editorial Serif Display -->
+  <section class="variant">
+    <div class="variant-meta">
+      <div>
+        <div class="variant-eyebrow">Variant · Serif</div>
+        <div class="variant-name"><strong>옵션 E</strong> · Display</div>
+      </div>
+      <div class="variant-id">E</div>
+    </div>
+    <div class="variant-cta-area">
+      <button class="cta-base cta-e">
+        <span class="ko">생성</span>
+        <span class="sep">·</span>
+        <span class="en">Generate</span>
+        <span class="sc">⇧↵</span>
+      </button>
+    </div>
+    <div class="variant-spec">
+      <strong>Editorial Serif Display</strong> — Fraunces italic 영문 + 검정 라인 + 골드 + 입체 그림자<br>
+      뉴트로 / 인쇄물 톤 · 호버 시 그림자 4px → 6px / 클릭 시 누름 효과<br>
+      <code>border 1.5px solid #1F1F1F</code> · <code>shadow 4px 4px 0 #1F1F1F</code>
+    </div>
+  </section>
+
+  <!-- F — Signature Bar Pill -->
+  <section class="variant">
+    <div class="variant-meta">
+      <div>
+        <div class="variant-eyebrow">Variant · Signature</div>
+        <div class="variant-name"><strong>옵션 F</strong> · Bar Pill</div>
+      </div>
+      <div class="variant-id">F</div>
+    </div>
+    <div class="variant-cta-area">
+      <button class="cta-base cta-f">
+        <span class="bar"></span>
+        <span class="body">
+          <span class="ko">생성</span>
+          <span class="sep">·</span>
+          <span class="en">Generate</span>
+        </span>
+        <span class="sc-area">⇧↵</span>
+      </button>
+    </div>
+    <div class="variant-spec">
+      <strong>Signature Bar Pill</strong> — 좌 시그니처 그라데이션 bar + bilingual + 우 모노 shortcut 영역<br>
+      흰 배경 + 정제된 디테일 · 호버 시 bar 8px → 14px 확장<br>
+      <code>flex layout · 좌 bar (8→14px) / 본문 / shortcut 영역 dashed border</code>
+    </div>
+  </section>
+
+</main>
+
+<aside class="global-note">
+  <h3>CTA 디자인 변형 비교</h3>
+  <p>현재 cards-v2.html 의 단순 파란색 pill CTA 를 6 가지 컨셉으로 다양화. 호버해서 모션 + 디테일 확인.</p>
+  <ul>
+    <li><strong>A · Editorial Magazine</strong> — 검정 + Fraunces italic + 골드 라인. Vogue Korea 톤. 미니멀 + 럭셔리 정체성.</li>
+    <li><strong>B · Aurora Glass Gradient</strong> — violet→blue 시그니처. 시스템 카드 톤 매칭. light sweep 모션.</li>
+    <li><strong>C · Holographic Shimmer</strong> — 5색 메탈릭 시머. 마법/AI 정체성 maximalist. 무한 애니메이션.</li>
+    <li><strong>D · Spotlight Pulse</strong> — radial indigo + 펄스 + sparkle 회전. 영적/마법 톤.</li>
+    <li><strong>E · Editorial Serif Display</strong> — 입체 그림자 + Fraunces italic + 골드. 뉴트로/인쇄물 톤.</li>
+    <li><strong>F · Signature Bar Pill</strong> — 좌 시그니처 bar + bilingual + 우 모노 shortcut 영역. 정제된 디테일.</li>
+  </ul>
+  <p style="margin-top:14px;"><strong>스펙트럼</strong> — 미니멀 럭셔리 (A/E) ↔ 시스템 매칭 (B/F) ↔ maximalist 마법 (C/D)</p>
+  <p style="margin-top:14px; color:var(--ink-4); font-size:11px;">
+    💡 <strong>결정 후</strong> — 골라서 cards-v2.html 의 <code>.cta-primary</code> CSS 교체. 5 패널 모두 자동 반영.
+  </p>
+</aside>
+
+</body>
+</html>
