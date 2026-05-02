@@ -1671,6 +1671,55 @@ button {
   background: linear-gradient(135deg, rgba(245,158,11,0.07), rgba(245,158,11,0.02));
   border: 1px solid rgba(245,158,11,0.24);
   box-shadow: 0 1px 2px rgba(23,20,14,.04);
+  /* 좁은 우측 패널에서 줄바꿈 허용 (옛 CardShell flexWrap 패턴) */
+  flex-wrap: wrap;
+}
+/* state 별 background/border override — filled (default · amber) vs empty/loading/disabled (surface · 옛 톤)
+   분석 결과 *있음* vs *없음* 시각 차별화 (Phase 5 Codex 3차 nit #2 — 옛 시각 의도 보존 + inline 0). */
+.ais-comparison-card[data-state="empty"],
+.ais-comparison-card[data-state="loading"],
+.ais-comparison-card[data-state="disabled"] {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+/* state 별 label · button · icon (자식 inline → CSS 이전) */
+.ais-comparison-card .ais-comp-label {
+  font-size: 12px;
+  color: var(--ink-3);
+  flex: 1;
+}
+.ais-comparison-card[data-state="loading"] .ais-comp-label {
+  color: var(--ink-2);
+}
+.ais-comparison-card[data-state="disabled"] .ais-comp-label {
+  font-size: 11.5px;
+  color: var(--ink-4);
+  line-height: 1.5;
+  flex: 0 1 auto;
+}
+/* empty/loading state Icon — base .ais-comp-icon (amber 박스 · filled 용) reset */
+.ais-comparison-card[data-state="empty"] .ais-comp-icon,
+.ais-comparison-card[data-state="loading"] .ais-comp-icon {
+  background: transparent;
+  width: auto;
+  height: auto;
+  color: var(--ink-3);
+  border-radius: 0;
+}
+.ais-comparison-card .ais-comp-analyze-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: #fff;
+  transition: filter .12s;
+}
+.ais-comparison-card .ais-comp-analyze-btn:hover {
+  filter: brightness(1.1);
 }
 .ais-comparison-card .ais-comp-icon {
   display: grid;

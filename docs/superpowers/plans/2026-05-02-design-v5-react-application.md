@@ -388,8 +388,14 @@
 
 - `frontend/components/studio/compare/CompareLeftPanel.tsx`:
   - CTA 상단 sticky (Phase 1.5 에서 이미 처리 — 검증만)
+- `frontend/components/studio/BeforeAfterSlider.tsx` (Phase 5 Codex 3차 nit #1 박제):
+  - **`labelVariant?: "before-after" | "ab"` prop 신규** (기본 "before-after" — Edit/Lightbox 호환)
+  - className 분기:
+    - `"before-after"` → `.ais-ba-label-before` / `.ais-ba-label-after` (V5 검은 톤 default · 현재 적용됨)
+    - `"ab"` → `.ais-ba-label-a` / `.ais-ba-label-b` (V5 violet/amber 그라데이션 시그니처 · `globals.css:1601-1614` 활용)
 - `frontend/components/studio/compare/CompareViewer.tsx`:
-  - BeforeAfter slider 안 **A=violet 그라데이션 / B=amber 그라데이션** 라벨 추가 (badge-ab 패턴 슬라이더 안 적용)
+  - BeforeAfterSlider 호출 시 **`labelVariant="ab"` + `beforeLabel="A"` + `afterLabel="B"`** 명시
+  - V5 시그니처 그라데이션 자동 적용 (globals.css 의 `.ais-ba-label-a` / `-b` 정의 활용)
   - 비율 차이 amber 경고 chip 그대로 유지
 - `frontend/components/studio/compare/CompareAnalysisPanel.tsx`:
   - 종합 chip = violet gradient (`linear-gradient(135deg, rgba(139,92,246,0.10), rgba(139,92,246,0.04))` + violet text)
