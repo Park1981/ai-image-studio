@@ -418,6 +418,12 @@
 
 ### Phase 8 — Cleanup + 회귀 테스트 (1-2h)
 
+- [ ] **VisionHistoryList 헤더 V5 Archive Header 패턴 통일 검토** (Codex Phase 6 nit #3 박제):
+  - 현재 옛 헤더: h3 "최근 분석" + count + 모두 지우기 버튼 (`.ais-vision-history-header`)
+  - Edit/Generate V5 패턴: HistorySectionHeader (eyebrow `IMAGE STUDIO · ARCHIVE` + Fraunces italic bilingual + count chip + sizeBytes chip)
+  - 옵션 A — 통일: HistorySectionHeader 격상 + `titleEn="History"` (sizeBytes 는 vision 전용 X — count 만)
+  - 옵션 B — 그대로 (Vision 전용 작은 헤더 의도 보존 · plan §6 명시 X)
+  - 결정 후보 — Phase 8 시점 시각 비교 후
 - [ ] 5 페이지 수동 검증 (Chrome MCP — 시안 페어 시각 일치 확인)
 - [ ] 회귀 테스트:
   - **`cd backend; pytest tests/` → 405 PASS** (CLAUDE.md 표준 명령 · legacy quarantine 적용)

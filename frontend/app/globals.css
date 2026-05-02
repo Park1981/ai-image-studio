@@ -2127,7 +2127,8 @@ button {
   font-size: 11.5px;
 }
 .ais-vpt-negative-label {
-  color: #EF4444;
+  /* V5 톤 통일 — split 모드의 NEGATIVE 섹션 색 (#B8232C) 과 매칭 (Codex Phase 6 nit #2 시각 일관성) */
+  color: #B8232C;
   font-weight: 600;
 }
 .ais-vpt-negative-text {
@@ -2256,6 +2257,7 @@ button {
   gap: 10px;
 }
 .ais-vision-history-tile {
+  position: relative; /* delete 버튼 absolute 앵커 (Phase 6 hover 노출) */
   display: flex;
   gap: 10px;
   padding: 10px;
@@ -2319,10 +2321,8 @@ button {
   color: var(--amber-ink);
   font-style: italic;
 }
-/* Vision history tile 내부 — relative wrapper + hover 시 delete 버튼 노출 */
-.ais-vision-history-tile {
-  position: relative;
-}
+/* Vision history tile delete 버튼 — hover/focus 시 absolute X 노출
+   (`.ais-vision-history-tile` 의 position: relative 가 앵커 — 본체 selector 에 통합) */
 .ais-vht-delete {
   position: absolute;
   top: 6px;
