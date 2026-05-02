@@ -46,6 +46,13 @@ interface Props {
    * Lightbox 등 다른 호출자는 prop 안 주면 contain 유지 → 회귀 0.
    */
   beforeFit?: "contain" | "cover";
+  /**
+   * 코너 라벨 시각 variant (Phase 7 — 디자인 V5 시그니처).
+   *  - "before-after" (기본): `.ais-ba-label-before` / `-after` — V5 검은 톤 (Edit/Lightbox 호환)
+   *  - "ab": `.ais-ba-label-a` / `-b` — V5 violet/amber 그라데이션 (Compare 시그니처)
+   * Compare 호출처는 `labelVariant="ab"` + `beforeLabel="A"` + `afterLabel="B"` 명시.
+   */
+  labelVariant?: "before-after" | "ab";
 }
 
 export default function BeforeAfterSlider({
@@ -59,7 +66,13 @@ export default function BeforeAfterSlider({
   beforeLabel = "Before",
   afterLabel = "After",
   beforeFit = "contain",
+  labelVariant = "before-after",
 }: Props) {
+  // Phase 7 — V5 라벨 className 분기 (Compare 시그니처 violet/amber 그라데이션 vs Edit 검은 톤)
+  const beforeLabelClass =
+    labelVariant === "ab" ? "ais-ba-label ais-ba-label-a" : "ais-ba-label ais-ba-label-before";
+  const afterLabelClass =
+    labelVariant === "ab" ? "ais-ba-label ais-ba-label-b" : "ais-ba-label ais-ba-label-after";
   // 비제어 fallback — 부모가 state 안 주면 내부에서 관리 (기본 50%).
   const [internalCompareX, setInternalCompareX] = useState(50);
   const compareX = controlledCompareX ?? internalCompareX;
@@ -176,8 +189,8 @@ export default function BeforeAfterSlider({
         {renderBefore}
       </div>
 
-      <span className="ais-ba-label ais-ba-label-before">{beforeLabel}</span>
-      <span className="ais-ba-label ais-ba-label-after">{afterLabel}</span>
+      <span className={beforeLabelClass}>{beforeLabel}</span>
+      <span className={afterLabelClass}>{afterLabel}</span>
 
       <div
         onMouseDown={startDrag}

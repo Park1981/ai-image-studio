@@ -4,8 +4,13 @@
  *
  * 헤더 (모드 토글 + 비율 차이 경고) + 본문 분기:
  *   - 둘 다 비어있으면 EmptyViewer
- *   - 슬라이더 모드: BeforeAfterSlider (A=before, B=after)
+ *   - 슬라이더 모드: BeforeAfterSlider (A=before, B=after) — V5 labelVariant="ab" violet/amber 그라데이션
  *   - 나란히 모드: 두 SideThumb 그리드
+ *
+ * 2026-05-02 디자인 V5 Phase 7 격상:
+ *  - BeforeAfterSlider 호출 시 `labelVariant="ab"` 명시 (Phase 5 nit #1 박제 활용)
+ *  - 외곽 wrapper / 헤더 / 비율 chip 옛 inline 그대로 (plan §7 명시 X — 회귀 0)
+ *  - 회귀 위험 #4 (BeforeAfterSlider 드래그) Phase 5 에서 보존됨 — Compare 도 자동 호환
  */
 
 "use client";
@@ -147,6 +152,7 @@ function SliderViewer({
           aspectRatio={aspect}
           beforeLabel="A"
           afterLabel="B"
+          labelVariant="ab"
         />
       </div>
     </div>

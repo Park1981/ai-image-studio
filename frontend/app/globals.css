@@ -1823,6 +1823,32 @@ button {
   flex-direction: column;
   gap: 14px;
   overflow: hidden;
+  min-height: 262px; /* production UX cap (옛 inline · plan §7 시각 cap 보존) */
+}
+/* body wrapper · running/empty/fallback/filled 분기 — overflow auto 로 좁은 우측 패널 스크롤 */
+.ais-cac-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+.ais-cac-filled {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/* fallback 카드 — amber soft (시안 X · 옛 production 시각 보존) */
+.ais-cac-fallback {
+  background: var(--amber-soft);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  font-size: 12px;
+  color: var(--amber-ink);
+  line-height: 1.55;
+}
+.ais-cac-fallback-title {
+  font-weight: 600;
+  margin-bottom: 4px;
 }
 .ais-cac-header {
   display: flex;
@@ -1912,6 +1938,9 @@ button {
   line-height: 1.55;
 }
 .ais-cac-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 9.5px;
   color: var(--ink-4);
@@ -1940,6 +1969,35 @@ button {
   color: var(--ink);
   line-height: 1.6;
   margin-top: 2px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+/* Transform 헤더 행 (eyebrow + contextLabel + 복사 버튼) */
+.ais-tp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 6px;
+  flex-wrap: wrap;
+}
+.ais-tp-context-meta {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 9.5px;
+  color: var(--ink-4);
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  margin-left: 4px;
+}
+/* Transform 영문 sub (textKo+textEn 모두 있을 때 dashed border-top 으로 구분) */
+.ais-tp-en-sub {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--line);
+  font-size: 10.5px;
+  color: var(--ink-4);
+  line-height: 1.5;
 }
 
 /* Uncertain Box — 비교 못한 영역 (amber 톤 · 경고적 의미) */

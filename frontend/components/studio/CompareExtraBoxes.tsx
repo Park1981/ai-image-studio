@@ -8,6 +8,14 @@
  *   - Vision Compare: TransformPromptBox = "A 를 B 로 바꾸는 t2i 변형 지시"
  *   - Edit context : TransformPromptBox = "사용자 의도를 완벽 실현하려면 추가로 필요한 변경"
  *   - 둘 다 UncertainBox = "비전이 신뢰성 있게 비교 못한 영역"
+ *
+ * 2026-05-02 디자인 V5 Phase 7 격상:
+ *  - inline → className `.ais-transform-prompt-box` (V5 violet gradient bg + violet border)
+ *  - inline → className `.ais-uncertain-box` (V5 amber gradient bg + amber border)
+ *  - eyebrow `.ais-cac-eyebrow` (CSS 가 자동 색 분기 — violet / amber-ink)
+ *  - body className `.ais-tp-body` (mono 11.5)
+ *  - 헤더 행 (eyebrow + contextLabel + 복사 버튼) → `.ais-tp-header`
+ *  - 복사 버튼 → `.ais-vs-copy-btn` (Phase 6 공용 className 재사용)
  */
 
 "use client";
@@ -16,7 +24,7 @@ import Icon from "@/components/ui/Icon";
 import { toast } from "@/stores/useToastStore";
 
 /**
- * Transform Prompt 박스 — 보라색 left-bar.
+ * Transform Prompt 박스 — V5 violet gradient 시그니처.
  *
  * @param contextLabel 헤더 라벨 (예: "A → B 변형 가이드" / "추가 수정 가이드")
  */
@@ -47,109 +55,26 @@ export function TransformPromptBox({
   };
 
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderLeft: "3px solid #A855F7",
-        borderRadius: "var(--radius)",
-        overflow: "hidden",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          padding: "8px 12px",
-          borderBottom: "1px solid var(--line)",
-          gap: 8,
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            color: "#A855F7",
-          }}
-        >
-          <Icon name="sparkle" size={11} />
-          <span
-            className="mono"
-            style={{
-              fontSize: 10,
-              fontWeight: 700,
-              color: "#A855F7",
-              letterSpacing: ".1em",
-            }}
-          >
-            TRANSFORM PROMPT
-          </span>
-          <span
-            className="mono"
-            style={{
-              fontSize: 9.5,
-              color: "var(--ink-4)",
-              letterSpacing: ".04em",
-              fontWeight: 500,
-            }}
-          >
-            · {contextLabel}
-          </span>
-        </div>
-        <button
-          type="button"
-          onClick={onCopy}
-          style={{
-            all: "unset",
-            cursor: "pointer",
-            fontSize: 10,
-            color: "var(--ink-3)",
-            padding: "2px 6px",
-            borderRadius: "var(--radius-sm)",
-            border: "1px solid var(--line)",
-            background: "var(--bg-2)",
-            display: "flex",
-            alignItems: "center",
-            gap: 3,
-          }}
-        >
-          <Icon name="copy" size={10} /> 복사
+    <div className="ais-transform-prompt-box">
+      <div className="ais-tp-header">
+        <span className="ais-cac-eyebrow">
+          TRANSFORM
+          <span className="ais-tp-context-meta">· {contextLabel}</span>
+        </span>
+        <button type="button" className="ais-vs-copy-btn" onClick={onCopy}>
+          <Icon name="copy" size={11} />
+          복사
         </button>
       </div>
-      <div
-        style={{
-          padding: "10px 12px",
-          fontSize: 12,
-          lineHeight: 1.55,
-          color: "var(--ink-2)",
-          whiteSpace: "pre-wrap",
-          wordBreak: "break-word",
-        }}
-      >
+      <div className="ais-tp-body">
         {text}
-        {showEn && textEn && (
-          <div
-            className="mono"
-            style={{
-              marginTop: 6,
-              paddingTop: 6,
-              borderTop: "1px dashed var(--line)",
-              fontSize: 10.5,
-              color: "var(--ink-4)",
-              lineHeight: 1.5,
-            }}
-          >
-            {textEn}
-          </div>
-        )}
+        {showEn && textEn && <div className="ais-tp-en-sub">{textEn}</div>}
       </div>
     </div>
   );
 }
 
-/** Uncertain 박스 — 회색 톤. */
+/** Uncertain 박스 — V5 amber gradient 시그니처. */
 export function UncertainBox({
   textKo,
   textEn,
@@ -160,41 +85,12 @@ export function UncertainBox({
   const text = (textKo && textKo.trim()) || (textEn && textEn.trim()) || "";
   if (!text) return null;
   return (
-    <div
-      style={{
-        background: "var(--bg-2)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius)",
-        padding: "8px 12px",
-        fontSize: 11.5,
-        color: "var(--ink-3)",
-        lineHeight: 1.5,
-        opacity: 0.9,
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 5,
-          marginBottom: 3,
-          color: "var(--ink-4)",
-        }}
-      >
-        <Icon name="search" size={10} />
-        <span
-          className="mono"
-          style={{
-            fontSize: 9.5,
-            fontWeight: 600,
-            letterSpacing: ".1em",
-            textTransform: "uppercase",
-          }}
-        >
-          Uncertain · 비교 못한 영역
-        </span>
+    <div className="ais-uncertain-box">
+      <div className="ais-cac-eyebrow">
+        <Icon name="search" size={11} />
+        UNCERTAIN · 비교 못한 영역
       </div>
-      {text}
+      <div className="ais-uncertain-body">{text}</div>
     </div>
   );
 }
