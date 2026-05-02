@@ -14,13 +14,14 @@
  *   - dot+halo · MONO 라벨 · usage · long bar · % mono — 4 row
  *   - VRAM ≥ 80% + breakdown 데이터 → ComfyUI / Ollama row 추가
  *
- * 접근성 (Codex 1차 🟡 보강):
+ * 접근성 (Codex 1차 🟡 보강 + Phase 8 cleanup 정통 disclosure 패턴):
  *   - hover-stay-open: globals.css 의 `::before` 10px invisible bridge + `:hover` selector
  *     (마우스가 popover 위로 transit 시 닫히지 않음) + close transition-delay 0.15s.
  *   - close timer 200ms: 마우스 leave 후 short delay (popover 안으로 transit 시간 확보).
  *   - `:focus-within` popover 자동 노출 — Tab 키 진입 시 (CSS 자동 hook).
- *   - **Esc 키 닫기**: focus 가 trigger 안에 있을 때만 active. blur 로 popover 닫힘.
- *   - `aria-expanded` + `aria-controls` 연결.
+ *   - **Esc 키 닫기**: focus 가 trigger 안에 있을 때만 active. focus return → trigger 유지.
+ *   - **정통 disclosure**: `<button>` + `aria-expanded={open}` + `aria-controls` + `onClick toggle`.
+ *     ESLint role="group" 충돌 해소 (Phase 8 cleanup · 2026-05-02).
  *
  * 회귀 위험 보존:
  *   - 8: hover-stay-open + 키보드 — bridge ::before + transition-delay + :focus-within + close timer 200ms + Esc.
@@ -54,7 +55,7 @@ export default function SystemMetrics() {
   // popover open state — `data-open="true"` hook 으로 키보드 활성화 보강 (Esc 시 false)
   const [open, setOpen] = useState(false);
   const closeTimerRef = useRef<number | null>(null);
-  const triggerRef = useRef<HTMLDivElement | null>(null);
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
   const popoverId = useId();
 
   // 메트릭 컴파일 — 데이터 있는 것만, 누락 메트릭은 자동 스킵
@@ -146,23 +147,19 @@ export default function SystemMetrics() {
   };
 
   return (
-    <div
+    <button
+      type="button"
       ref={triggerRef}
       className="ais-metrics"
-      role="group"
       aria-label="시스템 자원 사용률"
-      // aria-controls — popover 와의 의미상 연결만 표시.
-      // aria-expanded 는 ESLint jsx-a11y/role-supports-aria-props 가 role="group" 과
-      // 충돌이라 후속 (정통 disclosure: trigger 를 <button> 으로 + onClick toggle 추가).
-      // 현재는 Esc focus return (Codex 3차 핵심) + hover-only + :focus-within 자동.
-      // 사유 박제: project_pending_issues.md → "🟡 Phase 8 cleanup 후보".
+      aria-expanded={open}
       aria-controls={popoverId}
-      // P0-5: 키보드 focus 시에도 펼쳐지게 — globals.css `:focus-within` 분기와 페어
-      tabIndex={0}
       // data-open hook — Esc 닫기 + close timer 동기화용 (CSS selector 와 페어)
       data-open={open ? "true" : undefined}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      // 정통 disclosure: 클릭 토글 (키보드 Enter/Space 도 자동 처리 · Phase 8 cleanup)
+      onClick={() => setOpen((v) => !v)}
     >
       {/* 4-bar trigger — 평상시 정지 + 색상 시그니처 (CPU 시안/GPU 초록/VRAM 보라/RAM 파랑) */}
       {metrics.map((m) => (
@@ -175,7 +172,7 @@ export default function SystemMetrics() {
         metrics={metrics}
         breakdown={showBreakdown ? breakdown : null}
       />
-    </div>
+    </button>
   );
 }
 

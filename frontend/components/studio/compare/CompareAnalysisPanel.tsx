@@ -181,7 +181,15 @@ function AxisRow({
           className="ais-axis-fill"
           data-tone={tone}
           style={{ width: `${pct}%` }}
-          aria-label={`${label} ${score === null ? "분석 안 됨" : score + "%"}`}
+          role="meter"
+          aria-valuenow={score ?? 0}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-label={
+            score === null
+              ? `${label} — 분석 안 됨`
+              : `${label} ${score}%`
+          }
         />
       </div>
       {comment && <div className="ais-axis-comment">{comment}</div>}

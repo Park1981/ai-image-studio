@@ -381,25 +381,8 @@ button {
   to   { transform: rotate(360deg); }
 }
 
-/* Phase 2 후속 (2026-05-01) — AI 보정 카드 통합 + 모드 segmented control.
- *  카드 wrap 자체가 Toggle 의 background/border 책임 (Toggle flat 사용 — 자체 박스 X).
- *  data-active 분기로 ON (accent-soft 톤) / OFF (bg-2 회색 톤) 색 자동 전환. */
-.ais-magic-prompt-card {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-2);
-  border: 1px solid var(--line-2);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
-  transition: background .15s, border-color .15s, box-shadow .15s;
-}
-.ais-magic-prompt-card[data-active="true"] {
-  background: var(--accent-soft);
-  border-color: rgba(74, 158, 255, 0.55);
-  box-shadow: 0 2px 8px rgba(74, 158, 255, 0.08);
-}
+/* (Phase 8 cleanup · 2026-05-02) — `.ais-magic-prompt-card` 제거됨.
+ * Phase 1.5 좌측 패널 V5 카드 전환 후 className 사용처 0 (dead CSS). */
 .ais-prompt-mode-segmented {
   position: relative;
   display: inline-flex;
@@ -609,6 +592,12 @@ button {
   background: transparent;
   white-space: nowrap;
   cursor: default;
+  /* (Phase 8 cleanup) button 호환 reset — `<button>` 으로 정통 disclosure 패턴 변경 후
+   * default font/color/margin/text-align inherit 보장 (시각 변화 0). */
+  font: inherit;
+  color: inherit;
+  margin: 0;
+  text-align: inherit;
 }
 
 .ais-metric-cell {
@@ -1072,9 +1061,9 @@ button {
 .ais-video-res-card {
   --ais-range-accent: var(--card-from);
 }
-.ais-size-card-v .ais-range-input {
-  accent-color: var(--card-from);
-}
+/* (Phase 8 cleanup · 2026-05-02) — `.ais-range-input` selector 제거됨.
+ * `--ais-range-accent` CSS variable cascade 채택 후 className 사용처 0 (dead CSS).
+ * Range 컴포넌트는 `var(--ais-range-accent, var(--accent))` 자동 inherit. */
 
 /* ── Section 6: 우측 페어 시안 CSS (.ais-result-* / .ais-archive-* / .ais-history-*) */
 
