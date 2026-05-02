@@ -1,6 +1,9 @@
 /**
  * HistoryBootstrap - 앱 부트 시 서버 히스토리 hydrate.
- * USE_MOCK=false 일 때만 동작. /api/studio/history 에서 최신 100 개 가져와서 replaceAll.
+ * USE_MOCK=false 일 때만 동작. mode 별 (generate/edit/video) 각 1000 개씩 병렬 fetch → 합쳐서 replaceAll.
+ *
+ * 2026-05-02: 옛 단일 limit 100 통합 fetch 는 mode 간 cap 충돌 문제 (예: edit 가 100 채우면 generate 0)
+ *  → mode 별 분리 fetch + 각 1000 limit 으로 변경. DB 진실 그대로 store 에 들어감.
  *
  * 재시도 정책 (2026-04-24 v2):
  *  - 최대 3회 backoff 재시도 (0.5s → 1.5s → 3s)
@@ -38,9 +41,18 @@ export default function HistoryBootstrap() {
     const attempt = async (tryIdx: number): Promise<void> => {
       if (cancelled) return;
       try {
-        const { items } = await listHistory({ limit: 100 });
+        // mode 별 병렬 fetch — 각 1000 limit. mode 간 cap 충돌 회피.
+        const [gen, edit, video] = await Promise.all([
+          listHistory({ mode: "generate", limit: 1000 }),
+          listHistory({ mode: "edit", limit: 1000 }),
+          listHistory({ mode: "video", limit: 1000 }),
+        ]);
         if (cancelled) return;
-        replaceAll(items);
+        // createdAt desc 통합 정렬 — store 가 mode 무관 단일 array 라.
+        const merged = [...gen.items, ...edit.items, ...video.items].sort(
+          (a, b) => b.createdAt - a.createdAt,
+        );
+        replaceAll(merged);
         markHydrated();
       } catch (e) {
         if (cancelled) return;

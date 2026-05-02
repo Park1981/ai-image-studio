@@ -29,15 +29,16 @@ export default function ResearchBanner({
   checked,
   onChange,
 }: ResearchBannerProps) {
+  // 시안 v7 결정 — desc 제거 + icon-box (search · 카드 wrapper 가 active 톤 책임).
   return (
     <Toggle
       flat
+      icon="search"
       checked={checked}
       onChange={onChange}
       align="right"
       tone="amber"
       label="🔍 Claude 프롬프트 조사"
-      desc="Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s"
     />
   );
 }

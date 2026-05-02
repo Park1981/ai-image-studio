@@ -72,21 +72,22 @@ export default function EditResultViewer({
 }: Props) {
   // 슬라이더 정합 fix (2026-04-29): 컨테이너 비율 = After (수정본) 자연 비율.
   //
-  // 옛 동작: 원본 (sourceWidth/Height) 비율 컨테이너 + 둘 다 contain
-  //   → ComfyUI FluxKontextImageScale 가 결과를 megapixel 정렬로 미세 리사이즈하면
-  //     After 가 letterbox 되고 인물이 컨테이너 가운데로 옮겨져 Before 와 좌표 어긋남.
+  // 2026-05-02 (오빠 피드백 — 세로 긴 사진 확대 문제 fix):
+  //   wrapper aspect = 원본 (Before) 기준 + 둘 다 contain.
+  //   - 원본을 그대로 풀필 (사용자가 원본 크기/비율 보고 싶다는 의도)
+  //   - After 는 ComfyUI megapixel 미세 정렬 차이만큼 살짝 letterbox (시각적으로 거의 안 보임)
+  //   - 옛 cover 로 Before 잘리던 문제 (세로 사진 확대 효과) 해결
   //
-  // 새 동작: After 비율 컨테이너 + Before 만 cover (한 축 fit + 가운데 정렬)
-  //   → After 는 풀필 (자기 비율), Before 는 짧은 축 기준 fit + 긴 축 미세 잘림
-  //   → 인물/피사체가 같은 좌표계에 떨어져 슬라이더 핸들로 자연스럽게 변화 비교 가능.
-  //
-  // fallback chain: After → 원본 → 16/10 (옛 row 호환).
+  // fallback chain: 원본 → After → 16/10 (옛 row 호환).
   const aspectRatio =
-    afterItem.width && afterItem.height
-      ? `${afterItem.width} / ${afterItem.height}`
-      : sourceWidth && sourceHeight
-        ? `${sourceWidth} / ${sourceHeight}`
+    sourceWidth && sourceHeight
+      ? `${sourceWidth} / ${sourceHeight}`
+      : afterItem.width && afterItem.height
+        ? `${afterItem.width} / ${afterItem.height}`
         : "16 / 10";
+
+  // 2026-05-02: 둘 다 contain 으로. ComfyUI 결과 미세 비율 차이 (~4%) 는 transform 보정 시도했으나
+  // 사용자 시각 인지 영역 밑이라 fix 빼고 그대로 contain 처리. (autoMatchAspect 시도 → 인물 약간 어색)
 
   // 비교 모드 — 슬라이더(기본) / 나란히. 세션 한정 (영속 X · 새로고침 시 slider 복귀).
   const [viewerMode, setViewerMode] = useState<EditViewerMode>("slider");
@@ -169,10 +170,12 @@ export default function EditResultViewer({
             <BeforeAfterSlider
               beforeSrc={sourceImage}
               afterSeed={afterItem.imageRef || afterItem.id}
+              afterSrc={afterItem.imageRef}
               compareX={compareX}
               setCompareX={setCompareX}
               aspectRatio={aspectRatio}
-              beforeFit="cover"
+              beforeFit="contain"
+              afterFit="contain"
             />
             <div onClick={(e) => e.stopPropagation()}>
               <ResultHoverActionBar hovered={hovered} variant="hero">
@@ -256,6 +259,7 @@ function SideBySidePanel({
           src={afterItem.imageRef}
           label="After"
           aspectRatio={aspectRatio}
+          fit="cover"
         />
         <div onClick={(e) => e.stopPropagation()}>
           <ResultHoverActionBar hovered={hovered} variant="hero">

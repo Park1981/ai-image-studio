@@ -271,15 +271,17 @@ export default function EditLeftPanel({
       <V5MotionCard
         className="ais-toggle-card ais-sig-ai"
         data-active="true"
+        tooltip="ON · 한국어/자연어 → 영문 정제 (Edit 필수)"
       >
+        {/* 시안 매칭 (2026-05-02): desc 제거 + icon-box 추가 — Generate 와 동일 패턴. */}
         <Toggle
           flat
+          icon="stars"
           checked
           disabled
           onChange={() => undefined}
           align="right"
           label="🪄 AI 프롬프트 보정"
-          desc="ON · 한국어/자연어 → 영문 정제 (Edit 필수)"
         />
         <PromptModeRadio value={promptMode} onChange={setPromptMode} />
       </V5MotionCard>
@@ -288,16 +290,19 @@ export default function EditLeftPanel({
        *  옛 설정 토글 → Edit 좌측 패널로 이동 (오빠 피드백 2026-04-27).
        *  결과 완료 시 백그라운드로 5축 평가. VRAM>13GB 면 자동 skip. */}
       <V5MotionCard
-        className="ais-toggle-card ais-auto-compare-card"
+        className="ais-toggle-card ais-sig-claude"
         data-active={autoCompareAnalysis}
+        onClick={() => setAutoCompareAnalysis(!autoCompareAnalysis)}
+        tooltip="결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 자동 skip)"
       >
+        {/* 2026-05-02: 라벨 단순화 + desc 제거 + icon-box (search · 시그니처 amber). */}
         <Toggle
           flat
+          icon="search"
           checked={autoCompareAnalysis}
           onChange={setAutoCompareAnalysis}
           align="right"
-          label="🔍 수정 후 자동 비교 분석"
-          desc="결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 자동 skip)"
+          label="🔍 결과 자동 분석"
         />
       </V5MotionCard>
 
@@ -308,18 +313,18 @@ export default function EditLeftPanel({
       <V5MotionCard
         className="ais-toggle-card ais-sig-fast"
         data-active={!lightning}
+        onClick={() => setLightning(!lightning)}
+        tooltip="ON 시 Lightning 4-step 끄고 풀 디테일 · 약 4배 느림"
       >
+        {/* 시안 매칭 (2026-05-02): 라벨 "💎 퀄리티 모드" 고정 + desc 제거 + icon-box (Generate 와 동일).
+         *  카드 OFF = Lightning 빠른 모드 사용 중 (기본) / ON = 퀄리티 모드 활성. */}
         <Toggle
           flat
+          icon="bolt"
           checked={!lightning}
           onChange={(v) => setLightning(!v)}
           align="right"
-          label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
-          desc={
-            lightning
-              ? "Lightning 4-step · 빠름 · 약간 낮은 디테일 (기본)"
-              : "Lightning OFF · 풀 퀄리티 · 약 ~38s 예상"
-          }
+          label="💎 퀄리티 모드"
         />
       </V5MotionCard>
 
@@ -330,18 +335,17 @@ export default function EditLeftPanel({
       <V5MotionCard
         className="ais-toggle-card ais-multi-ref-card"
         data-active={useReferenceImage}
+        onClick={() => setUseReferenceImage(!useReferenceImage)}
+        tooltip="두번째 이미지를 참조로 사용 — 역할 명시 필요"
       >
+        {/* 2026-05-02: "(실험적)" 제거 + desc 제거 + icon-box (image). */}
         <Toggle
           flat
+          icon="image"
           checked={useReferenceImage}
           onChange={setUseReferenceImage}
           align="right"
-          label="🖼️ 참조 이미지 사용 (실험적)"
-          desc={
-            useReferenceImage
-              ? "두번째 이미지를 참조로 사용 — 역할 명시 필요"
-              : "OFF · 단일 이미지 수정 (기본)"
-          }
+          label="🖼️ 참조 이미지 사용"
         />
       </V5MotionCard>
 

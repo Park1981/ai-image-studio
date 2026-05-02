@@ -59,9 +59,11 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
 
   const [viewerHovered, setViewerHovered] = useState(false);
 
-  // V5 Archive Header size chip — generate 모드 디스크 사용량
+  // V5 Archive Header size chip — generate 모드 디스크 사용량 + DB 카운트
+  // 2026-05-02: count 출처 store length → backend stats (DB 정확값) — limit 100 fetch 누락 영향 회피.
   const stats = useHistoryStats();
   const generateSizeBytes = stats?.byMode.generate.sizeBytes;
+  const generateCount = stats?.byMode.generate.count ?? genItems.length;
 
   /** 결과/히스토리 공용 — 이 이미지를 /edit 의 원본으로 보내고 라우팅. */
   const sendToEdit = async (it: { id: string; imageRef: string; label: string }) => {
@@ -83,6 +85,7 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
   };
 
   // V5 result-meta-pills — 첫 violet pill = 해상도, 추가 pill = 모델/Lightning
+  // 2026-05-02: 이미지 미선택 시 pill 자체 숨김 (옛 PNG fallback 제거 — 의미 없음).
   const metaPills = selectedItem ? (
     <>
       <span className="ais-result-pill ais-pill-violet mono">
@@ -93,13 +96,11 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
         <span className="ais-result-pill ais-pill-amber mono">Lightning</span>
       )}
     </>
-  ) : (
-    <span className="ais-result-pill mono">PNG</span>
-  );
+  ) : null;
 
   return (
     <StudioRightPanel>
-      <StudioResultHeader title="생성 결과" titleEn="Generated" meta={metaPills} />
+      <StudioResultHeader title="결과" titleEn="Latest" meta={metaPills} />
 
       {selectedItem ? (
         <GenerateResultViewer
@@ -136,7 +137,7 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
       <HistorySectionHeader
         title="보관"
         titleEn="History"
-        count={genItems.length}
+        count={generateCount}
         sizeBytes={generateSizeBytes}
       />
 

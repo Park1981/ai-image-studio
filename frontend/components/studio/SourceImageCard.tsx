@@ -13,8 +13,8 @@
 
 "use client";
 
-import { useState, type ReactNode } from "react";
-import Icon from "@/components/ui/Icon";
+import { useState } from "react";
+import Icon, { type IconName } from "@/components/ui/Icon";
 import StudioUploadSlot from "@/components/studio/StudioUploadSlot";
 
 interface SourceImageCardProps {
@@ -43,9 +43,14 @@ export default function SourceImageCard({
   onError,
   pasteRequireHover = false,
 }: SourceImageCardProps) {
-  const [infoOpen, setInfoOpen] = useState(false);
   // StudioUploadSlot.onReady 로 받아둔 trigger — 변경 버튼 클릭 시 호출.
   const [pickFn, setPickFn] = useState<(() => void) | null>(null);
+
+  // 시안 매칭 (2026-05-02): sourceLabel 형식 `${file.name} · ${w}×${h}` 에서 파일명만 추출.
+  const filename = sourceLabel.split(" · ")[0] || sourceLabel;
+  // 파일명 끝 확장자 → 형식 라벨 (대문자). 없으면 PNG fallback.
+  const formatExt =
+    (filename.split(".").pop() || "png").toUpperCase().slice(0, 5) || "PNG";
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -76,68 +81,10 @@ export default function SourceImageCard({
 
   const handleClear = () => {
     onClear();
-    setInfoOpen(false);
   };
 
   return (
     <div style={{ position: "relative" }}>
-      {/* 정보 팝오버 — ⓘ 클릭 시 카드 위에 표시 */}
-      {infoOpen && sourceImage && (
-        <div
-          style={{
-            position: "absolute",
-            bottom: "calc(100% + 6px)",
-            left: 0,
-            right: 0,
-            background: "var(--surface)",
-            border: "1px solid var(--line)",
-            borderRadius: "var(--radius)",
-            padding: "10px 12px",
-            zIndex: 20,
-            boxShadow: "0 4px 16px rgba(0,0,0,.1)",
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            fontSize: 11.5,
-          }}
-        >
-          <Icon
-            name="check"
-            size={10}
-            style={{ color: "var(--green)", flexShrink: 0 }}
-          />
-          <span
-            style={{
-              flex: 1,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              color: "var(--ink-2)",
-            }}
-          >
-            {sourceLabel}
-          </span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              handleClear();
-            }}
-            style={{
-              all: "unset",
-              cursor: "pointer",
-              color: "var(--ink-3)",
-              fontSize: 11,
-              textDecoration: "underline",
-              textUnderlineOffset: 3,
-              flexShrink: 0,
-            }}
-          >
-            해제
-          </button>
-        </div>
-      )}
-
       {/* StudioUploadSlot — shell + 드래그/드롭/paste 로직 담당 */}
       <StudioUploadSlot
         filled={!!sourceImage}
@@ -187,87 +134,76 @@ export default function SourceImageCard({
                 background: "var(--bg-2)",
               }}
             />
-            {/* 하단 그라디언트 — 배지/버튼 가독성용 (audit R1-3 에서 .42 강도로 완화) */}
+            {/* 시안 매칭 (2026-05-02): 하단 어두운 frosted bar — 좌 파일명 / 우 크기·형식.
+             *  옛 ⓘ 정보 팝오버 + 좌하단 사이즈 배지 → 통합 (정보 한 곳). */}
             <div
               style={{
                 position: "absolute",
-                inset: 0,
-                background:
-                  "linear-gradient(to top, rgba(0,0,0,.42) 0%, transparent 55%)",
+                left: 0,
+                right: 0,
+                bottom: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                gap: 12,
+                padding: "10px 14px",
+                background: "rgba(0,0,0,.35)",
+                backdropFilter: "blur(14px) saturate(180%)",
+                WebkitBackdropFilter: "blur(14px) saturate(180%)",
+                color: "#fff",
+                fontSize: 12,
+                fontWeight: 500,
                 pointerEvents: "none",
               }}
-            />
-            {/* 사이즈 배지 — bottom-left */}
-            {sourceWidth && sourceHeight && (
-              <span
-                className="mono"
-                style={{
-                  position: "absolute",
-                  bottom: 8,
-                  left: 10,
-                  fontSize: 10,
-                  color: "rgba(255,255,255,.85)",
-                  letterSpacing: ".04em",
-                  background: "rgba(0,0,0,.35)",
-                  borderRadius: 4,
-                  padding: "2px 6px",
-                  pointerEvents: "none",
-                }}
-              >
-                {sourceWidth}×{sourceHeight}
-              </span>
-            )}
-            {/* ⓘ 상세 — top-left (단일 이미지 컨텍스트) */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setInfoOpen((v) => !v);
-              }}
-              style={{
-                position: "absolute",
-                top: 8,
-                left: 8,
-                width: 22,
-                height: 22,
-                borderRadius: "50%",
-                background: infoOpen
-                  ? "rgba(255,255,255,.9)"
-                  : "rgba(0,0,0,.4)",
-                color: infoOpen ? "var(--ink)" : "#fff",
-                border: "none",
-                cursor: "pointer",
-                display: "grid",
-                placeItems: "center",
-                fontSize: 11,
-                fontWeight: 700,
-                fontFamily: "serif",
-                lineHeight: 1,
-              }}
-              title="상세 정보"
             >
-              i
-            </button>
-            {/* 변경 + 해제 — top-right cluster (CompareImageSlot 와 디자인 통일 · 2026-04-27).
-             *  ActionPill: blur 배경 + round-full + 아이콘+텍스트. */}
+              <span
+                style={{
+                  flex: 1,
+                  minWidth: 0,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  letterSpacing: "0.01em",
+                }}
+                title={filename}
+              >
+                {filename}
+              </span>
+              {sourceWidth && sourceHeight && (
+                <span
+                  className="mono"
+                  style={{
+                    fontSize: 11,
+                    color: "rgba(255,255,255,.85)",
+                    letterSpacing: ".04em",
+                    flexShrink: 0,
+                  }}
+                >
+                  {sourceWidth} × {sourceHeight} · {formatExt}
+                </span>
+              )}
+            </div>
+            {/* 시안 매칭 (2026-05-02): 우상단 둥근 frosted glass 아이콘 버튼 2개 — refresh + x.
+             *  옛 ActionPill 텍스트("변경") 제거 — 시안 스타일 (icon-only round). */}
             <div
               style={{
                 position: "absolute",
-                top: 8,
-                right: 8,
+                top: 10,
+                right: 10,
                 display: "flex",
                 gap: 6,
               }}
             >
-              <ActionPill
+              <RoundIconBtn
                 title="이미지 변경"
+                icon="refresh"
                 onClick={() => pickFn?.()}
-              >
-                <Icon name="refresh" size={11} /> 변경
-              </ActionPill>
-              <ActionPill title="이미지 해제" onClick={handleClear}>
-                <Icon name="x" size={11} />
-              </ActionPill>
+              />
+              <RoundIconBtn
+                title="이미지 해제"
+                icon="x"
+                onClick={handleClear}
+              />
             </div>
           </>
         )}
@@ -276,15 +212,14 @@ export default function SourceImageCard({
   );
 }
 
-/** ActionPill — blur 배경 + round-full pill 버튼.
- *  CompareImageSlot 와 동일 스타일 (오빠 피드백 2026-04-27 — 두 컴포넌트 통일).
- *  추후 두 곳 외에 더 쓰이면 별도 파일로 추출 검토. */
-function ActionPill({
-  children,
+/** RoundIconBtn — 시안 매칭 (2026-05-02). frosted glass 둥근 아이콘 버튼.
+ *  옛 ActionPill (텍스트+아이콘 pill) 대체 — icon-only round (시안 스타일). */
+function RoundIconBtn({
+  icon,
   onClick,
   title,
 }: {
-  children: ReactNode;
+  icon: IconName;
   onClick: () => void;
   title?: string;
 }) {
@@ -299,18 +234,20 @@ function ActionPill({
       style={{
         all: "unset",
         cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "4px 8px",
-        background: "rgba(0,0,0,.55)",
-        backdropFilter: "blur(6px)",
+        width: 30,
+        height: 30,
+        borderRadius: "50%",
+        background: "rgba(0,0,0,.35)",
+        backdropFilter: "blur(14px) saturate(180%)",
+        WebkitBackdropFilter: "blur(14px) saturate(180%)",
+        border: "1px solid rgba(255,255,255,.20)",
+        boxShadow: "0 4px 12px rgba(0,0,0,.20)",
         color: "#fff",
-        fontSize: 11,
-        borderRadius: "var(--radius-full)",
+        display: "grid",
+        placeItems: "center",
       }}
     >
-      {children}
+      <Icon name={icon} size={13} />
     </button>
   );
 }

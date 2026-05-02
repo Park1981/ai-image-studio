@@ -152,6 +152,9 @@ export default function HistoryGallery({
         // 좁은 우측 패널에서 타일 또는 Masonry 내부가 가로로 넘치지 않게 차단.
         // 세로 스크롤은 호출처 스크롤 박스(overflowY:auto)가 담당.
         overflowX: "hidden",
+        // 2026-05-02: padding 4px — selected tile box-shadow (0 0 0 4px violet ring) 가
+        // wrapper overflowX:hidden 에 잘리지 않게 안쪽 여백 확보 (좌/우/상/하 모두).
+        padding: 4,
       }}
     >
       {/* 안내: 본 컴포넌트 하단의 MasonryRow 가 실제 grid 분배를 담당 */}

@@ -66,9 +66,11 @@ export default function EditRightPanel({
 
   const [viewerHovered, setViewerHovered] = useState(false);
 
-  // V5 Archive Header size chip — edit 모드 디스크 사용량
+  // V5 Archive Header size chip — edit 모드 디스크 사용량 + DB 카운트
+  // 2026-05-02: count 출처 store length → backend stats (DB 정확값) — limit 100 fetch 누락 영향 회피.
   const stats = useHistoryStats();
   const editSizeBytes = stats?.byMode.edit.sizeBytes;
+  const editCount = stats?.byMode.edit.count ?? editResults.length;
 
   /** 짝 일치 조건 — Before/After 슬라이더는 진짜 한 쌍만 표시 */
   const pairMatched =
@@ -133,7 +135,7 @@ export default function EditRightPanel({
       <HistorySectionHeader
         title="보관"
         titleEn="History"
-        count={editResults.length}
+        count={editCount}
         sizeBytes={editSizeBytes}
       />
 

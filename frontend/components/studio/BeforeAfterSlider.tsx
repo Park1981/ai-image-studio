@@ -17,7 +17,7 @@
 
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useLayoutEffect, type SyntheticEvent } from "react";
 import ImageTile from "@/components/ui/ImageTile";
 import Icon from "@/components/ui/Icon";
 
@@ -43,9 +43,35 @@ interface Props {
    * Before 이미지 fit 방식 (2026-04-29 슬라이더 정합 fix).
    *  - "contain" (기본): 기존 동작 — 비율 유지하며 컨테이너 안에 내접 (letterbox 가능)
    *  - "cover": 짧은 축 fit + 긴 축 가운데 잘림 — Before/After 비율 미세 차이 시 시각 매칭
+   *  - "fill": wrapper 비율로 강제 stretch — 비율 왜곡 가능 (사이즈 정합 강제 시 사용)
    * Lightbox 등 다른 호출자는 prop 안 주면 contain 유지 → 회귀 0.
    */
-  beforeFit?: "contain" | "cover";
+  beforeFit?: "contain" | "cover" | "fill";
+  /**
+   * After 이미지 fit 방식 (2026-05-02 — 사이즈 강제 일치 정책).
+   *  - "contain" (기본): 옛 동작 — letterbox 가능
+   *  - "cover": Before/After 비율 미세 차이 (~1%) 흡수 + 두 이미지 사이즈 정확히 일치
+   *  - "fill": wrapper 비율로 강제 stretch — 비율 왜곡 가능 (Edit 결과의 ComfyUI megapixel
+   *    재정렬로 비율이 미세 다를 때 frontend 출력만 강제 일치 — 데이터 무손실).
+   * Lightbox/Compare 호출자 무영향 (default contain).
+   */
+  afterFit?: "contain" | "cover" | "fill";
+  /**
+   * After 이미지에 적용할 scaleX (2026-05-02 임시 시도 — 원본 비율 강제 매칭).
+   *  - element 자체에 transform → wrapper deform 무관, Before 위치 영향 없음
+   *  - 원본 1672/941 (1.777) vs After 1392/752 (1.851) 시 scaleX = 1.777/1.851 = 0.96 → After 가로 4% 압축
+   *  - 4% 압축은 인물 사진에서 시각 거의 인지 X
+   *  - 다운로드 파일은 transform 무관 → 원본 그대로 (데이터 무손실 ✓)
+   * 1 (기본) 또는 미전달 시 transform 안 적용 — 회귀 0.
+   */
+  afterScaleX?: number;
+  /**
+   * 자동 비율 매칭 (2026-05-02 — store 데이터 의존 없는 robust fix).
+   * true 일 때 두 <img> 의 naturalWidth/naturalHeight onLoad 시 자동 측정 → scaleX 계산 + 적용.
+   * Guard ±15% (0.85 < scaleX < 1.15) 안에서만 보정 — 이상 데이터 (90도 회전 등) 는 미적용.
+   * afterScaleX prop 보다 우선순위 낮음 — afterScaleX 가 1이 아니면 그게 우선.
+   */
+  autoMatchAspect?: boolean;
   /**
    * 코너 라벨 시각 variant (Phase 7 — 디자인 V5 시그니처).
    *  - "before-after" (기본): `.ais-ba-label-before` / `-after` — V5 검은 톤 (Edit/Lightbox 호환)
@@ -66,8 +92,48 @@ export default function BeforeAfterSlider({
   beforeLabel = "Before",
   afterLabel = "After",
   beforeFit = "contain",
+  afterFit = "contain",
+  afterScaleX = 1,
+  autoMatchAspect = false,
   labelVariant = "before-after",
 }: Props) {
+  // 2026-05-02: autoMatchAspect 용 — 두 <img> naturalSize + wrapper boxSize 측정 후 자동 매칭.
+  const [beforeNat, setBeforeNat] = useState<{ w: number; h: number } | null>(null);
+  const [afterNat, setAfterNat] = useState<{ w: number; h: number } | null>(null);
+  const [boxSize, setBoxSize] = useState<{ w: number; h: number } | null>(null);
+  const onBeforeImgLoad = (e: SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      setBeforeNat({ w: img.naturalWidth, h: img.naturalHeight });
+    }
+  };
+  const onAfterImgLoad = (e: SyntheticEvent<HTMLImageElement>) => {
+    const img = e.currentTarget;
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+      setAfterNat({ w: img.naturalWidth, h: img.naturalHeight });
+    }
+  };
+  // autoScale 계산 — Before/After 둘 다 contain 으로 그렸을 때 drawn 사이즈 차이 보정.
+  // box 비율에 따라 짧은 축 fit → drawn 의 한 축은 같음, 다른 축만 보정 필요.
+  // Guard ±15%: 정상 ComfyUI megapixel 미세 차이만 보정. 90도 회전 같은 이상 데이터는 미적용.
+  const autoScale = (() => {
+    if (!autoMatchAspect || !beforeNat || !afterNat || !boxSize) return { x: 1, y: 1 };
+    const beforeScale = Math.min(boxSize.w / beforeNat.w, boxSize.h / beforeNat.h);
+    const afterScale = Math.min(boxSize.w / afterNat.w, boxSize.h / afterNat.h);
+    const bw = beforeNat.w * beforeScale;
+    const bh = beforeNat.h * beforeScale;
+    const aw = afterNat.w * afterScale;
+    const ah = afterNat.h * afterScale;
+    const rx = bw / aw;
+    const ry = bh / ah;
+    return {
+      x: rx > 0.85 && rx < 1.15 ? rx : 1,
+      y: ry > 0.85 && ry < 1.15 ? ry : 1,
+    };
+  })();
+  // 우선순위: 외부 afterScaleX prop > autoScale.x. autoScale.y 는 외부 prop 없음 (yet).
+  const finalScaleX = afterScaleX !== 1 ? afterScaleX : autoScale.x;
+  const finalScaleY = autoScale.y;
   // Phase 7 — V5 라벨 className 분기 (Compare 시그니처 violet/amber 그라데이션 vs Edit 검은 톤)
   const beforeLabelClass =
     labelVariant === "ab" ? "ais-ba-label ais-ba-label-a" : "ais-ba-label ais-ba-label-before";
@@ -79,6 +145,20 @@ export default function BeforeAfterSlider({
   const setCompareX = controlledSetCompareX ?? setInternalCompareX;
 
   const wrapRef = useRef<HTMLDivElement>(null);
+
+  // wrapper box 사이즈 측정 (resize 시 재계산) — autoMatchAspect 의 contain drawn 계산용.
+  useLayoutEffect(() => {
+    if (!autoMatchAspect || !wrapRef.current) return;
+    const el = wrapRef.current;
+    const update = () => {
+      const r = el.getBoundingClientRect();
+      setBoxSize({ w: r.width, h: r.height });
+    };
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [autoMatchAspect]);
 
   const onDrag = (clientX: number) => {
     if (!wrapRef.current) return;
@@ -121,6 +201,7 @@ export default function BeforeAfterSlider({
       src={beforeSrc}
       alt="before"
       draggable={false} // 기본 이미지 고스트 드래그 방지
+      onLoad={onBeforeImgLoad}
       style={{
         width: "100%",
         height: "100%",
@@ -161,11 +242,18 @@ export default function BeforeAfterSlider({
           src={afterSrc}
           alt="after"
           draggable={false}
+          onLoad={onAfterImgLoad}
           style={{
             width: "100%",
             height: "100%",
-            objectFit: "contain",
+            objectFit: afterFit,
+            objectPosition: "center",
             display: "block",
+            transform:
+              finalScaleX !== 1 || finalScaleY !== 1
+                ? `scale(${finalScaleX}, ${finalScaleY})`
+                : undefined,
+            transformOrigin: "center",
             // @ts-expect-error — 비표준 Webkit 속성
             WebkitUserDrag: "none",
             userSelect: "none",

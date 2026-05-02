@@ -35,7 +35,11 @@ export type IconName =
   | "play"
   | "compare"
   | "upscale"
-  | "home";
+  | "home"
+  | "power"
+  | "dots-grid"
+  | "stars"
+  | "bolt";
 
 interface IconProps {
   name: IconName;
@@ -276,6 +280,44 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
         <svg {...common}>
           <rect x="4" y="11" width="16" height="10" rx="2" />
           <path d="M8 11V7a4 4 0 0 1 8 0" />
+        </svg>
+      );
+    // 전원 — 종료 버튼 (시안 pair-generate.html v7 매치)
+    // 위 막대 + 아래 둥근 호 (universal power 심볼)
+    case "power":
+      return (
+        <svg {...common}>
+          <path d="M12 2v10" />
+          <path d="M5.5 7.5a8 8 0 1 0 13 0" />
+        </svg>
+      );
+    // 4개 점 — mode-flow-link (도움말/흐름 보기). 시안 pair-generate.html v7 매치.
+    // 4 모서리 작은 원 (도넛형 stroke). grid 아이콘 (4 사각형) 과 시각적으로 구분.
+    case "dots-grid":
+      return (
+        <svg {...common}>
+          <circle cx="6" cy="6" r="2" />
+          <circle cx="18" cy="6" r="2" />
+          <circle cx="6" cy="18" r="2" />
+          <circle cx="18" cy="18" r="2" />
+        </svg>
+      );
+    // 별 두 개 — AI 보정 카드 icon-box (시안 pair-generate.html v7 sparkle stars).
+    // 큰 다이아몬드 별 + 작은 다이아몬드 별. 기존 sparkle (4방향 광선) 과 시각 구분.
+    case "stars":
+      return (
+        <svg {...common}>
+          <path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z" />
+          <path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9z" />
+        </svg>
+      );
+    // 번개 — 퀄리티/빠른 모드 카드 icon-box (시안 pair-generate.html v7 lightning bolt).
+    case "bolt":
+      return (
+        <svg {...common}>
+          <path d="M6 3h12l4 6-10 13L2 9Z" />
+          <path d="M2 9h20" />
+          <path d="M9 9l3-6 3 6" />
         </svg>
       );
     default:

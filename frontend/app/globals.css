@@ -1,6 +1,10 @@
-/* 2026-04-25: 외부 @import 를 tailwind 보다 먼저 — Tailwind v4 가 layer 펼치면서
-   @import 가 다른 rules 뒤로 밀려 PostCSS 에러 발생하던 문제 해결. */
-@import url("https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..700,0..100,0..1&display=swap");
+/* 2026-05-02: Google Fonts 로드는 layout.tsx <head> <link> 로 이동.
+   Tailwind v4 + Next 16 Turbopack 이 외부 @import url(google fonts) 를 컴파일에서 누락시킴
+   (document.fonts 0개 / fontResources 0건 검증 완료 · 2026-05-02). Pretendard cdn 만 살아남음.
+   link rel="stylesheet" 직접 삽입이 가장 안전 (시안 pair-generate.html 도 동일 방식).
+
+   Fraunces axis 시안 v7 일치: ital,opsz,wght,SOFT — ital 0/1 instance 두 개 받아
+   font-style: italic 시 진짜 Fraunces italic 글리프 사용 (옛: WONK 4축 + ital 누락 → 합성 italic). */
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css");
 @import "tailwindcss";
 
@@ -127,7 +131,7 @@ body {
    Fraunces: variable serif · opsz(144) + SOFT(50) 로 극적인 세리프 & 부드러운 커브
    에디토리얼·매거진 무드 (하이엔드 브랜드 웹사이트 풍) */
 .display {
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-feature-settings: "ss01";
 }
@@ -394,6 +398,16 @@ button {
   /* 가운데 정렬 + 내용물 너비만 — 시각 균형 */
   width: fit-content;
 }
+/* 시안 v3c2 매칭 (2026-05-02): 활성 카드 안 segmented = 반투명 흰 pill + blur + inset border.
+ *  옛 검정 0.04 배경은 인물 webp 위에서 묻혀 thinking 라벨이 안 보였음.
+ *  pair-generate.html line 910~915 와 1:1 매칭.
+ *  !important — base 룰의 background cascade 패배 방지 (HMR cascade race 안전망). */
+.ais-toggle-card[data-active="true"] .ais-prompt-mode-segmented {
+  background: rgba(255, 255, 255, 0.7) !important;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+}
 /* iOS-style 슬라이드 thumb — active 위치로 부드럽게 translate.
  *  width 50% (각 버튼 동등) + transition cubic-bezier 자연 ease. */
 .ais-prompt-mode-thumb {
@@ -410,6 +424,15 @@ button {
   transition: transform .28s cubic-bezier(.32, .72, 0, 1);
   pointer-events: none;
   z-index: 0;
+}
+/* 시안 v3c2 매칭 (2026-05-02): 활성 카드 안 thumb = 시그니처 보라색 외곽선 + 깊은 그림자.
+ *  pair-generate.html line 916~922 와 1:1 매칭. */
+.ais-toggle-card[data-active="true"] .ais-prompt-mode-thumb {
+  background: var(--surface);
+  box-shadow:
+    0 0 0 0.5px var(--card-from),
+    0 2px 6px rgba(0, 0, 0, 0.10),
+    0 1px 2px rgba(0, 0, 0, 0.06);
 }
 .ais-prompt-mode-segmented[data-value="precise"] .ais-prompt-mode-thumb {
   transform: translateX(100%);
@@ -446,6 +469,25 @@ button {
 .ais-prompt-mode-seg-btn[data-active="true"] {
   color: var(--accent-ink);
   font-weight: 600;
+}
+/* 시안 v3c2 매칭 (2026-05-02): 활성 카드 안 active 버튼 = 시그니처 보라색.
+ *  pair-generate.html line 923~929 와 1:1 매칭. 비활성 옵션은 ink-2 로 살짝 진하게. */
+.ais-toggle-card[data-active="true"] .ais-prompt-mode-seg-btn[data-active="true"] {
+  color: var(--card-from);
+  font-weight: 600;
+}
+.ais-toggle-card[data-active="true"] .ais-prompt-mode-seg-btn:not([data-active="true"]) {
+  color: var(--ink-2);
+}
+
+/* 시안 pair-generate.html v7 line 614/625 일치 — active 카드 안에선 segmented 톤이 카드 시그니처 색을 따름.
+   thumb 배경 = white gradient (배경 카드 화이트 그라디언트와 자연스러운 중첩) ·
+   active btn 컬러 = 카드 시그니처 시작 색 (var(--card-from) — ai violet · claude amber · fast lime). */
+.ais-toggle-card[data-active="true"] .ais-prompt-mode-thumb {
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+}
+.ais-toggle-card[data-active="true"] .ais-prompt-mode-seg-btn[data-active="true"] {
+  color: var(--card-from);
 }
 
 /* Primary CTA 버튼 — sticky 하단 + progress bar overlay (edit/video 공용) */
@@ -741,7 +783,7 @@ button {
   gap: 12px;
 }
 .ais-mode-title {
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-style: italic;
   font-size: 26px;
@@ -856,6 +898,10 @@ button {
   box-shadow:
     0 1px 2px rgba(23,20,14,.04),
     0 4px 16px rgba(23,20,14,.04);
+  /* 시안 v7 .toggle-card 일치 — flex column + gap 10. PromptModeRadio align-self:center 가 작동. */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   transition:
     padding var(--ais-card-transition),
     transform 0.25s cubic-bezier(.4, 0, .2, 1),
@@ -872,6 +918,44 @@ button {
     0 4px 8px rgba(23,20,14,.06),
     0 18px 40px rgba(23,20,14,.10);
 }
+
+/* Hover 툴팁 (시안 v3c2 패턴 · 2026-05-02) — data-tooltip attr 박힌 카드만 hover 시 검정 box.
+ *  카드 위쪽에 fade-in + 살짝 위로 떠오름. overflow:visible 로 카드 밖 그림 가능. */
+.ais-toggle-card[data-tooltip]:hover::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 500;
+  padding: 7px 12px;
+  border-radius: 6px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 100;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.18);
+  animation: ais-tooltip-in 0.18s ease;
+}
+@keyframes ais-tooltip-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(4px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+/* 카드 overflow visible — 툴팁이 카드 밖으로 그려질 수 있도록 (인물 webp 는 ::before mask 로 영역 제한) */
+.ais-toggle-card[data-tooltip] { overflow: visible; }
+/* hover 카드 자체와 outer motion.div (직계 부모) 모두 z-index 50 으로 올려서 다른 카드 motion.div 위로.
+ *  motion.div 가 transform 으로 stacking context 만들어 z-index 100 ::after 가 갇히는 문제 해결. */
+.ais-toggle-card[data-tooltip]:hover { z-index: 50; }
+:has(> .ais-toggle-card[data-tooltip]:hover) {
+  position: relative;
+  z-index: 50;
+}
+
+/* Edit AI 카드 disabled toggle 의 opacity 0.7 (Toggle wrapper inline) override —
+ *  Generate 의 active AI 카드와 시각 통일 (라벨 진한 검정 + 600 cascade). */
+.ais-toggle-card.ais-sig-ai[data-active="true"] > * { opacity: 1 !important; }
 /* 인물 배경 — 시안 V5: opacity 0.28 (비활성) → 1 (활성) + saturate 분기 */
 .ais-toggle-card::before {
   content: "";
@@ -937,6 +1021,32 @@ button {
     url('/studio/cards/card-bg-fast@2x.webp') 2x
   );
 }
+/* 시안 pair-generate.html v7 .icon-box — 40x40 둥근 사각 + active 시 카드 시그니처 그라디언트.
+   비활성: 회색 surface + ink-3 / 활성: 화이트 글리프 + 그라디언트 + 그림자.
+   카드 wrapper 의 `data-active="true"` 가 카드 자식 .ais-toggle-icon-box 를 active 톤으로 격상. */
+.ais-toggle-icon-box {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  background: rgba(244,242,238,0.85);
+  color: var(--ink-3);
+  border: 1px solid rgba(232,229,223,0.8);
+  transition: all 0.25s;
+  position: relative;
+  z-index: 2; /* ::before 인물 배경 (z=1) 위 */
+}
+.ais-toggle-card[data-active="true"] .ais-toggle-icon-box {
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow:
+    0 4px 14px var(--card-shadow),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+  border-color: transparent;
+}
+
 .ais-toggle-card.ais-sig-claude {
   --card-from: var(--ais-card-from-claude);
   --card-to: var(--ais-card-to-claude);
@@ -1058,6 +1168,62 @@ button {
 .ais-size-card-v {
   --ais-range-accent: var(--card-from);
 }
+
+/* 사이즈 카드 헤더 — 시안 매칭 (pair-generate.html v3 .size-header · 2026-05-02).
+ *  큰 아이콘 박스 (rose grad) + title "사이즈" + chip "1328×744 · 16:9"
+ *  + solid 구분선 (border-bottom).
+ *  z-index: 2 — .ais-size-card-v::before (인물 webp · z 1) 위로 명시 (stacking context 안전망). */
+.ais-size-header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(232,229,223,0.8);
+}
+.ais-size-header-icon {
+  position: relative;
+  z-index: 2;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow:
+    0 4px 14px var(--card-shadow),
+    inset 0 1px 0 rgba(255,255,255,0.35);
+  font-size: 19px;
+}
+.ais-size-header-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.ais-size-header-title {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.ais-size-header-chip {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  color: var(--ink-2);
+}
+
+/* 사이즈 카드 안 input — 솔리드 흰 + 옅은 line-2 (인물 webp 위에서 또렷).
+ *  시안 v3c2: .v3c2 .size-card-v .dim-input input { background: var(--surface); border-color: var(--line-2); } */
+.ais-size-card-v input[type="number"],
+.ais-size-card-v input[type="text"] {
+  background: var(--surface);
+  border-color: var(--line-2);
+}
 .ais-video-res-card {
   --ais-range-accent: var(--card-from);
 }
@@ -1069,7 +1235,11 @@ button {
 
 /* Result Header — Fraunces italic 26 + violet output accent + meta pills */
 .ais-result-header {
-  padding: 4px 0 14px;
+  /* padding-top 4 / padding-bottom 14 — 좌/우 점선 정렬은 StudioResultHeader.tsx 안 spacer div 가 담당. */
+  padding-top: 4px;
+  padding-right: 0;
+  padding-bottom: 14px;
+  padding-left: 0;
   border-bottom: 1px dashed var(--line-2);
 }
 .ais-result-eyebrow {
@@ -1088,7 +1258,7 @@ button {
   flex-wrap: wrap;
 }
 .ais-result-title {
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-style: italic;
   font-size: 26px;
@@ -1224,9 +1394,10 @@ button {
   align-items: center;
   gap: 4px;
   padding: 6px;
-  background: rgba(28,30,38,0.32);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  /* 2026-05-02: 옛 alpha 0.32 → 너무 투명 (배경 비침). 0.55 + blur 22 로 frosted glass 진하게. */
+  background: rgba(28,30,38,0.55);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
   border: 1px solid rgba(255,255,255,0.22);
   border-radius: var(--radius-full);
   box-shadow:
@@ -1266,7 +1437,7 @@ button {
 }
 .ais-result-caption-prompt {
   flex: 1;
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-style: italic;
   font-size: 14.5px;
@@ -1332,7 +1503,7 @@ button {
   flex-wrap: wrap;
 }
 .ais-archive-title {
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-style: italic;
   font-size: 26px;
@@ -1400,7 +1571,7 @@ button {
   transform: rotate(-90deg);
 }
 .ais-history-section-header .ais-title {
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-style: italic;
   font-size: 17px;
@@ -1433,6 +1604,9 @@ button {
   display: grid;
   grid-template-columns: repeat(4, 1fr); /* 시안 default · production 은 inline gridTemplateColumns 가 override */
   gap: 10px;
+  /* 2026-05-02: padding 4px — selected tile box-shadow (0 0 0 4px violet) 가 grid 영역 밖으로 나가
+   *  panel overflow 에 잘림. ring 두께만큼 안쪽 여백 확보 (좌/우/상/하 모든 가장자리 보호). */
+  padding: 4px;
 }
 .ais-history-tile {
   position: relative;
@@ -1497,9 +1671,10 @@ button {
   align-items: center;
   gap: 4px;
   padding: 4px;
-  background: rgba(28,30,38,0.32);
-  backdrop-filter: blur(18px) saturate(180%);
-  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  /* 2026-05-02: alpha 0.32 → 0.55 + blur 22 (시안 frosted glass 톤). result-action-bar 와 동일 처리. */
+  background: rgba(28,30,38,0.55);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
   border: 1px solid rgba(255,255,255,0.22);
   border-radius: var(--radius-full);
   box-shadow:
@@ -2511,12 +2686,16 @@ button {
   line-height: 1;
 }
 .ais-ah-logo-name {
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  /* 시안 (pair-generate.html v7) 1:1 — fallback 에서 Pretendard 제거.
+     Pretendard 가 일부 영문 글리프를 가로챌 수 있어 Fraunces serif 톤이 흐려짐. */
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  /* ss01 — Fraunces stylistic set 1 (시안 .display 와 동일 양식적 변형) */
+  font-feature-settings: "ss01";
   font-style: italic;
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: 0;
+  letter-spacing: -0.015em;
 }
 .ais-ah-logo-version {
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -2541,13 +2720,15 @@ button {
   cursor: pointer;
   padding: 5px 13px;
   border-radius: var(--radius-full);
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  /* 시안 (pair-generate.html v7) 1:1 — fallback 에서 Pretendard 제거 + ss01 stylistic set */
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-feature-settings: "ss01";
   font-style: italic;
   font-size: 13px;
   font-weight: 500;
   color: var(--ink-3);
-  letter-spacing: 0;
+  letter-spacing: -0.005em;
   white-space: nowrap;
   position: relative;
   transition:
@@ -2749,7 +2930,7 @@ button {
   flex: 1;
   font-size: 10px;
   font-style: italic;
-  font-family: "Fraunces", "Pretendard Variable", Georgia, serif;
+  font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   color: var(--ink-3);
   white-space: nowrap;

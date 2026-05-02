@@ -55,7 +55,11 @@ function PromptModeRadioImpl({ value, onChange }: Props) {
             aria-checked={active}
             data-active={active}
             title={opt.desc}
-            onClick={() => onChange(opt.id)}
+            onClick={(e) => {
+              // V5MotionCard onClick (카드 자체 토글) 으로 bubble 차단 — segmented 는 카드 내부 독립 control.
+              e.stopPropagation();
+              onChange(opt.id);
+            }}
             className="ais-prompt-mode-seg-btn"
           >
             {opt.label}

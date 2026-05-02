@@ -21,7 +21,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 
 /** 5 패널 공용 V5 카드 spring transition — layout 한정 */
 const V5_SPRING_TRANSITION = {
@@ -33,6 +33,11 @@ interface Props {
   className?: string;
   /** active 상태 (CSS [data-active="true"] selector 매칭) — *inner* div 에 적용 */
   "data-active"?: boolean | "true" | "false";
+  /** 카드 자체가 토글 역할 (시안 v7 결정 #2). 안 Toggle 의 input 은 flat 모드로 제거됨.
+   *  segmented (PromptModeRadio) 등 자식 click 은 e.stopPropagation 으로 차단해야 함. */
+  onClick?: () => void;
+  /** Hover 툴팁 텍스트 — CSS `[data-tooltip]:hover::after` 로 검정 박스 표시 (2026-05-02). */
+  tooltip?: string;
   /** 카드 내부 콘텐츠 */
   children: ReactNode;
 }
@@ -40,6 +45,8 @@ interface Props {
 export default function V5MotionCard({
   className,
   "data-active": dataActive,
+  onClick,
+  tooltip,
   children,
 }: Props) {
   // boolean → "true" / "false" 문자열 변환 (CSS [data-active="true"] selector 매칭).
@@ -50,11 +57,37 @@ export default function V5MotionCard({
         : "false"
       : dataActive;
 
+  // 카드 자체 click 핸들러 (시안 v7 결정 #2 — Toggle 작은 스위치 제거 + 카드 클릭 = 토글).
+  // 키보드: Enter / Space 도 동일 동작 + role="button" + aria-pressed 로 접근성 보장.
+  const interactiveProps = onClick
+    ? {
+        onClick,
+        role: "button" as const,
+        tabIndex: 0,
+        "aria-pressed":
+          typeof dataActive === "boolean"
+            ? dataActive
+            : dataActive === "true",
+        onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        },
+        style: { cursor: "pointer" as const },
+      }
+    : undefined;
+
   return (
     // outer: framer-motion layout (transform 사용 — 형제 reflow 보간)
     <motion.div layout transition={V5_SPRING_TRANSITION}>
       {/* inner: V5 시각 + :hover transform (CSS) — outer/inner 분리로 transform race 회피 */}
-      <div className={className} data-active={dataActiveStr}>
+      <div
+        className={className}
+        data-active={dataActiveStr}
+        data-tooltip={tooltip}
+        {...interactiveProps}
+      >
         {children}
       </div>
     </motion.div>

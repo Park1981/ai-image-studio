@@ -10,7 +10,6 @@
 import { useState } from "react";
 import Icon from "@/components/ui/Icon";
 import {
-  Field,
   Range,
   inputStyle,
   iconBtnStyle,
@@ -77,10 +76,26 @@ export default function SizeCard({
     // Phase 1.5.2 (2026-05-02 · V5 적용) — 옛 surface inline style → .ais-size-card-v
     // (rose-pink 시그니처 + 인물 webp 배경 fade + size-card 패턴).
     <div className="ais-size-card-v">
-      <Field
-        label={`사이즈 · ${sizeLabel}${aspect === "custom" ? "" : ` · ${aspect}`}`}
-      >
-        {/* W/H 세트 — 각 입력박스 바로 아래에 동일 너비 슬라이더 (컴팩트) */}
+      {/* 시안 매칭 (2026-05-02): size-header 구조 (pair-generate.html:2247~2253).
+       *  옛 Field 한 줄 라벨 → 큰 rose 아이콘 + "사이즈" title + meta chip 2단. */}
+      <div className="ais-size-header">
+        <span className="ais-size-header-icon" aria-hidden>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <rect x="3" y="3" width="18" height="18" rx="1.5" />
+            <path d="M3 9h18M9 3v18" />
+          </svg>
+        </span>
+        <span className="ais-size-header-meta">
+          <span className="ais-size-header-title">사이즈</span>
+          <span className="ais-size-header-chip">
+            {sizeLabel}
+            {aspect !== "custom" ? ` · ${aspect}` : ""}
+          </span>
+        </span>
+      </div>
+
+      {/* W/H 세트 — 각 입력박스 바로 아래에 동일 너비 슬라이더 (컴팩트) */}
+      <div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           {/* W 세트 (input + slider 세로) */}
           <div
@@ -119,12 +134,15 @@ export default function SizeCard({
             style={{
               ...iconBtnStyle,
               alignSelf: "center",
+              // 시안 매칭 (2026-05-02): cascade 받은 var(--card-from) = rose pink (#F43F5E).
+              // 옛 var(--card-glow) (rose 8% alpha) → 카드 fade 영역에서 인물 webp 위로 묻힘.
+              // 새 처리: 솔리드 흰 배경 + rose 보더/아이콘 (시안 v3c 패턴).
               background: aspectLocked
-                ? "var(--accent-soft)"
+                ? "var(--surface)"
                 : iconBtnStyle.background,
-              color: aspectLocked ? "var(--accent)" : iconBtnStyle.color,
+              color: aspectLocked ? "var(--card-from)" : iconBtnStyle.color,
               borderColor: aspectLocked
-                ? "var(--accent)"
+                ? "var(--card-from)"
                 : iconBtnStyle.borderColor,
             }}
           >
@@ -185,7 +203,7 @@ export default function SizeCard({
             );
           })}
         </div>
-      </Field>
+      </div>
     </div>
   );
 }
@@ -246,7 +264,9 @@ function DimInput({
           width: "100%",
           paddingLeft: 22,
           textAlign: "right",
-          opacity: disabled ? 0.5 : 1,
+          // 시안 매칭 (2026-05-02): 옛 opacity 0.5 → 배경까지 50% 투명 → 인물 webp 비침.
+          // 새 처리: 배경은 솔리드 흰 유지 + 텍스트만 회색 + cursor not-allowed.
+          color: disabled ? "var(--ink-4)" : undefined,
           cursor: disabled ? "not-allowed" : "auto",
         }}
         aria-label={label === "W" ? "width px" : "height px"}
@@ -298,15 +318,16 @@ function AspectCard({
         padding: "10px 4px 8px",
         height: 70,
         boxSizing: "border-box",
+        // 시안 매칭 (2026-05-02): active 색 cascade var(--card-from) = rose pink.
+        // var(--card-glow) = rose 8% soft 배경.
+        // position+z-index — 인물 webp (::before z 1) 위로 올려 솔리드 흰 보장.
+        position: "relative",
+        zIndex: 2,
         border: `1.5px solid ${
-          active ? "var(--accent)" : hov ? "var(--line-2)" : "var(--line)"
+          active ? "var(--card-from)" : hov ? "var(--line-2)" : "var(--line)"
         }`,
         borderRadius: "var(--radius-md)",
-        background: active
-          ? "var(--accent-soft)"
-          : hov
-          ? "var(--bg-2)"
-          : "var(--surface)",
+        background: hov && !active ? "var(--bg-2)" : "var(--surface)",
         transition: "all .15s",
       }}
     >
@@ -315,7 +336,7 @@ function AspectCard({
         style={{
           width: boxW,
           height: boxH,
-          border: `1.5px solid ${active ? "var(--accent)" : "var(--ink-3)"}`,
+          border: `1.5px solid ${active ? "var(--card-from)" : "var(--ink-3)"}`,
           borderRadius: 2,
           transition: "border-color .15s",
         }}
@@ -326,7 +347,7 @@ function AspectCard({
           fontSize: 10.5,
           fontWeight: 600,
           letterSpacing: ".02em",
-          color: active ? "var(--accent)" : "var(--ink-2)",
+          color: active ? "var(--card-from)" : "var(--ink-2)",
           transition: "color .15s",
         }}
       >

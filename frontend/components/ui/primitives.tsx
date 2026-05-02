@@ -125,6 +125,7 @@ export function Toggle({
   tone = "neutral",
   disabled = false,
   flat = false,
+  icon,
 }: {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -137,6 +138,9 @@ export function Toggle({
   /** 2026-05-01 — 외부 카드 안 inline 으로 들어갈 때 자체 background/border/padding 제거.
    *  외부 카드 (.ais-magic-prompt-card 등) 가 색 책임. */
   flat?: boolean;
+  /** 2026-05-02 — V5 카드 안 좌측 40x40 icon-box. 시안 pair-generate.html v7 .icon-box 패턴.
+   *  flat 모드에서만 의미 있음 (외부 카드 wrapper 가 active 톤 책임). */
+  icon?: IconName;
 }) {
   // tone 별 색깔 매핑
   const toneColors =
@@ -189,7 +193,8 @@ export function Toggle({
         minWidth: 0,
       }}
     >
-      <span style={{ fontSize: 12, fontWeight: 500, color: "var(--ink-2)" }}>
+      {/* 시안 pair-generate.html v7 일치 — fontSize 12 → 12.5 (시안 .toggle-row .label-area .label). */}
+      <span style={{ fontSize: 12.5, fontWeight: 500, color: "var(--ink-2)" }}>
         {label}
       </span>
       {desc && (
@@ -221,41 +226,48 @@ export function Toggle({
         opacity: disabled ? 0.7 : 1,
       }}
     >
-      {/*
-        visually-transparent 패턴 (2026-04-25 layout shift fix · Codex 진단).
-        label 전체를 덮는 투명 input 으로 전환 — 접근성 (Tab 포커스 + 스크린리더)
-        은 동일하게 유지되며 1x1 박스가 만드는 측정 잡음 제거.
-      */}
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => {
-          if (disabled) return;
-          onChange(e.target.checked);
-        }}
-        disabled={disabled}
-        aria-label={label}
-        style={{
-          position: "absolute",
-          inset: 0,
-          width: "100%",
-          height: "100%",
-          margin: 0,
-          opacity: 0,
-          cursor: disabled ? "not-allowed" : "pointer",
-          border: 0,
-        }}
-      />
-      {/* align 에 따라 토글/라벨 순서 결정 */}
+      {/* visually-transparent 패턴 (2026-04-25 layout shift fix · Codex 진단).
+          flat=true (V5 카드 안 inline) 시 — input + 작은 toggleSwitch 시각 모두 제거.
+          카드 wrapper (V5MotionCard) 가 onClick + 시각/접근성 책임 (시안 v7 결정 #2 · 카드 자체가 토글). */}
+      {!flat && (
+        <input
+          type="checkbox"
+          checked={checked}
+          onChange={(e) => {
+            if (disabled) return;
+            onChange(e.target.checked);
+          }}
+          disabled={disabled}
+          aria-label={label}
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: "100%",
+            height: "100%",
+            margin: 0,
+            opacity: 0,
+            cursor: disabled ? "not-allowed" : "pointer",
+            border: 0,
+          }}
+        />
+      )}
+      {/* V5 카드 좌측 icon-box (시안 pair-generate.html v7 .icon-box 패턴 · flat 모드 한정).
+          align 무관하게 라벨 *좌측* 에 위치 — 시안 .toggle-row 구조 (icon · label · ...). */}
+      {flat && icon && (
+        <span className="ais-toggle-icon-box">
+          <Icon name={icon} size={19} />
+        </span>
+      )}
+      {/* align 에 따라 토글/라벨 순서 결정 — flat 시 toggleSwitch 시각도 제거. */}
       {align === "left" ? (
         <>
-          {toggleSwitch}
+          {!flat && toggleSwitch}
           {labelArea}
         </>
       ) : (
         <>
           {labelArea}
-          {toggleSwitch}
+          {!flat && toggleSwitch}
         </>
       )}
     </label>

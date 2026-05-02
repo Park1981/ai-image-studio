@@ -19,6 +19,7 @@ import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
 import VideoPlayerCard from "@/components/studio/VideoPlayerCard";
+import { useHistoryStats } from "@/hooks/useHistoryStats";
 import type { HistoryItem } from "@/lib/api/types";
 import { filenameFromRef } from "@/lib/image-actions";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -34,6 +35,9 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
   const { running, pipelineLabel } = useVideoRunning();
   const items = useHistoryStore((s) => s.items);
   const videoResults = items.filter((x) => x.mode === "video");
+  // 2026-05-02: count 출처 store length → backend stats (DB 정확값) — limit 100 fetch 누락 영향 회피.
+  const stats = useHistoryStats();
+  const videoCount = stats?.byMode.video.count ?? videoResults.length;
 
   /** 현재 재생할 mp4: lastVideoRef (세션) — 진입 시 빈 상태 (히스토리 fallback 제거) */
   const playingRef = lastVideoRef ?? null;
@@ -62,7 +66,7 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
         }
       />
 
-      <HistorySectionHeader title="영상 히스토리" count={videoResults.length} />
+      <HistorySectionHeader title="영상 히스토리" count={videoCount} />
 
       <HistoryGallery
         items={videoResults}

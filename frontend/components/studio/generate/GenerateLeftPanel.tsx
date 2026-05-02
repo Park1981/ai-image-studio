@@ -197,12 +197,6 @@ export default function GenerateLeftPanel({
             </>
           )}
         </button>
-
-        <div className="ais-cta-eta">
-          평균 소요{" "}
-          <span className="mono">~{research ? "42" : "28"}s</span> · 로컬
-          처리 · 데이터 전송 없음
-        </div>
       </div>
 
       {/* ── 프롬프트 카드 ── */}
@@ -280,18 +274,21 @@ export default function GenerateLeftPanel({
       <V5MotionCard
         className="ais-toggle-card ais-sig-ai"
         data-active={!skipUpgrade}
+        onClick={() => setSkipUpgrade(!skipUpgrade)}
+        tooltip={
+          skipUpgrade
+            ? "OFF · 프롬프트 그대로 사용 (~10초 절약)"
+            : "ON · 한국어/자연어 → 영문 정제"
+        }
       >
+        {/* 시안 v7 결정 — desc 제거 (라벨만 표시) + icon-box 시그니처 (별 두 개). */}
         <Toggle
           flat
+          icon="stars"
           checked={!skipUpgrade}
           onChange={(v) => setSkipUpgrade(!v)}
           align="right"
           label="🪄 AI 프롬프트 보정"
-          desc={
-            skipUpgrade
-              ? "OFF · 프롬프트 그대로 사용 (~10초 절약)"
-              : "ON · 한국어/자연어 → 영문 정제 (기본)"
-          }
         />
         {!skipUpgrade && (
           <PromptModeRadio value={promptMode} onChange={setPromptMode} />
@@ -304,6 +301,8 @@ export default function GenerateLeftPanel({
       <V5MotionCard
         className="ais-toggle-card ais-sig-claude"
         data-active={research}
+        onClick={() => setResearch(!research)}
+        tooltip="Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s"
       >
         <ResearchBanner checked={research} onChange={setResearch} />
       </V5MotionCard>
@@ -315,18 +314,19 @@ export default function GenerateLeftPanel({
       <V5MotionCard
         className="ais-toggle-card ais-sig-fast"
         data-active={!lightning}
+        onClick={() => applyLightning(!lightning)}
+        tooltip="ON 시 Lightning 4-step 끄고 풀 디테일 · 약 4배 느림"
       >
+        {/* 시안 v7 결정 — desc 제거. 라벨만 + icon-box (lightning bolt).
+         *  시안 매칭 (2026-05-02): 라벨 "💎 퀄리티 모드" 고정 (pair-generate.html:2239).
+         *  카드 OFF = Lightning 빠른 모드 사용 중 (기본) / ON = 퀄리티 모드 활성. */}
         <Toggle
           flat
+          icon="bolt"
           checked={!lightning}
           onChange={(v) => applyLightning(!v)}
           align="right"
-          label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
-          desc={
-            lightning
-              ? "Lightning 4-step · 약 4배 빠름 (기본)"
-              : "Lightning OFF · 풀 퀄리티 · 약 4배 느림"
-          }
+          label="💎 퀄리티 모드"
         />
       </V5MotionCard>
 

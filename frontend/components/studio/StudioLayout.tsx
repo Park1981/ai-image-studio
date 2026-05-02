@@ -136,21 +136,22 @@ export function StudioModeHeader({
   const resolvedEn = titleEn ?? "";
   return (
     <header className="ais-mode-header">
+      {/* 시안 pair-generate.html v7 구조 일치 — eyebrow 를 mode-title-row *밖* 의 별도 행으로.
+          옛 구조는 eyebrow + title 을 익명 div 에 묶어 mode-title-row 안에 넣어서
+          flex baseline 정렬 시 row 수직 영역이 늘어나 title 이 살짝 아래로 밀림. */}
+      {eyebrow && <div className="ais-mode-eyebrow">{eyebrow}</div>}
       <div className="ais-mode-title-row">
-        <div>
-          {eyebrow && <span className="ais-mode-eyebrow">{eyebrow}</span>}
-          <h1 className="ais-mode-title">
-            {resolvedEn ? (
-              <>
-                <strong>{resolvedKo}</strong>
-                {" · "}
-                {resolvedEn}
-              </>
-            ) : (
+        <h1 className="ais-mode-title">
+          {resolvedEn ? (
+            <>
               <strong>{resolvedKo}</strong>
-            )}
-          </h1>
-        </div>
+              {" · "}
+              {resolvedEn}
+            </>
+          ) : (
+            <strong>{resolvedKo}</strong>
+          )}
+        </h1>
         {flowHref && (
           <Link
             href={flowHref}
@@ -158,7 +159,8 @@ export function StudioModeHeader({
             aria-label={flowLabel}
             className="ais-mode-flow-link"
           >
-            <Icon name="grid" size={15} />
+            {/* 시안 pair-generate.html v7 일치 — 4개 원형 점 (도넛형). 옛 grid 4사각형 → dots-grid. */}
+            <Icon name="dots-grid" size={15} />
           </Link>
         )}
       </div>

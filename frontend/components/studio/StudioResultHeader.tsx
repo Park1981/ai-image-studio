@@ -86,6 +86,9 @@ export default function StudioResultHeader({
           </div>
         )}
       </div>
+      {/* 좌측 mode-header desc (12px font + 6px margin = 약 18px) 자리 보강 — 좌/우 패널 점선 정렬.
+       *  2026-05-02: CSS padding-bottom 으로 했더니 HMR 캐시 문제 → HTML spacer 로 직접 박음. */}
+      <div aria-hidden style={{ height: 18, marginTop: 6 }} />
     </div>
   );
 }

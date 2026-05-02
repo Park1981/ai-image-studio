@@ -82,6 +82,10 @@ export default function ShutdownButton() {
           />,
           document.body,
         )}
+      {/* V5 시안 (pair-generate.html v7) 일치 — Settings 와 ghost 톤 통일 + power 아이콘.
+          옛 빨간 위험 톤 (border rgba(239,68,68,.32) / bg rgba(239,68,68,.07) / color #b42318)
+          → ghost (transparent border/bg + ink-2 + hover bg-2). 위험성은 confirm 모달에서 책임.
+          running 상태는 opacity + cursor 로 disable 표시 (시각 차이 ghost 톤 유지). */}
       <button
         type="button"
         onClick={() => setPhase("confirm")}
@@ -94,16 +98,25 @@ export default function ShutdownButton() {
           width: 32,
           height: 32,
           borderRadius: "var(--radius-sm)",
-          border: "1px solid rgba(239,68,68,.32)",
-          background: "rgba(239,68,68,.07)",
-          color: "#b42318",
+          border: "1px solid transparent",
+          background: "transparent",
+          color: "var(--ink-2)",
           display: "grid",
           placeItems: "center",
           opacity: running ? 0.55 : 1,
           transition: "all .15s",
         }}
+        onMouseEnter={(e) => {
+          if (running) return;
+          (e.currentTarget as HTMLButtonElement).style.background = "var(--bg-2)";
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--ink)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+          (e.currentTarget as HTMLButtonElement).style.color = "var(--ink-2)";
+        }}
       >
-        <Icon name="x" size={15} />
+        <Icon name="power" size={15} />
       </button>
     </>
   );

@@ -3,6 +3,61 @@
 > 누적 변경 로그 — 완료된 작업의 역사적 기록.
 > 최신 변경 + 활성 정책은 `CLAUDE.md` 참조. 자세한 작업 내역은 git log + memory.
 
+## 2026-05-02 (저녁)
+
+### 디자인 V5 시안 vs React 차이점 fix — 사용자 검증 라운드
+
+세션: 사용자가 시안 (`docs/design-test/pair-generate.html`) 과 실제 React 비교하면서 짚어준 차이점들 차례로 fix.
+세션 인계: `memory/project_session_2026_05_02_design_v5_user_verification_round.md`
+
+**Generate 좌측 (V5 카드 시그니처 정합)**:
+- AI 프롬프트 보정 segmented (instant/thinking) — 활성 카드 wrapper 흰 반투명 + blur (옛 검정 0.04 → 인물 webp 위 묻힘 fix · `globals.css` `.ais-toggle-card[data-active="true"] .ais-prompt-mode-segmented`)
+- 퀄리티 모드 라벨 고정 ("⚡ 빠른 모드" / "💎 퀄리티 모드" 동적 → "💎 퀄리티 모드" 고정 · 시안 `:2239`)
+- 사이즈 카드 헤더 재구조화 — Field 라벨 → `.ais-size-header` (40px rose 그라데이션 아이콘 + title + chip · `:2247`)
+- AspectCard rose-pink 시그니처 + AspectCard active 솔리드 흰 배경 (`var(--card-glow)` → `var(--surface)`) + position/z-index 강제 (인물 webp 위)
+- DimInput disabled 시 `opacity: 0.5` → 텍스트 색만 회색 (배경 솔리드 유지)
+- lock 버튼 active 배경 솔리드 흰 (옛 옅은 rose 묻힘 fix)
+- 카드 hover 툴팁 — V5MotionCard `tooltip` prop + `.ais-toggle-card[data-tooltip]:hover::after` + `:has()` z-index 50
+
+**Generate 우측 (헤더 + 카운트)**:
+- StudioResultHeader title `생성 결과 · Generated` → `결과 · Latest` + invisible spacer div (좌/우 점선 정렬 · CSS HMR 우회)
+- ResearchBanner `icon="search"` + desc 제거 (시안 v7)
+- StudioModeHeader 구조 변경 — eyebrow 별도 행 (옛 mode-title-row 안 nested div → flex baseline 정렬 영향)
+- Meta pills 미선택 시 PNG fallback null (옛 dummy chip 제거)
+- 보관 카운트 source: store length → `useHistoryStats().byMode.X.count` (DB 정확값) — Generate/Edit/Video 모두 적용
+- HistoryBootstrap fetch 정책: `listHistory({limit:100})` × 1 → mode 별 병렬 `Promise.all([generate, edit, video], limit:1000)` — mode 간 cap 충돌 회피 (예: edit 가 100 채우면 generate 0)
+- HistoryGallery wrapper padding 4px (selected tile box-shadow 4px violet ring 의 좌/우/상/하 가장자리 잘림 fix)
+
+**Edit 좌측 (카드 클릭 + 시그니처 + tooltip + icon-box)**:
+- 4 카드 (AI/자동 분석/퀄리티/Multi-ref) onClick 추가 (옛 카드 자체 클릭 안 먹는 문제 fix)
+- 라벨 단순화: "수정 후 자동 비교 분석" → "결과 자동 분석" / "빠른 모드" 동적 → "💎 퀄리티 모드" 고정 / "(실험적)" 제거
+- desc 제거 (시안 v7 — Generate 와 동일 패턴)
+- 자동 분석 카드 클래스 `ais-auto-compare-card` → `ais-sig-claude` (Generate Claude 와 동일 amber 시그니처 + `card-bg-claude.webp`)
+- 4 카드에 `tooltip` prop 박음 (Generate 동일)
+- 4 카드에 icon-box 추가 (`stars`, `search`, `bolt`, `image`)
+- AI 카드 disabled opacity `0.7` → `1` 강제 (`.ais-toggle-card.ais-sig-ai[data-active="true"] > * { opacity: 1 !important }`) — Generate 와 시각 통일
+
+**Edit 우측 (BeforeAfter 정합 시도 + SourceImageCard 시안 매칭)**:
+- SourceImageCard 재구성 — 시안 매칭:
+  - 옛 좌상단 ⓘ + 좌하단 사이즈 칩 제거 → 하단 frosted bar (좌 파일명 + 우 `1672 × 941 · PNG`)
+  - 옛 [변경][x] 텍스트 pill → **둥근 frosted glass icon-only 2개** (refresh + x · 30×30)
+  - frosted bar alpha 0.55 → 0.35 + blur 12 → 14
+- BeforeAfterSlider — `afterFit`, `afterScaleX`, `autoMatchAspect` prop 신설 (default contain — 회귀 0)
+  - 슬라이더 정합 fix 시도 — wrapper aspect = 원본 + 둘 다 contain (사용자 만족 · "지금 로직이 제일 좋아보인다")
+  - autoMatchAspect 자동 측정 (onLoad + ResizeObserver + Guard ±15%) — 결국 비활성. 4% ComfyUI megapixel 미세 차이는 시각 인지 영역 밑이라 transform 보정 안 함
+- result-header invisible spacer div (좌/우 점선 정렬)
+- ResultHoverActionBar 진하기 alpha 0.55 + blur 22 (옛 0.32 + 18 너무 옅음 fix)
+
+**Codex 미사용 (사용자 직접 진단 패턴)**:
+- 사용자가 화면 캡처 + DevTools 진단 명령으로 직접 짚는 패턴 — Codex 호출 없이 1:1 fix
+- 메모리 박제 — `memory/feedback_design_v5_no_spec_lookup.md` (시안 file 직접 보지 말고 사용자 말로만 수정)
+
+**검증**: TSC clean (모든 fix 후 `tsc --noEmit` exit 0). pytest/vitest 미실행 (CSS + UI 전용 변경).
+
+**HMR Known Issue 학습**: Next.js 16 + React 19 + globals.css 조합에서 *server-side module 캐시* stale → Hard reload 무관. 해결 — dev 서버 재시작. 작업 워크플로우: 가능한 React/inline style 위주 (HMR 안정), CSS class 변경은 한 박자 늦음 감안.
+
+---
+
 ## 2026-05-02
 
 ### 디자인 V5 — Phase 4~8 branch 적용 (우측 패널 + cleanup · master 미반영)
