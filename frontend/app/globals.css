@@ -813,7 +813,7 @@ button {
   font-size: 26px;
   font-weight: 500;
   color: var(--ink);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .ais-mode-title strong {
   font-style: normal;
@@ -988,21 +988,30 @@ button {
   --card-to: var(--ais-card-to-ai);
   --card-glow: var(--ais-card-glow-ai);
   --card-shadow: var(--ais-card-shadow-ai);
-  --ais-card-bg-image: url('/studio/cards/card-bg-ai.webp');
+  --ais-card-bg-image: image-set(
+    url('/studio/cards/card-bg-ai.webp') 1x,
+    url('/studio/cards/card-bg-ai@2x.webp') 2x
+  );
 }
 .ais-toggle-card.ais-sig-fast {
   --card-from: var(--ais-card-from-fast);
   --card-to: var(--ais-card-to-fast);
   --card-glow: var(--ais-card-glow-fast);
   --card-shadow: var(--ais-card-shadow-fast);
-  --ais-card-bg-image: url('/studio/cards/card-bg-fast.webp');
+  --ais-card-bg-image: image-set(
+    url('/studio/cards/card-bg-fast.webp') 1x,
+    url('/studio/cards/card-bg-fast@2x.webp') 2x
+  );
 }
 .ais-toggle-card.ais-sig-claude {
   --card-from: var(--ais-card-from-claude);
   --card-to: var(--ais-card-to-claude);
   --card-glow: var(--ais-card-glow-claude);
   --card-shadow: var(--ais-card-shadow-claude);
-  --ais-card-bg-image: url('/studio/cards/card-bg-claude.webp');
+  --ais-card-bg-image: image-set(
+    url('/studio/cards/card-bg-claude.webp') 1x,
+    url('/studio/cards/card-bg-claude@2x.webp') 2x
+  );
 }
 
 /* 자동 비교 평가 카드 (Edit 전용 · 결정 C) */
@@ -1011,7 +1020,10 @@ button {
   --card-to: var(--ais-card-to-auto-compare);
   --card-glow: var(--ais-card-glow-auto-compare);
   --card-shadow: var(--ais-card-shadow-auto-compare);
-  --ais-card-bg-image: url('/studio/cards/card-bg-auto-compare.webp');
+  --ais-card-bg-image: image-set(
+    url('/studio/cards/card-bg-auto-compare.webp') 1x,
+    url('/studio/cards/card-bg-auto-compare@2x.webp') 2x
+  );
 }
 
 /* Multi-ref 카드 (Edit 전용 · 결정 J fuchsia 분리) */
@@ -1020,7 +1032,10 @@ button {
   --card-to: var(--ais-card-to-multi-ref);
   --card-glow: var(--ais-card-glow-multi-ref);
   --card-shadow: var(--ais-card-shadow-multi-ref);
-  --ais-card-bg-image: url('/studio/cards/card-bg-multi-ref.webp');
+  --ais-card-bg-image: image-set(
+    url('/studio/cards/card-bg-multi-ref.webp') 1x,
+    url('/studio/cards/card-bg-multi-ref@2x.webp') 2x
+  );
 }
 
 /* 영상 해상도 카드 (Video 전용 · 결정 D · warm coral) — 사이즈 카드 패턴 차용
@@ -1030,7 +1045,10 @@ button {
   --card-to: var(--ais-card-to-video-res);
   --card-glow: var(--ais-card-glow-video-res);
   --card-shadow: var(--ais-card-shadow-video-res);
-  --ais-card-bg-image: url('/studio/cards/card-bg-video-res.webp');
+  --ais-card-bg-image: image-set(
+    url('/studio/cards/card-bg-video-res.webp') 1x,
+    url('/studio/cards/card-bg-video-res@2x.webp') 2x
+  );
 }
 
 /* 성인 모드 카드 (Video 전용 · crimson) — 활성 시 16:9 늘어남 (원본 인물 풀 노출) */
@@ -1039,7 +1057,10 @@ button {
   --card-to: var(--ais-card-to-adult);
   --card-glow: var(--ais-card-glow-adult);
   --card-shadow: var(--ais-card-shadow-adult);
-  --ais-card-bg-image: url('/studio/cards/card-bg-adult.webp');
+  --ais-card-bg-image: image-set(
+    url('/studio/cards/card-bg-adult.webp') 1x,
+    url('/studio/cards/card-bg-adult@2x.webp') 2x
+  );
 }
 .ais-adult-card[data-active="true"] {
   aspect-ratio: 16 / 9;
@@ -1069,7 +1090,10 @@ button {
   --card-to: var(--ais-card-to-size);
   --card-glow: var(--ais-card-glow-size);
   --card-shadow: var(--ais-card-shadow-size);
-  --ais-card-bg-image: url('/studio/cards/card-bg-size.webp');
+  --ais-card-bg-image: image-set(
+    url('/studio/cards/card-bg-size.webp') 1x,
+    url('/studio/cards/card-bg-size@2x.webp') 2x
+  );
 }
 .ais-size-card-v::before {
   content: "";
@@ -1128,7 +1152,7 @@ button {
   font-size: 26px;
   font-weight: 500;
   color: var(--ink);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .ais-result-title strong {
   font-style: normal;
@@ -1303,7 +1327,7 @@ button {
   font-size: 14.5px;
   font-weight: 400;
   color: var(--ink-2);
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   line-height: 1.55;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1369,7 +1393,7 @@ button {
   font-size: 26px;
   font-weight: 500;
   color: var(--ink);
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .ais-archive-title strong {
   font-style: normal;
@@ -1436,7 +1460,7 @@ button {
   font-style: italic;
   font-size: 17px;
   font-weight: 500;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
 }
 .ais-history-section-header .ais-title strong {
   font-style: normal;
@@ -1783,7 +1807,7 @@ button {
 .ais-axis-label {
   font-weight: 600;
   color: var(--ink-2);
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
 }
 .ais-axis-score {
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -1971,7 +1995,7 @@ button {
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-style: italic;
   font-size: 13.5px;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
 }
 
 /* Prompt Toggle Card — combined/split 토글 보존 + 색 톤만 추가 (positive=green / negative=red) */
@@ -2119,7 +2143,7 @@ button {
   font-family: "Fraunces", Georgia, serif;
   font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-style: italic;
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -2178,7 +2202,7 @@ button {
   font-style: italic;
   font-size: 14px;
   font-weight: 600;
-  letter-spacing: -0.015em;
+  letter-spacing: 0;
 }
 .ais-ah-logo-version {
   font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
@@ -2209,7 +2233,7 @@ button {
   font-size: 13px;
   font-weight: 500;
   color: var(--ink-3);
-  letter-spacing: -0.005em;
+  letter-spacing: 0;
   white-space: nowrap;
   position: relative;
   transition:
