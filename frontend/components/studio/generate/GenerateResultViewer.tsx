@@ -8,9 +8,13 @@
  *  - 매트지 효과 (카드 padding 24 + 이미지 자체 그림자)
  *  - dot grid 배경 (Figma 캔버스 톤)
  *  - hover-only wheel zoom (1.0~4.0) + drag pan + 더블클릭 reset
- *    · wheel native addEventListener (passive: false 로 preventDefault)
- *    · drag 는 window mousemove/mouseup 에 attach (영역 밖 마우스 추적)
- *    · scale 1 시 offset 자동 reset, item 바뀌면 zoom/pan 모두 reset
+ *
+ * 2026-05-02 디자인 V5 Phase 4 격상:
+ *  - **Action Bar 4 버튼** — download 제거 (자세히 / 복사 / 수정 / 리프레시)
+ *  - **Caption 슬롯 NEW** (결정 ⓒ · α 적용) — italic prompt 1줄 truncate (Hero 아래)
+ *  - className `.ais-result-caption` (V5 토큰 cascade)
+ *  - **회귀 위험 #2 보존**: Hero wheel zoom + drag pan + dbl-click reset (line 81~143 그대로)
+ *  - Hero 자체 inline style 은 동적 aspectRatio (item.width/height) 라 유지 (plan v4 변경 #4 — 동적 계산 허용)
  */
 
 "use client";
@@ -27,8 +31,7 @@ interface Props {
   onEnter: () => void;
   onLeave: () => void;
   onExpand: () => void;
-  onDownload: () => void;
-  /** 프롬프트 텍스트 클립보드 복사 (2026-04-27 변경 — 옛 이미지 복사 X) */
+  /** 프롬프트 텍스트 클립보드 복사 */
   onCopyPrompt: () => void;
   onSendToEdit: () => void;
   onReuse: () => void;
@@ -46,7 +49,6 @@ export default function GenerateResultViewer({
   onEnter,
   onLeave,
   onExpand,
-  onDownload,
   onCopyPrompt,
   onSendToEdit,
   onReuse,
@@ -78,6 +80,7 @@ export default function GenerateResultViewer({
   }
 
   /* ── hover-only wheel zoom (native addEventListener · passive:false) ── */
+  /* ── 회귀 위험 #2 보존: 이 useEffect + onMouseDown + onDoubleClick 블록은 V5 격상에도 변경 X. ── */
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -151,102 +154,108 @@ export default function GenerateResultViewer({
       : "default";
 
   return (
-    <div
-      ref={containerRef}
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      onMouseDown={onMouseDown}
-      onDoubleClick={onDoubleClick}
-      style={{
-        position: "relative",
-        width: "100%",
-        // 결과 뷰어: 원본 비율 유지 + 최대 높이 65vh 제한. contain 으로 레터박스.
-        aspectRatio,
-        maxHeight: "65vh",
-        // 2026-04-27: dot grid 배경 (Figma 캔버스 톤) + 흰색 매트 (오빠 피드백 — 더 깔끔)
-        backgroundColor: "var(--surface)",
-        backgroundImage:
-          "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
-        backgroundSize: "16px 16px",
-        borderRadius: "var(--radius-card)",
-        overflow: "hidden",
-        border: "1px solid var(--line)",
-        boxShadow: "var(--shadow-sm)",
-        // 매트지 효과: 카드 안 padding → 이미지가 떠있는 느낌 (미술관 액자).
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 24,
-        boxSizing: "border-box",
-        cursor,
-        // touchpad pinch zoom 등 native 제스처 차단 (wheel 만 사용)
-        touchAction: "none",
-      }}
-      title={
-        scale > SCALE_MIN
-          ? "드래그로 이동 · 더블클릭으로 100% 복원"
-          : "휠로 확대/축소"
-      }
-    >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={item.imageRef}
-        alt={item.label}
-        draggable={false}
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        ref={containerRef}
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+        onMouseDown={onMouseDown}
+        onDoubleClick={onDoubleClick}
         style={{
-          maxWidth: "100%",
-          maxHeight: "100%",
-          objectFit: "contain",
-          display: "block",
-          // 매트 위 떠있는 사진 효과 — 자체 그림자 + 옅은 테두리
-          borderRadius: "var(--radius-md)",
-          boxShadow:
-            "0 10px 32px rgba(0,0,0,.14), 0 3px 10px rgba(0,0,0,.08)",
-          border: "1px solid rgba(0,0,0,.06)",
-          // zoom + pan transform
-          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-          transformOrigin: "center center",
-          // drag 중엔 transition 끔 (입력 즉각 반영) · 그 외엔 부드럽게
-          transition: isDragging
-            ? "none"
-            : "transform .18s ease-out",
-          // @ts-expect-error — 비표준 Webkit
-          WebkitUserDrag: "none",
-          userSelect: "none",
-          pointerEvents: "none", // mousedown 은 부모 div 가 받음
+          position: "relative",
+          width: "100%",
+          // 결과 뷰어: 원본 비율 유지 + 최대 높이 65vh 제한. contain 으로 레터박스.
+          aspectRatio,
+          maxHeight: "65vh",
+          // 2026-04-27: dot grid 배경 (Figma 캔버스 톤) + 흰색 매트 (오빠 피드백 — 더 깔끔)
+          backgroundColor: "var(--surface)",
+          backgroundImage:
+            "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
+          backgroundSize: "16px 16px",
+          borderRadius: "var(--radius-card)",
+          overflow: "hidden",
+          border: "1px solid var(--line)",
+          boxShadow: "var(--shadow-sm)",
+          // 매트지 효과: 카드 안 padding → 이미지가 떠있는 느낌 (미술관 액자).
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 24,
+          boxSizing: "border-box",
+          cursor,
+          // touchpad pinch zoom 등 native 제스처 차단 (wheel 만 사용)
+          touchAction: "none",
         }}
-      />
+        title={
+          scale > SCALE_MIN
+            ? "드래그로 이동 · 더블클릭으로 100% 복원"
+            : "휠로 확대/축소"
+        }
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={item.imageRef}
+          alt={item.label}
+          draggable={false}
+          style={{
+            maxWidth: "100%",
+            maxHeight: "100%",
+            objectFit: "contain",
+            display: "block",
+            // 매트 위 떠있는 사진 효과 — 자체 그림자 + 옅은 테두리
+            borderRadius: "var(--radius-md)",
+            boxShadow:
+              "0 10px 32px rgba(0,0,0,.14), 0 3px 10px rgba(0,0,0,.08)",
+            border: "1px solid rgba(0,0,0,.06)",
+            // zoom + pan transform
+            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+            transformOrigin: "center center",
+            // drag 중엔 transition 끔 (입력 즉각 반영) · 그 외엔 부드럽게
+            transition: isDragging
+              ? "none"
+              : "transform .18s ease-out",
+            // @ts-expect-error — 비표준 Webkit
+            WebkitUserDrag: "none",
+            userSelect: "none",
+            pointerEvents: "none", // mousedown 은 부모 div 가 받음
+          }}
+        />
 
-      {/* 하단 호버 액션바 — summary 없음 (버튼만) */}
-      <div onClick={(e) => e.stopPropagation()}>
-        <ResultHoverActionBar hovered={hovered}>
-          <ActionBarButton
-            icon="zoom-in"
-            title="크게 보기"
-            onClick={onExpand}
-          />
-          <ActionBarButton
-            icon="download"
-            title="저장"
-            onClick={onDownload}
-          />
-          <ActionBarButton
-            icon="copy"
-            title="프롬프트 복사"
-            onClick={onCopyPrompt}
-          />
-          <ActionBarButton
-            icon="edit"
-            title="수정으로"
-            onClick={onSendToEdit}
-          />
-          <ActionBarButton
-            icon="refresh"
-            title="재생성 (파라미터 복원)"
-            onClick={onReuse}
-          />
-        </ResultHoverActionBar>
+        {/* 하단 호버 액션바 — V5 4 버튼 (download 제거 · 자세히/복사/수정/리프레시) */}
+        <div onClick={(e) => e.stopPropagation()}>
+          <ResultHoverActionBar hovered={hovered} variant="hero">
+            <ActionBarButton
+              icon="zoom-in"
+              title="크게 보기"
+              onClick={onExpand}
+            />
+            <ActionBarButton
+              icon="copy"
+              title="프롬프트 복사"
+              onClick={onCopyPrompt}
+            />
+            <ActionBarButton
+              icon="edit"
+              title="수정으로"
+              onClick={onSendToEdit}
+            />
+            <ActionBarButton
+              icon="refresh"
+              title="재생성 (파라미터 복원)"
+              onClick={onReuse}
+            />
+          </ResultHoverActionBar>
+        </div>
       </div>
+
+      {/* V5 Caption 슬롯 — italic prompt 1줄 truncate (Hero 바로 아래) */}
+      {item.prompt && (
+        <div className="ais-result-caption">
+          <p className="ais-result-caption-prompt" title={item.prompt}>
+            {item.prompt}
+          </p>
+        </div>
+      )}
     </div>
   );
 }

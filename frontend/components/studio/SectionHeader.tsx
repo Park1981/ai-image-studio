@@ -4,20 +4,16 @@
  *
  * 클릭 시 토글, ▼/▶ 화살표 회전, 라벨 옆에 개수 chip 노출.
  *
- * 2026-04-27 폴리시 (오빠 피드백):
- *  - label fontSize 12.5 → 14, weight 600 → 700 (시각 위계 ↑)
- *  - count → 둥근 회색 chip pill (Image #7 reference)
- *  - chevron 색 ink-3 → ink-2 (더 분명)
- *  - 박스 카드 형태 (border + radius + background + shadow) — 닫힘/열림 동일 (옵션 A)
- *    · 닫힘만 박스 (옵션 D) 시도 → "사라져서 오히려 이상" 피드백 → A 로 후퇴.
- *  - box-sizing: border-box 명시 — `all: "unset"` 이 box-sizing 까지 reset 해서
- *    padding 더해질 때 우측 짤리던 문제 해결.
- *  - 닫힘=옅은 색 / 열림=진한 색 → 위계 표현 (박스는 같지만 텍스트 색으로 분기)
+ * 2026-05-02 디자인 V5 Phase 4 격상:
+ *  - inline style → className `.ais-history-section-header` 전환 (V5 토큰 cascade)
+ *  - Fraunces italic bilingual `<strong>오늘</strong> · Today` 17px (알려진 한글 → 영문 매핑 내장)
+ *  - chevron + count chip CSS 가 처리 (data-closed 속성 분기)
+ *  - 박스 카드 형태 (border + radius + surface + shadow) — 닫힘/열림 동일 (옵션 A 유지)
+ *  - 닫힘 = ink-3 / 열림 = ink → 위계 표현
  */
 
 "use client";
 
-import { useState } from "react";
 import Icon from "@/components/ui/Icon";
 
 interface Props {
@@ -27,75 +23,34 @@ interface Props {
   onToggle: () => void;
 }
 
+/**
+ * 알려진 한글 라벨 → 영문 매핑 (Fraunces italic bilingual 시그니처).
+ * date-sections 의 today/yesterday/thisWeek 만 매핑 — 동적 날짜 ("5월 1일" 등) 는 영문 미표시.
+ */
+const KNOWN_EN: Record<string, string> = {
+  "오늘": "Today",
+  "어제": "Yesterday",
+  "이번 주": "This week",
+};
+
 export default function SectionHeader({ label, count, closed, onToggle }: Props) {
-  const [hov, setHov] = useState(false);
+  const labelEn = KNOWN_EN[label];
   return (
     <button
       type="button"
+      className="ais-history-section-header"
+      data-closed={closed ? "true" : "false"}
       onClick={onToggle}
-      onMouseEnter={() => setHov(true)}
-      onMouseLeave={() => setHov(false)}
-      style={{
-        all: "unset",
-        // all: unset 이 box-sizing 도 reset → padding/border 가 width 위로 더해져 우측 짤림.
-        // border-box 명시로 해결.
-        boxSizing: "border-box",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        width: "100%",
-        padding: "10px 14px",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius-md)",
-        background: hov ? "var(--bg-2)" : "var(--surface)",
-        boxShadow: "var(--shadow-sm)",
-        // 닫힘=옅음 / 열림=진함 → 시각 위계
-        color: closed
-          ? hov
-            ? "var(--ink-2)"
-            : "var(--ink-3)"
-          : "var(--ink)",
-        transition: "color .15s, background .15s, border-color .15s",
-      }}
       title={closed ? "펼치기" : "접기"}
     >
-      <span
-        aria-hidden
-        style={{
-          display: "inline-flex",
-          transform: closed ? "rotate(-90deg)" : "rotate(0deg)",
-          transition: "transform .18s",
-          color: "var(--ink-2)",
-        }}
-      >
+      <span aria-hidden className="ais-chev">
         <Icon name="chevron-down" size={14} />
       </span>
-      <span
-        style={{
-          fontSize: 14,
-          fontWeight: 700,
-          letterSpacing: "-.005em",
-        }}
-      >
-        {label}
+      <span className="ais-title">
+        <strong>{label}</strong>
+        {labelEn ? ` · ${labelEn}` : null}
       </span>
-      {/* count chip — 둥근 회색 pill (Image #7 reference) */}
-      <span
-        className="mono"
-        style={{
-          fontSize: 10.5,
-          fontWeight: 600,
-          letterSpacing: ".04em",
-          color: "var(--ink-3)",
-          background: "var(--bg-2)",
-          padding: "2px 8px",
-          borderRadius: "var(--radius-full)",
-          border: "1px solid var(--line)",
-        }}
-      >
-        {count}
-      </span>
+      <span className="ais-count mono">{count}</span>
     </button>
   );
 }
