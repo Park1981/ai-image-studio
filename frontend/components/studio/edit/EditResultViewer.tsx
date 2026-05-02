@@ -6,6 +6,15 @@
  *  - 단순 액션 (Download / UseAsSource / Reuse) 은 store 직접 호출 — page 슬림화
  *  - 외부 영향 액션 (Lightbox open / Comparison detail) 만 콜백
  *
+ * 2026-05-02 디자인 V5 Phase 5 격상:
+ *  - 매트지 wrapper inline → className `.ais-result-hero .ais-result-hero-edit` (V5 토큰)
+ *  - SegControl wrapper → className `.ais-hero-seg-row`
+ *  - **Action Bar 4 버튼** — download 제거 + copy 신규 (자세히 / 수정 지시 복사 / 다음 수정 원본 / 리프레시)
+ *  - **canPromote=true 시 5번째 액션 "라이브러리 저장"** 유지 필수 (회귀 위험 #5)
+ *  - **Caption 슬롯 NEW** — italic afterItem.prompt 1줄 truncate (Hero 아래 · 결정 ⓒ)
+ *  - **회귀 위험 #4 보존**: BeforeAfterSlider 자체 드래그 핸들 (별도 컴포넌트 — 변경 0)
+ *  - inner box (BeforeAfter wrapper) inline 제거 — BeforeAfterSlider 자체 box-shadow 가 처리
+ *
  * 조건부 렌더는 부모 (EditRightPanel) 가 담당 — 이 컴포넌트는 항상 afterItem 보유 가정.
  */
 
@@ -18,7 +27,7 @@ import ResultHoverActionBar, {
 } from "@/components/studio/ResultHoverActionBar";
 import { SegControl } from "@/components/ui/primitives";
 import type { HistoryItem } from "@/lib/api/types";
-import { downloadImage, filenameFromRef } from "@/lib/image-actions";
+import { copyText } from "@/lib/image-actions";
 import { useEditStore } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
@@ -83,11 +92,7 @@ export default function EditResultViewer({
   const [viewerMode, setViewerMode] = useState<EditViewerMode>("slider");
 
   // v9 (2026-04-29 · Phase C.2): 사후 라이브러리 저장 모달 트리거.
-  // canPromote: history.referenceRef 가 *임시 풀 URL substring 매칭* 일 때만 노출.
-  //   - 사용자 직접 업로드 → 임시 풀 → canPromote=true
-  //   - 라이브러리 픽 → 영구 라이브러리 URL → canPromote=false
-  //   - promote 성공 후 백엔드가 영구 URL 로 swap → canPromote=false (자동 숨김)
-  //   - referenceRef NULL (옛 row OR multi-ref OFF) → canPromote=false
+  // canPromote: history.referenceRef 가 *임시 풀 URL substring 매칭* 일 때만 노출. (회귀 위험 #5)
   const [promoteOpen, setPromoteOpen] = useState(false);
   const canPromote =
     !!afterItem.referenceRef &&
@@ -95,22 +100,14 @@ export default function EditResultViewer({
 
   const updateReferenceRef = useHistoryStore((s) => s.updateReferenceRef);
 
-  // 액션바 — 두 모드 공통 (slider 는 슬라이더 위, sidebyside 는 결과 이미지 위에서만).
+  // V5 Action Bar — 4 버튼 (download 제거 → copy 신규) + canPromote=true 시 5번째 "라이브러리 저장"
   const actionBarChildren = (
     <>
       <ActionBarButton icon="zoom-in" title="크게 보기" onClick={onExpand} />
       <ActionBarButton
-        icon="download"
-        title="저장"
-        onClick={() =>
-          downloadImage(
-            afterItem.imageRef,
-            filenameFromRef(
-              afterItem.imageRef,
-              `ais-edit-${afterItem.id}.png`,
-            ),
-          )
-        }
+        icon="copy"
+        title="수정 지시 복사"
+        onClick={() => void copyText(afterItem.prompt || "", "수정 지시")}
       />
       <ActionBarButton
         icon="edit"
@@ -149,51 +146,26 @@ export default function EditResultViewer({
   );
 
   return (
-    <div
-      onMouseEnter={onEnter}
-      onMouseLeave={onLeave}
-      style={{
-        // 2026-04-27 매트 카드 (Generate 와 통일): 카드 안 padding → 슬라이더가 떠있는 느낌.
-        // dot grid 배경 + boxShadow + border (액자). BeforeAfter 자체 dimensions 보존.
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        backgroundColor: "var(--surface)",
-        backgroundImage:
-          "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
-        backgroundSize: "16px 16px",
-        borderRadius: "var(--radius-card)",
-        border: "1px solid var(--line)",
-        boxShadow: "var(--shadow-sm)",
-        padding: 24,
-        boxSizing: "border-box",
-      }}
-    >
-      {/* 모드 토글 — 우측 상단. CompareViewer 와 통일 (2026-04-27 오빠 피드백). */}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <SegControl
-          value={viewerMode}
-          onChange={(v) => setViewerMode(v as EditViewerMode)}
-          options={[
-            { value: "slider", label: "슬라이더" },
-            { value: "sidebyside", label: "나란히" },
-          ]}
-        />
-      </div>
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      <div
+        className="ais-result-hero ais-result-hero-edit"
+        onMouseEnter={onEnter}
+        onMouseLeave={onLeave}
+      >
+        {/* 모드 토글 — 우측 상단. CompareViewer 와 통일 (2026-04-27 오빠 피드백). */}
+        <div className="ais-hero-seg-row">
+          <SegControl
+            value={viewerMode}
+            onChange={(v) => setViewerMode(v as EditViewerMode)}
+            options={[
+              { value: "slider", label: "슬라이더" },
+              { value: "sidebyside", label: "나란히" },
+            ]}
+          />
+        </div>
 
-      {viewerMode === "slider" ? (
-        <div style={{ display: "flex", justifyContent: "center" }}>
-          <div
-            style={{
-              position: "relative",
-              borderRadius: "var(--radius-md)",
-              overflow: "hidden",
-              boxShadow:
-                "0 10px 32px rgba(0,0,0,.14), 0 3px 10px rgba(0,0,0,.08)",
-              border: "1px solid rgba(0,0,0,.06)",
-            }}
-          >
+        {viewerMode === "slider" ? (
+          <div style={{ position: "relative" }}>
             <BeforeAfterSlider
               beforeSrc={sourceImage}
               afterSeed={afterItem.imageRef || afterItem.id}
@@ -203,22 +175,32 @@ export default function EditResultViewer({
               beforeFit="cover"
             />
             <div onClick={(e) => e.stopPropagation()}>
-              <ResultHoverActionBar hovered={hovered}>
+              <ResultHoverActionBar hovered={hovered} variant="hero">
                 {actionBarChildren}
               </ResultHoverActionBar>
             </div>
           </div>
+        ) : (
+          <SideBySidePanel
+            beforeSrc={sourceImage}
+            afterItem={afterItem}
+            aspectRatio={aspectRatio}
+            hovered={hovered}
+            actionBarChildren={actionBarChildren}
+            beforeFit="cover"
+          />
+        )}
+      </div>
+
+      {/* V5 Caption 슬롯 — Edit 지시 italic 1줄 truncate (Hero 매트지 아래 · 결정 ⓒ) */}
+      {afterItem.prompt && (
+        <div className="ais-result-caption">
+          <p className="ais-result-caption-prompt" title={afterItem.prompt}>
+            {afterItem.prompt}
+          </p>
         </div>
-      ) : (
-        <SideBySidePanel
-          beforeSrc={sourceImage}
-          afterItem={afterItem}
-          aspectRatio={aspectRatio}
-          hovered={hovered}
-          actionBarChildren={actionBarChildren}
-          beforeFit="cover"
-        />
       )}
+
       {/* v9 (2026-04-29 · Phase C.2): 사후 라이브러리 저장 모달 */}
       {canPromote && (
         <ReferencePromoteModal
@@ -276,7 +258,7 @@ function SideBySidePanel({
           aspectRatio={aspectRatio}
         />
         <div onClick={(e) => e.stopPropagation()}>
-          <ResultHoverActionBar hovered={hovered}>
+          <ResultHoverActionBar hovered={hovered} variant="hero">
             {actionBarChildren}
           </ResultHoverActionBar>
         </div>

@@ -1,16 +1,19 @@
 /**
  * EditRightPanel — Edit 페이지 우측 결과 + 비교 분석 + 히스토리.
  *
- * 포함:
- *  - StudioResultHeader
- *  - EditResultViewer (조건부) 또는 StudioEmptyState
- *  - ComparisonAnalysisCard (afterItem 있을 때만)
- *  - HistorySectionHeader (그리드 컬럼 토글)
- *  - HistoryGallery (mode=edit 만 필터)
+ * 포함 (V5 시안 순서):
+ *  1. StudioResultHeader (V5 — bilingual + meta pills)
+ *  2. EditResultViewer (Hero 매트지 + Caption 슬롯 자체 포함) 또는 StudioEmptyState
+ *  3. ComparisonAnalysisCard (afterItem 있을 때만 · filled state V5 amber)
+ *  4. HistorySectionHeader (V5 Archive Header — eyebrow + bilingual + count + size chip)
+ *  5. HistoryGallery (mode=edit 만 필터)
  *
  * 2026-04-26: edit/page.tsx 분해 step 3.
- *  - afterId 는 page-level state — props 로 받고 setAfterId 도 콜백
- *  - viewerHovered / gridCols 는 컴포넌트 내부 state
+ *
+ * 2026-05-02 디자인 V5 Phase 5 격상:
+ *  - StudioResultHeader: titleEn="Edited" + meta pills (해상도 violet · BEFORE/AFTER · Lightning)
+ *  - HistorySectionHeader: titleEn="History" + sizeBytes (useHistoryStats edit)
+ *  - 회귀 위험 #7 보존: sourceRef NULL 옛 row 클릭 toast 안내 그대로
  */
 
 "use client";
@@ -23,6 +26,7 @@ import StudioEmptyState from "@/components/studio/StudioEmptyState";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
 import { useComparisonAnalysis } from "@/hooks/useComparisonAnalysis";
+import { useHistoryStats } from "@/hooks/useHistoryStats";
 import type { HistoryItem } from "@/lib/api/types";
 import { useEditStore, useEditInputs } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -48,7 +52,6 @@ export default function EditRightPanel({
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
   // Phase 2 후속 (Codex Phase 4 리뷰 Medium #1) — 수동 비교 분석도 Edit promptMode 전파.
-  // 자동 트리거와 동일 정책: cache miss 시 clarify_edit_intent 가 같은 모드로 호출.
   const editPromptMode = useEditStore((s) => s.promptMode);
 
   const items = useHistoryStore((s) => s.items);
@@ -63,6 +66,10 @@ export default function EditRightPanel({
 
   const [viewerHovered, setViewerHovered] = useState(false);
 
+  // V5 Archive Header size chip — edit 모드 디스크 사용량
+  const stats = useHistoryStats();
+  const editSizeBytes = stats?.byMode.edit.sizeBytes;
+
   /** 짝 일치 조건 — Before/After 슬라이더는 진짜 한 쌍만 표시 */
   const pairMatched =
     !!sourceImage &&
@@ -70,9 +77,24 @@ export default function EditRightPanel({
     !!afterItem.sourceRef &&
     afterItem.sourceRef === sourceImage;
 
+  // V5 result-meta-pills — 첫 violet pill = 해상도 (afterItem) · BEFORE·AFTER · Lightning
+  const metaPills = afterItem ? (
+    <>
+      <span className="ais-result-pill ais-pill-violet mono">
+        {afterItem.width} × {afterItem.height}
+      </span>
+      <span className="ais-result-pill mono">BEFORE · AFTER</span>
+      {afterItem.lightning && (
+        <span className="ais-result-pill ais-pill-amber mono">Lightning</span>
+      )}
+    </>
+  ) : (
+    <span className="ais-result-pill mono">BEFORE · AFTER</span>
+  );
+
   return (
     <StudioRightPanel>
-      <StudioResultHeader title="수정 결과" meta="BEFORE · AFTER" />
+      <StudioResultHeader title="수정 결과" titleEn="Edited" meta={metaPills} />
 
       {pairMatched ? (
         <>
@@ -90,7 +112,7 @@ export default function EditRightPanel({
             onAfterIdReset={() => setAfterId(null)}
           />
 
-          {/* 비교 분석 카드 — 수정 결과 대 원본 5축 평가 */}
+          {/* 비교 분석 카드 — 수정 결과 대 원본 5축 평가 (V5 amber filled) */}
           <ComparisonAnalysisCard
             item={afterItem!}
             busy={isBusy(afterItem!.id)}
@@ -107,8 +129,13 @@ export default function EditRightPanel({
         </StudioEmptyState>
       )}
 
-      {/* ── 히스토리 ── */}
-      <HistorySectionHeader title="수정 히스토리" count={editResults.length} />
+      {/* ── V5 Archive Header — bilingual + count + size chip ── */}
+      <HistorySectionHeader
+        title="보관"
+        titleEn="History"
+        count={editResults.length}
+        sizeBytes={editSizeBytes}
+      />
 
       <HistoryGallery
         items={editResults}
@@ -117,6 +144,7 @@ export default function EditRightPanel({
           // 히스토리 타일 클릭 = "이 수정 다시 보기"
           // sourceRef 있으면 원본도 같이 복원해 진짜 한 쌍 슬라이더로 표시.
           // sourceRef 없는 옛 row 는 안내 + source 보존 (슬라이더 자동 빈 상태).
+          // ⚠ 회귀 위험 #7 보존 — 이 toast 분기 제거하면 옛 row 사용자 혼란
           if (it.sourceRef) {
             useEditStore
               .getState()
