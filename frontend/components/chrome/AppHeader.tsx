@@ -1,72 +1,36 @@
 /**
  * AppHeader — 모든 페이지 공용 통합 헤더.
  *
- * 라우트 자동 분기 (usePathname):
- *   "/"               → 메인. HomeBtn 숨김 (이미 메인이니까).
- *   "/generate" 등    → 메뉴 페이지. HomeBtn 표시.
+ * Phase 2 (V5 · 2026-05-02 · 결정 M):
+ *   - HomeBtn 좌측 *제거* (시안 v7 부터 ModeNav 첫 chip 으로 흡수).
+ *   - 중앙에 <ModeNav /> 6 chip — Home / Generate / Edit / Video / Analyze / Compare.
+ *   - Logo 텍스트 → Fraunces italic 14 (Chrome.tsx · `.ais-ah-logo-name`).
+ *   - SettingsButton / ShutdownButton ghost 톤 통일 (이미 OK · 그대로 유지).
  *
- * 우측 영역 순서 (오빠 결정 7):
- *   [SystemStatusChip][SystemMetrics][SettingsButton]
+ * 우측 영역 순서 (오빠 결정 7 · 보존):
+ *   [MockBadge?][SystemStatusChip][SystemMetrics][SettingsButton][ShutdownButton]
  *
- * 2026-04-26 신설 — 6 페이지가 동일한 TopBar 패턴 5번 반복하던 걸 한 줄로 통합.
- *   각 페이지는 <AppHeader /> 한 줄만 호출.
+ * 회귀 위험 보존:
+ *   - 9: MockBadge / StatusChip 조건부 노출 — `USE_MOCK / running grace` 그대로.
+ *   - 11: V5 시각 대상 inline style → className (TopBar/Logo/ModeNav 본체 inline 0).
  *
- * 2026-04-30 (Phase 3.3 · refactor doc §R1):
- *   ShutdownBtn / ShutdownOverlay / shutdownModalButton 3 함수 (~310줄) 를
- *   ShutdownButton.tsx 로 분리 → 이 파일은 헤더 composition 위주.
+ * 2026-04-26 신설 — 6 페이지 동일 TopBar 패턴 통합.
+ * 2026-04-30 (Phase 3.3) — ShutdownBtn / Overlay 분리 → ShutdownButton.tsx.
+ * 2026-05-02 (Phase 2 · V5) — HomeBtn 흡수 + ModeNav 신설 + Logo italic className.
  */
 
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
 import { Logo, TopBar } from "./Chrome";
+import ModeNav from "./ModeNav";
 import SettingsButton from "@/components/settings/SettingsButton";
 import SystemMetrics from "./SystemMetrics";
 import SystemStatusChip from "./SystemStatusChip";
 import ShutdownButton from "./ShutdownButton";
-import Icon from "@/components/ui/Icon";
 import { USE_MOCK } from "@/lib/api/client";
 
-/** 홈 아이콘 버튼 — 메뉴 페이지 좌측 상단 (BackBtn 자리 대체).
- *  icon-only · tooltip "메인으로" · 단축키 없음 (Esc 충돌 회피).
- */
-function HomeBtn({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      onClick={onClick}
-      title="메인으로"
-      aria-label="메인으로"
-      style={{
-        all: "unset",
-        cursor: "pointer",
-        width: 32,
-        height: 32,
-        borderRadius: "var(--radius-sm)",
-        border: "1px solid var(--line)",
-        background: "var(--surface)",
-        color: "var(--ink-2)",
-        display: "grid",
-        placeItems: "center",
-        transition: "all .15s",
-      }}
-      onMouseEnter={(e) => {
-        const t = e.currentTarget as HTMLButtonElement;
-        t.style.borderColor = "var(--line-2)";
-        t.style.background = "var(--bg-2)";
-        t.style.color = "var(--ink)";
-      }}
-      onMouseLeave={(e) => {
-        const t = e.currentTarget as HTMLButtonElement;
-        t.style.borderColor = "var(--line)";
-        t.style.background = "var(--surface)";
-        t.style.color = "var(--ink-2)";
-      }}
-    >
-      <Icon name="home" size={15} />
-    </button>
-  );
-}
-
+/** Mock 모드 표시 chip — `NEXT_PUBLIC_USE_MOCK=true` 환경에서만 노출.
+ *  V5 V6 단계에서 className 으로 격상 가능하나 운영/디자인 본체 외 운영 도구라 inline 유지. */
 function MockModeBadge() {
   if (!USE_MOCK) return null;
 
@@ -95,24 +59,10 @@ function MockModeBadge() {
 }
 
 export default function AppHeader() {
-  const pathname = usePathname();
-  const router = useRouter();
-
-  // 메인 페이지는 HomeBtn 숨김
-  const showHomeBtn = pathname !== "/";
-
   return (
     <TopBar
-      left={
-        showHomeBtn ? (
-          <>
-            <HomeBtn onClick={() => router.push("/")} />
-            <Logo />
-          </>
-        ) : (
-          <Logo />
-        )
-      }
+      left={<Logo />}
+      center={<ModeNav />}
       right={
         <>
           <MockModeBadge />

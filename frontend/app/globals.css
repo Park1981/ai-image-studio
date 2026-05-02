@@ -590,11 +590,16 @@ button {
 }
 
 /* ─────────────────────────────────────────
-   SystemMetrics — 헤더 통합 자원 사용률 4-bar UI
-   class 토글 패턴 (inline style transition 불안정 회피).
-   collapsed: 막대만 / hover: dot · 라벨 · 사용량 · % 슬라이드 인.
-   ───────────────────────────────────────── */
+   SystemMetrics — 헤더 통합 자원 사용률 4-bar UI (V5 trigger)
+   ─────────────────────────────────────────
+   Phase 2 (V5 · 결정 N · 2026-05-02 · 옵션 A):
+   - trigger (4-bar) 는 평상시 정지 — 호버/포커스 시 *trigger 자체* 변하지 않음.
+   - 호버/포커스 시 아래로 `.ais-ah-metrics-popover` 가 떨어진다 (시안 v3).
+   - 옛 V4 의 hover expand 정책 (gap 6→12 / bar 44→112 / dot 0→6 / slide max-width 0→60+) 폐기.
+     V5 popover 모델로 대체 (시안 결정 메모리 — "bars 정지 + 호버 시 아래로 떨어짐").
+   - `position: relative` 는 `.ais-ah-metrics-popover` (absolute 자식) 의 앵커. */
 .ais-metrics {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -604,79 +609,25 @@ button {
   background: transparent;
   white-space: nowrap;
   cursor: default;
-  transition:
-    gap .35s var(--ais-ease-out-back),
-    padding .35s var(--ais-ease-out-back),
-    border-color .25s var(--ais-ease-quick),
-    background-color .25s var(--ais-ease-quick);
-}
-.ais-metrics:hover,
-.ais-metrics:focus-within {
-  gap: 12px;
-  padding: 5px 10px;
-  border-color: var(--line);
-  background: var(--surface);
 }
 
 .ais-metric-cell {
   display: flex;
   align-items: center;
   gap: 0;
-  transition: gap .35s var(--ais-ease-out-back);
-}
-.ais-metrics:hover .ais-metric-cell,
-.ais-metrics:focus-within .ais-metric-cell {
-  gap: 6px;
 }
 
-/* dot — collapsed 0px, expanded 6px */
+/* dot — V5 trigger 에서는 노출 안 함 (popover 의 .ais-ah-mp-dot 으로 이동) */
 .ais-metric-cell .ais-dot {
-  width: 0;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  opacity: 0;
-  transition:
-    width .35s var(--ais-ease-out-back) .04s,
-    opacity .3s var(--ais-ease-quick) .04s;
-}
-.ais-metrics:hover .ais-metric-cell .ais-dot,
-.ais-metrics:focus-within .ais-metric-cell .ais-dot {
-  width: 6px;
-  opacity: 1;
+  display: none;
 }
 
-/* 텍스트 슬라이드 (라벨 / 사용량 / 퍼센트) — 공통 슬라이드 트랜지션 + delay 시퀀스 */
+/* 텍스트 슬라이드 (라벨 / 사용량 / 퍼센트) — V5 trigger 에서는 모두 비노출 */
 .ais-metric-cell .ais-slide {
-  display: inline-block;
-  opacity: 0;
-  max-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  transition:
-    opacity .35s var(--ais-ease-quick),
-    max-width .4s var(--ais-ease-out-back);
-}
-.ais-metrics:hover .ais-metric-cell .ais-label,
-.ais-metrics:focus-within .ais-metric-cell .ais-label {
-  opacity: 1;
-  max-width: 60px;
-  transition-delay: .08s;
-}
-.ais-metrics:hover .ais-metric-cell .ais-usage,
-.ais-metrics:focus-within .ais-metric-cell .ais-usage {
-  opacity: 1;
-  max-width: 72px;
-  transition-delay: .12s;
-}
-.ais-metrics:hover .ais-metric-cell .ais-percent,
-.ais-metrics:focus-within .ais-metric-cell .ais-percent {
-  opacity: 1;
-  max-width: 36px;
-  transition-delay: .18s;
+  display: none;
 }
 
-/* bar — collapsed 44px, expanded 112px (2026-04-26 후속: 100% 길게 + 위험 그라데이션 가시성 확보) */
+/* bar — V5 collapsed 폭만 (44px) · hover expand 제거. popover 안 longer bar 가 별도. */
 .ais-metric-cell .ais-bar {
   width: 44px;
   height: 6px;
@@ -684,17 +635,11 @@ button {
   border-radius: 3px;
   overflow: hidden;
   flex-shrink: 0;
-  transition: width .4s var(--ais-ease-out-back);
-}
-.ais-metrics:hover .ais-metric-cell .ais-bar,
-.ais-metrics:focus-within .ais-metric-cell .ais-bar {
-  width: 112px;
 }
 .ais-metric-cell .ais-bar-fill {
   height: 100%;
   border-radius: 3px;
-  /* 0-80% solid 고유색 / 80-90% amber 톤 / 90-100% 빨강 그라데이션
-     background 변경도 부드럽게 — fill 의 width transition 과 동시 효과 */
+  /* 0-80 solid / 80-90 amber tail / 90+ red tail — 색상 변화 부드럽게 */
   transition: width .35s ease, background .35s ease;
 }
 
@@ -2296,13 +2241,43 @@ button {
     opacity 0.2s ease,
     transform 0.28s var(--ais-ease-out-back);
 }
-/* hover-stay-open + 키보드 접근성 (Phase 2 보강 · :focus-within + close timer 컴포넌트 구현) */
+/* invisible bridge — trigger ↔ popover 사이 10px 다리 (마우스 transit 자연 처리)
+   `.ais-metrics:hover` 가 trigger 영역을 떠난 직후에도 popover 가 hover 상태 유지하도록.
+   ::before 는 popover 자신의 호버 영역을 위쪽으로 확장하는 가상 요소.
+   pointer-events: auto — 다리 위에서 마우스 hover 유지 */
+.ais-ah-metrics-popover::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 0;
+  right: 0;
+  height: 10px;
+  /* hover state 유지 목적이라 pointer-events 활성. opacity 0 으로 시각 0 */
+  pointer-events: auto;
+}
+/* hover-stay-open + 키보드 접근성 (Phase 2 보강 · 4중 안전망):
+   - .ais-metrics:hover — 마우스가 trigger 위
+   - .ais-metrics:focus-within — Tab 키 포커스 (키보드 접근성)
+   - .ais-metrics[data-open="true"] — 컴포넌트 close timer (200ms) 가 강제 유지하는 동안
+   - .ais-ah-metrics-popover:hover — 마우스가 popover 위 (trigger 떠나도 자체 유지)
+   close 시는 모든 selector 풀림 → base style 의 transition-delay 0.15s 적용 */
 .ais-metrics:hover .ais-ah-metrics-popover,
 .ais-metrics:focus-within .ais-ah-metrics-popover,
-.ais-ah-metrics-popover[data-open="true"] {
+.ais-metrics[data-open="true"] .ais-ah-metrics-popover,
+.ais-ah-metrics-popover:hover {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+  /* open 시는 즉시 (delay 0), close 시만 base 의 0.15s 적용 */
+  transition:
+    opacity 0.2s ease,
+    transform 0.28s var(--ais-ease-out-back);
+}
+/* close 시 약간의 지연 — 마우스 transit 자연 처리 (bridge 와 페어) */
+.ais-ah-metrics-popover {
+  transition:
+    opacity 0.2s ease 0.15s,
+    transform 0.28s var(--ais-ease-out-back) 0.15s;
 }
 
 /* MetricsPopover row — 4 metric (CPU/GPU/VRAM/RAM) + VRAM breakdown */
