@@ -3,6 +3,67 @@
 > 누적 변경 로그 — 완료된 작업의 역사적 기록.
 > 최신 변경 + 활성 정책은 `CLAUDE.md` 참조. 자세한 작업 내역은 git log + memory.
 
+## 2026-05-01
+
+### 디자인 V5 — 5 패널 풀 시안 (좌측 패널 리디자인 · 시안 단계 · master 미반영)
+
+**위치**: `docs/design-test/cards-v2.html` (1500+ 줄) · `docs/design-test/README.md`
+
+**5 패널** (V5 Aurora Glass — frosted blur + 카드 전체 클릭 + hover 툴팁):
+- 생성 (Generate) — 프롬프트 → Qwen Image · final fix
+- 수정 (Edit) — 실제 EditLeftPanel.tsx 매칭 (참조 ON sub-section 포함)
+- 분석 (Vision Analyze) — 간소 (이미지 + CTA + 안내)
+- 비교 (Vision Compare) — A/B 슬롯 + 스왑 + 비교 지시
+- 영상 (Video Generate) — LTX-2.3 i2v · 영상 해상도 (사이즈 카드 패턴 재사용)
+
+**시그니처 6 컬러**:
+
+| from → to | 카드 |
+|---|---|
+| violet `#8B5CF6` → blue `#3B82F6` | AI 보정 |
+| amber `#F59E0B` → orange `#FB923C` | Claude 조사 / 결과 자동 평가 (페어) |
+| lime `#84CC16` → cyan `#06B6D4` | 퀄리티 모드 |
+| rose `#F43F5E` → pink `#EC4899` | 사이즈 / 추가 참조 / 영상 해상도 (트리오) |
+| crimson `#DC2626` → red `#F87171` | 성인 모드 |
+| (legacy) teal `#14B8A6` → emerald `#10B981` | 옛 자동평가 — 사용 X |
+
+**이미지 7장** (ChatGPT image 2.0 · 16:9 · rule of thirds 우측 1/3 · K-pop 인물 · Vogue Korea 톤):
+- card-bg-{ai, claude, fast, size, multi-ref, auto-compare, adult}.webp (@1x + @2x · 평균 25-50KB)
+- 자동화: `resize_cards.py` (PIL · 원본 → raw 백업 + WebP)
+
+**카드 패턴**:
+- 카드 전체 클릭 = ON/OFF 토글 (토글 스위치 *제거*)
+- desc 텍스트 *제거* + hover 검정 pill 툴팁 (data-tooltip)
+- 비활성 카드 segmented `display: none`
+- 비활성 이미지 `opacity 0.28 · saturate 0.4 · brightness 0.92`
+- 활성 텍스트 `ink + 600 굵기`
+- segmented 반투명 (`rgba 0.7 + backdrop-blur 8px`)
+
+**라벨 이모지 통일** (5 패널 일관):
+- 🪄 AI 프롬프트 보정 / 🔍 Claude 프롬프트 조사 / 📊 결과 자동 평가
+- 💎 퀄리티 모드 (다이아 ◆ 아이콘 — 번개 → 변경)
+- 🖼️ 추가 참조 이미지 / 🔞 성인 모드
+
+**상세 인계**: `memory/project_session_2026_05_01_design_v5_5panels.md`
+
+**다음 단계**: 오빠 시안 검토 → React 적용 plan (`/pdca plan generate-edit-leftpanel-v5-redesign` · 추정 6-8h).
+
+---
+
+### Prompt Tools Reasoning Modes Phase 1~5 + Codex 2라운드 fix + M2 보강 (master `b37b638`)
+
+**검증**: backend pytest **405 PASS** · frontend vitest **150 PASS** · tsc/ESLint clean · 회귀 0건
+
+6 commit (Phase 1~5 + Codex Phase 4/5 리뷰 fix + spec 갱신 + M2 자동 Compare 정밀 모드 사용자 인지 보강).
+
+**핵심**:
+- Phase 1~4: 프롬프트 reasoning modes (instant/thinking) · clarify_edit_intent + upgrade 분기
+- Phase 5: 프롬프트 도구 (번역/분리) + 양방향 번역 (KO ↔ EN)
+- M2 결정: Edit Compare 자동 트리거 — 옵션 A + 부분 C 하이브리드 (toast.info 한 줄)
+- spec: `docs/superpowers/specs/2026-05-01-prompt-tools-reasoning-modes-design.md` §13.2 (Codex 2라운드 review · 알려진 이슈 박제)
+
+**상세**: `memory/project_session_2026_05_01_prompt_tools_phase_1_5_impl.md`
+
 ## 2026-04-30
 
 ### Phase 4.5 — backend `comfy_api_builder.py` 1197줄 4 sub-module 분할 (current master · Phase 4 시리즈 마무리)

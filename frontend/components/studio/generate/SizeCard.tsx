@@ -74,16 +74,9 @@ export default function SizeCard({
   };
 
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius)",
-        overflow: "hidden",
-        transition: "all .2s",
-        padding: "14px 16px 16px",
-      }}
-    >
+    // Phase 1.5.2 (2026-05-02 · V5 적용) — 옛 surface inline style → .ais-size-card-v
+    // (rose-pink 시그니처 + 인물 webp 배경 fade + size-card 패턴).
+    <div className="ais-size-card-v">
       <Field
         label={`사이즈 · ${sizeLabel}${aspect === "custom" ? "" : ` · ${aspect}`}`}
       >

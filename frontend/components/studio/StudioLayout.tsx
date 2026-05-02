@@ -50,7 +50,13 @@ export function StudioWorkspace({
   style?: CSSProperties;
 }) {
   return (
+    // V5 Phase 3 (결정 L · 2026-05-02 plan v4 media query 분기):
+    //   - className `.ais-studio-workspace` — globals.css §Section 12 가 책임
+    //   - 1024~1279px: frame 스타일 없음 (inline grid 만 — 옛 동작 그대로)
+    //   - 1280px+: max-width: min(95vw, 1600px) + 박스 frame (border + padding + shadow)
+    //   inline grid 는 그대로 유지 (className 은 추가 frame 만 책임 · cascade 안 충돌)
     <div
+      className="ais-studio-workspace"
       style={{
         flex: 1,
         display: "grid",
@@ -89,91 +95,75 @@ export function StudioLeftPanel({
   );
 }
 
+/**
+ * StudioModeHeader — V5 Aurora 디자인 (Phase 1.5.1 · 2026-05-02)
+ *
+ * 시안 매칭: eyebrow JetBrains Mono `MODE · GENERATE` + Fraunces italic 26 bilingual
+ * `<strong>한글</strong> · English` + 우측 흐름 가이드 링크 (옵션) + 점선 border-bottom.
+ *
+ * Prop:
+ *  - titleKo: 한글 제목 (e.g. "생성")
+ *  - titleEn: 영문 제목 (e.g. "Generate")
+ *  - eyebrow: 작은 mono 라벨 (e.g. "MODE · GENERATE") — 옵션
+ *  - description: 부제 (옵션)
+ *  - flowHref / flowLabel: 흐름 가이드 링크 (옵션)
+ *
+ * 호환 alias (Phase 1.5 진행 중):
+ *  - 옛 `title` prop 받으면 titleKo 로 매핑 (영문 토큰 추출 시도 — `Image Generate` → "Generate")
+ *
+ * inline style 잔여 0 — globals.css `.ais-mode-*` 클래스로 처리.
+ */
 export function StudioModeHeader({
-  title,
+  titleKo,
+  titleEn,
+  eyebrow,
   description,
   flowHref,
   flowLabel = "프롬프트 흐름 보기",
+  /** @deprecated Phase 1.5 호환 — 새 코드는 titleKo + titleEn 사용 */
+  title,
 }: {
-  title: string;
-  description: string;
-  /** /prompt-flow/{mode} 같은 흐름 가이드 링크. 있으면 우측에 동그란 아이콘 버튼 렌더. */
+  titleKo?: string;
+  titleEn?: string;
+  eyebrow?: string;
+  description?: string;
   flowHref?: string;
-  /** 동그란 버튼 hover/aria 라벨 텍스트. */
   flowLabel?: string;
+  title?: string;
 }) {
+  // 옛 title alias → titleKo 폴백 (Phase 1.5 호환 — 호출 site 미전환 케이스 대비)
+  const resolvedKo = titleKo ?? title ?? "";
+  const resolvedEn = titleEn ?? "";
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "space-between",
-        gap: 12,
-        padding: "2px 0 4px",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 4,
-          minWidth: 0,
-          flex: 1,
-        }}
-      >
-        <h1
-          className="display"
-          style={{
-            margin: 0,
-            fontSize: 21,
-            fontWeight: 650,
-            color: "var(--ink)",
-            letterSpacing: 0,
-            lineHeight: 1.05,
-            fontVariationSettings: '"opsz" 72, "SOFT" 42, "WONK" 0',
-          }}
-        >
-          {title}
-        </h1>
-        <p
-          style={{
-            margin: 0,
-            fontSize: 12,
-            fontWeight: 500,
-            color: "var(--ink-3)",
-            lineHeight: 1.45,
-            letterSpacing: 0,
-          }}
-        >
-          {description}
-        </p>
+    <header className="ais-mode-header">
+      <div className="ais-mode-title-row">
+        <div>
+          {eyebrow && <span className="ais-mode-eyebrow">{eyebrow}</span>}
+          <h1 className="ais-mode-title">
+            {resolvedEn ? (
+              <>
+                <strong>{resolvedKo}</strong>
+                {" · "}
+                {resolvedEn}
+              </>
+            ) : (
+              <strong>{resolvedKo}</strong>
+            )}
+          </h1>
+        </div>
+        {flowHref && (
+          <Link
+            href={flowHref}
+            title={flowLabel}
+            aria-label={flowLabel}
+            className="ais-mode-flow-link"
+          >
+            <Icon name="grid" size={15} />
+          </Link>
+        )}
       </div>
-      {flowHref && (
-        <Link
-          href={flowHref}
-          title={flowLabel}
-          aria-label={flowLabel}
-          style={{
-            flexShrink: 0,
-            width: 34,
-            height: 34,
-            borderRadius: "50%",
-            border: "1px solid var(--line)",
-            background: "var(--surface)",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            color: "var(--ink-2)",
-            textDecoration: "none",
-            transition: "all 0.15s ease",
-            marginTop: 2,
-          }}
-          className="ais-flow-link-btn"
-        >
-          <Icon name="grid" size={15} />
-        </Link>
-      )}
-    </div>
+      {description && <p className="ais-mode-desc">{description}</p>}
+    </header>
   );
 }
 

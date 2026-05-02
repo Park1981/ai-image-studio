@@ -1,0 +1,1097 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Studio Design Test · Generate Left Panel</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+
+<style>
+/* ═══════════════════════════════════════════════
+   Studio Design Test — Generate Left Panel
+   3 versions side-by-side · static prototype (no server)
+   ═══════════════════════════════════════════════ */
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+button { font-family: inherit; cursor: pointer; }
+input, textarea { font-family: inherit; }
+
+/* ── Tokens (mirror of globals.css) ── */
+:root {
+  --bg: #FAF9F7;
+  --bg-2: #F4F2EE;
+  --surface: #FFFFFF;
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --accent: #4A9EFF;
+  --accent-ink: #1E7BE0;
+  --accent-soft: #EAF3FF;
+  --accent-disabled: #C8D6E8;
+  --green: #52C41A;
+  --green-soft: #EEF9E4;
+  --green-ink: #3E9912;
+  --amber: #FAAD14;
+  --amber-soft: #FFF7E0;
+  --amber-ink: #B47600;
+  --shadow-sm: 0 1px 2px rgba(23,20,14,.04), 0 2px 8px rgba(23,20,14,.04);
+  --shadow-md: 0 2px 4px rgba(23,20,14,.04), 0 8px 24px rgba(23,20,14,.06);
+  --shadow-lg: 0 4px 10px rgba(23,20,14,.05), 0 20px 48px rgba(23,20,14,.08);
+  --r-sm: 8px;
+  --r-md: 12px;
+  --r-card: 14px;
+  --r-lg: 16px;
+  --r-full: 999px;
+}
+
+html, body {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(74,158,255,0.04), transparent 40%),
+    radial-gradient(circle at 80% 100%, rgba(250,173,20,0.03), transparent 50%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans KR", -apple-system, system-ui, sans-serif;
+  font-feature-settings: "ss02", "cv11";
+  -webkit-font-smoothing: antialiased;
+  font-size: 14px; line-height: 1.6; letter-spacing: 0;
+  min-height: 100vh;
+}
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; font-feature-settings: "zero"; }
+.display { font-family: "Fraunces", Georgia, serif; font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0; font-feature-settings: "ss01"; }
+
+/* ── Page Header ── */
+.page-header {
+  padding: 28px 40px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 24px;
+  position: sticky; top: 0; z-index: 10;
+}
+.page-title { font-size: 24px; font-weight: 600; letter-spacing: -0.012em; }
+.page-title .display { font-style: italic; font-weight: 500; color: var(--accent-ink); }
+.page-sub { font-size: 12.5px; color: var(--ink-3); margin-top: 4px; }
+.page-meta { font-size: 11px; color: var(--ink-4); display: flex; gap: 18px; }
+.page-meta .mono { color: var(--ink-3); letter-spacing: 0.02em; }
+.page-meta .pill {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3); border: 1px solid var(--line);
+  letter-spacing: 0.04em;
+}
+
+/* ── Grid (3 versions side-by-side) ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 460px);
+  gap: 28px;
+  padding: 32px 40px 80px;
+  justify-content: center;
+  align-items: start;
+}
+@media (max-width: 1500px) {
+  .grid { grid-template-columns: repeat(auto-fit, 460px); }
+}
+
+/* ── Panel wrap (one V) ── */
+.panel {
+  width: 460px;
+  background:
+    linear-gradient(180deg, var(--surface), rgba(255,255,255,0.5));
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  padding: 18px 18px 28px;
+  box-shadow: var(--shadow-sm);
+}
+.panel-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 0 4px 4px; padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.panel-eyebrow {
+  font-family: "JetBrains Mono", monospace; font-size: 9.5px;
+  color: var(--ink-4); letter-spacing: 0.14em; text-transform: uppercase;
+}
+.panel-name {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic; font-size: 22px; font-weight: 500;
+  color: var(--ink); letter-spacing: -0.01em;
+  margin-top: 2px;
+}
+.panel-name strong { font-style: normal; font-weight: 700; color: var(--accent-ink); }
+.panel-tag {
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  padding: 3px 8px; border-radius: 999px;
+  background: var(--bg-2); color: var(--ink-3);
+  border: 1px solid var(--line); letter-spacing: 0.04em;
+}
+.legend {
+  margin: 10px 4px 18px;
+  font-size: 11.5px; color: var(--ink-3); line-height: 1.7;
+}
+.legend strong { color: var(--ink-2); font-weight: 600; }
+
+/* ── Inner Studio Left Panel ── */
+.left-panel {
+  width: 400px; margin: 0 auto;
+  display: flex; flex-direction: column; gap: 14px;
+  padding: 8px 0;
+}
+
+/* Studio Mode Header */
+.mode-header { padding: 4px 0 8px; }
+.mode-title-row { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.mode-title { font-size: 22px; font-weight: 600; letter-spacing: -0.012em; color: var(--ink); }
+.mode-flow-link {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--line); background: var(--surface);
+  display: grid; place-items: center; color: var(--ink-3);
+  cursor: pointer; transition: all 0.15s;
+}
+.mode-flow-link:hover {
+  border-color: var(--accent-ink); color: var(--accent-ink); background: var(--bg-2);
+  transform: scale(1.05);
+}
+.mode-desc { font-size: 12px; color: var(--ink-3); margin-top: 4px; }
+
+/* Primary CTA */
+.cta-primary {
+  all: unset; cursor: pointer; text-align: center;
+  background: var(--accent); color: #fff;
+  padding: 14px 20px; border-radius: var(--r-full);
+  font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; box-sizing: border-box;
+  box-shadow: 0 4px 18px rgba(74,158,255,0.42), inset 0 1px 0 rgba(255,255,255,0.2);
+  transition: all 0.18s;
+}
+.cta-primary:hover { background: var(--accent-ink); transform: translateY(-1px); }
+.cta-primary .shortcut {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px; opacity: 0.8; font-weight: 500;
+  margin-left: 4px; padding: 1px 6px; border-radius: 4px;
+  background: rgba(255,255,255,0.18);
+}
+.cta-eta {
+  font-size: 11px; color: var(--ink-4); text-align: center; margin-top: 6px;
+}
+.cta-eta .mono { color: var(--ink-3); }
+
+/* Field label */
+.field-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 10px;
+}
+.field-label {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2);
+  display: inline-flex; align-items: baseline; gap: 8px;
+}
+.accent-bar { width: 3px; height: 12px; background: var(--accent); border-radius: 2px; position: relative; top: 1px; }
+.field-meta-link {
+  font-size: 11px; color: var(--ink-3); cursor: pointer;
+  display: flex; align-items: center; gap: 4px;
+  background: none; border: none;
+}
+.field-meta-link:hover { color: var(--ink); }
+
+/* Prompt Shell */
+.prompt-shell {
+  position: relative; display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--r-md); transition: border 0.15s;
+  box-shadow: var(--shadow-sm);
+}
+.prompt-textarea {
+  display: block; width: 100%; border: none; outline: none; resize: none;
+  background: transparent; padding: 14px 48px 44px 16px;
+  font-size: 14px; line-height: 1.6; color: var(--ink);
+  border-radius: var(--r-md); min-height: 110px;
+}
+.prompt-textarea::placeholder { color: var(--ink-4); }
+.prompt-history-btn, .prompt-tool-btn, .prompt-clear-icon {
+  width: 26px; height: 26px;
+  display: grid; place-items: center;
+  color: var(--ink-4); background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--r-sm);
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
+  transition: all 0.12s;
+}
+.prompt-history-btn:hover, .prompt-tool-btn:hover, .prompt-clear-icon:hover {
+  color: var(--ink); border-color: var(--line-2);
+}
+.prompt-history-btn { position: absolute; top: 10px; right: 10px; }
+.prompt-tools-stack {
+  position: absolute; top: 46px; right: 10px;
+  display: flex; flex-direction: column; gap: 6px;
+}
+.prompt-clear-icon { position: absolute; right: 10px; bottom: 10px; }
+
+/* ── Toggle card BASE (overridden per-V) ── */
+.toggle-card {
+  position: relative;
+  border-radius: var(--r-sm);
+  padding: 12px 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--line-2);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+  transition: all 0.18s;
+  display: flex; flex-direction: column; gap: 10px;
+  cursor: pointer;
+}
+.toggle-row {
+  display: flex; align-items: center; gap: 10px;
+  position: relative; z-index: 1;
+}
+.toggle-row .label-area {
+  display: flex; flex-direction: column; gap: 3px; flex: 1; min-width: 0;
+}
+.toggle-row .label-area .label {
+  font-size: 12.5px; font-weight: 500; color: var(--ink-2);
+}
+.toggle-row .label-area .desc {
+  font-size: 10.5px; color: var(--ink-4);
+}
+.toggle-switch {
+  position: relative; flex-shrink: 0;
+  width: 30px; height: 17px; border-radius: var(--r-full);
+  background: var(--line-2); transition: background 0.18s;
+}
+.toggle-switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 13px; height: 13px; border-radius: 50%;
+  background: #fff; transition: left 0.18s;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+}
+.toggle-card[data-active="true"] .toggle-switch { background: var(--accent); }
+.toggle-card[data-active="true"] .toggle-switch::after { left: 15px; }
+
+/* Segmented (instant/thinking) */
+.seg-wrap {
+  position: relative; display: inline-flex; padding: 3px;
+  background: rgba(0,0,0,0.04); border-radius: var(--r-full);
+  align-self: center; width: fit-content;
+}
+.seg-thumb {
+  position: absolute; top: 3px; left: 3px;
+  width: calc(50% - 3px); height: calc(100% - 6px);
+  background: var(--surface); border-radius: var(--r-full);
+  box-shadow: 0 0 0 0.5px rgba(74,158,255,.18), 0 1px 3px rgba(0,0,0,.06);
+  transition: transform 0.28s cubic-bezier(.32,.72,0,1);
+  pointer-events: none; z-index: 0;
+}
+.seg-wrap[data-value="precise"] .seg-thumb { transform: translateX(100%); }
+.seg-btn {
+  position: relative; z-index: 1; height: 28px; min-width: 92px; padding: 0 18px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11.5px; font-weight: 500; letter-spacing: 0.04em;
+  border-radius: var(--r-full); border: none; background: transparent;
+  color: var(--ink-3); transition: all 0.22s;
+}
+.seg-btn[data-active="true"] { color: var(--accent-ink); font-weight: 600; }
+
+/* ── Size card pieces ── */
+.size-row { display: flex; align-items: center; gap: 8px; }
+.size-col { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 0; }
+.dim-input { position: relative; width: 100%; }
+.dim-input span.label {
+  position: absolute; left: 8px; top: 50%; transform: translateY(-50%);
+  font-family: "JetBrains Mono", monospace; font-size: 10px;
+  color: var(--ink-4); pointer-events: none; font-weight: 500; letter-spacing: 0.04em;
+}
+.dim-input input {
+  width: 100%; border: 1px solid var(--line); border-radius: var(--r-sm);
+  padding: 7px 10px 7px 22px; font-family: "JetBrains Mono", monospace;
+  font-size: 12px; background: var(--bg); color: var(--ink); outline: none;
+  text-align: right;
+}
+.lock-btn {
+  width: 30px; height: 30px; border-radius: var(--r-sm);
+  border: 1px solid var(--line); background: var(--bg);
+  color: var(--ink-2); display: grid; place-items: center;
+  cursor: pointer; align-self: center; flex-shrink: 0; transition: all 0.15s;
+}
+.lock-btn[data-locked="true"] {
+  background: var(--accent-soft); color: var(--accent); border-color: var(--accent);
+}
+.range-input { width: 100%; accent-color: var(--accent); }
+.aspect-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 6px; margin-top: 8px;
+}
+.aspect-card {
+  all: unset; cursor: pointer;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 6px;
+  padding: 10px 4px 8px; height: 70px; box-sizing: border-box;
+  border: 1.5px solid var(--line); border-radius: var(--r-md);
+  background: var(--surface); transition: all 0.15s;
+}
+.aspect-card:hover { background: var(--bg-2); border-color: var(--line-2); }
+.aspect-card[data-active="true"] {
+  border-color: var(--accent); background: var(--accent-soft);
+}
+.aspect-card .mini-box { border: 1.5px solid var(--ink-3); border-radius: 2px; }
+.aspect-card[data-active="true"] .mini-box { border-color: var(--accent); }
+.aspect-card .a-label {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.02em; color: var(--ink-2);
+}
+.aspect-card[data-active="true"] .a-label { color: var(--accent); }
+
+/* ─────────────────────────────────────────────────────────────
+   V1 — REFINED MINIMAL
+   현재 톤 유지 + 구조 통일 (radius/padding/shadow 일관)
+   변화 포인트: 토글/사이즈 카드 동일 wrap · 좌측 3px accent indicator
+   ───────────────────────────────────────────────────────────── */
+.v1 .toggle-card {
+  border-radius: var(--r-md);
+  padding: 13px 14px 13px 17px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+.v1 .toggle-card[data-active="true"] {
+  background: var(--accent-soft);
+  border-color: rgba(74,158,255,0.5);
+}
+.v1 .toggle-card.tone-amber[data-active="true"] {
+  background: var(--amber-soft);
+  border-color: rgba(250,173,20,0.45);
+}
+.v1 .toggle-card.tone-amber[data-active="true"] .toggle-switch { background: var(--amber-ink); }
+.v1 .toggle-card::before {
+  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px;
+  width: 3px; border-radius: 0 2px 2px 0;
+  background: transparent; transition: background 0.18s;
+}
+.v1 .toggle-card[data-active="true"]::before { background: var(--accent); }
+.v1 .toggle-card.tone-amber[data-active="true"]::before { background: var(--amber-ink); }
+
+.v1 .size-card {
+  position: relative;
+  border-radius: var(--r-md);
+  padding: 13px 14px 14px 17px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+}
+.v1 .size-card::before {
+  content: ""; position: absolute; left: 0; top: 12px; bottom: 12px;
+  width: 3px; border-radius: 0 2px 2px 0;
+  background: var(--ink-4);
+}
+.v1 .size-card-title {
+  font-size: 11.5px; color: var(--ink-3); font-weight: 500;
+  margin-bottom: 10px; display: flex; justify-content: space-between;
+  letter-spacing: 0;
+}
+.v1 .size-card-title .chip {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.02em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   V2 — SIGNATURE GRADIENT
+   카드별 시그니처 컬러 + 좌측 그라데이션 아이콘박스 + soft glow
+   AI=violet→blue / Claude=amber→orange / 빠른=lime→cyan / 사이즈=slate→indigo
+   ───────────────────────────────────────────────────────────── */
+.v2 .toggle-card {
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s cubic-bezier(.4,0,.2,1);
+}
+.v2 .toggle-card:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.v2 .toggle-row { gap: 14px; }
+.v2 .icon-box {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: grid; place-items: center; flex-shrink: 0;
+  background: var(--bg-2); color: var(--ink-3);
+  font-size: 18px;
+  transition: all 0.2s;
+}
+.v2 .toggle-card[data-active="true"] .icon-box {
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 12px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.25);
+}
+.v2 .toggle-card[data-active="true"] {
+  border-color: var(--card-from);
+  background: linear-gradient(135deg, var(--card-soft) 0%, var(--surface) 60%);
+  box-shadow: 0 0 0 3px var(--card-glow), 0 4px 16px var(--card-shadow);
+}
+.v2 .toggle-card[data-active="true"] .toggle-switch { background: var(--card-from); }
+.v2 .toggle-card[data-active="true"] .seg-btn[data-active="true"] { color: var(--card-from); }
+
+.v2 .ai-card { --card-from: #8B5CF6; --card-to: #3B82F6; --card-soft: #EDE9FE; --card-glow: rgba(139,92,246,0.10); --card-shadow: rgba(99,102,241,0.18); }
+.v2 .claude-card { --card-from: #F59E0B; --card-to: #FB923C; --card-soft: #FEF3C7; --card-glow: rgba(245,158,11,0.10); --card-shadow: rgba(245,158,11,0.18); }
+.v2 .fast-card { --card-from: #84CC16; --card-to: #06B6D4; --card-soft: #ECFCCB; --card-glow: rgba(132,204,22,0.10); --card-shadow: rgba(132,204,22,0.18); }
+.v2 .size-card-v {
+  --card-from: #64748B; --card-to: #6366F1;
+  --card-shadow: rgba(99,102,241,0.16);
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-sm);
+  transition: all 0.2s;
+}
+.v2 .size-card-v:hover { transform: translateY(-1px); box-shadow: var(--shadow-md); }
+.v2 .size-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+}
+.v2 .size-header .icon-box {
+  width: 38px; height: 38px; border-radius: 10px;
+  display: grid; place-items: center; flex-shrink: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 3px 10px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.25);
+  font-size: 18px;
+}
+.v2 .size-header .meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.v2 .size-header .meta .title {
+  font-size: 12.5px; font-weight: 600; color: var(--ink-2); letter-spacing: 0;
+}
+.v2 .size-header .meta .chip {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px; color: var(--ink-3); letter-spacing: 0.02em;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   V3 — AURORA GLASS
+   V2 + frosted backdrop + radial mesh + 그라데이션 토글 thumb
+   premium · creative tool 톤 · backdrop-filter 활용
+   ───────────────────────────────────────────────────────────── */
+.v3 .toggle-card {
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 4px 16px rgba(23,20,14,.04);
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
+}
+.v3 .toggle-card::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, var(--card-mesh-a, transparent), transparent 55%),
+    radial-gradient(circle at 85% 100%, var(--card-mesh-b, transparent), transparent 55%);
+  opacity: 0; transition: opacity 0.35s; z-index: 0;
+}
+.v3 .toggle-card[data-active="true"]::after { opacity: 1; }
+.v3 .toggle-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 32px rgba(23,20,14,.08); }
+.v3 .toggle-row { gap: 14px; }
+.v3 .icon-box {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+  background: rgba(244,242,238,0.85); color: var(--ink-3);
+  font-size: 19px;
+  transition: all 0.25s; border: 1px solid rgba(232,229,223,0.8);
+}
+.v3 .toggle-card[data-active="true"] .icon-box {
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 14px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  border-color: transparent;
+}
+.v3 .toggle-card[data-active="true"] {
+  background:
+    linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.6));
+  border-color: rgba(255,255,255,0.7);
+  box-shadow:
+    0 0 0 1px var(--card-from),
+    0 0 0 4px var(--card-glow),
+    0 8px 28px var(--card-shadow);
+}
+.v3 .toggle-card[data-active="true"] .toggle-switch {
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+}
+.v3 .toggle-card[data-active="true"] .seg-thumb {
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+}
+.v3 .toggle-card[data-active="true"] .seg-btn[data-active="true"] { color: var(--card-from); }
+
+.v3 .ai-card { --card-from: #8B5CF6; --card-to: #3B82F6; --card-glow: rgba(139,92,246,0.10); --card-shadow: rgba(99,102,241,0.18); --card-mesh-a: rgba(139,92,246,0.12); --card-mesh-b: rgba(59,130,246,0.10); }
+.v3 .claude-card { --card-from: #F59E0B; --card-to: #FB923C; --card-glow: rgba(245,158,11,0.10); --card-shadow: rgba(245,158,11,0.18); --card-mesh-a: rgba(245,158,11,0.12); --card-mesh-b: rgba(251,146,60,0.10); }
+.v3 .fast-card { --card-from: #84CC16; --card-to: #06B6D4; --card-glow: rgba(132,204,22,0.10); --card-shadow: rgba(132,204,22,0.18); --card-mesh-a: rgba(132,204,22,0.12); --card-mesh-b: rgba(6,182,212,0.10); }
+.v3 .size-card-v {
+  --card-from: #64748B; --card-to: #6366F1;
+  --card-shadow: rgba(99,102,241,0.16);
+  --card-mesh-a: rgba(100,116,139,0.08);
+  --card-mesh-b: rgba(99,102,241,0.06);
+  position: relative;
+  border-radius: var(--r-card);
+  padding: 14px 16px;
+  background: rgba(255,255,255,0.65);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  border: 1px solid rgba(232,229,223,0.7);
+  box-shadow: 0 1px 2px rgba(23,20,14,.04), 0 4px 16px rgba(23,20,14,.04);
+  overflow: hidden;
+  transition: all 0.25s;
+}
+.v3 .size-card-v::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 20%, var(--card-mesh-a), transparent 55%),
+    radial-gradient(circle at 85% 100%, var(--card-mesh-b), transparent 55%);
+  opacity: 0.6; z-index: 0;
+}
+.v3 .size-card-v:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 32px rgba(23,20,14,.08); }
+.v3 .size-card-v > * { position: relative; z-index: 1; }
+.v3 .size-header {
+  display: flex; align-items: center; gap: 12px; margin-bottom: 12px;
+  padding-bottom: 12px; border-bottom: 1px solid rgba(232,229,223,0.8);
+}
+.v3 .size-header .icon-box {
+  width: 40px; height: 40px; border-radius: 11px;
+  display: grid; place-items: center; flex-shrink: 0;
+  color: #fff;
+  background: linear-gradient(135deg, var(--card-from), var(--card-to));
+  box-shadow: 0 4px 14px var(--card-shadow), inset 0 1px 0 rgba(255,255,255,0.35);
+  font-size: 19px;
+}
+.v3 .size-header .meta { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.v3 .size-header .meta .title { font-size: 12.5px; font-weight: 600; color: var(--ink-2); }
+.v3 .size-header .meta .chip { font-family: "JetBrains Mono", monospace; font-size: 10.5px; color: var(--ink-3); }
+.v3 .aspect-card {
+  background: rgba(255,255,255,0.7);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+}
+.v3 .aspect-card[data-active="true"] {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(255,255,255,0.7));
+  border-color: var(--card-from);
+}
+.v3 .aspect-card[data-active="true"] .mini-box { border-color: var(--card-from); }
+.v3 .aspect-card[data-active="true"] .a-label { color: var(--card-from); }
+.v3 .lock-btn[data-locked="true"] {
+  background: linear-gradient(135deg, rgba(99,102,241,0.12), rgba(99,102,241,0.04));
+  border-color: var(--card-to); color: var(--card-to);
+}
+.v3 .dim-input input { background: rgba(255,255,255,0.7); }
+
+/* ── Spec Footer (per panel) ── */
+.spec-footer {
+  margin: 22px 4px 0 4px;
+  padding: 14px 14px 12px;
+  background: rgba(0,0,0,0.025);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-md);
+  font-size: 11px; color: var(--ink-3); line-height: 1.7;
+}
+.spec-footer h4 {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--ink-4); margin-bottom: 6px; font-weight: 500;
+}
+.spec-footer code {
+  font-family: "JetBrains Mono", monospace; font-size: 10.5px;
+  background: rgba(0,0,0,0.04); padding: 1px 5px; border-radius: 3px;
+  color: var(--ink-2);
+}
+
+/* ── Bottom note ── */
+.global-note {
+  max-width: 1380px; margin: 0 auto;
+  padding: 24px 40px 60px;
+  font-size: 12px; color: var(--ink-3); line-height: 1.8;
+  border-top: 1px dashed var(--line);
+}
+.global-note h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic; font-weight: 500; font-size: 18px; color: var(--ink);
+  letter-spacing: -0.01em; margin-bottom: 10px;
+}
+.global-note ul { padding-left: 20px; margin: 8px 0; }
+.global-note code {
+  font-family: "JetBrains Mono", monospace; font-size: 11px;
+  background: var(--bg-2); padding: 2px 6px; border-radius: 4px;
+  color: var(--ink-2);
+}
+
+/* ── small svg icon strokes ── */
+.ic { width: 14px; height: 14px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+.ic-lg { width: 18px; height: 18px; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; fill: none; stroke: currentColor; }
+</style>
+</head>
+<body>
+
+<header class="page-header">
+  <div>
+    <h1 class="page-title"><span class="display">Studio</span> Design Test</h1>
+    <p class="page-sub">Generate Left Panel · 3 versions side-by-side · 좌측에서 우측으로 시각 임팩트 ↑</p>
+  </div>
+  <div class="page-meta">
+    <span class="pill">cards-v1</span>
+    <span><span class="mono">2026-05-01</span></span>
+    <span>좌측 패널 너비 <span class="mono">400px</span></span>
+  </div>
+</header>
+
+<main class="grid">
+
+  <!-- ════════════════════════ V1 ════════════════════════ -->
+  <section class="panel v1">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">VERSION 1</div>
+        <div class="panel-name"><strong>Refined</strong> · Minimal</div>
+      </div>
+      <div class="panel-tag">SAFE</div>
+    </div>
+    <div class="legend">
+      <strong>특징</strong> &nbsp;구조 통일 (radius/padding/shadow 일관) · 현재 컬러 유지 · 좌측 3px accent indicator · 토글/사이즈 카드 동일 wrap
+    </div>
+
+    <div class="left-panel">
+      <!-- mode header -->
+      <div class="mode-header">
+        <div class="mode-title-row">
+          <h2 class="mode-title">Image Generate</h2>
+          <button class="mode-flow-link" title="이 모드의 프롬프트 흐름 보기">
+            <svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+          </button>
+        </div>
+        <p class="mode-desc">프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다.</p>
+      </div>
+
+      <!-- CTA -->
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          생성
+          <span class="shortcut">⇧↵</span>
+        </button>
+        <div class="cta-eta">평균 소요 <span class="mono">~28s</span> · 로컬 처리 · 데이터 전송 없음</div>
+      </div>
+
+      <!-- Prompt -->
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>프롬프트</span>
+          <button class="field-meta-link"><svg class="ic" viewBox="0 0 24 24" style="width:11px;height:11px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>라이브러리에서 선택</button>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn" title="최근 프롬프트"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <div class="prompt-tools-stack">
+            <button class="prompt-tool-btn" title="번역"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
+            <button class="prompt-tool-btn" title="분리"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+          </div>
+          <textarea class="prompt-textarea" rows="3" placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."></textarea>
+        </div>
+      </div>
+
+      <!-- AI 보정 카드 (active) -->
+      <div class="toggle-card no-toggle" data-active="true">
+        <div class="toggle-row">
+          <span class="label-area">
+            <span class="label">🪄 AI 프롬프트 보정</span>
+            <span class="desc">ON · 한국어/자연어 → 영문 정제 (기본)</span>
+          </span>
+          <span class="toggle-switch toggle-target"></span>
+        </div>
+        <div class="seg-wrap" data-value="fast">
+          <span class="seg-thumb"></span>
+          <button class="seg-btn" data-value="fast" data-active="true">instant</button>
+          <button class="seg-btn" data-value="precise" data-active="false">thinking</button>
+        </div>
+      </div>
+
+      <!-- Claude 조사 카드 (off, amber tone) -->
+      <div class="toggle-card tone-amber" data-active="false">
+        <div class="toggle-row">
+          <span class="label-area">
+            <span class="label">🔍 Claude 프롬프트 조사</span>
+            <span class="desc">Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 빠른 모드 (off) -->
+      <div class="toggle-card" data-active="false">
+        <div class="toggle-row">
+          <span class="label-area">
+            <span class="label">⚡ 빠른 모드</span>
+            <span class="desc">Lightning 4-step · 약 4배 빠름 (기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 사이즈 카드 -->
+      <div class="size-card">
+        <div class="size-card-title">
+          <span>사이즈</span>
+          <span class="chip">1328×744 · 16:9</span>
+        </div>
+        <div class="size-row">
+          <div class="size-col">
+            <div class="dim-input"><span class="label">W</span><input type="text" value="1328" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="1328">
+          </div>
+          <button class="lock-btn" data-locked="true" title="비율 잠금"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+          <div class="size-col">
+            <div class="dim-input"><span class="label">H</span><input type="text" value="744" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="744" disabled>
+          </div>
+        </div>
+        <div class="aspect-grid">
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:38px"></span><span class="a-label">1:1</span></button>
+          <button class="aspect-card" data-active="true"><span class="mini-box" style="width:38px;height:21px"></span><span class="a-label">16:9</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:21px;height:38px"></span><span class="a-label">9:16</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:28.5px"></span><span class="a-label">4:3</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · v1</h4>
+      카드 wrap: <code>radius 12 · padding 13/14 · shadow-sm</code><br>
+      활성 표시: <code>::before</code> 좌측 <code>3px</code> accent bar<br>
+      컬러: AI=<code>blue</code> · Claude=<code>amber</code> · 빠른=<code>blue</code> · 사이즈=<code>neutral</code>
+    </div>
+  </section>
+
+  <!-- ════════════════════════ V2 ════════════════════════ -->
+  <section class="panel v2">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">VERSION 2</div>
+        <div class="panel-name"><strong>Signature</strong> · Gradient</div>
+      </div>
+      <div class="panel-tag">RECOMMENDED</div>
+    </div>
+    <div class="legend">
+      <strong>특징</strong> &nbsp;카드별 시그니처 컬러 그라데이션 + 좌측 아이콘박스 + soft glow · hover lift
+    </div>
+
+    <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-title-row">
+          <h2 class="mode-title">Image Generate</h2>
+          <button class="mode-flow-link"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+        </div>
+        <p class="mode-desc">프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다.</p>
+      </div>
+
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          생성
+          <span class="shortcut">⇧↵</span>
+        </button>
+        <div class="cta-eta">평균 소요 <span class="mono">~28s</span> · 로컬 처리 · 데이터 전송 없음</div>
+      </div>
+
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>프롬프트</span>
+          <button class="field-meta-link"><svg class="ic" viewBox="0 0 24 24" style="width:11px;height:11px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>라이브러리에서 선택</button>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <div class="prompt-tools-stack">
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+          </div>
+          <textarea class="prompt-textarea" rows="3" placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."></textarea>
+        </div>
+      </div>
+
+      <!-- AI 보정 (active · violet→blue) -->
+      <div class="toggle-card ai-card" data-active="true">
+        <div class="toggle-row">
+          <span class="icon-box">
+            <svg class="ic-lg" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9z"/></svg>
+          </span>
+          <span class="label-area">
+            <span class="label">AI 프롬프트 보정</span>
+            <span class="desc">ON · 한국어/자연어 → 영문 정제 (기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+        <div class="seg-wrap" data-value="fast">
+          <span class="seg-thumb"></span>
+          <button class="seg-btn" data-value="fast" data-active="true">instant</button>
+          <button class="seg-btn" data-value="precise" data-active="false">thinking</button>
+        </div>
+      </div>
+
+      <!-- Claude (off · amber) -->
+      <div class="toggle-card claude-card" data-active="false">
+        <div class="toggle-row">
+          <span class="icon-box">
+            <svg class="ic-lg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </span>
+          <span class="label-area">
+            <span class="label">Claude 프롬프트 조사</span>
+            <span class="desc">Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 빠른 모드 (off · lime→cyan) -->
+      <div class="toggle-card fast-card" data-active="false">
+        <div class="toggle-row">
+          <span class="icon-box">
+            <svg class="ic-lg" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+          </span>
+          <span class="label-area">
+            <span class="label">빠른 모드</span>
+            <span class="desc">Lightning 4-step · 약 4배 빠름 (기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 사이즈 카드 (slate→indigo) -->
+      <div class="size-card-v">
+        <div class="size-header">
+          <span class="icon-box">
+            <svg class="ic-lg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M9 3v18"/></svg>
+          </span>
+          <span class="meta">
+            <span class="title">사이즈</span>
+            <span class="chip">1328×744 · 16:9</span>
+          </span>
+        </div>
+        <div class="size-row">
+          <div class="size-col">
+            <div class="dim-input"><span class="label">W</span><input type="text" value="1328" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="1328">
+          </div>
+          <button class="lock-btn" data-locked="true"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+          <div class="size-col">
+            <div class="dim-input"><span class="label">H</span><input type="text" value="744" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="744" disabled>
+          </div>
+        </div>
+        <div class="aspect-grid">
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:38px"></span><span class="a-label">1:1</span></button>
+          <button class="aspect-card" data-active="true"><span class="mini-box" style="width:38px;height:21px"></span><span class="a-label">16:9</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:21px;height:38px"></span><span class="a-label">9:16</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:28.5px"></span><span class="a-label">4:3</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · v2</h4>
+      카드 wrap: <code>radius 14 · padding 14/16 · shadow-sm</code> + active <code>glow 3px ring</code><br>
+      좌측 <code>38×38</code> 그라데이션 아이콘박스 (활성 시 vivid)<br>
+      컬러: AI=<code>violet→blue</code> · Claude=<code>amber→orange</code> · 빠른=<code>lime→cyan</code> · 사이즈=<code>slate→indigo</code><br>
+      Hover: <code>translateY(-1px) + shadow-md</code>
+    </div>
+  </section>
+
+  <!-- ════════════════════════ V3 ════════════════════════ -->
+  <section class="panel v3">
+    <div class="panel-header">
+      <div>
+        <div class="panel-eyebrow">VERSION 3</div>
+        <div class="panel-name"><strong>Aurora</strong> · Glass</div>
+      </div>
+      <div class="panel-tag">PREMIUM</div>
+    </div>
+    <div class="legend">
+      <strong>특징</strong> &nbsp;V2 + frosted backdrop-blur + radial mesh + 그라데이션 토글 thumb · creative tool premium 톤
+    </div>
+
+    <div class="left-panel">
+      <div class="mode-header">
+        <div class="mode-title-row">
+          <h2 class="mode-title">Image Generate</h2>
+          <button class="mode-flow-link"><svg class="ic" viewBox="0 0 24 24"><circle cx="6" cy="6" r="2"/><circle cx="18" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+        </div>
+        <p class="mode-desc">프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다.</p>
+      </div>
+
+      <div>
+        <button class="cta-primary">
+          <svg class="ic" viewBox="0 0 24 24"><path d="M12 2l2.5 7.5L22 12l-7.5 2.5L12 22l-2.5-7.5L2 12l7.5-2.5z"/></svg>
+          생성
+          <span class="shortcut">⇧↵</span>
+        </button>
+        <div class="cta-eta">평균 소요 <span class="mono">~28s</span> · 로컬 처리 · 데이터 전송 없음</div>
+      </div>
+
+      <div>
+        <div class="field-header">
+          <span class="field-label"><span class="accent-bar"></span>프롬프트</span>
+          <button class="field-meta-link"><svg class="ic" viewBox="0 0 24 24" style="width:11px;height:11px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>라이브러리에서 선택</button>
+        </div>
+        <div class="prompt-shell">
+          <button class="prompt-history-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></button>
+          <div class="prompt-tools-stack">
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg></button>
+            <button class="prompt-tool-btn"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><path d="M3 6h18M3 12h18M3 18h18"/></svg></button>
+          </div>
+          <textarea class="prompt-textarea" rows="3" placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."></textarea>
+        </div>
+      </div>
+
+      <!-- AI 보정 (active · violet→blue + glass + mesh) -->
+      <div class="toggle-card ai-card" data-active="true">
+        <div class="toggle-row">
+          <span class="icon-box">
+            <svg class="ic-lg" viewBox="0 0 24 24"><path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5z"/><path d="M19 14l.7 2.1L22 17l-2.3.9L19 20l-.7-2.1L16 17l2.3-.9z"/></svg>
+          </span>
+          <span class="label-area">
+            <span class="label">AI 프롬프트 보정</span>
+            <span class="desc">ON · 한국어/자연어 → 영문 정제 (기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+        <div class="seg-wrap" data-value="fast">
+          <span class="seg-thumb"></span>
+          <button class="seg-btn" data-value="fast" data-active="true">instant</button>
+          <button class="seg-btn" data-value="precise" data-active="false">thinking</button>
+        </div>
+      </div>
+
+      <!-- Claude (off) -->
+      <div class="toggle-card claude-card" data-active="false">
+        <div class="toggle-row">
+          <span class="icon-box">
+            <svg class="ic-lg" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          </span>
+          <span class="label-area">
+            <span class="label">Claude 프롬프트 조사</span>
+            <span class="desc">Claude 가 프롬프트를 분석해 개선 힌트를 반영합니다 · 약 +15s</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 빠른 모드 (off) -->
+      <div class="toggle-card fast-card" data-active="false">
+        <div class="toggle-row">
+          <span class="icon-box">
+            <svg class="ic-lg" viewBox="0 0 24 24"><path d="M13 2 4 14h7l-1 8 9-12h-7z"/></svg>
+          </span>
+          <span class="label-area">
+            <span class="label">빠른 모드</span>
+            <span class="desc">Lightning 4-step · 약 4배 빠름 (기본)</span>
+          </span>
+          <span class="toggle-switch"></span>
+        </div>
+      </div>
+
+      <!-- 사이즈 카드 -->
+      <div class="size-card-v">
+        <div class="size-header">
+          <span class="icon-box">
+            <svg class="ic-lg" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M9 3v18"/></svg>
+          </span>
+          <span class="meta">
+            <span class="title">사이즈</span>
+            <span class="chip">1328×744 · 16:9</span>
+          </span>
+        </div>
+        <div class="size-row">
+          <div class="size-col">
+            <div class="dim-input"><span class="label">W</span><input type="text" value="1328" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="1328">
+          </div>
+          <button class="lock-btn" data-locked="true"><svg class="ic" viewBox="0 0 24 24" style="width:13px;height:13px"><rect x="5" y="11" width="14" height="10" rx="1.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg></button>
+          <div class="size-col">
+            <div class="dim-input"><span class="label">H</span><input type="text" value="744" readonly></div>
+            <input type="range" class="range-input" min="768" max="2048" step="8" value="744" disabled>
+          </div>
+        </div>
+        <div class="aspect-grid">
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:38px"></span><span class="a-label">1:1</span></button>
+          <button class="aspect-card" data-active="true"><span class="mini-box" style="width:38px;height:21px"></span><span class="a-label">16:9</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:21px;height:38px"></span><span class="a-label">9:16</span></button>
+          <button class="aspect-card" data-active="false"><span class="mini-box" style="width:38px;height:28.5px"></span><span class="a-label">4:3</span></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="spec-footer">
+      <h4>SPEC · v3</h4>
+      V2 + <code>backdrop-filter: blur(12px) saturate(160%)</code> + radial mesh<br>
+      활성 카드: <code>1px ring + 4px glow + 8px ambient shadow</code> 다층<br>
+      Toggle thumb: <code>linear-gradient</code> (시그니처 컬러)<br>
+      Hover lift + 0.25s cubic-bezier ease
+    </div>
+  </section>
+
+</main>
+
+<aside class="global-note">
+  <h3>적용 가이드 (선택 후)</h3>
+  <p>오빠가 V1/V2/V3 중 하나 고르면, 아래 위치에 단계별로 적용:</p>
+  <ul>
+    <li><code>frontend/app/globals.css</code> — <code>.ais-toggle-card</code>, <code>.ais-card-icon</code>, V 별 시그니처 컬러 토큰 추가</li>
+    <li><code>frontend/components/studio/generate/GenerateLeftPanel.tsx:298-318</code> — Claude/빠른 모드 wrap 추가 (Toggle <code>flat=true</code> + 외부 <code>.ais-toggle-card</code>)</li>
+    <li><code>frontend/components/studio/generate/SizeCard.tsx:77-85</code> — 인라인 style → className</li>
+    <li><code>frontend/components/ui/primitives.tsx</code> — Toggle <code>flat</code> prop 으로 분기 처리 (호환 유지)</li>
+  </ul>
+  <p>이미지 생성 페이지 OK 면 → <code>EditLeftPanel.tsx</code> + <code>VideoLeftPanel.tsx</code> 동일 패턴 확장.</p>
+  <p style="margin-top:14px; color:var(--ink-4); font-size:11px;">
+    💡 <strong>인터랙션 데모</strong> — 카드 클릭으로 ON/OFF 전환 / instant/thinking 클릭으로 thumb 슬라이드 / 비율 카드 클릭으로 선택 변경 / hover 효과 확인 가능.
+  </p>
+</aside>
+
+<script>
+// 카드 클릭 → ON/OFF 토글 (segmented/aspect 클릭은 제외)
+document.querySelectorAll('.toggle-card').forEach(card => {
+  card.addEventListener('click', e => {
+    if (e.target.closest('.seg-btn')) return;
+    if (e.target.closest('.toggle-target')) {/* falls through */}
+    const active = card.dataset.active === 'true';
+    card.dataset.active = !active;
+  });
+});
+
+// Segmented (instant/thinking) → thumb 슬라이드
+document.querySelectorAll('.seg-wrap').forEach(wrap => {
+  wrap.addEventListener('click', e => {
+    const btn = e.target.closest('.seg-btn');
+    if (!btn) return;
+    e.stopPropagation(); // 카드 토글 막음
+    const value = btn.dataset.value;
+    wrap.dataset.value = value;
+    wrap.querySelectorAll('.seg-btn').forEach(b => {
+      b.dataset.active = (b.dataset.value === value);
+    });
+  });
+});
+
+// 비율 카드 → active 전환
+document.querySelectorAll('.aspect-grid').forEach(grid => {
+  grid.addEventListener('click', e => {
+    const card = e.target.closest('.aspect-card');
+    if (!card) return;
+    grid.querySelectorAll('.aspect-card').forEach(c => c.dataset.active = "false");
+    card.dataset.active = "true";
+  });
+});
+
+// 비율잠금 토글
+document.querySelectorAll('.lock-btn').forEach(btn => {
+  btn.addEventListener('click', e => {
+    e.stopPropagation();
+    const locked = btn.dataset.locked === 'true';
+    btn.dataset.locked = !locked;
+  });
+});
+</script>
+</body>
+</html>

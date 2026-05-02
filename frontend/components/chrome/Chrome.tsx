@@ -5,6 +5,13 @@
  * Logo: 잉크 사각 + 액센트 점 커스텀 마크
  * TopBar: 좌/중/우 3영역 grid, sticky, backdrop-blur
  * IconBtn, BackBtn, ModelBadge: 다양한 상단바 요소
+ *
+ * Phase 2 (V5 · 2026-05-02 · 결정 M):
+ *   - Logo: 텍스트만 inline → className 으로 전환 (Fraunces italic 14px Image Studio + mono version).
+ *     mark 박스는 SVG 적/시각 디테일이라 inline 유지 (V5 시각 본체 한정 inline 0).
+ *   - TopBar: inline style → `.ais-app-header` className 으로 전환. globals.css §11 의
+ *     스타일과 1:1 매치 (height 52 + padding 0 20 + sticky + z-30 + grid 1fr auto 1fr).
+ *   - 좌/중/우 wrapper 도 `.ais-ah-{left,center,right}` 로 전환.
  */
 
 "use client";
@@ -12,10 +19,12 @@
 import type { ReactNode } from "react";
 import Icon, { type IconName } from "@/components/ui/Icon";
 
-/* ── Logo ── 커스텀 마크 + 프로덕트명 + 런타임 뱃지 */
+/* ── Logo ── 커스텀 마크 + 프로덕트명 + 런타임 뱃지 (V5: 텍스트 italic + className) */
 export function Logo() {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+    <div className="ais-ah-logo">
+      {/* 잉크 사각 + 액센트 점 마크 — 시각 디테일 (inline 유지)
+          V5 정책: 카드/헤더/CTA/action bar 본체만 inline 0. 마크 같은 미세 그래픽은 허용. */}
       <div
         style={{
           width: 22,
@@ -49,27 +58,16 @@ export function Logo() {
           }}
         />
       </div>
-      <div style={{ display: "flex", flexDirection: "column", lineHeight: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, letterSpacing: "-0.015em" }}>
-          Image Studio
-        </div>
-        <div
-          className="mono"
-          style={{
-            fontSize: 9,
-            color: "var(--ink-3)",
-            marginTop: 2,
-            letterSpacing: ".08em",
-          }}
-        >
-          LOCAL · v1.2.4
-        </div>
+      <div className="ais-ah-logo-text">
+        <div className="ais-ah-logo-name">Image Studio</div>
+        <div className="ais-ah-logo-version">LOCAL · v1.2.4</div>
       </div>
     </div>
   );
 }
 
-/* ── TopBar ── 3영역 sticky 헤더 */
+/* ── TopBar ── 3영역 sticky 헤더 (V5: className 전환 · globals.css §11)
+   z-index 위계: 헤더 30 > sticky CTA 20 > PromptHistoryPeek 5 (2026-04-27 결정 보존). */
 export function TopBar({
   left,
   center,
@@ -80,36 +78,10 @@ export function TopBar({
   right?: ReactNode;
 }) {
   return (
-    <header
-      style={{
-        height: 52,
-        padding: "0 20px",
-        borderBottom: "1px solid var(--line)",
-        background: "rgba(250,249,247,.85)",
-        backdropFilter: "blur(10px)",
-        WebkitBackdropFilter: "blur(10px)",
-        display: "grid",
-        gridTemplateColumns: "1fr auto 1fr",
-        alignItems: "center",
-        position: "sticky",
-        top: 0,
-        // z-index 위계 (2026-04-27 오빠 피드백): 헤더 30 > sticky CTA 20 > PromptHistoryPeek 5
-        // → 헤더는 항상 viewport 가장 위 (시계 아이콘 / 잘린 텍스트 비집고 못 올라옴)
-        zIndex: 30,
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>{left}</div>
-      <div style={{ display: "flex", justifyContent: "center" }}>{center}</div>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          justifyContent: "flex-end",
-        }}
-      >
-        {right}
-      </div>
+    <header className="ais-app-header">
+      <div className="ais-ah-left">{left}</div>
+      <div className="ais-ah-center">{center}</div>
+      <div className="ais-ah-right">{right}</div>
     </header>
   );
 }

@@ -43,6 +43,7 @@ import {
   StudioLeftPanel,
   StudioModeHeader,
 } from "@/components/studio/StudioLayout";
+import V5MotionCard from "@/components/studio/V5MotionCard";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import { useEditInputs, useEditRunning } from "@/stores/useEditStore";
@@ -132,13 +133,16 @@ export default function EditLeftPanel({
   return (
     <StudioLeftPanel>
       <StudioModeHeader
-        title="Image Edit"
+        titleKo="수정"
+        titleEn="Edit"
+        eyebrow="MODE · EDIT"
         description="원본 이미지와 수정 지시로 새로운 결과 이미지를 만듭니다."
         flowHref="/prompt-flow/edit"
         flowLabel="이미지 수정 프롬프트 흐름 보기"
       />
 
-      {/* Primary CTA — sticky 상단 (Generate 와 통일 · 폼 길어져도 시야 안) */}
+      {/* Primary CTA — sticky 상단 (Generate 와 통일 · 폼 길어져도 시야 안).
+       *  Phase 1.5.3 (결정 K) — shortcut 표시 X (Edit 은 이미 표시 X 였음). 텍스트 영문 통일 (Edit). */}
       <div className="ais-cta-sticky-top">
         <button
           type="button"
@@ -153,7 +157,7 @@ export default function EditLeftPanel({
           ) : (
             <>
               <Icon name="wand" size={16} />
-              수정 생성
+              Edit
             </>
           )}
         </button>
@@ -255,28 +259,19 @@ export default function EditLeftPanel({
         <PromptToolsResults tools={promptTools} />
       </div>
 
-      {/* ── 퀄리티 모드 토글 (Generate 와 통일 · 우측 토글 · 의미 반전) ──
-       *  OFF=Lightning 빠름 (기본) / ON=💎 퀄리티 모드 (강화 옵션)
-       *  라벨 동적 분기 (2026-04-27 후속): 토글 상태가 곧 모드 명.
-       *  store 의 lightning 의미는 그대로 (true=LoRA ON=빠름) — UI 만 반전 (`!lightning`).
-       */}
-      <Toggle
-        checked={!lightning}
-        onChange={(v) => setLightning(!v)}
-        align="right"
-        label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
-        desc={
-          lightning
-            ? "Lightning 4-step · 빠름 · 약간 낮은 디테일 (기본)"
-            : "Lightning OFF · 풀 퀄리티 · 약 ~38s 예상"
-        }
-      />
+      {/* ── 카드 순서 (Phase 1.5.3 · 결정 A · 2026-05-02) ──
+       *  옛: 퀄리티 → AI보정 → 자동평가 → multi-ref
+       *  신: AI → 자동평가 → 퀄리티 → multi-ref (Edit 은 성인 X · Codex 2차 정정)
+       *  의도: 분석 도구 그룹 (AI/자동평가) 위 + 결과 옵션 (퀄리티) 아래. */}
 
-      {/* AI 보정 카드 (Phase 2 후속 · 2026-05-01) — Generate/Video 와 통일 패턴.
+      {/* AI 보정 카드 — V5 시그니처 (.ais-sig-ai · violet/blue).
        *  Edit 은 보정 우회 옵션 없음 (vision + clarify + upgrade 가 본질) →
-       *  토글은 *disabled checked* 로 시각 일관성만 표현, 모드 segmented 는 항상 활성.
-       *  clarify_edit_intent 와 upgrade_edit_prompt 양쪽에 promptMode 영향. */}
-      <div className="ais-magic-prompt-card" data-active="true">
+       *  Toggle 은 *disabled checked* 로 시각 일관성만 표현, 모드 segmented 는 항상 활성.
+       *  data-active="true" 고정 — 항상 active 톤. */}
+      <V5MotionCard
+        className="ais-toggle-card ais-sig-ai"
+        data-active="true"
+      >
         <Toggle
           flat
           checked
@@ -287,30 +282,68 @@ export default function EditLeftPanel({
           desc="ON · 한국어/자연어 → 영문 정제 (Edit 필수)"
         />
         <PromptModeRadio value={promptMode} onChange={setPromptMode} />
-      </div>
+      </V5MotionCard>
 
-      {/* 수정 후 자동 비교 분석 — 옛 설정 토글에서 이 위치로 이동 (오빠 피드백 2026-04-27).
+      {/* 수정 후 자동 비교 분석 — V5 .ais-auto-compare-card (amber 시그니처 · 결정 C).
+       *  옛 설정 토글 → Edit 좌측 패널로 이동 (오빠 피드백 2026-04-27).
        *  결과 완료 시 백그라운드로 5축 평가. VRAM>13GB 면 자동 skip. */}
-      <Toggle
-        checked={autoCompareAnalysis}
-        onChange={setAutoCompareAnalysis}
-        align="right"
-        label="🔍 수정 후 자동 비교 분석"
-        desc="결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 자동 skip)"
-      />
+      <V5MotionCard
+        className="ais-toggle-card ais-auto-compare-card"
+        data-active={autoCompareAnalysis}
+      >
+        <Toggle
+          flat
+          checked={autoCompareAnalysis}
+          onChange={setAutoCompareAnalysis}
+          align="right"
+          label="🔍 수정 후 자동 비교 분석"
+          desc="결과 완료 시 백그라운드로 5축 평가 (VRAM>13GB 시 자동 skip)"
+        />
+      </V5MotionCard>
 
-      {/* Multi-reference (2026-04-27): 두번째 이미지 토글 + 조건부 슬롯 */}
-      <Toggle
-        checked={useReferenceImage}
-        onChange={setUseReferenceImage}
-        align="right"
-        label="🖼️ 참조 이미지 사용 (실험적)"
-        desc={
-          useReferenceImage
-            ? "두번째 이미지를 참조로 사용 — 역할 명시 필요"
-            : "OFF · 단일 이미지 수정 (기본)"
-        }
-      />
+      {/* 퀄리티 모드 토글 — V5 시그니처 (.ais-sig-fast · lime/cyan).
+       *  OFF=Lightning 빠름 (기본) / ON=💎 퀄리티 모드 (강화 옵션)
+       *  store 의 lightning 의미는 그대로 (true=LoRA ON=빠름) — UI 만 반전 (`!lightning`).
+       *  data-active 는 "강화" (lightning=false) 시 ON. */}
+      <V5MotionCard
+        className="ais-toggle-card ais-sig-fast"
+        data-active={!lightning}
+      >
+        <Toggle
+          flat
+          checked={!lightning}
+          onChange={(v) => setLightning(!v)}
+          align="right"
+          label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
+          desc={
+            lightning
+              ? "Lightning 4-step · 빠름 · 약간 낮은 디테일 (기본)"
+              : "Lightning OFF · 풀 퀄리티 · 약 ~38s 예상"
+          }
+        />
+      </V5MotionCard>
+
+      {/* Multi-reference (2026-04-27 + Phase 1.5.3 V5):
+       *  V5 .ais-multi-ref-card (fuchsia 시그니처 · 결정 J — rose-pink 트리오에서 추가 참조만 분리).
+       *  토글 ON 일 때 참조 이미지 슬롯 + 역할 select sub-section 노출 (카드 *외부*).
+       *  data-active 는 토글 ON 일 때. */}
+      <V5MotionCard
+        className="ais-toggle-card ais-multi-ref-card"
+        data-active={useReferenceImage}
+      >
+        <Toggle
+          flat
+          checked={useReferenceImage}
+          onChange={setUseReferenceImage}
+          align="right"
+          label="🖼️ 참조 이미지 사용 (실험적)"
+          desc={
+            useReferenceImage
+              ? "두번째 이미지를 참조로 사용 — 역할 명시 필요"
+              : "OFF · 단일 이미지 수정 (기본)"
+          }
+        />
+      </V5MotionCard>
 
       {useReferenceImage && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>

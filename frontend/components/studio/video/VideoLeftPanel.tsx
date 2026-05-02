@@ -29,6 +29,7 @@ import {
   StudioLeftPanel,
   StudioModeHeader,
 } from "@/components/studio/StudioLayout";
+import V5MotionCard from "@/components/studio/V5MotionCard";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import {
@@ -103,13 +104,16 @@ export default function VideoLeftPanel({
   return (
     <StudioLeftPanel>
       <StudioModeHeader
-        title="Video Generate"
+        titleKo="영상"
+        titleEn="Video"
+        eyebrow="MODE · VIDEO"
         description="원본 이미지와 영상 지시로 5초 MP4를 생성합니다."
         flowHref="/prompt-flow/video"
         flowLabel="영상 생성 프롬프트 흐름 보기"
       />
 
-      {/* Primary CTA — sticky 상단 (Generate / Edit 와 통일) */}
+      {/* Primary CTA — sticky 상단 (Generate / Edit 와 통일).
+       *  Phase 1.5.4 (결정 K) — 텍스트 영문 통일 (Render). shortcut 표시 X. */}
       <div className="ais-cta-sticky-top">
         <button
           type="button"
@@ -124,7 +128,7 @@ export default function VideoLeftPanel({
           ) : (
             <>
               <Icon name="sparkle" size={15} />
-              영상 생성
+              Render
             </>
           )}
         </button>
@@ -203,10 +207,17 @@ export default function VideoLeftPanel({
         <PromptToolsResults tools={promptTools} />
       </div>
 
-      {/* AI 보정 카드 (Phase 2 후속 · 2026-05-01) — Generate/Edit 와 통일 패턴.
-       *  Toggle + segmented 를 하나의 카드 wrap. 토글 OFF 면 segmented 미노출.
+      {/* ── 카드 순서 (Phase 1.5.4 · 결정 B · 2026-05-02) ──
+       *  옛: AI → 영상해상도 → 퀄리티 → 성인
+       *  신: AI → 퀄리티 → 성인 → 영상해상도 (맨 아래) — 사이즈 카드와 페어 의도.
+       *  속도 chip 4단계는 video-res-card *내부에* 유지 (결정 E). */}
+
+      {/* AI 보정 카드 — V5 시그니처 (.ais-sig-ai · violet/blue).
        *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약 (기본 OFF). */}
-      <div className="ais-magic-prompt-card" data-active={!skipUpgrade}>
+      <V5MotionCard
+        className="ais-toggle-card ais-sig-ai"
+        data-active={!skipUpgrade}
+      >
         <Toggle
           flat
           checked={!skipUpgrade}
@@ -222,44 +233,57 @@ export default function VideoLeftPanel({
         {!skipUpgrade && (
           <PromptModeRadio value={promptMode} onChange={setPromptMode} />
         )}
-      </div>
+      </V5MotionCard>
 
-      {/* ── 영상 해상도 슬라이더 ── */}
+      {/* 퀄리티 모드 토글 — V5 시그니처 (.ais-sig-fast · lime/cyan).
+       *  OFF=Lightning 빠름 (기본) / ON=💎 퀄리티 모드 (강화 옵션 · 얼굴 보존 우선) */}
+      <V5MotionCard
+        className="ais-toggle-card ais-sig-fast"
+        data-active={!lightning}
+      >
+        <Toggle
+          flat
+          checked={!lightning}
+          onChange={(v) => setLightning(!v)}
+          align="right"
+          label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
+          desc={
+            lightning
+              ? "Lightning 4-step · 약 5분 · 얼굴 변할 수 있음 (기본)"
+              : "Full step · 약 20분+ · 얼굴 보존 우선"
+          }
+        />
+      </V5MotionCard>
+
+      {/* 성인 모드 — V5 .ais-adult-card (crimson 시그니처 · Video 전용).
+       *  활성 시 aspect-ratio 16/9 자동 적용 (globals.css line 1066) — 인물 풀 노출.
+       *  framer-motion layout 으로 16:9 변화 시 다른 카드 reflow spring 보간 (가장 큰 효과). */}
+      <V5MotionCard
+        className="ais-toggle-card ais-adult-card"
+        data-active={adult}
+      >
+        <Toggle
+          flat
+          checked={adult}
+          onChange={setAdult}
+          align="right"
+          label="🔞 성인 모드"
+          desc={
+            adult
+              ? "에로틱 모션 + NSFW LoRA 적용"
+              : "SFW 프롬프트 · 얼굴 보존 안정"
+          }
+        />
+      </V5MotionCard>
+
+      {/* ── 영상 해상도 슬라이더 (맨 아래 · 결정 B + D) ──
+       *  V5 .ais-size-card-v + .ais-video-res-card (coral 시그니처 · 사이즈 카드와 페어).
+       *  속도 chip 4단계는 *내부에* 유지 (결정 E · v4 명시). */}
       <VideoResolutionSlider
         longerEdge={longerEdge}
         setLongerEdge={setLongerEdge}
         sourceWidth={sourceWidth}
         sourceHeight={sourceHeight}
-      />
-
-      {/* ── 퀄리티 모드 토글 (Generate / Edit 와 통일 · 의미 반전)
-       *  OFF=Lightning 빠름 (기본) / ON=💎 퀄리티 모드 (강화 옵션 · 얼굴 보존 우선)
-       *  라벨 동적 분기 (2026-04-27 후속): 토글 상태가 곧 모드 명.
-       *  store 의 lightning 의미는 그대로 (true=빠름) — UI 만 반전 (`!lightning`).
-       */}
-      <Toggle
-        checked={!lightning}
-        onChange={(v) => setLightning(!v)}
-        align="right"
-        label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
-        desc={
-          lightning
-            ? "Lightning 4-step · 약 5분 · 얼굴 변할 수 있음 (기본)"
-            : "Full step · 약 20분+ · 얼굴 보존 우선"
-        }
-      />
-
-      {/* 성인 모드 — align="right" (의미는 그대로 ON=켜짐 자연스러움) */}
-      <Toggle
-        checked={adult}
-        onChange={setAdult}
-        align="right"
-        label="🔞 성인 모드"
-        desc={
-          adult
-            ? "에로틱 모션 + NSFW LoRA 적용"
-            : "SFW 프롬프트 · 얼굴 보존 안정"
-        }
       />
 
     </StudioLeftPanel>
@@ -306,12 +330,13 @@ function VideoResolutionSlider({
   };
 
   return (
+    // Phase 1.5.4 (V5 · 결정 D + E) — 옛 surface inline style → .ais-size-card-v.ais-video-res-card.
+    // size-card-v 가 base (padding/blur/glass) + video-res-card 가 시그니처 var override (coral).
+    // 속도 chip 4단계는 내부에 유지 (결정 E · 별도 카드 X).
+    // hasSource=false 시 opacity 만 동적 (V5 시각 대상 inline 잔여 — Codex 2차 허용 범위).
     <div
+      className="ais-size-card-v ais-video-res-card"
       style={{
-        padding: "12px 14px",
-        borderRadius: "var(--radius)",
-        border: "1px solid var(--line)",
-        background: "var(--surface)",
         opacity: hasSource ? 1 : 0.55,
         transition: "opacity .2s",
       }}
@@ -399,7 +424,8 @@ function VideoResolutionSlider({
         onChange={(e) => setLongerEdge(Number(e.target.value))}
         style={{
           width: "100%",
-          accentColor: "var(--accent)",
+          // V5 시그니처 (.ais-video-res-card → coral) cascade 활용. 외부 사용처는 fallback var(--accent) 유지.
+          accentColor: "var(--ais-range-accent, var(--accent))",
           cursor: hasSource ? "pointer" : "not-allowed",
         }}
       />

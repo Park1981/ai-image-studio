@@ -8,6 +8,10 @@
  *  - "힌트 미리 받기" 버튼 + 결과 인라인 영역 UI 제거 (오빠 피드백 — UI 만 빼기)
  *  - useGeneratePipeline.researchPreview hook 자체는 유지 (향후 살릴 때 빠르게)
  *  - ResearchBanner 단순 Toggle 카드 — checked / onChange 만 받음
+ *
+ * 2026-05-02 (Phase 1.5.2 · V5 적용):
+ *  - flat=true — 외부 V5 카드 wrap (.ais-toggle-card .ais-sig-claude) 안 inline
+ *  - 외부 카드가 색 책임 → 자체 박스 제거 (이중 박스 회피)
  */
 
 "use client";
@@ -27,6 +31,7 @@ export default function ResearchBanner({
 }: ResearchBannerProps) {
   return (
     <Toggle
+      flat
       checked={checked}
       onChange={onChange}
       align="right"

@@ -32,6 +32,7 @@ import {
   StudioLeftPanel,
   StudioModeHeader,
 } from "@/components/studio/StudioLayout";
+import V5MotionCard from "@/components/studio/V5MotionCard";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import {
@@ -160,13 +161,17 @@ export default function GenerateLeftPanel({
   return (
     <StudioLeftPanel>
       <StudioModeHeader
-        title="Image Generate"
+        titleKo="생성"
+        titleEn="Generate"
+        eyebrow="MODE · GENERATE"
         description="프롬프트를 다듬고 로컬 ComfyUI로 이미지를 생성합니다."
         flowHref="/prompt-flow/generate"
         flowLabel="이 모드의 프롬프트 흐름 보기 (분기 트리)"
       />
 
-      {/* Primary CTA — sticky 상단 (폼 길어지면 따라옴 · generate 전용 클래스) */}
+      {/* Primary CTA — sticky 상단 (폼 길어지면 따라옴 · generate 전용 클래스).
+       *  Phase 1.5.2 (결정 K) — shortcut (⇧↵) 표시 제거. 기능 미구현 유지.
+       *  CSS .ais-cta-shortcut 자체는 보존 (향후 단축키 기능 살릴 때 재사용). */}
       <div className="ais-cta-sticky-top">
         <button
           type="button"
@@ -188,8 +193,7 @@ export default function GenerateLeftPanel({
           ) : (
             <>
               <Icon name="sparkle" size={15} />
-              생성
-              <span className="mono ais-cta-shortcut">⇧↵</span>
+              Generate
             </>
           )}
         </button>
@@ -267,17 +271,16 @@ export default function GenerateLeftPanel({
         onToggleSnippet={handleToggleSnippet}
       />
 
-      {/* AI 프롬프트 보정 토글 (2026-04-27 오빠 피드백):
-       *  사용자 직관 매칭 — 토글 ON=기능 ON / OFF=기능 OFF.
-       *    ON  (기본 · skipUpgrade=false) → gemma4 실행 (보정 ON)
-       *    OFF (skipUpgrade=true)         → gemma4 skip (정제된 프롬프트 그대로)
-       *  Lightning 의 의미 반전 + 라벨 동적 패턴은 "빠른/퀄리티" 모드 선택이라 자연스러웠지만,
-       *  보정 토글은 단순 기능 ON/OFF 라 직관 따르는 게 옳음 (오빠 피드백).
-       */}
       {/* AI 보정 카드 — 토글 + (ON 일 때만) instant/thinking segmented 통합.
-       *  Phase 2 후속 (2026-05-01) — 옛: Toggle + 별도 PromptModeRadio 카드 두 개 분리.
-       *  신: 하나의 카드 wrap 안에 Toggle 위 + segmented 아래 (오빠 디자인 피드백). */}
-      <div className="ais-magic-prompt-card" data-active={!skipUpgrade}>
+       *  Phase 1.5.2 (2026-05-02): V5 시그니처 카드 (.ais-toggle-card .ais-sig-ai · violet/blue) 적용.
+       *    옛: .ais-magic-prompt-card (단순 회색/blue 카드).
+       *    신: V5 인물 webp 배경 + active=padding 38 + violet glow.
+       *  Toggle flat=true → 카드 wrapper 가 색 책임. Toggle 의 visually-transparent input 이
+       *  카드 전체 click 처리. segmented 는 stopPropagation 으로 토글 영향 차단. */}
+      <V5MotionCard
+        className="ais-toggle-card ais-sig-ai"
+        data-active={!skipUpgrade}
+      >
         <Toggle
           flat
           checked={!skipUpgrade}
@@ -293,29 +296,39 @@ export default function GenerateLeftPanel({
         {!skipUpgrade && (
           <PromptModeRadio value={promptMode} onChange={setPromptMode} />
         )}
-      </div>
+      </V5MotionCard>
 
-      {/* Claude 조사 토글 — Lightning 과 동일 패턴 (우측 토글 · amber 톤) */}
-      <ResearchBanner checked={research} onChange={setResearch} />
+      {/* Claude 조사 토글 — V5 시그니처 카드 (.ais-sig-claude · orange).
+       *  ResearchBanner 가 옛 단일 Toggle (flat=true) 이라 외부 카드 wrapper 가 색 책임.
+       *  Phase 1.5.7 — V5MotionCard 로 spring layout 보간. */}
+      <V5MotionCard
+        className="ais-toggle-card ais-sig-claude"
+        data-active={research}
+      >
+        <ResearchBanner checked={research} onChange={setResearch} />
+      </V5MotionCard>
 
-      {/* 퀄리티 모드 토글 — 우측 토글 (settings 패턴 · ResearchBanner 와 통일).
-       *  의미 반전 (2026-04-27 오빠 피드백): OFF 가 기본 빠름 / ON 이 강화 옵션 (퀄리티).
-       *  라벨 동적 분기 — 토글 상태가 곧 모드 명 (오빠 직관 매칭 · 2026-04-27 후속):
-       *    OFF (기본 · lightning=true)  → ⚡ 빠른 모드
-       *    ON  (강화 · lightning=false) → 💎 퀄리티 모드
-       *  store 의 lightning 의미는 그대로 (true=Lightning LoRA ON=빠름) — UI 만 반전.
-       */}
-      <Toggle
-        checked={!lightning}
-        onChange={(v) => applyLightning(!v)}
-        align="right"
-        label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
-        desc={
-          lightning
-            ? "Lightning 4-step · 약 4배 빠름 (기본)"
-            : "Lightning OFF · 풀 퀄리티 · 약 4배 느림"
-        }
-      />
+      {/* 퀄리티 모드 토글 — V5 시그니처 카드 (.ais-sig-fast · lime/cyan).
+       *  의미 반전 (2026-04-27): OFF=Lightning 빠름 (기본) / ON=💎 퀄리티 모드 (강화).
+       *  라벨 동적 분기 — 토글 상태가 곧 모드 명. store 의 lightning 의미는 그대로 (true=빠름).
+       *  data-active 는 "강화" (lightning=false) 시 ON. */}
+      <V5MotionCard
+        className="ais-toggle-card ais-sig-fast"
+        data-active={!lightning}
+      >
+        <Toggle
+          flat
+          checked={!lightning}
+          onChange={(v) => applyLightning(!v)}
+          align="right"
+          label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
+          desc={
+            lightning
+              ? "Lightning 4-step · 약 4배 빠름 (기본)"
+              : "Lightning OFF · 풀 퀄리티 · 약 4배 느림"
+          }
+        />
+      </V5MotionCard>
 
       {/* 사이즈 카드 */}
       <SizeCard
