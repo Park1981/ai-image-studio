@@ -32,11 +32,26 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
 
-// 임시 비교 토글 (2026-05-04) — qwen3-vl:8b vs 8b-thinking-q8_0 검증용.
+// 임시 비교 카드 (2026-05-04) — qwen3-vl:8b vs 8b-thinking-q8_0 검증용.
 // Ollama 재시동 없이 분석 시점에 모델 변경 가능 (useSettingsStore.visionModel persist).
+// 시그니처 색: 8B = Cyan (#06b6d4 · Cool/빠름) / Thinking = Amber (#f59e0b · Warm/사색).
 const VISION_MODEL_OPTIONS = [
-  { id: "qwen3-vl:8b", label: "8B" },
-  { id: "qwen3-vl:8b-thinking-q8_0", label: "8B Thinking" },
+  {
+    id: "qwen3-vl:8b",
+    label: "8B",
+    sublabel: "빠른 응답 · Cyan",
+    bgImage: "/vision-models/8b.png",
+    accentColor: "#06b6d4",
+    glowRgba: "rgba(6, 182, 212, 0.45)",
+  },
+  {
+    id: "qwen3-vl:8b-thinking-q8_0",
+    label: "Thinking",
+    sublabel: "깊은 추론 · Amber",
+    bgImage: "/vision-models/thinking.png",
+    accentColor: "#f59e0b",
+    glowRgba: "rgba(245, 158, 11, 0.45)",
+  },
 ] as const;
 
 /* dataURL 의 base64 길이로 byte 추정 (URL 이면 0). */
@@ -174,60 +189,6 @@ export default function VisionPage() {
             </button>
           </div>
 
-          {/* ── 임시 모델 토글 (2026-05-04 · qwen3-vl:8b vs 8b-thinking-q8_0 비교 검증) ── */}
-          <div>
-            <div className="ais-field-header">
-              <label
-                className="ais-field-label"
-                style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-              >
-                <SectionAccentBar accent="violet" />
-                Vision 모델 (실험)
-              </label>
-              <span className="mono ais-field-meta">{visionModel}</span>
-            </div>
-            <div
-              role="tablist"
-              aria-label="Vision 모델 선택"
-              style={{
-                display: "flex",
-                gap: 4,
-                padding: 4,
-                background: "var(--bg-2)",
-                border: "1px solid var(--line)",
-                borderRadius: "var(--radius)",
-              }}
-            >
-              {VISION_MODEL_OPTIONS.map((opt) => {
-                const active = visionModel === opt.id;
-                return (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setVisionModel(opt.id)}
-                    disabled={analyzing}
-                    style={{
-                      flex: 1,
-                      padding: "6px 10px",
-                      border: "none",
-                      borderRadius: "calc(var(--radius) - 2px)",
-                      background: active ? "var(--accent)" : "transparent",
-                      color: active ? "#fff" : "var(--ink-2)",
-                      fontSize: 12,
-                      fontWeight: 600,
-                      cursor: analyzing ? "not-allowed" : "pointer",
-                      transition: "background 0.15s",
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
           {/* ── 원본 이미지 (Edit/Video 와 통일 — .ais-field-header + SectionAccentBar) ── */}
           <div>
             <div className="ais-field-header">
@@ -254,6 +215,120 @@ export default function VisionPage() {
               onClear={handleClearSource}
               onError={(msg) => toast.error(msg)}
             />
+          </div>
+
+          {/* ── 임시 모델 비교 카드 (2026-05-04 · 원본 이미지 하단 · 8B vs 8B Thinking) ── */}
+          <div>
+            <div className="ais-field-header">
+              <label
+                className="ais-field-label"
+                style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+              >
+                <SectionAccentBar accent="violet" />
+                Vision 모델 (실험)
+              </label>
+              <span className="mono ais-field-meta">
+                {VISION_MODEL_OPTIONS.find((o) => o.id === visionModel)?.label ??
+                  visionModel}
+              </span>
+            </div>
+            <div
+              role="tablist"
+              aria-label="Vision 모델 선택"
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr 1fr",
+                gap: 8,
+              }}
+            >
+              {VISION_MODEL_OPTIONS.map((opt) => {
+                const active = visionModel === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setVisionModel(opt.id)}
+                    disabled={analyzing}
+                    style={{
+                      position: "relative",
+                      aspectRatio: "2.5 / 1",
+                      padding: 0,
+                      border: active
+                        ? `2px solid ${opt.accentColor}`
+                        : "1px solid var(--line)",
+                      borderRadius: "var(--radius)",
+                      background: `url('${opt.bgImage}') center/cover, var(--bg-2)`,
+                      cursor: analyzing ? "not-allowed" : "pointer",
+                      boxShadow: active
+                        ? `0 0 0 1px ${opt.accentColor}, 0 8px 24px ${opt.glowRgba}`
+                        : "0 1px 3px rgba(0,0,0,0.08)",
+                      transition: "all 0.18s ease",
+                      opacity: !active && analyzing ? 0.5 : 1,
+                      overflow: "hidden",
+                      textAlign: "left",
+                    }}
+                  >
+                    {/* 좌측 텍스트 가독성 위한 그라데이션 오버레이 */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background:
+                          "linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.2) 50%, transparent 70%)",
+                      }}
+                    />
+                    {/* 좌측 라벨 + sublabel */}
+                    <div
+                      style={{
+                        position: "relative",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                        height: "100%",
+                        padding: "12px 14px",
+                        color: "#fff",
+                      }}
+                    >
+                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                        {active && (
+                          <span
+                            style={{
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: opt.accentColor,
+                              boxShadow: `0 0 8px ${opt.accentColor}`,
+                            }}
+                          />
+                        )}
+                        <span
+                          style={{
+                            fontSize: 15,
+                            fontWeight: 700,
+                            letterSpacing: "-0.01em",
+                            textShadow: "0 2px 6px rgba(0,0,0,0.7)",
+                          }}
+                        >
+                          {opt.label}
+                        </span>
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          opacity: 0.92,
+                          fontWeight: 500,
+                          textShadow: "0 1px 4px rgba(0,0,0,0.7)",
+                        }}
+                      >
+                        {opt.sublabel}
+                      </div>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* 안내 배너 — 이 기능의 성격 (옛 그대로 유지). */}
