@@ -293,14 +293,14 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     { type: "save-output", label: "MP4 저장", subLabel: "h264 인코딩" },
   ],
 
-  /* ── Vision Analyzer (3 stage · qwen2.5vl + gemma4 번역) — Phase 6 ── */
+  /* ── Vision Analyzer (4 stage · qwen3-vl + gemma4 합성 + gemma4 번역) — Phase 6 ── */
   vision: [
     { type: "vision-encoding", label: "이미지 인코딩", subLabel: "browser" },
     {
       // 2026-04-27 라벨 일관화: vision-call → vision-analyze (edit/video 와 동일 type)
       type: "vision-analyze",
       label: "이미지 분석",
-      subLabel: "qwen2.5vl:7b",
+      subLabel: "qwen3-vl:8b",
       // Edit/Video 패턴 일관 — 이미지 분석 완료 시 summary 박스 표시 (provider="fallback" → warn 톤)
       renderDetail: (p) => {
         const summary = p.summary as string | undefined;
@@ -316,6 +316,13 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
           </DetailBox>
         );
       },
+    },
+    {
+      // Phase 5 (2026-05-03) — 2단계 파이프라인 합성 신호.
+      // 백엔드 _signal("prompt-synthesize") → SSE type "prompt-synthesize" → 이 엔트리.
+      type: "prompt-synthesize",
+      label: "프롬프트 합성",
+      subLabel: "gemma4-un",
     },
     {
       // gemma4 번역 — 미래 토글 OFF 시 enabled 한 줄로 자동 숨김 (옵션 B 통일 가치).

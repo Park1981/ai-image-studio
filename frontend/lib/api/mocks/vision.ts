@@ -1,7 +1,7 @@
 /**
  * lib/api/mocks/vision.ts — Vision Analyzer Mock (Phase 3.5 fix · 추가 분리).
  * 2026-04-30 · USE_MOCK=true 환경에서 단계별 sleep + onStage emit + 가짜 결과 반환.
- * 실 백엔드 task-based SSE 패턴 모사 (vision-encoding / vision-analyze / translation 3단계).
+ * 실 백엔드 task-based SSE 패턴 모사 (vision-encoding / vision-analyze / prompt-synthesize / translation 4단계).
  */
 
 import { sleep } from "../client";
@@ -29,10 +29,19 @@ export async function mockAnalyze(
     opts.onStage({
       type: "vision-analyze",
       progress: 20,
-      stageLabel: "이미지 분석 (qwen2.5vl)",
+      stageLabel: "이미지 분석 (qwen3-vl)",
     });
   }
   await sleep(300 + Math.random() * 300);
+  if (opts.onStage) {
+    // Phase 5 (2026-05-03) — prompt-synthesize 신규 단계 시뮬레이션.
+    opts.onStage({
+      type: "prompt-synthesize",
+      progress: 45,
+      stageLabel: "프롬프트 합성 (gemma4)",
+    });
+  }
+  await sleep(150);
   if (opts.onStage) {
     opts.onStage({
       type: "translation",

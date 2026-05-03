@@ -36,7 +36,7 @@ _VISION_PROGRESS = {
     "translation": 70,
 }
 _VISION_LABEL = {
-    "vision-call": "이미지 분석 (qwen2.5vl)",
+    "vision-call": "이미지 분석 (qwen3-vl)",
     "prompt-synthesize": "프롬프트 합성 (gemma4)",  # Phase 5 신규 단계
     "translation": "한국어 번역 (gemma4)",
 }
