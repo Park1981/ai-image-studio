@@ -32,15 +32,18 @@ log = logging.getLogger(__name__)
 # 백엔드 함수는 다르지만 사용자 시점에선 "이미지 분석" 동일 동작.
 _VISION_PROGRESS = {
     "vision-call": 20,  # vision_pipeline.analyze_image_detailed 가 callback 으로 보내는 신호명
+    "prompt-synthesize": 45,  # Phase 5: image_detail.py 2단계 (gemma4 text 합성) 시작 신호
     "translation": 70,
 }
 _VISION_LABEL = {
-    "vision-call": "이미지 분석 (qwen2.5vl)",
+    "vision-call": "이미지 분석 (qwen3-vl)",
+    "prompt-synthesize": "프롬프트 합성 (gemma4)",  # Phase 5 신규 단계
     "translation": "한국어 번역 (gemma4)",
 }
 # callback 신호명 → SSE stage type 매핑 (백엔드 함수 콜백명은 유지 · SSE type 만 통일)
 _STAGE_TYPE_MAP = {
     "vision-call": "vision-analyze",
+    "prompt-synthesize": "prompt-synthesize",  # Phase 5: 프론트 SSE type 그대로 전달
     "translation": "translation",
 }
 

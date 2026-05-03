@@ -174,7 +174,8 @@ export const DEFAULT_OLLAMA_MODELS = {
   /** 텍스트 업그레이드 + 번역 (gemma4 계열) */
   text: "gemma4-un:latest",
   /** 이미지 비전 설명 (Edit 모드 파이프라인 step 1) */
-  vision: "qwen2.5vl:7b",
+  // 2026-05-03 qwen2.5vl:7b → qwen3-vl:8b (ChatGPT 정공법 · backend presets.py 동기화)
+  vision: "qwen3-vl:8b",
 } as const;
 
 /* ──────────────────────────────────────────────────────

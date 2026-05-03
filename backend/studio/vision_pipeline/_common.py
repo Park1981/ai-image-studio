@@ -6,7 +6,7 @@ edit_source.py / image_detail.py 둘 다 의존하는 항목:
   - VISION_SYSTEM (Edit 짧은 캡션 system · _describe_image 의 default system prompt)
   - _describe_image (qwen2.5vl 캡션 호출 — Edit 폴백 + Vision Analyzer 폴백 + reference_storage / video_pipeline lazy import)
   - _to_base64 (image → base64 PNG)
-  - _aspect_label (codex C2 fix · Edit `_call_vision_edit_source` + Vision Analyzer `_call_vision_recipe_v2` 둘 다 사용)
+  - _aspect_label (codex C2 fix · Edit `_call_vision_edit_source` + Vision Analyzer `observe_image` 둘 다 사용)
 
 prompt_pipeline alias:
   - _DEFAULT_OLLAMA_URL (Ollama 기본 URL)
@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 from pathlib import Path
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from .._ollama_client import call_chat_payload
 
@@ -126,3 +127,24 @@ def _to_base64(image: Path | str | bytes) -> str:
     else:
         data = image
     return base64.b64encode(data).decode("ascii")
+
+
+# ──────────────────────────────────────────────
+# 디버그 헬퍼 (ChatGPT 2차 리뷰 채택 · 2026-05-03)
+# ──────────────────────────────────────────────
+
+_DEBUG_TRUTHY = ("1", "true", "yes", "on")
+
+
+def debug_log(stage: str, payload: Any) -> None:
+    """STUDIO_VISION_DEBUG=1 일 때만 stage + payload 를 log 에 출력.
+
+    개발/디버깅용 헬퍼. 운영 배포 시 환경 변수를 켜지 않으면 noop.
+
+    ChatGPT 2차 리뷰 — env var 를 함수 내부에서 읽어서
+    재시작 없이도 런타임 ON/OFF 즉시 반영. module-level 캐싱 X.
+    """
+    enabled = os.environ.get("STUDIO_VISION_DEBUG", "").strip().lower() in _DEBUG_TRUTHY
+    if not enabled:
+        return
+    log.warning("[VISION_DEBUG][%s] %s", stage, payload)

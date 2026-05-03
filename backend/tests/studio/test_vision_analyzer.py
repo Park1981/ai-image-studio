@@ -1,24 +1,22 @@
 """
-analyze_image_detailed + POST /api/studio/vision-analyze 견고성 테스트 (2026-04-24).
+analyze_image_detailed + POST /api/studio/vision-analyze 견고성 테스트.
 
-핵심:
-  - fallback 경로가 항상 존재 (비전 실패 → en="" + fallback=True)
-  - 번역만 실패 시 en 보존 + ko=None
-  - system prompt 가 SYSTEM_VISION_DETAILED 로 올바르게 쓰이는지
+Phase 5 (2026-05-03): 옛 1-shot 아키텍처 (SYSTEM_VISION_RECIPE_V2,
+_call_vision_recipe_v2, SYSTEM_VISION_DETAILED) 제거 후 갱신.
+핵심 시나리오는 test_image_detail_v3.py 로 이동.
+본 파일에는 변경 없는 유틸 + 라우트 테스트만 유지.
 """
 
 from __future__ import annotations
 
 import asyncio
 import io
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from PIL import Image
 
 from studio.vision_pipeline import (
-    SYSTEM_VISION_DETAILED,
-    SYSTEM_VISION_RECIPE_V2,
     VisionAnalysisResult,
     analyze_image_detailed,
 )
@@ -31,156 +29,38 @@ def _tiny_png_bytes() -> bytes:
     return buf.getvalue()
 
 
-# ───────── 상수/가이드 검증 ─────────
+# ───────── 유틸 상수 검증 ─────────
 
 
-def test_system_vision_detailed_has_required_cues() -> None:
-    """상세 어조 가이드에 핵심 키워드들 포함."""
-    assert "40-120 words" in SYSTEM_VISION_DETAILED
-    # 프롬프트 재사용용이라 주제/조명/스타일 키워드 언급 필수
-    for cue in ("subject", "composition", "lighting", "mood"):
-        assert cue in SYSTEM_VISION_DETAILED.lower()
-    # No bullets / markdown 제약 명시
-    assert "no bullets" in SYSTEM_VISION_DETAILED.lower()
-    assert "no markdown" in SYSTEM_VISION_DETAILED.lower()
+def test_vision_progress_includes_prompt_synthesize_stage() -> None:
+    """Phase 5 신규 prompt-synthesize 단계가 vision_analyze 의 progress/label/stage_type_map 에 등록되어야 한다."""
+    from studio.pipelines.vision_analyze import (
+        _STAGE_TYPE_MAP,
+        _VISION_LABEL,
+        _VISION_PROGRESS,
+    )
+
+    assert "prompt-synthesize" in _VISION_PROGRESS
+    assert "prompt-synthesize" in _VISION_LABEL
+    assert "prompt-synthesize" in _STAGE_TYPE_MAP
+    # 순서: vision-call(20) < prompt-synthesize(45) < translation(70)
+    assert _VISION_PROGRESS["vision-call"] < _VISION_PROGRESS["prompt-synthesize"]
+    assert _VISION_PROGRESS["prompt-synthesize"] < _VISION_PROGRESS["translation"]
 
 
-def test_system_vision_recipe_v2_has_single_image_guard() -> None:
-    """단일 Vision Analyzer 가 비교/2장 레이아웃으로 새지 않도록 가드."""
-    prompt = SYSTEM_VISION_RECIPE_V2
-    compact_prompt = " ".join(prompt.split())
-    assert "exactly ONE uploaded" in prompt
-    assert "additional image" in prompt
-    assert "DEFAULT SINGLE-IMAGE ANCHOR" in prompt
-    assert "Never use ordinal image labels" in prompt
-    assert "Never split one visible person" in prompt
-    assert "choose single-frame" in prompt
-    assert "clear panel boundaries" in prompt
-    assert "Use multi-subject or multi-panel wording ONLY" in prompt
-    assert "clearly separated layout panels" in compact_prompt
-    # 이전 side-by-side 예시가 모델 출력 템플릿처럼 복사되는 회귀 방지.
-    assert "Two side-by-side portraits of the same young woman" not in prompt
+def test_aspect_label_common_ratios() -> None:
+    """_aspect_label — 권장 비율들이 사람 친화 라벨로 매핑."""
+    from studio.vision_pipeline import _aspect_label
 
-
-# ───────── analyze_image_detailed 경로 ─────────
-
-
-def test_vision_fallback_when_describe_fails() -> None:
-    """비전 호출 완전 실패 (_describe_image returns "") 시 fallback=True, en="".
-
-    번역은 호출되지 않아야 함.
-    """
-    translate_mock = AsyncMock(return_value="(should not be called)")
-    with (
-        patch(
-            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
-            new=AsyncMock(return_value=""),
-        ),
-        patch(
-            "studio.vision_pipeline._common._describe_image",
-            new=AsyncMock(return_value=""),
-        ),
-        patch(
-            "studio.vision_pipeline.image_detail.translate_to_korean",
-            new=translate_mock,
-        ),
-    ):
-        result: VisionAnalysisResult = asyncio.run(
-            analyze_image_detailed(_tiny_png_bytes())
-        )
-    assert result.fallback is True
-    assert result.en == ""
-    assert result.ko is None
-    assert result.provider == "fallback"
-    translate_mock.assert_not_called()
-
-
-def test_vision_success_with_translation() -> None:
-    """비전 + 번역 모두 성공 — fallback=False, en/ko 모두 유효."""
-    describe_mock = AsyncMock(return_value="A warm editorial photo at dusk.")
-    translate_mock = AsyncMock(return_value="황혼 무렵의 따뜻한 에디토리얼 사진.")
-    with (
-        patch(
-            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
-            new=AsyncMock(return_value=""),
-        ),
-        patch(
-            "studio.vision_pipeline._common._describe_image",
-            new=describe_mock,
-        ),
-        patch(
-            "studio.vision_pipeline.image_detail.translate_to_korean",
-            new=translate_mock,
-        ),
-    ):
-        result = asyncio.run(analyze_image_detailed(_tiny_png_bytes()))
-    assert result.fallback is False
-    assert result.provider == "ollama"
-    assert "editorial photo" in result.en
-    assert "에디토리얼" in (result.ko or "")
-
-
-def test_vision_success_translation_only_fails() -> None:
-    """비전은 성공, 번역만 실패 — en 은 유지 · ko=None · fallback=False."""
-    describe_mock = AsyncMock(return_value="A portrait with soft window light.")
-    translate_mock = AsyncMock(return_value=None)  # translate 실패 시 None 반환
-    with (
-        patch(
-            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
-            new=AsyncMock(return_value=""),
-        ),
-        patch(
-            "studio.vision_pipeline._common._describe_image",
-            new=describe_mock,
-        ),
-        patch(
-            "studio.vision_pipeline.image_detail.translate_to_korean",
-            new=translate_mock,
-        ),
-    ):
-        result = asyncio.run(analyze_image_detailed(_tiny_png_bytes()))
-    assert result.fallback is False
-    assert result.provider == "ollama"
-    assert "portrait" in result.en
-    assert result.ko is None
-
-
-def test_vision_model_override_propagates() -> None:
-    """vision_model / text_model override 가 실제 호출에 전달되는지."""
-    recipe_mock = AsyncMock(return_value="")
-    describe_mock = AsyncMock(return_value="x")
-    translate_mock = AsyncMock(return_value=None)
-    with (
-        patch(
-            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
-            new=recipe_mock,
-        ),
-        patch(
-            "studio.vision_pipeline._common._describe_image",
-            new=describe_mock,
-        ),
-        patch(
-            "studio.vision_pipeline.image_detail.translate_to_korean",
-            new=translate_mock,
-        ),
-    ):
-        asyncio.run(
-            analyze_image_detailed(
-                _tiny_png_bytes(),
-                vision_model="custom-vision:latest",
-                text_model="custom-text:latest",
-            )
-        )
-    # describe_mock 의 kwargs 에 vision_model 전달 확인
-    _, kwargs = describe_mock.call_args
-    assert kwargs["vision_model"] == "custom-vision:latest"
-    assert kwargs["system_prompt"] == SYSTEM_VISION_DETAILED
-    _, rkwargs = recipe_mock.call_args
-    assert rkwargs["vision_model"] == "custom-vision:latest"
-
-    # translate_mock 에 text_model 이 model 인자로 전달
-    _, tkwargs = translate_mock.call_args
-    assert tkwargs["model"] == "custom-text:latest"
+    assert _aspect_label(1024, 1024) == "1:1 square"
+    assert _aspect_label(1664, 928) == "16:9 widescreen"  # GCD=104
+    assert _aspect_label(928, 1664) == "9:16 vertical"
+    assert _aspect_label(1472, 1104) == "4:3 standard"
+    assert _aspect_label(1584, 1056) == "3:2 landscape"
+    # 비표준 비율은 custom 라벨
+    assert _aspect_label(1000, 333).endswith("custom")
+    # 0/음수 방어
+    assert _aspect_label(0, 0) == "unknown aspect"
 
 
 # ───────── FastAPI 라우트 검증 ─────────
@@ -192,6 +72,7 @@ async def test_vision_analyze_route_happy_path() -> None:
 
     Phase 6 (2026-04-27): 동기 JSON → task-based SSE 로 전환. POST 는 {task_id, stream_url}
     반환, 실 결과는 SSE drain 후 done event payload 에서 추출.
+    Phase 5 (2026-05-03): 2-stage mock (_vo.observe_image + _ps.synthesize_prompt).
     """
     import json as _json
 
@@ -199,20 +80,30 @@ async def test_vision_analyze_route_happy_path() -> None:
 
     from main import app  # type: ignore
 
-    describe_mock = AsyncMock(return_value="A moody studio portrait.")
-    translate_mock = AsyncMock(return_value="분위기 있는 스튜디오 초상.")
+    # v3 2-stage 아키텍처 — vision 관찰 + text 합성 각각 mock
+    mock_observation = {
+        "subjects": [{"broad_visible_appearance": "East Asian female", "apparent_age_group": "young adult"}],
+        "environment": {"location_type": "studio"},
+    }
+    mock_synthesized = {
+        "summary": "A moody studio portrait.",
+        "positive_prompt": "East Asian young adult female, studio portrait",
+        "negative_prompt": "blurry, watermark",
+        "key_visual_anchors": ["studio backdrop"],
+        "uncertain": [],
+    }
     with (
         patch(
-            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
-            new=AsyncMock(return_value=""),
+            "studio.vision_pipeline.image_detail._vo.observe_image",
+            new=AsyncMock(return_value=mock_observation),
         ),
         patch(
-            "studio.vision_pipeline._common._describe_image",
-            new=describe_mock,
+            "studio.vision_pipeline.image_detail._ps.synthesize_prompt",
+            new=AsyncMock(return_value=mock_synthesized),
         ),
         patch(
             "studio.vision_pipeline.image_detail.translate_to_korean",
-            new=translate_mock,
+            new=AsyncMock(return_value="분위기 있는 스튜디오 초상."),
         ),
     ):
         transport = ASGITransport(app=app)
@@ -243,159 +134,13 @@ async def test_vision_analyze_route_happy_path() -> None:
                             break
 
     assert data is not None
-    assert data["en"].startswith("A moody")
+    assert "moody" in data["en"]
     assert data["ko"] and "초상" in data["ko"]
     assert data["provider"] == "ollama"
     assert data["fallback"] is False
     assert data["width"] == 2
     assert data["height"] == 2
     assert data["sizeBytes"] > 0
-
-
-# ───────── Vision Recipe v2 (2026-04-26 spec 18) ─────────
-
-
-def test_aspect_label_common_ratios() -> None:
-    """_aspect_label — 권장 비율들이 사람 친화 라벨로 매핑."""
-    from studio.vision_pipeline import _aspect_label
-
-    assert _aspect_label(1024, 1024) == "1:1 square"
-    assert _aspect_label(1664, 928) == "16:9 widescreen"  # GCD=104
-    assert _aspect_label(928, 1664) == "9:16 vertical"
-    assert _aspect_label(1472, 1104) == "4:3 standard"
-    assert _aspect_label(1584, 1056) == "3:2 landscape"
-    # 비표준 비율은 custom 라벨
-    assert _aspect_label(1000, 333).endswith("custom")
-    # 0/음수 방어
-    assert _aspect_label(0, 0) == "unknown aspect"
-
-
-@pytest.mark.asyncio
-async def test_call_vision_recipe_v2_payload_declares_single_source() -> None:
-    """Ollama user message 에도 단일 이미지 조건을 명시."""
-    from studio.vision_pipeline import _call_vision_recipe_v2
-
-    captured: dict = {}
-
-    class _FakeResponse:
-        def raise_for_status(self) -> None: ...
-
-        def json(self) -> dict:
-            return {"message": {"content": "{}"}}
-
-    class _FakeClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *a):
-            return False
-
-        async def post(self, url: str, json=None):
-            captured["url"] = url
-            captured["payload"] = json
-            return _FakeResponse()
-
-    with patch(
-        "studio._ollama_client.httpx.AsyncClient",
-        new=MagicMock(return_value=_FakeClient()),
-    ):
-        await _call_vision_recipe_v2(
-            _tiny_png_bytes(),
-            width=491,
-            height=628,
-            vision_model="qwen2.5vl:7b",
-            timeout=10.0,
-            ollama_url="http://x",
-        )
-
-    payload = captured["payload"]
-    assert payload.get("format") == "json"
-    assert payload.get("keep_alive") == "0"
-    sys_msg = payload["messages"][0]["content"]
-    user_msg = payload["messages"][1]["content"]
-    assert "exactly ONE uploaded" in sys_msg
-    assert "Exactly one SOURCE image is attached" in user_msg
-    assert "Analyze this single image only" in user_msg
-    assert "Do not mention a second image" in user_msg
-    assert "491×628" in user_msg
-
-
-def test_vision_v2_json_path_populates_slots() -> None:
-    """v2 JSON 경로 — 정상 응답 시 9 슬롯 모두 채워지고 fallback=False."""
-    fake_json = (
-        '{"summary":"A studio portrait.","positive_prompt":"editorial portrait, '
-        'subject-first, soft key, 85mm","negative_prompt":"blurry, watermark",'
-        '"composition":"medium shot, centered","subject":"woman, neutral pose",'
-        '"clothing_or_materials":"wool coat, matte texture",'
-        '"environment":"plain studio backdrop","lighting_camera_style":'
-        '"softbox key from left, 85mm f/1.8","uncertain":"exact age"}'
-    )
-    recipe_mock = AsyncMock(return_value=fake_json)
-    translate_mock = AsyncMock(return_value="스튜디오 초상.")
-    with (
-        patch(
-            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
-            new=recipe_mock,
-        ),
-        patch(
-            "studio.vision_pipeline.image_detail.translate_to_korean",
-            new=translate_mock,
-        ),
-    ):
-        result = asyncio.run(
-            analyze_image_detailed(_tiny_png_bytes(), width=1024, height=1024)
-        )
-
-    assert result.fallback is False
-    assert result.provider == "ollama"
-    assert result.summary == "A studio portrait."
-    assert "85mm" in result.positive_prompt
-    assert "blurry" in result.negative_prompt
-    assert result.composition == "medium shot, centered"
-    assert result.subject == "woman, neutral pose"
-    assert result.environment.startswith("plain studio")
-    assert result.uncertain == "exact age"
-    # en 은 summary + positive_prompt 합본
-    assert "studio portrait" in result.en.lower()
-    assert "85mm" in result.en
-    # ko 는 summary 번역
-    assert "스튜디오" in (result.ko or "")
-
-
-def test_vision_v2_parse_failure_falls_back_to_paragraph() -> None:
-    """v2 JSON 파싱 실패 → 옛 SYSTEM_VISION_DETAILED 폴백 경로 진입.
-
-    9 슬롯 모두 빈 문자열 + en/ko 단락만 채워짐.
-    """
-    recipe_mock = AsyncMock(return_value="not a json {{{ broken")
-    describe_mock = AsyncMock(return_value="A warm photo at dusk.")
-    translate_mock = AsyncMock(return_value="황혼 사진.")
-    with (
-        patch(
-            "studio.vision_pipeline.image_detail._call_vision_recipe_v2",
-            new=recipe_mock,
-        ),
-        patch(
-            "studio.vision_pipeline._common._describe_image",
-            new=describe_mock,
-        ),
-        patch(
-            "studio.vision_pipeline.image_detail.translate_to_korean",
-            new=translate_mock,
-        ),
-    ):
-        result = asyncio.run(analyze_image_detailed(_tiny_png_bytes()))
-
-    assert result.fallback is False
-    assert result.provider == "ollama"
-    assert "warm photo" in result.en
-    assert "황혼" in (result.ko or "")
-    # 9 슬롯 모두 빈 문자열 (옛 row 와 동일 형태)
-    assert result.summary == ""
-    assert result.positive_prompt == ""
-    assert result.negative_prompt == ""
-    assert result.composition == ""
-    assert result.subject == ""
 
 
 @pytest.mark.asyncio

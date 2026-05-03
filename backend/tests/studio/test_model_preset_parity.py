@@ -14,6 +14,7 @@ from studio.presets import (
     EDIT_MODEL,
     GENERATE_MODEL,
     GENERATE_STYLES,
+    OllamaRoles,
 )
 
 
@@ -81,7 +82,17 @@ def _lora_snapshot(loras) -> list[dict]:
     return [asdict(lora) for lora in loras]
 
 
-def test_frontend_model_presets_match_backend_contract() -> None:
+def test_frontend_model_presets_match_backend_contract(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # env var (STUDIO_VISION_MODEL / STUDIO_TEXT_MODEL) 가 로컬 개발 환경에서
+    # 설정돼 있어도 "default 상태의 parity" 만 검증하도록 env 를 명시 삭제.
+    # Phase 6 에서 DEFAULT_OLLAMA_ROLES 가 env var 를 읽게 변경됨에 따라 추가.
+    # importlib.reload() 는 Wan22ModelPreset 등 다른 클래스 identity 를 깨뜨리므로
+    # 사용 금지 — 대신 default 값으로 OllamaRoles 를 직접 인스턴스화해서 비교.
+    monkeypatch.delenv("STUDIO_VISION_MODEL", raising=False)
+    monkeypatch.delenv("STUDIO_TEXT_MODEL", raising=False)
+
     frontend = _frontend_preset_snapshot()
 
     assert frontend["aspectRatios"] == [asdict(a) for a in ASPECT_RATIOS]
@@ -115,7 +126,14 @@ def test_frontend_model_presets_match_backend_contract() -> None:
     assert frontend["edit"]["autoScaleReferenceImage"] is EDIT_MODEL.auto_scale_reference
     assert frontend["edit"]["maxReferenceImages"] == EDIT_MODEL.max_reference_images
 
-    assert frontend["ollama"] == asdict(DEFAULT_OLLAMA_ROLES)
+    # env override 없는 "default" OllamaRoles 를 직접 생성해서 비교.
+    # DEFAULT_OLLAMA_ROLES 는 모듈 import 시 env var 를 읽어 고정되므로,
+    # 현재 env 가 삭제된 상태에서 expected 를 재계산함.
+    expected_ollama_roles = OllamaRoles(
+        vision="qwen3-vl:8b",
+        text="gemma4-un:latest",
+    )
+    assert frontend["ollama"] == asdict(expected_ollama_roles)
     assert [
         {
             "id": style.id,
