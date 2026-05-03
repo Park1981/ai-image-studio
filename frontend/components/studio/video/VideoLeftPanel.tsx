@@ -30,8 +30,10 @@ import {
   StudioModeHeader,
 } from "@/components/studio/StudioLayout";
 import V5MotionCard from "@/components/studio/V5MotionCard";
+import VideoModelSegment from "@/components/studio/video/VideoModelSegment";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
+import { VIDEO_MODEL_PRESETS } from "@/lib/model-presets";
 import {
   computeVideoResize,
   useVideoInputs,
@@ -62,8 +64,34 @@ export default function VideoLeftPanel({
     lightning, setLightning,
     skipUpgrade, setSkipUpgrade,
     promptMode, setPromptMode,
+    // Phase 5 (2026-05-03) — 영상 모델 선택 (Wan 2.2 / LTX 2.3)
+    selectedVideoModel, setSelectedVideoModel,
   } = useVideoInputs();
   const { running } = useVideoRunning();
+
+  // Phase 5 (2026-05-03) — 모델별 ETA 자동 채움 (mirror.speedHint).
+  // VIDEO_MODEL_PRESETS 가 backend WAN22_VIDEO_PRESET / LTX_VIDEO_PRESET 와 동기화 유지.
+  const modelMirror = VIDEO_MODEL_PRESETS[selectedVideoModel];
+  const etaText = lightning
+    ? modelMirror.speedHint.lightning
+    : modelMirror.speedHint.precise;
+  // duration: Wan 22 = 81f@16fps≈5초 / LTX = 126f@25fps≈5초. 둘 다 ~5초.
+  const durationSec = Math.round(
+    (modelMirror.defaultLength / modelMirror.baseFps) * 10,
+  ) / 10;
+
+  // Phase 5 (2026-05-03) — 페이지 마운트 시 1회 settings.videoModel 로 sync.
+  // setSelectedVideoModel 은 cross-store fan-out (옵션 A) 이라 settings 에서 store 로 회수만 필요.
+  const videoModelInitRef = useRef(false);
+  useEffect(() => {
+    if (videoModelInitRef.current) return;
+    videoModelInitRef.current = true;
+    const persisted = useSettingsStore.getState().videoModel;
+    if (persisted !== selectedVideoModel) {
+      setSelectedVideoModel(persisted);
+    }
+    // selectedVideoModel 은 effect deps 에 안 넣음 — mount 시 1회만 init.
+  }, [setSelectedVideoModel]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Codex Phase 5 fix Medium — settings 의 ollamaModel override 를 도구로 전파.
   const ollamaModelForTools = useSettingsStore((s) => s.ollamaModel);
@@ -112,8 +140,17 @@ export default function VideoLeftPanel({
         flowLabel="영상 생성 프롬프트 흐름 보기"
       />
 
+      {/* Phase 5 (2026-05-03 · spec §5.6) — 영상 모델 선택 세그먼트 (Wan 2.2 / LTX 2.3).
+       *  CTA 위에 배치 — ETA 텍스트가 모델 따라 즉시 변하는 시각적 일관성. */}
+      <VideoModelSegment
+        value={selectedVideoModel}
+        onChange={setSelectedVideoModel}
+        disabled={running}
+      />
+
       {/* Primary CTA — sticky 상단 (Generate / Edit 와 통일).
-       *  Phase 1.5.4 (결정 K) — 텍스트 영문 통일 (Render). shortcut 표시 X. */}
+       *  Phase 1.5.4 (결정 K) — 텍스트 영문 통일 (Render). shortcut 표시 X.
+       *  Phase 5 (2026-05-03) — ETA 텍스트 model-aware (modelMirror.speedHint). */}
       <div className="ais-cta-sticky-top">
         <button
           type="button"
@@ -133,9 +170,8 @@ export default function VideoLeftPanel({
           )}
         </button>
         <div className="ais-cta-eta">
-          평균 소요{" "}
-          <span className="mono">{lightning ? "5~10분" : "25~40분"}</span> ·
-          5초 영상 · 로컬 처리
+          평균 소요 <span className="mono">{etaText}</span> ·{" "}
+          <span className="mono">{durationSec}초</span> 영상 · 로컬 처리
         </div>
       </div>
 
