@@ -128,6 +128,20 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
         }
       />
 
+      {/* V5 Caption 슬롯 — Generate/Edit 와 통일 (2026-05-03).
+       *  upgradedPrompt 우선 → 없으면 사용자 영상 지시 fallback.
+       *  running/empty 상태엔 playingItem 자체가 없어 자연스럽게 미노출. */}
+      {playingItem && (playingItem.upgradedPrompt || playingItem.prompt) && (
+        <div className="ais-result-caption">
+          <p
+            className="ais-result-caption-prompt"
+            title={playingItem.upgradedPrompt || playingItem.prompt}
+          >
+            {playingItem.upgradedPrompt || playingItem.prompt}
+          </p>
+        </div>
+      )}
+
       <HistorySectionHeader
         title="보관"
         titleEn="History"

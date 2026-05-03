@@ -220,11 +220,16 @@ export default function GenerateResultViewer({
         </div>
       </div>
 
-      {/* V5 Caption 슬롯 — italic prompt 1줄 truncate (Hero 바로 아래) */}
-      {item.prompt && (
+      {/* V5 Caption 슬롯 — italic prompt 1줄 truncate (Hero 바로 아래).
+       *  2026-05-03 통일: upgradedPrompt 우선 → 없으면 사용자 입력 fallback.
+       *  Edit/Generate 양쪽 동일 정책 (영어 업그레이드 결과로 풍성한 캡션). */}
+      {(item.upgradedPrompt || item.prompt) && (
         <div className="ais-result-caption">
-          <p className="ais-result-caption-prompt" title={item.prompt}>
-            {item.prompt}
+          <p
+            className="ais-result-caption-prompt"
+            title={item.upgradedPrompt || item.prompt}
+          >
+            {item.upgradedPrompt || item.prompt}
           </p>
         </div>
       )}

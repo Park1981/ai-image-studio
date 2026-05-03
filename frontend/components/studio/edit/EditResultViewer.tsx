@@ -199,11 +199,16 @@ export default function EditResultViewer({
         )}
       </div>
 
-      {/* V5 Caption 슬롯 — Edit 지시 italic 1줄 truncate (Hero 매트지 아래 · 결정 ⓒ) */}
-      {afterItem.prompt && (
+      {/* V5 Caption 슬롯 — italic 1줄 truncate (Hero 매트지 아래 · 결정 ⓒ).
+       *  2026-05-03 통일: upgradedPrompt 우선 → 없으면 사용자 지시 fallback.
+       *  Generate 와 동일 정책 (영어 업그레이드 결과로 풍성한 캡션). */}
+      {(afterItem.upgradedPrompt || afterItem.prompt) && (
         <div className="ais-result-caption">
-          <p className="ais-result-caption-prompt" title={afterItem.prompt}>
-            {afterItem.prompt}
+          <p
+            className="ais-result-caption-prompt"
+            title={afterItem.upgradedPrompt || afterItem.prompt}
+          >
+            {afterItem.upgradedPrompt || afterItem.prompt}
           </p>
         </div>
       )}
