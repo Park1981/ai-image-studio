@@ -18,7 +18,7 @@ from studio.vision_pipeline.prompt_synthesize import (
 class TestPromptSynthesize:
     """합성 단계 — Ollama text model mock + 5 슬롯 결과."""
 
-    async def test_returns_4_slots_on_success(self) -> None:
+    async def test_returns_5_slots_on_success(self) -> None:
         """정상 응답 → 5 슬롯 (summary/positive/negative/anchors/uncertain) 반환."""
         mock_response = {
             "summary": "An East Asian young adult woman at a music festival.",
@@ -88,6 +88,7 @@ class TestPromptSynthesize:
             allow_thinking_fallback: bool = True,
         ) -> str:
             captured.update(payload)
+            captured["__allow_thinking_fallback"] = allow_thinking_fallback
             return "{}"
 
         with patch(
@@ -107,6 +108,7 @@ class TestPromptSynthesize:
         assert captured["keep_alive"] == "5m"
         assert captured["options"]["temperature"] == 0.4
         assert captured["options"]["num_ctx"] == 6144
+        assert captured["__allow_thinking_fallback"] is False
 
     def test_system_prompt_forbids_boilerplate_unless_supported(self) -> None:
         """system prompt 가 boilerplate 조건부 금지 + 150~260 word + adult lock 명시."""

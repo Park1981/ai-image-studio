@@ -96,6 +96,7 @@ class TestVisionObserve:
 
         async def capture(*, ollama_url: str, payload: dict, timeout: float, allow_thinking_fallback: bool = True) -> str:
             captured.update(payload)
+            captured["__allow_thinking_fallback"] = allow_thinking_fallback  # 별도 키 (payload 와 충돌 방지)
             return "{}"
 
         with patch(
@@ -116,6 +117,7 @@ class TestVisionObserve:
         assert captured["keep_alive"] == "5m"
         assert captured["options"]["temperature"] == 0.2
         assert captured["options"]["num_ctx"] == 4096
+        assert captured["__allow_thinking_fallback"] is False  # 명시적 False 전달 검증
 
     def test_system_prompt_forbids_boilerplate(self) -> None:
         """system prompt 가 boilerplate 금지 어휘 + positive_prompt 작성 금지 명시."""
