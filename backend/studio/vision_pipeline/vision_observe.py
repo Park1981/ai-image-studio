@@ -51,7 +51,28 @@ Schema:
       "pose": "",
       "hands": "",
       "clothing": [],
-      "accessories_or_objects": []
+      "accessories_or_objects": [],
+      "face_detail": {
+        "eye_state": "",
+        "left_eye": "",
+        "right_eye": "",
+        "mouth_state": "",
+        "expression_notes": []
+      },
+      "object_interaction": {
+        "object": "",
+        "object_position_relative_to_face": "",
+        "action": ""
+      },
+      "clothing_detail": {
+        "top_type": "",
+        "top_color": "",
+        "strap_layout": "",
+        "cutouts_or_openings": "",
+        "bottom_type": "",
+        "bottom_color": "",
+        "bottom_style_details": []
+      }
     }
   ],
   "environment": {
@@ -59,7 +80,13 @@ Schema:
     "foreground": [],
     "midground": [],
     "background": [],
-    "weather_or_surface_condition": []
+    "weather_or_surface_condition": [],
+    "crowd_detail": {
+      "people_visible": "",
+      "raincoats_or_ponchos": "",
+      "crowd_clothing": [],
+      "crowd_focus": ""
+    }
   },
   "lighting_and_color": {
     "visible_light_sources": [],
@@ -75,6 +102,30 @@ Schema:
   },
   "uncertain": []
 }
+
+Precision Observation Checklist:
+Before filling the JSON, inspect the image for small but important visual anchors.
+
+Face and expression:
+- Check whether both eyes are open, one eye is closed, or one eye is partially closed.
+- If one eye is closed or nearly closed while the other is open, describe it as "winking" or "one eye closed".
+- Describe mouth state separately: closed mouth, open mouth, drinking, cup covering mouth, smile, neutral.
+
+Object interaction:
+- Do not write only "holding a cup" if the cup is close to the mouth.
+- Specify whether the cup is raised to the lips, covering the mouth, held near the chest, or held down.
+
+Clothing:
+- Do not simplify distinctive garments.
+- Look for asymmetric straps, cross straps, cutouts, cropped tops, side openings, cargo pockets, utility details, pants vs shorts.
+- If unsure whether the bottom is shorts or pants, write "uncertain" instead of guessing.
+
+Framing:
+- Carefully distinguish full-body, thigh-up, waist-up, chest-up, close-up.
+- Do not use full-body unless the full body from head to feet is visible.
+
+Background:
+- Look for rain, wet surfaces, transparent raincoats, plastic ponchos, stage lights, neon signs, concert or festival structures.
 
 Rules:
 - Use short concrete phrases.

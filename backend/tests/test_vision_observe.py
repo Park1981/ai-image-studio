@@ -132,3 +132,40 @@ class TestVisionObserve:
             assert forbidden in VISION_OBSERVATION_SYSTEM, (
                 f"VISION_OBSERVATION_SYSTEM missing critical guard: {forbidden!r}"
             )
+
+    def test_system_prompt_includes_precision_checklist(self) -> None:
+        """Phase 5차 누락 영역 (윙크/cutout/cargo/우비/chest-up) 가
+        Precision Checklist 에 명시되어 있다."""
+        for cue in [
+            "winking",
+            "one eye closed",
+            "raised to the lips",
+            "asymmetric straps",
+            "cross straps",
+            "cutouts",
+            "cargo pockets",
+            "pants vs shorts",
+            "chest-up",
+            "transparent raincoats",
+            "plastic ponchos",
+        ]:
+            assert cue in VISION_OBSERVATION_SYSTEM, (
+                f"Precision Checklist missing cue: {cue!r}"
+            )
+
+    def test_system_prompt_schema_includes_new_detail_slots(self) -> None:
+        """Schema 에 새 4 슬롯 (face_detail / object_interaction / clothing_detail / crowd_detail) 이 있다."""
+        for slot in [
+            "face_detail",
+            "object_interaction",
+            "clothing_detail",
+            "crowd_detail",
+            "eye_state",
+            "object_position_relative_to_face",
+            "strap_layout",
+            "cutouts_or_openings",
+            "raincoats_or_ponchos",
+        ]:
+            assert slot in VISION_OBSERVATION_SYSTEM, (
+                f"Schema missing slot key: {slot!r}"
+            )
