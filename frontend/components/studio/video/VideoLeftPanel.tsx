@@ -33,7 +33,6 @@ import V5MotionCard from "@/components/studio/V5MotionCard";
 import VideoModelSegment from "@/components/studio/video/VideoModelSegment";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
-import { VIDEO_MODEL_PRESETS } from "@/lib/model-presets";
 import {
   computeVideoResize,
   useVideoInputs,
@@ -68,17 +67,6 @@ export default function VideoLeftPanel({
     selectedVideoModel, setSelectedVideoModel,
   } = useVideoInputs();
   const { running } = useVideoRunning();
-
-  // Phase 5 (2026-05-03) — 모델별 ETA 자동 채움 (mirror.speedHint).
-  // VIDEO_MODEL_PRESETS 가 backend WAN22_VIDEO_PRESET / LTX_VIDEO_PRESET 와 동기화 유지.
-  const modelMirror = VIDEO_MODEL_PRESETS[selectedVideoModel];
-  const etaText = lightning
-    ? modelMirror.speedHint.lightning
-    : modelMirror.speedHint.precise;
-  // duration: Wan 22 = 81f@16fps≈5초 / LTX = 126f@25fps≈5초. 둘 다 ~5초.
-  const durationSec = Math.round(
-    (modelMirror.defaultLength / modelMirror.baseFps) * 10,
-  ) / 10;
 
   // Phase 5 (2026-05-03) — 페이지 마운트 시 1회 settings.videoModel 로 sync.
   // setSelectedVideoModel 은 cross-store fan-out (옵션 A) 이라 settings 에서 store 로 회수만 필요.
@@ -150,7 +138,7 @@ export default function VideoLeftPanel({
 
       {/* Primary CTA — sticky 상단 (Generate / Edit 와 통일).
        *  Phase 1.5.4 (결정 K) — 텍스트 영문 통일 (Render). shortcut 표시 X.
-       *  Phase 5 (2026-05-03) — ETA 텍스트 model-aware (modelMirror.speedHint). */}
+       *  Phase 5 follow-up 4 (2026-05-03 fix) — ETA description 제거 (Generate/Edit 와 통일). */}
       <div className="ais-cta-sticky-top">
         <button
           type="button"
@@ -169,10 +157,6 @@ export default function VideoLeftPanel({
             </>
           )}
         </button>
-        <div className="ais-cta-eta">
-          평균 소요 <span className="mono">{etaText}</span> ·{" "}
-          <span className="mono">{durationSec}초</span> 영상 · 로컬 처리
-        </div>
       </div>
 
       {/* ── 원본 이미지 ── */}

@@ -160,10 +160,6 @@ export default function VisionPage() {
                 </>
               )}
             </button>
-            <div className="ais-cta-eta">
-              평균 소요 <span className="mono">~8s</span> · 로컬 처리 · 데이터
-              전송 없음
-            </div>
           </div>
 
           {/* ── 원본 이미지 (Edit/Video 와 통일 — .ais-field-header + SectionAccentBar) ── */}
