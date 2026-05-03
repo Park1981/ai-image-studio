@@ -28,8 +28,16 @@ import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
 import { useVisionPipeline } from "@/hooks/useVisionPipeline";
 import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
+
+// 임시 비교 토글 (2026-05-04) — qwen3-vl:8b vs 8b-thinking-q8_0 검증용.
+// Ollama 재시동 없이 분석 시점에 모델 변경 가능 (useSettingsStore.visionModel persist).
+const VISION_MODEL_OPTIONS = [
+  { id: "qwen3-vl:8b", label: "8B" },
+  { id: "qwen3-vl:8b-thinking-q8_0", label: "8B Thinking" },
+] as const;
 
 /* dataURL 의 base64 길이로 byte 추정 (URL 이면 0). */
 function estimateDataUrlBytes(dataUrl: string | null): number {
@@ -97,6 +105,10 @@ export default function VisionPage() {
   const clearEntries = useVisionStore((s) => s.clearEntries);
   const loadEntry = useVisionStore((s) => s.loadEntry);
 
+  /* ── 임시 모델 토글 (2026-05-04 비교 검증용) ── */
+  const visionModel = useSettingsStore((s) => s.visionModel);
+  const setVisionModel = useSettingsStore((s) => s.setVisionModel);
+
 
   /* ── 파이프라인 훅 ── */
   const { analyze, analyzing } = useVisionPipeline();
@@ -160,6 +172,60 @@ export default function VisionPage() {
                 </>
               )}
             </button>
+          </div>
+
+          {/* ── 임시 모델 토글 (2026-05-04 · qwen3-vl:8b vs 8b-thinking-q8_0 비교 검증) ── */}
+          <div>
+            <div className="ais-field-header">
+              <label
+                className="ais-field-label"
+                style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+              >
+                <SectionAccentBar accent="violet" />
+                Vision 모델 (실험)
+              </label>
+              <span className="mono ais-field-meta">{visionModel}</span>
+            </div>
+            <div
+              role="tablist"
+              aria-label="Vision 모델 선택"
+              style={{
+                display: "flex",
+                gap: 4,
+                padding: 4,
+                background: "var(--bg-2)",
+                border: "1px solid var(--line)",
+                borderRadius: "var(--radius)",
+              }}
+            >
+              {VISION_MODEL_OPTIONS.map((opt) => {
+                const active = visionModel === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setVisionModel(opt.id)}
+                    disabled={analyzing}
+                    style={{
+                      flex: 1,
+                      padding: "6px 10px",
+                      border: "none",
+                      borderRadius: "calc(var(--radius) - 2px)",
+                      background: active ? "var(--accent)" : "transparent",
+                      color: active ? "#fff" : "var(--ink-2)",
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: analyzing ? "not-allowed" : "pointer",
+                      transition: "background 0.15s",
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {/* ── 원본 이미지 (Edit/Video 와 통일 — .ais-field-header + SectionAccentBar) ── */}
