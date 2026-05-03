@@ -37,6 +37,10 @@ class ProcessManager:
         self._comfyui_started_at: float | None = None
         # 마지막 이미지 생성 완료 시각 (유휴 자동 종료용)
         self._last_generation_at: float | None = None
+        # 활성 작업 카운터 — 5 mode (generate/edit/video/vision/compare) 모두 포함.
+        # tasks.Task 의 lifecycle (생성→close/cancel) 에서 inc/dec.
+        # 0 보다 크면 idle 자동 종료 skip (작업 도중 ComfyUI kill 방지 · 2026-05-03).
+        self._active_dispatch_count: int = 0
         # ComfyUI start/stop 경로 직렬화 락 (동시 기동 경쟁 방지)
         self._comfyui_lifecycle_lock = asyncio.Lock()
         # ComfyUI stdout/stderr 로 사용한 파일 핸들 — 종료 시 close 필요
@@ -525,12 +529,32 @@ class ProcessManager:
         self._last_generation_at = time.time()
         logger.info("생성 완료 시각 기록 — 유휴 타이머 시작")
 
+    def increment_active_dispatch(self) -> None:
+        """활성 작업 카운터 증가 — Task 생성 시 호출 (5 mode 공통)."""
+        self._active_dispatch_count += 1
+
+    def decrement_active_dispatch(self) -> None:
+        """활성 작업 카운터 감소 — Task close/cancel 시 호출.
+        max(0, ...) 로 음수 방어 (close + cancel 둘 다 호출 시 idempotent flag 와 결합)."""
+        self._active_dispatch_count = max(0, self._active_dispatch_count - 1)
+
+    @property
+    def active_dispatch_count(self) -> int:
+        """현재 활성 작업 수 (외부 검사 용 · 진단/테스트)."""
+        return self._active_dispatch_count
+
     async def check_idle_shutdown(self) -> bool:
         """
         유휴 자동 종료 체크.
         마지막 생성 후 설정 시간 경과 시 ComfyUI 종료.
+        활성 작업 (generate/edit/video/vision/compare) 진행 중이면 skip.
         반환: True면 종료 실행됨.
         """
+        # 2026-05-03 fix: 5 mode 활성 작업 도중엔 절대 종료 안 함.
+        # 영상 도중 idle threshold 초과 시 강제 kill 되던 버그 방지.
+        if self._active_dispatch_count > 0:
+            return False
+
         if self._last_generation_at is None:
             return False
 

@@ -19,6 +19,30 @@ from typing import Any
 log = logging.getLogger(__name__)
 
 
+def _inc_active_dispatch() -> None:
+    """ProcessManager 활성 카운터 증가 (lazy import — 순환 회피).
+
+    process_manager 미존재 (테스트 환경 등) 또는 호출 실패는 silent ignore.
+    Task lifecycle 정확성보다 import safety 우선.
+    """
+    try:
+        from services.process_manager import process_manager
+
+        process_manager.increment_active_dispatch()
+    except Exception as exc:
+        log.warning("inc active_dispatch failed (non-fatal): %s", exc)
+
+
+def _dec_active_dispatch() -> None:
+    """ProcessManager 활성 카운터 감소 (lazy import — 순환 회피)."""
+    try:
+        from services.process_manager import process_manager
+
+        process_manager.decrement_active_dispatch()
+    except Exception as exc:
+        log.warning("dec active_dispatch failed (non-fatal): %s", exc)
+
+
 class Task:
     """단일 생성/수정 태스크 상태.
 
@@ -41,6 +65,9 @@ class Task:
         # close() 호출 시점 — closed 이후 메모리 회수 TTL 계산용.
         self.closed_at: float | None = None
         self.worker: asyncio.Task[Any] | None = None
+        # 2026-05-03: ProcessManager._active_dispatch_count idempotency flag.
+        # close() 와 cancel() 모두 dec 시도하므로 이미 dec 했으면 noop.
+        self._dispatch_counted: bool = False
 
     async def emit(self, event_type: str, payload: dict[str, Any]) -> None:
         # last_event_at 갱신 — 활성 task 의 idle 판정 기준.
@@ -53,6 +80,10 @@ class Task:
             self.closed = True
             self.closed_at = time.monotonic()
             await self.queue.put({"event": "__close__", "data": {}})
+            # 활성 dispatch 카운트 감소 (idempotent — close/cancel 중복 호출 방어).
+            if self._dispatch_counted:
+                self._dispatch_counted = False
+                _dec_active_dispatch()
 
     def cancel(self) -> None:
         """클라이언트 끊김 시 파이프라인 강제 종료 + 큐 drain."""
@@ -65,6 +96,10 @@ class Task:
                 self.queue.get_nowait()
         except asyncio.QueueEmpty:
             pass
+        # 활성 dispatch 카운트 감소 (idempotent — close 가 먼저 호출된 경우 noop).
+        if self._dispatch_counted:
+            self._dispatch_counted = False
+            _dec_active_dispatch()
 
 
 TASKS: dict[str, Task] = {}
@@ -93,6 +128,10 @@ async def _new_task() -> Task:
     async with _TASKS_LOCK:
         task_id = f"tsk-{uuid.uuid4().hex[:12]}"
         t = Task(task_id)
+        # 활성 dispatch 카운터 증가 (5 mode 공통 · ComfyUI idle shutdown 보호).
+        # close() 또는 cancel() 시점에 정확히 한 번 dec.
+        t._dispatch_counted = True
+        _inc_active_dispatch()
         TASKS[task_id] = t
         return t
 
