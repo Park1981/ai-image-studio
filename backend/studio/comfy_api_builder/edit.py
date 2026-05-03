@@ -48,6 +48,11 @@ class EditApiInput:
     # ON 시 ComfyUI input/ 에 업로드된 두번째 파일명 + role 명시.
     reference_image_filename: str | None = None
     reference_role: str | None = None
+    # 2026-05-03 혼합 정책: source 입력이 1MP 미만이면 FluxKontextImageScale 노드를 *조건부* 추가.
+    #  - True (작은 입력): 노드 추가 → 권장 해상도로 업스케일 → 모델 학습 분포 안에서 처리 + 슬라이더 정합
+    #  - False (≥1MP): 노드 제거 → 입력 사이즈 그대로 → 슬라이더 100% 정합
+    # image2 (reference) 는 슬라이더 무관 + 모델 입력 일관성 위해 *항상* 노드 거침.
+    source_needs_upscale: bool = False
     filename_prefix: str = "AIS-Edit"
 
 
@@ -107,17 +112,22 @@ def _build_edit_api_single(v: EditApiInput) -> ApiPrompt:
         unet_name=v.unet_name, clip_name=v.clip_name, vae_name=v.vae_name,
     )
 
-    # LoadImage + FluxKontextImageScale (원본 이미지 자동 스케일)
+    # 혼합 정책 (2026-05-03): ≥1MP 면 노드 제거 (입력=출력 정합) / <1MP 면 노드 추가
+    #   (모델 학습 분포 안으로 업스케일). source_needs_upscale 은 pipeline 에서 PIL 측정.
     load_id = nid()
     api[load_id] = {
         "class_type": "LoadImage",
         "inputs": {"image": v.source_image_filename, "upload": "image"},
     }
-    scale_id = nid()
-    api[scale_id] = {
-        "class_type": "FluxKontextImageScale",
-        "inputs": {"image": [load_id, 0]},
-    }
+    if v.source_needs_upscale:
+        scale_id = nid()
+        api[scale_id] = {
+            "class_type": "FluxKontextImageScale",
+            "inputs": {"image": [load_id, 0]},
+        }
+        source_ref: list = [scale_id, 0]
+    else:
+        source_ref = [load_id, 0]
 
     # Model chain: UNET → (Lightning LoRA?) → (extra LoRAs) → ModelSamplingAuraFlow → CFGNorm
     model_ref = _build_lora_chain(
@@ -146,7 +156,7 @@ def _build_edit_api_single(v: EditApiInput) -> ApiPrompt:
         "inputs": {
             "clip": [clip_id, 0],
             "vae": [vae_id, 0],
-            "image1": [scale_id, 0],
+            "image1": source_ref,
             "prompt": v.prompt,
         },
     }
@@ -157,7 +167,7 @@ def _build_edit_api_single(v: EditApiInput) -> ApiPrompt:
         "inputs": {
             "clip": [clip_id, 0],
             "vae": [vae_id, 0],
-            "image1": [scale_id, 0],
+            "image1": source_ref,
             "prompt": "",
         },
     }
@@ -180,11 +190,11 @@ def _build_edit_api_single(v: EditApiInput) -> ApiPrompt:
         },
     }
 
-    # VAEEncode (원본 → latent)
+    # VAEEncode (원본 → latent) — 혼합 정책에 따른 source_ref 사용.
     encode_id = nid()
     api[encode_id] = {
         "class_type": "VAEEncode",
-        "inputs": {"pixels": [scale_id, 0], "vae": [vae_id, 0]},
+        "inputs": {"pixels": source_ref, "vae": [vae_id, 0]},
     }
 
     # KSampler
@@ -217,7 +227,7 @@ def _build_edit_api_single(v: EditApiInput) -> ApiPrompt:
 
 
 def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
-    """Multi-reference 흐름 — image1 + image2 둘 다 LoadImage + FluxKontextImageScale.
+    """Multi-reference 흐름 — image1 + image2 둘 다 LoadImage 만 (FluxKontextImageScale 제거).
 
     TextEncodeQwenImageEditPlus 의 image1/image2 슬롯 둘 다 채움.
     KSampler latent 는 image1 (편집 대상) 만 별도 VAEEncode.
@@ -235,19 +245,23 @@ def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
         unet_name=v.unet_name, clip_name=v.clip_name, vae_name=v.vae_name,
     )
 
-    # Image1 (편집 대상) — LoadImage + FluxKontextImageScale
+    # Image1 (편집 대상) — 혼합 정책: ≥1MP 면 노드 제거, <1MP 면 추가.
     load1_id = nid()
     api[load1_id] = {
         "class_type": "LoadImage",
         "inputs": {"image": v.source_image_filename, "upload": "image"},
     }
-    scale1_id = nid()
-    api[scale1_id] = {
-        "class_type": "FluxKontextImageScale",
-        "inputs": {"image": [load1_id, 0]},
-    }
+    if v.source_needs_upscale:
+        scale1_id = nid()
+        api[scale1_id] = {
+            "class_type": "FluxKontextImageScale",
+            "inputs": {"image": [load1_id, 0]},
+        }
+        image1_ref: list = [scale1_id, 0]
+    else:
+        image1_ref = [load1_id, 0]
 
-    # Image2 (참조) — 동일 패턴.
+    # Image2 (참조) — *항상* FluxKontextImageScale 거침 (슬라이더 무관 + 모델 입력 일관성).
     # reference_image_filename 은 None 이 아닌 게 보장됨 (build_edit_api 분기에서).
     assert v.reference_image_filename is not None
     load2_id = nid()
@@ -260,6 +274,7 @@ def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
         "class_type": "FluxKontextImageScale",
         "inputs": {"image": [load2_id, 0]},
     }
+    image2_ref: list = [scale2_id, 0]
 
     # Model chain (단일 path 와 동일)
     model_ref = _build_lora_chain(
@@ -286,8 +301,8 @@ def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
         "inputs": {
             "clip": [clip_id, 0],
             "vae": [vae_id, 0],
-            "image1": [scale1_id, 0],
-            "image2": [scale2_id, 0],
+            "image1": image1_ref,
+            "image2": image2_ref,
             "prompt": v.prompt,
         },
     }
@@ -298,8 +313,8 @@ def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
         "inputs": {
             "clip": [clip_id, 0],
             "vae": [vae_id, 0],
-            "image1": [scale1_id, 0],
-            "image2": [scale2_id, 0],
+            "image1": image1_ref,
+            "image2": image2_ref,
             "prompt": neg_prompt_text,
         },
     }
@@ -322,12 +337,12 @@ def _build_edit_api_multi_ref(v: EditApiInput) -> ApiPrompt:
         },
     }
 
-    # VAEEncode — KSampler latent 는 image1 만.
+    # VAEEncode — KSampler latent 는 image1 만 (혼합 정책 source_ref 동일하게 image1_ref 사용).
     # (image2 는 TextEncodeQwenImageEditPlus 내부에서 reference 인코딩 — Qwen Edit Plus 노드 동작)
     encode_id = nid()
     api[encode_id] = {
         "class_type": "VAEEncode",
-        "inputs": {"pixels": [scale1_id, 0], "vae": [vae_id, 0]},
+        "inputs": {"pixels": image1_ref, "vae": [vae_id, 0]},
     }
 
     # KSampler + VAEDecode + SaveImage (단일 path 와 동일)
@@ -369,6 +384,7 @@ def build_edit_from_request(
     lightning: bool,
     reference_image_filename: str | None = None,
     reference_role: str | None = None,
+    source_needs_upscale: bool = False,
 ) -> ApiPrompt:
     d = EDIT_MODEL.defaults
     lightning_lora = next(
@@ -397,5 +413,6 @@ def build_edit_from_request(
         lightning_lora_name=lightning_lora.name if lightning_lora else None,
         reference_image_filename=reference_image_filename,
         reference_role=reference_role,
+        source_needs_upscale=source_needs_upscale,
     )
     return build_edit_api(inp)

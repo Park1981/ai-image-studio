@@ -48,7 +48,7 @@ export default function EditRightPanel({
   onLightboxOpen,
   onComparisonModalOpen,
 }: Props) {
-  const { sourceImage, sourceWidth, sourceHeight } = useEditInputs();
+  const { sourceImage } = useEditInputs();
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
   // Phase 2 후속 (Codex Phase 4 리뷰 Medium #1) — 수동 비교 분석도 Edit promptMode 전파.
@@ -103,8 +103,6 @@ export default function EditRightPanel({
           <EditResultViewer
             afterItem={afterItem!}
             sourceImage={sourceImage!}
-            sourceWidth={sourceWidth}
-            sourceHeight={sourceHeight}
             compareX={compareX}
             setCompareX={setCompareX}
             hovered={viewerHovered}

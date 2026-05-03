@@ -308,8 +308,9 @@ async def test_edit_endpoint_role_ignored_when_useref_false(monkeypatch) -> None
 def _make_edit_input(
     reference_filename: str | None = None,
     reference_role: str | None = None,
+    source_needs_upscale: bool = False,
 ):
-    """EditApiInput 헬퍼 — 기본값으로 채우고 reference 만 override."""
+    """EditApiInput 헬퍼 — 기본값으로 채우고 reference / scale flag override."""
     from studio.comfy_api_builder import EditApiInput
     from studio.presets import EDIT_MODEL
 
@@ -331,6 +332,7 @@ def _make_edit_input(
         lightning_lora_name=None,
         reference_image_filename=reference_filename,
         reference_role=reference_role,
+        source_needs_upscale=source_needs_upscale,
     )
 
 
@@ -341,10 +343,10 @@ def test_no_reference_returns_single_path():
     inp = _make_edit_input(reference_filename=None)
     api = build_edit_api(inp)
 
-    # 옛 path 의 핵심 노드 존재 확인
+    # 옛 path 의 핵심 노드 존재 확인 (FluxKontextImageScale 제거 · 2026-05-03)
     classes = {node["class_type"] for node in api.values()}
     assert "LoadImage" in classes
-    assert "FluxKontextImageScale" in classes
+    assert "FluxKontextImageScale" not in classes
     assert "TextEncodeQwenImageEditPlus" in classes
     assert "VAEEncode" in classes
     assert "KSampler" in classes
@@ -353,6 +355,62 @@ def test_no_reference_returns_single_path():
     # 단일 이미지 path 라 LoadImage 가 정확히 1개여야 함
     load_count = sum(1 for n in api.values() if n["class_type"] == "LoadImage")
     assert load_count == 1
+
+
+# ─────────────────────────────────────────────
+# 2026-05-03 혼합 정책: source_needs_upscale 분기 테스트
+# ─────────────────────────────────────────────
+
+
+def test_single_path_small_input_adds_scale_node():
+    """source_needs_upscale=True (작은 입력) → FluxKontextImageScale 노드 추가됨."""
+    from studio.comfy_api_builder import build_edit_api
+
+    inp = _make_edit_input(reference_filename=None, source_needs_upscale=True)
+    api = build_edit_api(inp)
+
+    classes = {node["class_type"] for node in api.values()}
+    assert "FluxKontextImageScale" in classes
+
+    # 노드 정확히 1개 (image1 만)
+    scale_count = sum(
+        1 for n in api.values() if n["class_type"] == "FluxKontextImageScale"
+    )
+    assert scale_count == 1
+
+
+def test_multi_ref_small_image1_two_scale_nodes():
+    """multi-ref + 작은 image1 → 노드 2개 (image1 + image2 모두)."""
+    from studio.comfy_api_builder import build_edit_api
+
+    inp = _make_edit_input(
+        reference_filename="ref.png",
+        reference_role="attire",
+        source_needs_upscale=True,
+    )
+    api = build_edit_api(inp)
+
+    scale_count = sum(
+        1 for n in api.values() if n["class_type"] == "FluxKontextImageScale"
+    )
+    assert scale_count == 2
+
+
+def test_multi_ref_large_image1_only_image2_scale():
+    """multi-ref + 큰 image1 (default False) → image2 만 노드 거침 (image1 직결)."""
+    from studio.comfy_api_builder import build_edit_api
+
+    inp = _make_edit_input(
+        reference_filename="ref.png",
+        reference_role="attire",
+        source_needs_upscale=False,
+    )
+    api = build_edit_api(inp)
+
+    scale_count = sum(
+        1 for n in api.values() if n["class_type"] == "FluxKontextImageScale"
+    )
+    assert scale_count == 1
 
 
 # ─────────────────────────────────────────────
@@ -487,11 +545,12 @@ def test_reference_returns_extra_load_image_node():
     )
     assert load_count_multi == 2
 
-    # FluxKontextImageScale 도 2개 (각 image 별)
+    # 혼합 정책 (2026-05-03): image1 (≥1MP 가정 default) 노드 제거 + image2 항상 노드 거침
+    # → 노드 1개 (image2 분만)
     scale_count_multi = sum(
         1 for n in api_multi.values() if n["class_type"] == "FluxKontextImageScale"
     )
-    assert scale_count_multi == 2
+    assert scale_count_multi == 1
 
     # TextEncodeQwenImageEditPlus pos + neg 둘 다 image2 슬롯에도 연결됐는지
     encode_nodes = [

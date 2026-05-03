@@ -20,7 +20,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import BeforeAfterSlider from "@/components/studio/BeforeAfterSlider";
 import ResultHoverActionBar, {
   ActionBarButton,
@@ -44,8 +44,6 @@ interface Props {
   afterItem: HistoryItem;
   /** 짝 일치한 원본 이미지 (afterItem.sourceRef === sourceImage 통과한 후) */
   sourceImage: string;
-  sourceWidth: number | null;
-  sourceHeight: number | null;
   compareX: number;
   setCompareX: (v: number) => void;
   hovered: boolean;
@@ -60,8 +58,6 @@ interface Props {
 export default function EditResultViewer({
   afterItem,
   sourceImage,
-  sourceWidth,
-  sourceHeight,
   compareX,
   setCompareX,
   hovered,
@@ -70,21 +66,29 @@ export default function EditResultViewer({
   onExpand,
   onAfterIdReset,
 }: Props) {
-  // 슬라이더 정합 fix (2026-04-29): 컨테이너 비율 = After (수정본) 자연 비율.
-  //
-  // 2026-05-02 (오빠 피드백 — 세로 긴 사진 확대 문제 fix):
-  //   wrapper aspect = 원본 (Before) 기준 + 둘 다 contain.
-  //   - 원본을 그대로 풀필 (사용자가 원본 크기/비율 보고 싶다는 의도)
-  //   - After 는 ComfyUI megapixel 미세 정렬 차이만큼 살짝 letterbox (시각적으로 거의 안 보임)
-  //   - 옛 cover 로 Before 잘리던 문제 (세로 사진 확대 효과) 해결
-  //
-  // fallback chain: 원본 → After → 16/10 (옛 row 호환).
-  const aspectRatio =
-    sourceWidth && sourceHeight
-      ? `${sourceWidth} / ${sourceHeight}`
-      : afterItem.width && afterItem.height
-        ? `${afterItem.width} / ${afterItem.height}`
-        : "16 / 10";
+  // 2026-05-03: Compare 와 동일 패턴 — sourceImage 직접 디코드해 *진짜 Before 비율* 측정.
+  //   배경: store 의 sourceWidth/Height 가 EditRightPanel:153 의 setSource(it.width, it.height)
+  //   버그로 *After 사이즈* 가 잘못 저장됨 → 옛 fallback chain 은 wrapper 비율을 After 로 잡아
+  //   Before(원본) 가 letterbox 되며 슬라이더 좌우가 어긋나 보였음.
+  //   Compare (CompareViewer:144) 는 imageA.width/height 가 본래 정확해서 정합 OK 였던 것.
+  // fallback: 측정 끝나기 전엔 afterItem 비율 → 16/10.
+  const [sourceNat, setSourceNat] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    setSourceNat(null);
+    if (!sourceImage) return;
+    const img = new Image();
+    img.onload = () => {
+      if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+        setSourceNat({ w: img.naturalWidth, h: img.naturalHeight });
+      }
+    };
+    img.src = sourceImage;
+  }, [sourceImage]);
+  const aspectRatio = sourceNat
+    ? `${sourceNat.w} / ${sourceNat.h}`
+    : afterItem.width && afterItem.height
+      ? `${afterItem.width} / ${afterItem.height}`
+      : "16 / 10";
 
   // 2026-05-02: 둘 다 contain 으로. ComfyUI 결과 미세 비율 차이 (~4%) 는 transform 보정 시도했으나
   // 사용자 시각 인지 영역 밑이라 fix 빼고 그대로 contain 처리. (autoMatchAspect 시도 → 인물 약간 어색)

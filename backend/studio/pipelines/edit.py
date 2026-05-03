@@ -129,6 +129,17 @@ async def _run_edit_pipeline(
 
         # Ollama unload + GPU gate 는 _dispatch_to_comfy 내부에서 공통 처리.
 
+        # 2026-05-03 혼합 정책: source 이미지가 1MP 미만이면 ComfyUI 워크플로우에 FluxKontextImageScale
+        # 노드를 *조건부* 추가 → 모델 학습 분포 (1.5~1.8MP) 안에서 처리. ≥1MP 면 노드 제거 →
+        # 입력=출력 사이즈 슬라이더 100% 정합. 임계값 1MP = Qwen 권장 최소 1024×1024.
+        try:
+            with Image.open(io.BytesIO(image_bytes)) as _probe:
+                _w, _h = _probe.size
+            source_needs_upscale = (_w * _h) < 1_000_000
+        except Exception:
+            # 측정 실패 시 안전 기본값 (옛 노드 동작 유지)
+            source_needs_upscale = True
+
         # Multi-ref (2026-04-27 Phase 4 Task 14): reference 없으면 effective_role = None
         # (zero-regression gate — reference_bytes 가 없으면 role 도 무시).
         effective_role = reference_role if reference_bytes is not None else None
@@ -164,6 +175,7 @@ async def _run_edit_pipeline(
                 lightning=lightning,
                 reference_image_filename=ref_filename,
                 reference_role=effective_role,
+                source_needs_upscale=source_needs_upscale,
             )
 
         dispatch = await _dispatch_to_comfy(
@@ -179,7 +191,7 @@ async def _run_edit_pipeline(
         )
         image_ref = dispatch.image_ref
         comfy_err = dispatch.comfy_error
-        # Edit 은 FluxKontextImageScale 가 원본+스케일 후 크기를 결정 → PIL 값이 권위
+        # Edit 은 입력 사이즈 ≈ 출력 사이즈 (FluxKontextImageScale 제거 후 · 8 배수 미세 보정만)
         result_w = dispatch.width or 0
         result_h = dispatch.height or 0
 
