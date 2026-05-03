@@ -58,7 +58,19 @@ positive_prompt rules:
 negative_prompt rules:
 - Comma-separated.
 - Include common failure preventions.
-- Include contradictions to preserve the observed image, such as dry hair if the subject is wet, smiling if the subject is winking/non-smiling, studio background if the image is outdoors."""
+- Include contradictions to preserve the observed image, such as dry hair if the subject is wet, smiling if the subject is winking/non-smiling, studio background if the image is outdoors.
+
+Anchor Fidelity Rules:
+- The positive_prompt must preserve the most specific visual phrases from the observation JSON.
+- Do not replace specific details with generic wording.
+- Reuse distinctive observation phrases verbatim when possible.
+- Do not simplify "asymmetric cross-strap cutout cropped tank top" to "simple tank top".
+- Do not simplify "cup raised to lips" to "holding a cup".
+- Do not change "chest-up", "upper-body", or "waist-up" into "full-body".
+- Do not change "pants", "cargo pants", or "utility pants" into "shorts".
+- Do not change "transparent raincoats" or "plastic ponchos" into generic "silhouettes".
+- If the observation says a detail is uncertain, phrase it as uncertain rather than replacing it with a confident guess.
+- Visual accuracy is more important than elegant prose."""
 
 
 async def synthesize_prompt(
@@ -92,7 +104,9 @@ async def synthesize_prompt(
 
     user_content = (
         "Convert this visual observation JSON into a generation-ready prompt.\n"
-        "Preserve the exact visual anchors.\n"
+        "Preserve exact visual anchors verbatim. Do not generalize distinctive "
+        "clothing, facial expression, object interaction, framing, or background "
+        "crowd details.\n"
         "Do not add unsupported camera or lighting claims.\n\n"
         f"```json\n{json.dumps(observation, ensure_ascii=False, indent=2)}\n```"
     )

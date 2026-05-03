@@ -116,3 +116,25 @@ class TestPromptSynthesize:
         assert "muted earth tones" in PROMPT_SYNTHESIZE_SYSTEM  # 금지 리스트 안에
         assert "fictional and adult" in PROMPT_SYNTHESIZE_SYSTEM
         assert "Do not invent details that contradict" in PROMPT_SYNTHESIZE_SYSTEM
+
+    def test_system_prompt_includes_anchor_fidelity_rules(self) -> None:
+        """Anchor Fidelity Rules 가 일반화 금지 cue 들을 명시한다."""
+        for forbidden_generalization in [
+            "Anchor Fidelity Rules",
+            "asymmetric cross-strap cutout cropped tank top",
+            "simple tank top",
+            "cup raised to lips",
+            "holding a cup",
+            "chest-up",
+            "full-body",
+            "cargo pants",
+            "shorts",
+            "transparent raincoats",
+            "plastic ponchos",
+            "silhouettes",
+            "Visual accuracy is more important than elegant prose",
+        ]:
+            assert forbidden_generalization in PROMPT_SYNTHESIZE_SYSTEM, (
+                f"PROMPT_SYNTHESIZE_SYSTEM missing fidelity rule: "
+                f"{forbidden_generalization!r}"
+            )
