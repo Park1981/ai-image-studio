@@ -8,6 +8,8 @@
 
 "use client";
 
+import { motion } from "framer-motion";
+
 import AppHeader from "@/components/chrome/AppHeader";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ProgressModal from "@/components/studio/ProgressModal";
@@ -35,11 +37,11 @@ import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
 // 임시 비교 카드 (2026-05-04) — qwen3-vl:8b vs 8b-thinking-q8_0 검증용.
 // Ollama 재시동 없이 분석 시점에 모델 변경 가능 (useSettingsStore.visionModel persist).
 // 시그니처 색: 8B = Cyan (#06b6d4 · Cool/빠름) / Thinking = Amber (#f59e0b · Warm/사색).
+// 영상 모델 카드 패턴 채택 (framer-motion flexGrow 1.7/1.0 spring + filter dim).
 const VISION_MODEL_OPTIONS = [
   {
     id: "qwen3-vl:8b",
     label: "8B",
-    sublabel: "빠른 응답 · Cyan",
     bgImage: "/vision-models/8b.png",
     accentColor: "#06b6d4",
     glowRgba: "rgba(6, 182, 212, 0.45)",
@@ -47,12 +49,20 @@ const VISION_MODEL_OPTIONS = [
   {
     id: "qwen3-vl:8b-thinking-q8_0",
     label: "Thinking",
-    sublabel: "깊은 추론 · Amber",
     bgImage: "/vision-models/thinking.png",
     accentColor: "#f59e0b",
     glowRgba: "rgba(245, 158, 11, 0.45)",
   },
 ] as const;
+
+// 영상 카드 패턴 (Phase 5 follow-up 3 · 2026-05-03) 그대로 채택.
+const ACTIVE_FLEX = 1.7;
+const INACTIVE_FLEX = 1;
+const SPRING_TRANSITION = {
+  type: "spring" as const,
+  stiffness: 320,
+  damping: 26,
+};
 
 /* dataURL 의 base64 길이로 byte 추정 (URL 이면 0). */
 function estimateDataUrlBytes(dataUrl: string | null): number {
@@ -217,7 +227,7 @@ export default function VisionPage() {
             />
           </div>
 
-          {/* ── 임시 모델 비교 카드 (2026-05-04 · 원본 이미지 하단 · 8B vs 8B Thinking) ── */}
+          {/* ── 모델 비교 카드 (2026-05-04 · 영상 카드 패턴 채택 · framer-motion flexGrow) ── */}
           <div>
             <div className="ais-field-header">
               <label
@@ -225,7 +235,7 @@ export default function VisionPage() {
                 style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
               >
                 <SectionAccentBar accent="violet" />
-                Vision 모델 (실험)
+                Vision 모델
               </label>
               <span className="mono ais-field-meta">
                 {VISION_MODEL_OPTIONS.find((o) => o.id === visionModel)?.label ??
@@ -233,99 +243,85 @@ export default function VisionPage() {
               </span>
             </div>
             <div
-              role="tablist"
+              role="radiogroup"
               aria-label="Vision 모델 선택"
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr 1fr",
+                display: "flex",
                 gap: 8,
+                width: "100%",
               }}
             >
               {VISION_MODEL_OPTIONS.map((opt) => {
                 const active = visionModel === opt.id;
                 return (
-                  <button
+                  <motion.button
                     key={opt.id}
                     type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setVisionModel(opt.id)}
+                    role="radio"
+                    aria-checked={active}
+                    aria-label={`${opt.label} 모델 선택`}
                     disabled={analyzing}
+                    onClick={() => setVisionModel(opt.id)}
+                    animate={{
+                      flexGrow: active ? ACTIVE_FLEX : INACTIVE_FLEX,
+                      scale: active ? 1 : 0.97,
+                    }}
+                    transition={SPRING_TRANSITION}
                     style={{
+                      flexBasis: 0,
+                      minWidth: 0,
                       position: "relative",
-                      aspectRatio: "2.5 / 1",
+                      minHeight: 88,
+                      borderRadius: 14,
+                      border: "none",
                       padding: 0,
-                      border: active
-                        ? `2px solid ${opt.accentColor}`
-                        : "1px solid var(--line)",
-                      borderRadius: "var(--radius)",
-                      background: `url('${opt.bgImage}') center/cover, var(--bg-2)`,
                       cursor: analyzing ? "not-allowed" : "pointer",
-                      boxShadow: active
-                        ? `0 0 0 1px ${opt.accentColor}, 0 8px 24px ${opt.glowRgba}`
-                        : "0 1px 3px rgba(0,0,0,0.08)",
-                      transition: "all 0.18s ease",
-                      opacity: !active && analyzing ? 0.5 : 1,
                       overflow: "hidden",
-                      textAlign: "left",
+                      backgroundImage: `url("${opt.bgImage}")`,
+                      backgroundSize: "cover",
+                      backgroundPosition: "center right",
+                      backgroundRepeat: "no-repeat",
+                      transition: "filter 220ms ease, box-shadow 220ms ease",
+                      opacity: analyzing ? 0.55 : 1,
+                      outline: "none",
+                      boxShadow: active
+                        ? `0 0 0 2px ${opt.accentColor}, 0 6px 18px ${opt.glowRgba}`
+                        : "0 0 0 1px rgba(148, 163, 184, 0.22), 0 1px 4px rgba(0, 0, 0, 0.18)",
+                      filter: active ? "none" : "saturate(0.65) brightness(0.72)",
                     }}
                   >
-                    {/* 좌측 텍스트 가독성 위한 그라데이션 오버레이 */}
+                    {/* 좌측 어두운 gradient overlay — 모델명 가독성 (인물/사진은 우측에 위치). */}
                     <div
+                      aria-hidden="true"
                       style={{
                         position: "absolute",
                         inset: 0,
                         background:
-                          "linear-gradient(to right, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.2) 50%, transparent 70%)",
+                          "linear-gradient(90deg, rgba(15,23,42,0.72) 0%, rgba(15,23,42,0.42) 42%, rgba(15,23,42,0) 70%)",
+                        pointerEvents: "none",
                       }}
                     />
-                    {/* 좌측 라벨 + sublabel */}
+                    {/* 모델명 — 좌측 세로 중앙 (영상 카드 패턴). */}
                     <div
                       style={{
-                        position: "relative",
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                        height: "100%",
-                        padding: "12px 14px",
-                        color: "#fff",
+                        position: "absolute",
+                        left: 16,
+                        top: "50%",
+                        transform: "translateY(-50%)",
+                        color: "#f8fafc",
+                        fontSize: 16,
+                        fontWeight: 700,
+                        letterSpacing: "-0.005em",
+                        lineHeight: 1.2,
+                        textShadow: "0 2px 8px rgba(0, 0, 0, 0.55)",
+                        pointerEvents: "none",
+                        maxWidth: "70%",
+                        whiteSpace: "nowrap",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                        {active && (
-                          <span
-                            style={{
-                              width: 6,
-                              height: 6,
-                              borderRadius: "50%",
-                              background: opt.accentColor,
-                              boxShadow: `0 0 8px ${opt.accentColor}`,
-                            }}
-                          />
-                        )}
-                        <span
-                          style={{
-                            fontSize: 15,
-                            fontWeight: 700,
-                            letterSpacing: "-0.01em",
-                            textShadow: "0 2px 6px rgba(0,0,0,0.7)",
-                          }}
-                        >
-                          {opt.label}
-                        </span>
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          opacity: 0.92,
-                          fontWeight: 500,
-                          textShadow: "0 1px 4px rgba(0,0,0,0.7)",
-                        }}
-                      >
-                        {opt.sublabel}
-                      </div>
+                      {opt.label}
                     </div>
-                  </button>
+                  </motion.button>
                 );
               })}
             </div>
