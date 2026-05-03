@@ -5,6 +5,7 @@
  */
 
 import { sleep, uid } from "../client";
+import { VIDEO_MODEL_PRESETS, DEFAULT_VIDEO_MODEL_ID } from "@/lib/model-presets";
 import type { HistoryItem, VideoRequest, VideoStage } from "../types";
 
 /** 영상 모드 mock 스트림 — 백엔드 5-stage (vision-analyze / prompt-merge /
@@ -56,6 +57,9 @@ export async function* mockVideoStream(
     await sleep(250 + Math.random() * 150);
   }
 
+  // Phase 3 (2026-05-03) — modelId 별 mock 응답 분기.
+  const modelId = req.modelId ?? DEFAULT_VIDEO_MODEL_ID;
+  const preset = VIDEO_MODEL_PRESETS[modelId];
   const item: HistoryItem = {
     id: uid("vid"),
     mode: "video",
@@ -67,7 +71,8 @@ export async function* mockVideoStream(
     steps: 0,
     cfg: 1.0,
     lightning: false,
-    model: "LTX Video 2.3",
+    model: preset.displayName,
+    modelId,
     createdAt: Date.now(),
     // Mock 모드는 실제 mp4 가 없음 → mock-seed:// sentinel 로 통일.
     // VideoPlayerCard / ImageLightbox 가 이 sentinel 을 보면 재생 시도 안 하고 안내 표시.
@@ -78,9 +83,9 @@ export async function* mockVideoStream(
     upgradedPromptKo:
       "시네마틱 달리 인, 따뜻한 창가 빛, 얕은 심도, 필름 그레인",
     promptProvider: "mock",
-    fps: 25,
-    frameCount: 126,
-    durationSec: 5,
+    fps: preset.baseFps,
+    frameCount: preset.defaultLength,
+    durationSec: Math.round((preset.defaultLength / preset.baseFps) * 100) / 100,
   };
   yield { type: "done", item, savedToHistory: true };
 }

@@ -243,7 +243,11 @@ export interface HistoryItem {
   steps: number;
   cfg: number;
   lightning: boolean;
+  /** display name (예: "LTX Video 2.3" / "Wan 2.2 i2v" / "Qwen Image 2512") */
   model: string;
+  /** Phase 3 (2026-05-03 · Wan 2.2 도입) — video 모드 전용. DB persist X · 응답에만 동봉.
+   *  옛 row 또는 generate/edit 결과는 undefined → 프론트가 fallback 처리 (cyan 배지 = LTX 가정). */
+  modelId?: import("@/lib/model-presets").VideoModelId;
   createdAt: number;
   /** generate/edit 은 이미지 URL, video 는 mp4 URL */
   imageRef: string;
@@ -560,6 +564,8 @@ export interface VideoRequest {
   preUpgradedPrompt?: string;
   /** gemma4 보강 모드 (Phase 2 · 2026-05-01). 미전달 시 백엔드 default = "fast". */
   promptMode?: "fast" | "precise";
+  /** 영상 모델 (Phase 3 · 2026-05-03). 미전달 시 백엔드 default = "wan22". */
+  modelId?: import("@/lib/model-presets").VideoModelId;
 }
 
 export type VideoStage =

@@ -11,8 +11,10 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import {
   DEFAULT_OLLAMA_MODELS,
+  DEFAULT_VIDEO_MODEL_ID,
   EDIT_MODEL,
   GENERATE_MODEL,
+  type VideoModelId,
 } from "@/lib/model-presets";
 
 export interface PromptTemplate {
@@ -38,6 +40,8 @@ export interface SettingsState {
   editModel: string;
   ollamaModel: string;
   visionModel: string;
+  /** Phase 4 (2026-05-03) — 영상 모델 선택 (Wan 2.2 default · 사용자 선택 persist) */
+  videoModel: VideoModelId;
 
   /* 프리퍼런스 토글 */
   /**
@@ -80,6 +84,7 @@ export interface SettingsState {
   setEditModel: (v: string) => void;
   setOllamaModel: (v: string) => void;
   setVisionModel: (v: string) => void;
+  setVideoModel: (v: VideoModelId) => void;
   setHideGeneratePrompts: (v: boolean) => void;
   setHideEditPrompts: (v: boolean) => void;
   setHideVideoPrompts: (v: boolean) => void;
@@ -118,6 +123,8 @@ export const useSettingsStore = create<SettingsState>()(
       // 상수 분리 이후 여기 직접 문자열 하드코딩 금지 (Opus S4).
       ollamaModel: DEFAULT_OLLAMA_MODELS.text,
       visionModel: DEFAULT_OLLAMA_MODELS.vision,
+      // Phase 4 (2026-05-03) — 사용자 결정 #1: default Wan 2.2.
+      videoModel: DEFAULT_VIDEO_MODEL_ID,
 
       hideGeneratePrompts: true,
       hideEditPrompts: true,
@@ -133,6 +140,7 @@ export const useSettingsStore = create<SettingsState>()(
       setEditModel: (v) => set({ editModel: v }),
       setOllamaModel: (v) => set({ ollamaModel: v }),
       setVisionModel: (v) => set({ visionModel: v }),
+      setVideoModel: (v) => set({ videoModel: v }),
       setHideGeneratePrompts: (v) => set({ hideGeneratePrompts: v }),
       setHideEditPrompts: (v) => set({ hideEditPrompts: v }),
       setHideVideoPrompts: (v) => set({ hideVideoPrompts: v }),
@@ -154,7 +162,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "ais:settings",
       storage: createJSONStorage(() => localStorage),
-      version: 5,
+      version: 6,
       migrate: (persisted: unknown, fromVersion: number) => {
         const obj = (persisted as Record<string, unknown>) || {};
         // v1 → v2: autoCompareAnalysis 기본 false 추가
@@ -183,6 +191,11 @@ export const useSettingsStore = create<SettingsState>()(
         // 기본 "fast" — 정밀 모드는 사용자 명시 선택만.
         if (fromVersion < 5) {
           obj.promptEnhanceMode = "fast";
+        }
+        // v5 → v6: videoModel 신설 (Phase 4 · 2026-05-03 · Wan 2.2 도입).
+        // 기본 "wan22" — 사용자 결정 #1 (spec §2).
+        if (fromVersion < 6) {
+          obj.videoModel = DEFAULT_VIDEO_MODEL_ID;
         }
         return obj as unknown as SettingsState;
       },
