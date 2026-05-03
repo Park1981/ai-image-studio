@@ -19,9 +19,11 @@ export async function downloadImage(
     return false;
   }
   try {
-    // cache: "no-store" — 과거에 CORS 헤더 없이 캐시된 응답을 재사용해
-    // "blocked by CORS policy" 로 차단되는 현상 방지.
-    const res = await fetch(url, { cache: "no-store" });
+    // cache: "reload" — stale cache (옛 시점에 CORS 헤더 없이 저장된 응답) 를
+    // *우회* 하고 강제로 네트워크 재요청. "no-store" 는 응답 *저장* 만 막을 뿐
+    // 기존 cache 사용은 못 막아서 "blocked by CORS policy" 가 간헐적으로
+    // 재현됐음 (2026-05-03 fix).
+    const res = await fetch(url, { cache: "reload" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const href = URL.createObjectURL(blob);
@@ -50,9 +52,8 @@ export async function copyImageToClipboard(url: string): Promise<boolean> {
     return false;
   }
   try {
-    // cache: "no-store" — 과거에 CORS 헤더 없이 캐시된 응답을 재사용해
-    // "blocked by CORS policy" 로 차단되는 현상 방지.
-    const res = await fetch(url, { cache: "no-store" });
+    // cache: "reload" — stale cache 우회 (downloadImage 의 fix 와 동일 정책 · 2026-05-03).
+    const res = await fetch(url, { cache: "reload" });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const blob = await res.blob();
     const item = new ClipboardItem({ [blob.type || "image/png"]: blob });
@@ -144,7 +145,9 @@ export async function urlToDataUrl(
 ): Promise<{ dataUrl: string; width: number; height: number } | null> {
   if (!url || url.startsWith("mock-seed://")) return null;
   try {
-    const res = await fetch(url, { cache: "no-store" });
+    // cache: "reload" — stale cache 우회. urlToDataUrl 은 "수정으로 전송" /
+    // "다음 수정 원본" 등 액션의 핵심 fetch 라 CORS 간헐 fail 가장 자주 발생했음.
+    const res = await fetch(url, { cache: "reload" });
     if (!res.ok) return null;
     const blob = await res.blob();
     const dataUrl = await new Promise<string>((resolve, reject) => {
