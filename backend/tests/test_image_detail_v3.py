@@ -35,14 +35,41 @@ class TestAnalyzeImageDetailedV3:
                     "count_index": 1,
                     "apparent_age_group": "young adult",
                     "broad_visible_appearance": "East Asian female",
-                    "expression": "winking",
+                    "expression": "winking",  # 옛 슬롯 — backward compat 검증용 유지
                     "hair": "long wet dark hair",
-                    "clothing": ["gray cropped tank with cutouts"],
+                    "clothing": ["gray cropped tank with cutouts"],  # 옛 슬롯 — fallback 검증용 유지
+                    # ── Recall Phase 1 새 슬롯 (우선 매핑 대상) ──
+                    "face_detail": {
+                        "eye_state": "winking",
+                        "left_eye": "open",
+                        "right_eye": "closed",
+                        "mouth_state": "cup raised to lips",
+                        "expression_notes": ["one eye closed", "drinking"],
+                    },
+                    "object_interaction": {
+                        "object": "clear plastic cup",
+                        "object_position_relative_to_face": "raised to lips",
+                        "action": "drinking",
+                    },
+                    "clothing_detail": {
+                        "top_color": "gray",
+                        "strap_layout": "asymmetric cross-strap",
+                        "cutouts_or_openings": "side cutouts",
+                        "top_type": "cropped tank top",
+                        "bottom_color": "beige",
+                        "bottom_type": "cargo pants",
+                        "bottom_style_details": ["utility pockets"],
+                    },
                 }
             ],
             "environment": {
                 "location_type": "music festival outdoor at night",
                 "background": ["neon MUSIC FESTIVAL sign"],
+                # ── Recall Phase 1 새 슬롯 ──
+                "crowd_detail": {
+                    "raincoats_or_ponchos": "transparent plastic raincoats",
+                    "crowd_clothing": ["wet hair"],
+                },
             },
             "lighting_and_color": {
                 "visible_light_sources": ["red stage lights", "blue stage lights"],
@@ -92,6 +119,19 @@ class TestAnalyzeImageDetailedV3:
         assert "chest-up" in result.composition
         assert result.uncertain == "drink type"
         assert result.ko is not None and "음악" in result.ko
+        # ── Recall Phase 1-3 새 슬롯 우선 매핑 검증 ──
+        # face_detail 경로 — eye_state + mouth_state + expression_notes
+        assert "winking" in result.subject
+        assert "cup raised to lips" in result.subject  # face_detail.mouth_state
+        assert "one eye closed" in result.subject  # face_detail.expression_notes[0]
+        # clothing_detail 우선 매핑 (옛 clothing[] 대신)
+        assert "asymmetric cross-strap" in result.clothing_or_materials
+        assert "side cutouts" in result.clothing_or_materials
+        assert "cargo pants" in result.clothing_or_materials
+        # object_interaction 흡수 (raised to lips 동작 보존)
+        assert "raised to lips" in result.clothing_or_materials
+        # crowd_detail → environment 흡수
+        assert "transparent plastic raincoats" in result.environment
 
     async def test_vision_failure_returns_fallback(self) -> None:
         """vision 호출 실패 → fallback=True (text 호출 안 함)."""
@@ -122,6 +162,11 @@ class TestAnalyzeImageDetailedV3:
                 {
                     "apparent_age_group": "young adult",
                     "broad_visible_appearance": "Caucasian male",
+                    # Recall Phase 1-3 검증 — 새 clothing_detail 일부 추가
+                    "clothing_detail": {
+                        "top_color": "white",
+                        "top_type": "t-shirt",
+                    },
                 }
             ],
             "environment": {"location_type": "studio"},
@@ -167,6 +212,8 @@ class TestAnalyzeImageDetailedV3:
         # observation 5 슬롯은 그대로
         assert "Caucasian male" in result.subject
         assert "studio" in result.environment
+        # 새 clothing_detail 도 fallback positive 에 흡수됨 (Phase 1-3 검증)
+        assert "white" in result.positive_prompt or "t-shirt" in result.positive_prompt.lower()
 
     async def test_banned_terms_filter_applied(self) -> None:
         """positive_prompt 안 boilerplate 가 observation 근거 없으면 제거된다."""
