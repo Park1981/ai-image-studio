@@ -85,6 +85,15 @@ export interface PipelineCtx {
    * vision translation stage 는 정책상 항상 fast (spec §4.4) → 분기 X.
    */
   promptMode?: "fast" | "precise";
+  /**
+   * 영상 모델 (Phase 5 follow-up · 2026-05-03 · spec §4.2 후속).
+   * mode === "video" 일 때만 채워짐 (그 외 undefined).
+   * 3 stage 의 subLabel/title 분기에 사용:
+   *   - workflow-dispatch: "Wan 2.2 i2v builder" / "LTX i2v builder"
+   *   - comfyui-sampling: "wan2.2-14b-q6_k" / "ltx-2.3-22b-fp8"
+   *   - prompt-merge.detail: "Wan 프롬프트" / "LTX 프롬프트"
+   */
+  videoModelId?: "wan22" | "ltx";
 }
 
 /**
@@ -94,6 +103,19 @@ export interface PipelineCtx {
  */
 const gemmaSubLabel = (c: PipelineCtx): string =>
   c.promptMode === "precise" ? "gemma4-un · 정밀 (30~60초)" : "gemma4-un";
+
+/**
+ * Video stage 의 model_id 분기 콜백 (Phase 5 follow-up · 2026-05-03).
+ * spec §4.2 의 두 모델 (Wan 2.2 / LTX 2.3) 빌더/체크포인트 라벨 분리.
+ */
+const videoBuilderSubLabel = (c: PipelineCtx): string =>
+  c.videoModelId === "wan22" ? "Wan 2.2 i2v builder" : "LTX i2v builder";
+
+const videoModelSubLabel = (c: PipelineCtx): string =>
+  c.videoModelId === "wan22" ? "wan2.2-14b-q6_k" : "ltx-2.3-22b-fp8";
+
+const videoPromptTitleLabel = (c: PipelineCtx): string =>
+  c.videoModelId === "wan22" ? "Wan" : "LTX";
 
 /** 백엔드가 SSE 로 보내는 stage event payload — 임의 필드 (mode 별 다름). */
 export type StagePayload = Record<string, unknown>;
@@ -234,13 +256,15 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
         const finalPrompt = p.finalPrompt as string | undefined;
         const finalPromptKo = p.finalPromptKo as string | undefined;
         const provider = p.provider as string | undefined;
+        // Phase 5 follow-up (2026-05-03) — title 도 model 별 분기.
+        const modelLabel = videoPromptTitleLabel(c);
         return (
           <>
             {finalPrompt && (
               <DetailBox
                 // Phase 2 (2026-05-01) — fallback / fallback-precise-failed 둘 다 warn 톤
                 kind={provider?.startsWith("fallback") ? "warn" : "info"}
-                title={`LTX 프롬프트 (${provider ?? "?"})`}
+                title={`${modelLabel} 프롬프트 (${provider ?? "?"})`}
               >
                 {finalPrompt}
               </DetailBox>
@@ -256,16 +280,15 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     },
     {
       // 백엔드 video.py 가 emit 하는 stage type 과 1:1 매칭 — workflow-dispatch.
-      // (Phase 3 2026-04-27 fix: 옛 정의 "workflow-build" 는 백엔드 emit 과
-      // 매칭 안 돼서 row 가 안 보이는 잠재 버그였음.)
+      // Phase 5 follow-up (2026-05-03) — model_id 분기 라벨 (spec §4.2 듀얼).
       type: "workflow-dispatch",
       label: "워크플로우 설정",
-      subLabel: "LTX i2v builder",
+      subLabel: videoBuilderSubLabel,
     },
     {
       type: "comfyui-sampling",
       label: "영상 생성",
-      subLabel: "ltx-2.3-22b-fp8",
+      subLabel: videoModelSubLabel,
     },
     { type: "save-output", label: "MP4 저장", subLabel: "h264 인코딩" },
   ],
