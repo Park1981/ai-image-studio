@@ -119,6 +119,7 @@ def _classes(api: dict) -> list[str]:
 
 def test_build_video_has_all_required_classes() -> None:
     api = build_video_from_request(
+        model_id="ltx",
         prompt="a cat walking", source_filename="input.png", seed=42
     )
     present = set(_classes(api))
@@ -131,6 +132,7 @@ def test_build_video_total_node_count_sfw() -> None:
     (Primitive/MathExpression/Reroute 조력 노드는 Python 에서 미리 계산해 제거)
     """
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1
     )
     assert len(api) == 37, f"노드 수 불일치: {len(api)} (expected 37, adult=False)"
@@ -139,6 +141,7 @@ def test_build_video_total_node_count_sfw() -> None:
 def test_build_video_total_node_count_adult() -> None:
     """성인 모드 ON — distilled 2개 + eros 1개 → 38 nodes."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1, adult=True
     )
     assert len(api) == 38, f"노드 수 불일치: {len(api)} (expected 38, adult=True)"
@@ -147,6 +150,7 @@ def test_build_video_total_node_count_adult() -> None:
 def test_build_video_lora_chain_count_sfw() -> None:
     """성인 모드 OFF — distilled 2개만 체인에 포함."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1
     )
     counts = Counter(_classes(api))
@@ -161,6 +165,7 @@ def test_build_video_lora_chain_count_sfw() -> None:
 def test_build_video_lora_chain_count_adult() -> None:
     """성인 모드 ON — distilled 2개 + eros 1개 체인에 포함."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1, adult=True
     )
     counts = Counter(_classes(api))
@@ -174,6 +179,7 @@ def test_build_video_lora_chain_count_adult() -> None:
 def test_build_video_lightning_off_skips_distilled() -> None:
     """Lightning OFF — distilled LoRA 체인에서 제거 (고품질 모드)."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1, lightning=False
     )
     counts = Counter(_classes(api))
@@ -184,6 +190,7 @@ def test_build_video_lightning_off_skips_distilled() -> None:
 def test_build_video_lightning_off_with_adult() -> None:
     """Lightning OFF + Adult ON — adult LoRA 1개만 체인에 포함."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x",
         source_filename="x.png",
         seed=1,
@@ -203,6 +210,7 @@ def test_build_video_lightning_off_uses_quality_sigmas() -> None:
     from studio.presets import QUALITY_BASE_SIGMAS, QUALITY_UPSCALE_SIGMAS
 
     api_off = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1, lightning=False
     )
     sigmas_nodes = [
@@ -216,6 +224,7 @@ def test_build_video_lightning_off_uses_quality_sigmas() -> None:
 
     # Lightning ON 에선 distilled sigmas (원본 VIDEO_MODEL.sampling 값)
     api_on = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1, lightning=True
     )
     sigmas_nodes_on = [
@@ -246,6 +255,7 @@ def test_quality_sigmas_format_and_shift() -> None:
 def test_build_video_sampling_counts() -> None:
     """2-stage sampling 의 노드 수는 adult 토글과 무관."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1
     )
     counts = Counter(_classes(api))
@@ -301,6 +311,7 @@ def test_compute_video_resize_zero_dims_fallback() -> None:
 def test_build_video_uses_source_dims_for_resize() -> None:
     """source_width/height 전달 시 pre_resize 가 원본 비율 유지."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x",
         source_filename="x.png",
         seed=1,
@@ -331,6 +342,7 @@ def test_build_video_uses_source_dims_for_resize() -> None:
 def test_build_video_no_dims_uses_legacy_portrait_box() -> None:
     """source_width/height 미전달 시 레거시 500×800 포트레이트 폴백."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1
     )
     resize_nodes = [
@@ -344,6 +356,7 @@ def test_build_video_no_dims_uses_legacy_portrait_box() -> None:
 def test_build_video_longer_edge_default_1536() -> None:
     """longer_edge 기본값은 1536 (VIDEO_LONGER_EDGE_DEFAULT)."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x",
         source_filename="x.png",
         seed=1,
@@ -366,6 +379,7 @@ def test_video_longer_edge_range_constants() -> None:
 
 def test_build_video_load_image_uses_source_filename() -> None:
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="myphoto.jpg", seed=1
     )
     load_nodes = [n for n in api.values() if n["class_type"] == "LoadImage"]
@@ -374,6 +388,7 @@ def test_build_video_load_image_uses_source_filename() -> None:
 
 def test_build_video_positive_prompt_wired() -> None:
     api = build_video_from_request(
+        model_id="ltx",
         prompt="UNIQUE_VERIFICATION_123", source_filename="x.png", seed=1
     )
     encodes = [n for n in api.values() if n["class_type"] == "CLIPTextEncode"]
@@ -388,6 +403,7 @@ def test_build_video_positive_prompt_wired() -> None:
 
 def test_build_video_negative_prompt_default() -> None:
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x", source_filename="x.png", seed=1
     )
     encodes = [n for n in api.values() if n["class_type"] == "CLIPTextEncode"]
@@ -401,6 +417,7 @@ def test_build_video_negative_prompt_default() -> None:
 
 def test_build_video_negative_prompt_override() -> None:
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x",
         source_filename="x.png",
         seed=1,
@@ -416,6 +433,7 @@ def test_build_video_negative_prompt_override() -> None:
 def test_build_video_unet_override() -> None:
     """env override 가 Checkpoint/AudioVAE/TextEncoder 모두에 반영."""
     api = build_video_from_request(
+        model_id="ltx",
         prompt="x",
         source_filename="x.png",
         seed=1,
@@ -430,7 +448,7 @@ def test_build_video_unet_override() -> None:
 
 
 def test_build_video_frame_params_match_preset() -> None:
-    api = build_video_from_request(prompt="x", source_filename="x.png", seed=1)
+    api = build_video_from_request(model_id="ltx", prompt="x", source_filename="x.png", seed=1)
     s = VIDEO_MODEL.sampling
     empty_vid = next(n for n in api.values() if n["class_type"] == "EmptyLTXVLatentVideo")
     assert empty_vid["inputs"]["length"] == s.frame_count
@@ -447,7 +465,7 @@ def test_build_video_frame_params_match_preset() -> None:
 
 def test_build_video_seed_different_for_stages() -> None:
     """base stage seed = 주어진 값, upscale stage seed = seed+1 로 구분."""
-    api = build_video_from_request(prompt="x", source_filename="x.png", seed=100)
+    api = build_video_from_request(model_id="ltx", prompt="x", source_filename="x.png", seed=100)
     noises = [n for n in api.values() if n["class_type"] == "RandomNoise"]
     seeds = [n["inputs"]["noise_seed"] for n in noises]
     assert sorted(seeds) == [100, 101]
