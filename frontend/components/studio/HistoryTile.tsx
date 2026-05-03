@@ -26,6 +26,7 @@ import ImageTile from "@/components/ui/ImageTile";
 import ResultHoverActionBar, {
   ActionBarButton,
 } from "@/components/studio/ResultHoverActionBar";
+import Badge from "@/components/ui/Badge";
 import { deleteHistoryItem } from "@/lib/api/history";
 import { copyText } from "@/lib/image-actions";
 import type { HistoryItem } from "@/lib/api/types";
@@ -139,6 +140,35 @@ export default function HistoryTile({
           boxShadow: "none",
         }}
       />
+
+      {/* Phase 5 (2026-05-03 · spec §5.7) — Video mode 시 모델 배지.
+       *  - 위치: top-RIGHT (옛 left 는 "● 선택" 칩과 충돌 — top:9, left:9 z-index:4)
+       *  - tone 결정: modelId 우선 → 누락 시 model 문자열 fallback (Wan 포함 → violet)
+       *    Phase 5 follow-up 3 (2026-05-03 fix): 옛 row (서버 재로드 후 modelId 없음) 도
+       *    시각 일관 위해 display_name 기반 추론. */}
+      {item.mode === "video" && item.model && (
+        <div
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 8,
+            pointerEvents: "none",
+            zIndex: 2,
+          }}
+        >
+          <Badge
+            tone={
+              item.modelId === "wan22" ||
+              (item.modelId == null && /wan/i.test(item.model))
+                ? "violet"
+                : "cyan"
+            }
+            title={`영상 모델: ${item.model}`}
+          >
+            {item.model}
+          </Badge>
+        </div>
+      )}
 
       {/* 결과 뷰어와 동일한 글래스 pill — 호버 시 통통 등장 (V5 tile variant) */}
       <div onClick={(e) => e.stopPropagation()}>

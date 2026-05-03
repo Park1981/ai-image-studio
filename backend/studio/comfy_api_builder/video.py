@@ -1,11 +1,13 @@
 """
-comfy_api_builder.video — LTX-2.3 Image-to-Video ComfyUI flat API 빌더.
+comfy_api_builder.video — 영상 빌더 (LTX-2.3 + Wan 2.2 i2v 듀얼).
 
-2-stage sampling (base + spatial upscale) + AV (audio/video) concat 흐름.
+2026-05-03 (Phase 2): build_video_from_request 가 model_id 분기 facade 로 변경.
+ - LTX: 기존 본문 → _build_ltx 로 캡슐화 (변경 X)
+ - Wan 2.2: _build_wan22 신규 (UnetLoaderGGUF × 2 + 2-stage KSamplerAdvanced)
 
-_build_video_lora_chain + build_video_from_request 진입점.
+기존 진입점 (build_video_from_request) 시그니처 호환 (model_id 추가만).
 
-Phase 4.5 단계 5 (2026-04-30) 분리.
+Phase 4.5 단계 5 (2026-04-30) 분리 → Phase 2 (2026-05-03) 듀얼 확장.
 """
 
 from __future__ import annotations
@@ -13,11 +15,15 @@ from __future__ import annotations
 from typing import Callable
 
 from ..presets import (
+    DEFAULT_VIDEO_MODEL_ID,
+    LTX_VIDEO_PRESET,
     QUALITY_BASE_SIGMAS,
     QUALITY_UPSCALE_SIGMAS,
     VIDEO_LONGER_EDGE_DEFAULT,
-    VIDEO_MODEL,
+    VIDEO_MODEL,  # 호환 alias (== LTX_VIDEO_PRESET) — 기존 테스트 호환용
     VideoLoraEntry,
+    VideoModelId,
+    WAN22_VIDEO_PRESET,
     active_video_loras,
     compute_video_resize,
     resolve_video_unet_name,
@@ -61,6 +67,7 @@ def _build_video_lora_chain(
 
 def build_video_from_request(
     *,
+    model_id: VideoModelId = DEFAULT_VIDEO_MODEL_ID,
     prompt: str,
     source_filename: str,
     seed: int,
@@ -72,30 +79,78 @@ def build_video_from_request(
     longer_edge: int | None = None,
     lightning: bool = True,
 ) -> ApiPrompt:
-    """LTX-2.3 i2v 워크플로우 API 포맷 조립.
+    """영상 빌더 facade — model_id 분기 (Phase 2 도입).
+
+    spec §4.2 / 사용자 결정 #1 — default model_id="wan22" (Wan 2.2 i2v).
 
     Args:
+        model_id: "ltx" | "wan22" — preset / 노드 그래프 분기.
+            기존 코드 (model_id 미지정) 는 default Wan 22 로 흐름 — 회귀 깨질 수 있어
+            기존 LTX 테스트는 model_id="ltx" 명시 추가 필요.
         prompt: gemma4 업그레이드 결과 (영문)
         source_filename: ComfyUI input/ 에 업로드된 파일명
-        seed: base stage RandomNoise 시드 (upscale stage 는 런타임 random)
-        negative_prompt: 기본은 VIDEO_MODEL.negative_prompt
-        unet_override: VRAM 16GB 대응용 · Kijai transformer_only 등 파일명
-        adult: 성인 모드 토글. True 면 eros LoRA 체인 포함.
-        source_width: 원본 이미지 너비 (px). 제공되면 원본 비율 유지 리사이즈 계산.
-            None 이면 레거시 포트레이트 박스 (500×800) fit 로 폴백.
-        source_height: 원본 이미지 높이.
-        longer_edge: 사용자 지정 긴 변 픽셀 (512~1536, step 128). 기본 1536.
-        lightning: Lightning 4-step 초고속 모드 (2026-04-24 · v10).
-            True (기본) = distilled LoRA 체인 + 4-step sigmas (5분 내외, 얼굴 drift 가능)
-            False       = LoRA 스킵 + 30-step full sigmas (20분+, 얼굴 보존 최강)
+        seed: base stage 시드 (LTX: upscale stage 는 seed+1 / Wan: high+low 동일 seed)
+        negative_prompt: 기본은 preset.negative_prompt
+        unet_override: LTX 전용 — VRAM 16GB 대응용 Kijai transformer_only 등 (Wan 무시)
+        adult: LTX 전용 — 성인 모드 토글 (Wan 무시 · LoRA 정책 다름)
+        source_width / source_height: 원본 이미지 dims · 비율 유지 리사이즈
+        longer_edge: 사용자 지정 긴 변 픽셀 (512~1536, step 128). 모델별 default.
+        lightning: 4-step 초고속 모드 (LTX: distilled LoRA / Wan: lightx2v LoRA).
+
+    Returns:
+        ComfyUI /prompt 용 flat dict.
+    """
+    if model_id == "ltx":
+        return _build_ltx(
+            prompt=prompt,
+            source_filename=source_filename,
+            seed=seed,
+            negative_prompt=negative_prompt,
+            unet_override=unet_override,
+            adult=adult,
+            source_width=source_width,
+            source_height=source_height,
+            longer_edge=longer_edge,
+            lightning=lightning,
+        )
+    if model_id == "wan22":
+        return _build_wan22(
+            prompt=prompt,
+            source_filename=source_filename,
+            seed=seed,
+            negative_prompt=negative_prompt,
+            source_width=source_width,
+            source_height=source_height,
+            longer_edge=longer_edge,
+            lightning=lightning,
+        )
+    raise ValueError(f"unknown video model_id: {model_id!r}")
+
+
+def _build_ltx(
+    *,
+    prompt: str,
+    source_filename: str,
+    seed: int,
+    negative_prompt: str | None = None,
+    unet_override: str | None = None,
+    adult: bool = False,
+    source_width: int | None = None,
+    source_height: int | None = None,
+    longer_edge: int | None = None,
+    lightning: bool = True,
+) -> ApiPrompt:
+    """LTX-2.3 i2v 워크플로우 API 포맷 조립 (private — 기존 본문).
+
+    2-stage sampling (base + spatial upscale) + AV (audio/video) concat 흐름.
 
     Returns:
         ComfyUI /prompt 용 flat dict (Lightning ON=37 nodes, OFF=35 nodes).
     """
     api: ApiPrompt = {}
     nid = _make_id_gen()
-    s = VIDEO_MODEL.sampling
-    neg = negative_prompt or VIDEO_MODEL.negative_prompt
+    s = LTX_VIDEO_PRESET.sampling
+    neg = negative_prompt or LTX_VIDEO_PRESET.negative_prompt
     unet_name = resolve_video_unet_name(unet_override)
 
     # ── 해상도 계산 (2026-04-24 · v9): 원본 비율 유지 + 사용자 longer_edge ──
@@ -450,6 +505,269 @@ def build_video_from_request(
             "filename_prefix": "AIS-Video",
             "format": s.save_format,
             "codec": s.save_codec,
+        },
+    }
+
+    return api
+
+
+# ═════════════════════════════════════════════════════════════════════
+# Wan 2.2 i2v 빌더 — 2-stage (high noise + low noise · 같은 cond/latent 공유)
+# ═════════════════════════════════════════════════════════════════════
+# spec §4.2 (Phase 1.5 검증 다이어그램) 1:1 mirror.
+# 출처 워크플로우: Next Diffusion GGUF + LightX2V (사용자 실증).
+# 핵심 차이 (LTX 대비):
+#  - WanImageToVideo 가 cond_pos/cond_neg/latent_init 3개 출력 (raw cond 를 video-aware 로 변환)
+#  - High/Low noise UNET 두 개를 KSamplerAdvanced 두 단계에 각각 적용 (MoE)
+#  - LoRA 는 high/low 분리 학습된 별 파일 (Lightning) + 공통 파일 (모션) 혼합
+#  - ModelSamplingSD3 shift=8.0 (GGUF 권장)
+# ═════════════════════════════════════════════════════════════════════
+
+
+def _build_wan22_lora_chain(
+    api: ApiPrompt,
+    nid: Callable[[], str],
+    *,
+    base_model: NodeRef,
+    loras: list,
+    use_high: bool,
+    lightning: bool,
+) -> NodeRef:
+    """Wan22LoraEntry 리스트 → high/low 별 LoRA 체인 적용.
+
+    Args:
+        loras: WAN22_VIDEO_PRESET.loras (Wan22LoraEntry list)
+        use_high: True 면 entry.name_high 사용, False 면 entry.name_low
+        lightning: False 면 role=="lightning" entry 스킵
+
+    Returns:
+        체인 끝 NodeRef.
+    """
+    chain: list[tuple[str, float]] = []
+    for entry in loras:
+        if entry.role == "lightning" and not lightning:
+            continue
+        name = entry.name_high if use_high else entry.name_low
+        chain.append((name, float(entry.strength)))
+    return _apply_lora_chain(api, nid, base_model=base_model, loras=chain)
+
+
+def _build_wan22(
+    *,
+    prompt: str,
+    source_filename: str,
+    seed: int,
+    negative_prompt: str | None = None,
+    source_width: int | None = None,
+    source_height: int | None = None,
+    longer_edge: int | None = None,
+    lightning: bool = True,
+) -> ApiPrompt:
+    """Wan 2.2 i2v ComfyUI flat API 빌더 (spec §4.2 다이어그램).
+
+    Args:
+        prompt: gemma4 업그레이드 결과 (영문)
+        source_filename: ComfyUI input/ 에 업로드된 파일명
+        seed: KSamplerAdvanced 의 noise_seed (high/low 동일 seed 공유)
+        negative_prompt: 기본은 WAN22_VIDEO_PRESET.negative_prompt
+        source_width / source_height: 원본 dims · 비율 유지 리사이즈 (8배수 스냅)
+        longer_edge: 긴 변 픽셀 · None 이면 default 832 (Wan sweet spot)
+        lightning: True (default) → 4-step / cfg 1 / split 2.
+                   False → 20-step / cfg 3.5 / split 10 (정밀 모드)
+
+    Returns:
+        ComfyUI /prompt 용 flat dict.
+        Lightning ON: 17 nodes (LoRA 체인 each side: lightning + motion = 2)
+        Lightning OFF: 15 nodes (LoRA 체인 each side: motion only = 1)
+    """
+    api: ApiPrompt = {}
+    nid = _make_id_gen()
+    p = WAN22_VIDEO_PRESET
+    s = p.sampling
+    f = p.files
+    neg = negative_prompt or p.negative_prompt
+
+    # ── Sampling 파라미터 (Lightning ON/OFF 분기) ──
+    if lightning:
+        steps = s.lightning_steps     # 4
+        cfg = s.lightning_cfg         # 1.0
+        split = s.lightning_split     # 2 (high noise end_step)
+    else:
+        steps = s.precise_steps       # 20
+        cfg = s.precise_cfg           # 3.5
+        split = s.precise_split       # 10
+
+    # ── 해상도 계산 — LTX 와 같은 compute_video_resize 활용 ──
+    # 사용자 longer_edge override 없으면 Wan sweet spot 832 사용 (16GB VRAM fit).
+    resolved_longer = longer_edge or s.default_width
+    if source_width and source_height:
+        width, height = compute_video_resize(
+            source_width, source_height, resolved_longer
+        )
+    else:
+        # 원본 dims 미상 시 default (832×480 가로) 사용.
+        width, height = s.default_width, s.default_height
+
+    length = s.default_length  # 81 frames (5초 @ 16fps)
+
+    # ── 0. Image 입력 ──
+    load_id = nid()
+    api[load_id] = {
+        "class_type": "LoadImage",
+        "inputs": {"image": source_filename, "upload": "image"},
+    }
+
+    # ── 1. CLIP / VAE 로더 (공통) ──
+    clip_id = nid()
+    api[clip_id] = {
+        "class_type": "CLIPLoader",
+        "inputs": {
+            "clip_name": f.text_encoder,
+            "type": "wan",  # Phase 1.5 검증: enum 19개 중 10번째 ✅
+            "device": "default",
+        },
+    }
+    vae_id = nid()
+    api[vae_id] = {
+        "class_type": "VAELoader",
+        "inputs": {"vae_name": f.vae},
+    }
+
+    # ── 2. CLIPTextEncode (raw cond — WanImageToVideo 로 흘려보냄) ──
+    pos_raw_id = nid()
+    api[pos_raw_id] = {
+        "class_type": "CLIPTextEncode",
+        "_meta": {"title": "Positive (raw)"},
+        "inputs": {"clip": [clip_id, 0], "text": prompt},
+    }
+    neg_raw_id = nid()
+    api[neg_raw_id] = {
+        "class_type": "CLIPTextEncode",
+        "_meta": {"title": "Negative (raw)"},
+        "inputs": {"clip": [clip_id, 0], "text": neg},
+    }
+
+    # ── 3. WanImageToVideo — cond × 2 + latent 3개 출력 ──
+    # Phase 1.5 검증: 출력 [positive_v, negative_v, latent_init] (slot 0/1/2).
+    # 양 sampler stage 가 이 출력의 cond/latent 를 공유 — sampling 전 1회 호출.
+    wan_i2v_id = nid()
+    api[wan_i2v_id] = {
+        "class_type": "WanImageToVideo",
+        "inputs": {
+            "positive": [pos_raw_id, 0],
+            "negative": [neg_raw_id, 0],
+            "vae": [vae_id, 0],
+            "width": width,
+            "height": height,
+            "length": length,
+            "batch_size": 1,
+            "start_image": [load_id, 0],  # i2v 핵심 입력 (optional schema)
+        },
+    }
+
+    # ── 4. HIGH NOISE 분기: UNET + LoRA chain + ModelSamplingSD3 ──
+    unet_high_id = nid()
+    api[unet_high_id] = {
+        "class_type": "UnetLoaderGGUF",  # city96/ComfyUI-GGUF (category="bootleg")
+        "inputs": {"unet_name": f.unet_high},
+        # Phase 1.5 검증: required=unet_name 만. dequant_dtype 없음.
+    }
+    model_high_ref = _build_wan22_lora_chain(
+        api, nid,
+        base_model=[unet_high_id, 0],
+        loras=p.loras,
+        use_high=True,
+        lightning=lightning,
+    )
+    shift_high_id = nid()
+    api[shift_high_id] = {
+        "class_type": "ModelSamplingSD3",
+        "inputs": {"model": model_high_ref, "shift": float(s.shift)},
+    }
+
+    # ── 5. KSamplerAdvanced HIGH (add_noise + leftover_noise enable) ──
+    ksampler_high_id = nid()
+    api[ksampler_high_id] = {
+        "class_type": "KSamplerAdvanced",
+        "inputs": {
+            "model": [shift_high_id, 0],
+            "add_noise": "enable",
+            "noise_seed": int(seed),
+            "steps": steps,
+            "cfg": float(cfg),
+            "sampler_name": s.sampler,
+            "scheduler": s.scheduler,
+            "positive": [wan_i2v_id, 0],   # WanImageToVideo positive
+            "negative": [wan_i2v_id, 1],   # WanImageToVideo negative
+            "latent_image": [wan_i2v_id, 2],  # WanImageToVideo latent_init
+            "start_at_step": 0,
+            "end_at_step": split,
+            "return_with_leftover_noise": "enable",
+        },
+    }
+
+    # ── 6. LOW NOISE 분기: UNET + LoRA chain + ModelSamplingSD3 ──
+    unet_low_id = nid()
+    api[unet_low_id] = {
+        "class_type": "UnetLoaderGGUF",
+        "inputs": {"unet_name": f.unet_low},
+    }
+    model_low_ref = _build_wan22_lora_chain(
+        api, nid,
+        base_model=[unet_low_id, 0],
+        loras=p.loras,
+        use_high=False,
+        lightning=lightning,
+    )
+    shift_low_id = nid()
+    api[shift_low_id] = {
+        "class_type": "ModelSamplingSD3",
+        "inputs": {"model": model_low_ref, "shift": float(s.shift)},
+    }
+
+    # ── 7. KSamplerAdvanced LOW (add_noise + leftover_noise disable) ──
+    ksampler_low_id = nid()
+    api[ksampler_low_id] = {
+        "class_type": "KSamplerAdvanced",
+        "inputs": {
+            "model": [shift_low_id, 0],
+            "add_noise": "disable",
+            "noise_seed": int(seed),  # high 와 동일 seed (low 는 fixed)
+            "steps": steps,
+            "cfg": float(cfg),
+            "sampler_name": s.sampler,
+            "scheduler": s.scheduler,
+            "positive": [wan_i2v_id, 0],   # 동일 cond 재사용 (이미 video-aware)
+            "negative": [wan_i2v_id, 1],
+            "latent_image": [ksampler_high_id, 0],  # high stage leftover noise
+            "start_at_step": split,
+            "end_at_step": 10000,
+            "return_with_leftover_noise": "disable",
+        },
+    }
+
+    # ── 8. VAEDecode + CreateVideo + SaveVideo ──
+    vae_decode_id = nid()
+    api[vae_decode_id] = {
+        "class_type": "VAEDecode",
+        "inputs": {"samples": [ksampler_low_id, 0], "vae": [vae_id, 0]},
+    }
+    create_video_id = nid()
+    api[create_video_id] = {
+        "class_type": "CreateVideo",
+        "inputs": {
+            "images": [vae_decode_id, 0],
+            "fps": float(s.base_fps),  # 16 — Wan 학습 fps (다른 값 시 모션 부자연)
+        },
+    }
+    save_id = nid()
+    api[save_id] = {
+        "class_type": "SaveVideo",
+        "inputs": {
+            "video": [create_video_id, 0],
+            "filename_prefix": "AIS-Video",
+            "format": "auto",
+            "codec": "h264",
         },
     }
 

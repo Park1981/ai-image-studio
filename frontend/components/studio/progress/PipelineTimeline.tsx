@@ -215,6 +215,8 @@ function usePipelineCtx(
   const genPromptMode = useGenerateStore((s) => s.promptMode);
   const editPromptMode = useEditStore((s) => s.promptMode);
   const videoPromptMode = useVideoStore((s) => s.promptMode);
+  // Phase 5 follow-up (2026-05-03) — video stage 의 builder/모델 라벨 분기용.
+  const videoModelId = useVideoStore((s) => s.selectedVideoModel);
 
   // warmup stage 가 도착했는지 — Phase 5 자동 기동 시 활성. stageHistory 안 type 검사.
   const warmupArrived = stageHistory.some((s) => s.type === "comfyui-warmup");
@@ -246,6 +248,7 @@ function usePipelineCtx(
     warmupArrived,
     intentRefineArrived: mode === "compare" ? intentRefineArrived : undefined,
     promptMode,
+    videoModelId: mode === "video" ? videoModelId : undefined,
   };
 }
 

@@ -39,6 +39,8 @@ export function useVideoPipeline(
   const lightning = useVideoStore((s) => s.lightning);
   const skipUpgrade = useVideoStore((s) => s.skipUpgrade);
   const promptMode = useVideoStore((s) => s.promptMode);
+  // Phase 4 (2026-05-03) — 영상 모델 선택 (Wan 2.2 / LTX 2.3)
+  const selectedVideoModel = useVideoStore((s) => s.selectedVideoModel);
   // 실행 상태
   const running = useVideoStore((s) => s.running);
   const setRunning = useVideoStore((s) => s.setRunning);
@@ -89,6 +91,8 @@ export function useVideoPipeline(
         preUpgradedPrompt: skipUpgrade ? prompt : undefined,
         // Phase 2 (2026-05-01) — gemma4 보강 모드 (정밀 시 motion/camera/preserve 해석 깊어짐).
         promptMode,
+        // Phase 4 (2026-05-03) — 영상 모델 선택 (Wan 2.2 / LTX 2.3)
+        modelId: selectedVideoModel,
       }),
       {
         on: {

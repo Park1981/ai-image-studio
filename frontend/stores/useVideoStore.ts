@@ -22,6 +22,13 @@ import {
   createStageActions,
   type StageSliceState,
 } from "@/stores/createStageSlice";
+// Phase 4 (2026-05-03) — 영상 모델 선택 (Wan 2.2 / LTX 2.3 듀얼)
+import {
+  DEFAULT_VIDEO_MODEL_ID,
+  VIDEO_MODEL_PRESETS,
+  type VideoModelId,
+} from "@/lib/model-presets";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 
 // ── 영상 해상도 슬라이더 범위 (backend presets.py 와 동기화) ──
 export const VIDEO_LONGER_EDGE_MIN = 512;
@@ -74,6 +81,21 @@ export interface VideoState extends StageSliceState {
   longerEdge: number;
 
   /**
+   * Phase 4 (2026-05-03) — 영상 모델 선택 (Wan 2.2 default · LTX 2.3 보존).
+   * 페이지 마운트 시 useSettingsStore.videoModel 로 init 동기화.
+   * 변경 시 setSelectedVideoModel 이 settings persist 도 함께 갱신 (옵션 A · spec §5.6).
+   */
+  selectedVideoModel: VideoModelId;
+
+  /**
+   * Phase 4 (2026-05-03) — 사용자가 longerEdge 슬라이더 직접 만진 적 있나 (sticky choice).
+   * - false (default): 모델 전환 시 새 모델 sweet spot 으로 longerEdge 자동 채움
+   * - true: 사용자 의도 존중 → 모델 전환 시 longerEdge 유지 (8배수 + range clamp 만)
+   * Reset 트리거: 페이지 진입 시 settings init / 새 source image 업로드.
+   */
+  longerEdgeUserOverride: boolean;
+
+  /**
    * Lightning 4-step 초고속 모드 (2026-04-24 · v10).
    * ON  (기본) — 5분 내외 · distilled LoRA · 얼굴 drift 가능
    * OFF        — 20분+ · full 30-step · 얼굴 보존 최강
@@ -110,6 +132,8 @@ export interface VideoState extends StageSliceState {
   setLongerEdge: (v: number) => void;
   setLightning: (v: boolean) => void;
   setSkipUpgrade: (v: boolean) => void;
+  /** Phase 4 (2026-05-03) — 영상 모델 전환 + settings persist fan-out + sweet spot 자동 채움 */
+  setSelectedVideoModel: (id: VideoModelId) => void;
   /** Phase 2 (2026-05-01): gemma4 보강 모드 토글 */
   setPromptMode: (v: "fast" | "precise") => void;
   setRunning: (running: boolean) => void;
@@ -130,6 +154,9 @@ export const useVideoStore = create<VideoState>((set) => ({
   prompt: "",
   adult: false,
   longerEdge: VIDEO_LONGER_EDGE_DEFAULT,
+  // Phase 4 (2026-05-03) — 영상 모델 + override 트래킹
+  selectedVideoModel: DEFAULT_VIDEO_MODEL_ID,
+  longerEdgeUserOverride: false,
   lightning: true,
   // 2026-05-01: default OFF 로 변경 (영상 사용자는 영문 프롬프트 직접 다듬어 쓰는 경향).
   // skipUpgrade=true → AI 보정 우회 (gemma4/vision 호출 X · ~15초 절약).
@@ -153,6 +180,8 @@ export const useVideoStore = create<VideoState>((set) => ({
       sourceLabel: label ?? "이미지를 업로드하거나 히스토리에서 선택",
       sourceWidth: w ?? null,
       sourceHeight: h ?? null,
+      // Phase 4 (2026-05-03) — 새 source 업로드 = 새 작업 컨텍스트 → override reset
+      longerEdgeUserOverride: false,
     }),
 
   setPrompt: (v) => set({ prompt: v }),
@@ -165,7 +194,23 @@ export const useVideoStore = create<VideoState>((set) => ({
       VIDEO_LONGER_EDGE_MIN,
       Math.min(VIDEO_LONGER_EDGE_MAX, Math.floor(v / 8) * 8),
     );
-    set({ longerEdge: clamped });
+    // Phase 4 (2026-05-03) — 사용자가 직접 슬라이더 조작 → sticky choice 활성
+    set({ longerEdge: clamped, longerEdgeUserOverride: true });
+  },
+
+  setSelectedVideoModel: (id) => {
+    // 옵션 A (spec §5.6) — useVideoStore 안에서 settings persist 동시 갱신.
+    // 두 zustand set 은 동기 호출이라 race 없음. 호출부는 한 곳만 호출.
+    useSettingsStore.getState().setVideoModel(id);
+    set((state) => {
+      const next: Partial<VideoState> = { selectedVideoModel: id };
+      // 사용자가 longerEdge 직접 안 만졌으면 새 모델 sweet spot 으로 자동 정렬.
+      // 만졌으면 (override=true) 현재 값 유지 (8배수 + range 는 setLongerEdge 가 보장).
+      if (!state.longerEdgeUserOverride) {
+        next.longerEdge = VIDEO_MODEL_PRESETS[id].defaultWidth;
+      }
+      return next;
+    });
   },
 
   setLightning: (v) => set({ lightning: v }),
@@ -234,6 +279,9 @@ export const useVideoInputs = () =>
       // Phase 2 (2026-05-01) — gemma4 보강 모드
       promptMode: s.promptMode,
       setPromptMode: s.setPromptMode,
+      // Phase 4 (2026-05-03) — 영상 모델 선택 (Wan 2.2 / LTX 2.3)
+      selectedVideoModel: s.selectedVideoModel,
+      setSelectedVideoModel: s.setSelectedVideoModel,
     })),
   );
 

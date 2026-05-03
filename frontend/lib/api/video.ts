@@ -69,6 +69,8 @@ async function* realVideoStream(
       preUpgradedPrompt: req.preUpgradedPrompt,
       // Phase 2 (2026-05-01) — gemma4 보강 모드. 백엔드 default 가 fast 이므로 미전달 OK.
       promptMode: req.promptMode,
+      // Phase 3 (2026-05-03) — 영상 모델 선택. 백엔드 default 가 wan22 이므로 미전달 OK.
+      modelId: req.modelId,
     }),
   );
 

@@ -58,10 +58,10 @@ cd frontend; npm run gen:types
 - **`studio/routes/`** (7 파일) — endpoint 도메인별 그룹: `streams.py` (gen/edit/video task+SSE) · `prompt.py` (upgrade-only/research/interrupt) · `vision.py` · `compare.py` · `system.py` · `_common.py` (SSE/태스크 유틸)
 - **`studio/pipelines/`** (7 파일) — 백그라운드 파이프라인: `_dispatch.py` (ComfyUI 디스패치 + Phase 5 자동기동 헬퍼) · `generate.py` · `edit.py` · `video.py` · `vision_analyze.py` · `compare_analyze.py` (Phase 6)
 - **`studio/{prompt,vision,video,comparison}_pipeline.py`** — Ollama gemma4 + qwen2.5vl 호출 로직. `progress_callback: Callable[[str], Awaitable[None]] | None` (Phase 6 이후 옵셔널).
-- **`studio/comfy_api_builder.py`** — ComfyUI flat API format 빌더 (`build_{generate,edit,video}_from_request`)
+- **`studio/comfy_api_builder.py`** — ComfyUI flat API format 빌더 (`build_{generate,edit,video}_from_request`). 영상 빌더는 `model_id` 분기 (`_build_ltx` / `_build_wan22`)
 - **`studio/comfy_transport.py`** — WebSocket + HTTP 전송 (idle 1200s / hard 7200s · 16GB VRAM swap 안전망)
-- **`studio/presets.py`** — Qwen Image 2512 / Edit 2511 / LTX Video 2.3 프리셋 (**프론트와 동기화 필수**)
-- **`studio/history_db.py`** — SQLite (mode: generate/edit/video) · v6 schema (refined_intent 캐싱 컬럼 포함)
+- **`studio/presets.py`** — Qwen Image 2512 / Edit 2511 / LTX Video 2.3 / **Wan 2.2 i2v** 프리셋 (**프론트와 동기화 필수**). `VideoModelId` Literal + `get_video_preset()` dispatch
+- **`studio/history_db.py`** — SQLite (mode: generate/edit/video) · v8 schema (reference_templates 포함)
 - **`studio/_json_utils.py` / `ollama_unload.py` / `_gpu_lock.py` / `dispatch_state.py` / `system_metrics.py` / `_proc_mgr.py`** — 공용 유틸
 - **`scripts/dump_openapi.py`** — FastAPI 풀 OpenAPI 3.1 dump (`npm run gen:types` 가 호출)
 - **`legacy/`** (quarantine) — 옛 5 라우터 + 5 services + 4 tests + conftest. **수정 금지**. main.py 등록 끊김.
@@ -76,6 +76,8 @@ cd frontend; npm run gen:types
 - **`components/studio/EditVisionBlock.tsx`** — Edit 비전 매트릭스 행 UI 공용 (인물 5 / 물체·풍경 5 슬롯 · 🔵수정/🟢보존 배지)
 - **`components/studio/{HistoryGallery,SectionHeader,HistorySectionHeader,ResultHoverActionBar,BeforeAfterSlider}.tsx`** — 4메뉴 통일 공용 컴포넌트 (ResultInfoModal 은 2026-04-30 dead code 청소 시 삭제 — InfoPanel 로 흡수됨)
 - **`components/studio/CompareExtraBoxes.tsx`** — TransformPromptBox + UncertainBox (Compare v2.2)
+- **`components/studio/video/VideoModelSegment.tsx`** — Wan 2.2 / LTX 2.3 모델 선택 세그먼트 (배경 이미지 카드 · framer-motion `flexGrow` 1.7/1.0 spring · 2026-05-03)
+- **`components/ui/Badge.tsx`** — 작은 chip 배지 (violet/cyan/neutral tone · HistoryTile video mode 모델 표시 + 결과 헤더 모델 pill)
 - **`components/chrome/{AppHeader,SystemMetrics,SystemStatusChip}.tsx`** — 통합 헤더 (CPU/GPU/VRAM/RAM 4-bar · macOS 색상 매핑 · 80% 임계 시 VRAM breakdown 오버레이). 옛 VramBadge 는 2026-04-30 dead code 청소 시 삭제됨.
 - **`hooks/{useGeneratePipeline,useEditPipeline,useVideoPipeline,useVisionPipeline,useComparisonAnalysis}.ts`** — mode 별 파이프라인 훅
 - **`lib/api/`** — `client.ts` (parseSSE 등) · `{generate,edit,video,vision,compare}.ts` (SSE drain) · `types.ts` (한글 주석/narrow union 손편집) · `generated.ts` (자동 생성) · `generated-helpers.ts` (Schemas/Paths alias)
@@ -146,15 +148,32 @@ cd frontend; npm run gen:types
 - **Lightning LoRA** (토글): `Qwen-Image-Edit-2511-Lightning-4steps-V1.0-bf16.safetensors` · **steps/cfg = 4 / 1.0**
 - **Extra LoRA** (상시 strength 0.7): `SexGod_CouplesNudity_QwenEdit_2511_v1.safetensors`
 
-### 영상 모드 — LTX Video 2.3
+### 영상 모드 — Wan 2.2 i2v + LTX Video 2.3 듀얼 (2026-05-03 도입)
 
-- **Diffusion**: `ltx-2.3-22b-dev-fp8.safetensors` (29GB · 16GB VRAM 한계)
+사용자가 모델 세그먼트로 선택. **default Wan 2.2** (`useSettingsStore.videoModel` persist).
+공통: 해상도 슬라이더 512~1536 (step 128) · 원본 비율 유지 (8배수 스냅) · 5초 분량.
+
+#### Wan 2.2 i2v (default · 신규 추천 · 16GB VRAM 적합)
+
+- **Diffusion (GGUF · MoE 2-stage)**: `Wan2.2-I2V-A14B-{HighNoise,LowNoise}-Q6_K.gguf` (각 11.18GB · 순차 swap)
+- **Text Encoder**: `umt5_xxl_fp8_e4m3fn_scaled.safetensors`
+- **VAE**: `wan_2.1_vae.safetensors`
+- **Lightning LoRA** (토글, 2개): `wan2.2_i2v_lightx2v_4steps_lora_v1_{high,low}_noise.safetensors` (4-step 가속)
+- **Motion LoRA** (항상 ON · strength 0.8): `BounceHighWan2_2.safetensors`
+- 2-stage KSamplerAdvanced (high noise → low noise · 동일 seed) · ModelSamplingSD3 shift=8.0
+- 81 frames @ 16fps (학습 fps · CreateVideo 노드 fps widget)
+- Lightning ON: 4 step / cfg 1.0 / split 2 · OFF: 20 step / cfg 3.5 / split 10
+- **약 320초 (5분) / 832×480 / Lightning ON** (사용자 실측 2026-05-03)
+- 의존성: city96/ComfyUI-GGUF custom node 필수 (`UnetLoaderGGUF` 노드 등록)
+
+#### LTX Video 2.3 (회귀 보존)
+
+- **Diffusion**: `ltx-2.3-22b-dev-fp8.safetensors` (29GB · 16GB VRAM swap)
 - **Text Encoder**: `gemma_3_12B_it_fp4_mixed.safetensors`
 - **Upscaler**: `ltx-2.3-spatial-upscaler-x2-1.1.safetensors`
 - **Lightning LoRA** (토글, 2개): `ltx-2.3-22b-distilled-lora-384.safetensors` × 2 (base/upscale)
 - **Adult LoRA** (토글): `ltx2310eros_beta.safetensors`
-- 2-stage sampling (base + upscale) · 126 frames (5s × 25fps + 1)
-- 해상도 슬라이더 512~1536 (step 128) · 원본 비율 유지 (8배수 스냅)
+- 2-stage sampling (base + spatial upscale x2) · 126 frames (5s × 25fps + 1)
 
 ### 공통
 

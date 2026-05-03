@@ -25,8 +25,14 @@ from .._gpu_lock import gpu_slot
 from ..comfy_api_builder import build_video_from_request
 from ..presets import (
     DEFAULT_OLLAMA_ROLES,
-    VIDEO_MODEL,
+    DEFAULT_VIDEO_MODEL_ID,
+    LTX_VIDEO_PRESET,
+    VIDEO_MODEL,  # 호환 alias (== LTX_VIDEO_PRESET)
+    VideoModelId,
+    WAN22_VIDEO_PRESET,
+    Wan22ModelPreset,
     compute_video_resize,
+    get_video_preset,
 )
 from ..storage import STUDIO_MAX_IMAGE_BYTES, _persist_history
 from ..tasks import Task
@@ -67,6 +73,7 @@ async def _run_video_pipeline_task(
     longer_edge: int | None = None,
     lightning: bool = True,
     *,
+    model_id: VideoModelId = DEFAULT_VIDEO_MODEL_ID,
     pre_upgraded_prompt: str | None = None,
     # Phase 2 (2026-05-01) — gemma4 보강 모드 ("fast" | "precise")
     prompt_mode: str = "fast",
@@ -180,17 +187,18 @@ async def _run_video_pipeline_task(
         )
 
         actual_seed = int(time.time() * 1000) & 0xFFFFFFFF  # uint32 범위
-        # .env 의 LTX_UNET_NAME override (config.settings.ltx_unet_name)
+        # .env 의 LTX_UNET_NAME override (config.settings.ltx_unet_name) — LTX 만 의미
         unet_override = getattr(settings, "ltx_unet_name", None)
 
         def _make_video_prompt(uploaded_name: str | None) -> dict[str, Any]:
             if uploaded_name is None:
                 raise RuntimeError("Video pipeline requires uploaded image")
             return build_video_from_request(
+                model_id=model_id,
                 prompt=video_res.final_prompt,
                 source_filename=uploaded_name,
                 seed=actual_seed,
-                unet_override=unet_override,
+                unet_override=unet_override if model_id == "ltx" else None,
                 adult=adult,
                 source_width=source_width or None,
                 source_height=source_height or None,
@@ -234,13 +242,30 @@ async def _run_video_pipeline_task(
         )
 
         # ── Done ──
-        s = VIDEO_MODEL.sampling
-        # 최종 영상 해상도 계산 — compute_video_resize 는 base(pre-upscale) 을 반환.
-        # LTX-2.3 은 spatial upscaler x2 로 공간 해상도만 2배 → 최종 = base × 2.
+        # 모델별 history item 분기 (Phase 3 · spec §4.3)
+        preset = get_video_preset(model_id)
+        # 최종 영상 해상도 계산 — compute_video_resize 가 base(pre-upscale) 을 반환.
         base_w, base_h = compute_video_resize(
             source_width or 0, source_height or 0, longer_edge
         )
-        final_w, final_h = base_w * 2, base_h * 2
+        if isinstance(preset, Wan22ModelPreset):
+            # Wan 2.2: spatial upscaler 없음 — base dims 그대로
+            ws = preset.sampling
+            final_w, final_h = base_w, base_h
+            fps_val: float = float(ws.base_fps)
+            frame_count = ws.default_length
+            duration_sec: float = round(ws.default_length / ws.base_fps, 2)
+            cfg_val: float = ws.lightning_cfg if lightning else ws.precise_cfg
+            steps_val: int = ws.lightning_steps if lightning else ws.precise_steps
+        else:
+            # LTX 2.3: spatial upscaler x2 로 공간 해상도만 2배 → 최종 = base × 2
+            ls = preset.sampling
+            final_w, final_h = base_w * 2, base_h * 2
+            fps_val = float(ls.fps)
+            frame_count = ls.frame_count
+            duration_sec = float(ls.seconds)
+            cfg_val = ls.base_cfg
+            steps_val = 0  # LTX 는 ManualSigmas — 전통 step 개념 없음
         item = {
             "id": f"vid-{uuid.uuid4().hex[:8]}",
             "mode": "video",
@@ -249,10 +274,11 @@ async def _run_video_pipeline_task(
             "width": final_w,
             "height": final_h,
             "seed": actual_seed,
-            "steps": 0,  # LTX 는 ManualSigmas 기반 — 전통 step 개념 없음
-            "cfg": s.base_cfg,
+            "steps": steps_val,
+            "cfg": cfg_val,
             "lightning": lightning,  # 실제 요청값 저장 (Lightning LoRA 토글)
-            "model": VIDEO_MODEL.display_name,
+            "model": preset.display_name,
+            "modelId": model_id,  # NEW (Phase 3) — DB persist X · 응답에만 동봉
             "createdAt": int(time.time() * 1000),
             "imageRef": video_ref,
             "upgradedPrompt": video_res.final_prompt,
@@ -262,9 +288,9 @@ async def _run_video_pipeline_task(
             "comfyError": comfy_err,
             # video 전용 메타 — adult/fps/frameCount/durationSec
             "adult": adult,
-            "fps": s.fps,
-            "frameCount": s.frame_count,
-            "durationSec": s.seconds,
+            "fps": fps_val,
+            "frameCount": frame_count,
+            "durationSec": duration_sec,
         }
         saved_to_history = await _persist_history(item)
         await task.emit(
