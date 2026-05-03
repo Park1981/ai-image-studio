@@ -800,10 +800,62 @@ v2 → v2.1 (코드베이스 정합 재검) 후속 결함 11건:
 
 → Phase 2 빌더 코드 작성에 차단 요인 없음. 게이트 통과.
 
-### 14.2 Phase 6 결과 (사용자 실측 후 갱신)
+### 14.2 Phase 5/6 사용자 실측 + 후속 사이클 (2026-05-03 완료)
 
-> 빈 자리. 다음 항목으로 채움:
-> - Phase 6 사용자 실측 시간 (Wan ON/OFF, LTX ON/OFF 4 케이스)
-> - Bounce strength 최종 결정값 (0.6/0.7/0.8/0.9 비교) + 비교 GIF 링크
-> - Codex 리뷰 사이클 결함/수정 내역
-> - 알려진 이슈 추가/해결
+#### 사용자 실측 결과
+
+| 케이스 | 모델 | Lightning | 해상도 | 시간 | 결과 |
+|--------|------|-----------|--------|------|------|
+| 1 | Wan 22 Q6_K | ON | 832×480 / 81f | 약 320초 (5분대) | ✅ "영상 완전 잘된다" — 모션 자연스러움 + 16GB swap 안에 fit |
+| LTX 회귀 | LTX 2.3 | (회귀 안 함 · 코드 동일) | - | - | 알 수 없음 — Phase 4.5 까지 동작이 그대로 보존되므로 회귀 필요 없음 (Phase 6 후속 사용자 결정으로 보류) |
+| Bounce strength | 0.8 (default) | - | - | - | ✅ 사용자 만족 — 0.6/0.7/0.9 비교 시도 안 함 (default 유지 결정) |
+
+#### Phase 5 follow-up 4 사이클 (사용자 피드백 fix)
+
+| Commit | 내용 |
+|--------|------|
+| `35e9374` | 모델 세그먼트 가독성 (어두운 배경 + 진한 글자) + History 배지 위치 (left → right · "선택" 칩과 충돌 회피) + 결과 헤더 모델명 pill |
+| `061fa77` | 진행 모달 라벨 model_id 분기 (`videoBuilderSubLabel` / `videoModelSubLabel` / `videoPromptTitleLabel` 콜백 신설) + VideoModelSegment 카드 풀 재디자인 (배경 이미지 + 모델명만) + 골드톤 bg 이미지 2장 강제 add (`.gitignore` 의 `images/` 우회) |
+| `0d7037a` | History 배지 모델명 추론 fallback (`/wan/i.test(item.model)` → violet · 옛 row 도 시각 일관) + 카드 동적 너비 (framer-motion `flexGrow` 1.7/1.0 + `scale` spring) |
+| `bc03b48` | CTA 하단 ETA description 제거 (Video / Vision · Generate/Edit 와 통일) + 관련 dead code 정리 |
+
+#### 결정 사항 (사용자 확정)
+
+- **Bounce LoRA strength = 0.8 default 유지** (Phase 6 §7.5 비교 튜닝 보류 — 사용자 만족)
+- **VRAM breakdown 임계 80% 그대로** (사용자 보류 · 후속 plan 후보)
+- **진행 모달 시스템 정보 추가 = 보류** (헤더 disclosure 가 동일 정보 제공 · 시각 복잡도 ↑)
+- **AI 보정 (skipUpgrade) default true 유지** (영상은 수동 영문 프롬프트 워크플로 가정 · 일시적 한 번 오작동 보고 있었으나 재현 X)
+
+#### 회귀 결과 최종
+
+- **pytest 408 → 424 PASS** (+16 신규 · Phase 2 builder 7 + Phase 3 routes/preset 9)
+- **vitest 165 → 178 PASS** (+13 신규 · Phase 4 store 10 + api 3)
+- **tsc clean** (모든 phase)
+- **lint** — `EditResultViewer.tsx:77` 의 `react-hooks/set-state-in-effect` 1건은 master 사전 존재 (본 변경 무관)
+
+#### 알려진 후속 plan 후보
+
+1. **VRAM breakdown 임계 낮추기 또는 제거** — 현재 80% 라 Wan 22 의 yo-yo 사용량에서 잘 안 보임. 50% 또는 항상 표시 검토.
+2. **진행 모달 헤더 disclosure 자동 펼침** — 영상 생성 시작 시 자동 펼쳐서 시스템 정보 노출.
+3. **Wan 22 fp8_scaled 옵션** — Q6_K 와 거의 동급 사이즈 · 사용자 보유 중. 모델 옵션 셀렉트 추가 시 진행.
+4. **Wan 호환 face transfer 노드** — InstantID/IP-Adapter 류 등장 시 별 spec.
+5. **t2v 모드** — 사용자가 Wan 2.2 t2v 모델 보유 중 (`wan2.2_t2v_*`). 별 mode `text-to-video` 신규 spec.
+6. **Bounce 외 모션 LoRA 슬롯 토글 UI** — 현재 Bounce 항상 ON / strength 코드 박제. 사용자가 다른 모션 LoRA 시도 시 토글화.
+
+#### 최종 commit 시퀀스 (feature/video-wan22-model-selection)
+
+```
+bc03b48 fix(ui): CTA 하단 ETA description 제거 (Video / Vision)
+0d7037a fix(video): Phase 5 follow-up 3 — History 배지 모델명 추론 + 카드 동적 너비
+061fa77 fix(video): Phase 5 follow-up 2 — 진행 모달 라벨 분기 + 모델 카드 배경 이미지
+35e9374 fix(video): Phase 5 follow-up — 모델 세그먼트 가독성 + History 배지 위치 + 결과 헤더 모델명
+3c5fa59 feat(video): Phase 5 — VideoLeftPanel 모델 세그먼트 + Badge + History 배지
+995ce4b feat(video): Phase 4 — frontend types/store/hook + useSettingsStore.videoModel persist
+7a77e31 feat(video): Phase 3 — pipelines/routes 분기 + dispatch_state + 통합 테스트 9건
+4cd14d5 feat(video): Phase 2 — Wan 2.2 i2v 빌더 + 단위 테스트 7건
+84c7b28 docs(video): Phase 1.5 — ComfyUI /object_info 캡처 + spec 갱신
+1e90c28 feat(video): Phase 1 — backend presets 분리 + frontend mirror 신설
+aa2e13c docs(spec): Wan 2.2 i2v 모델 선택 spec v2 박제 (Phase 0)
+```
+
+총 **11 commit · 28 files · +3914 / -59 lines** (이 §14.2 박제 commit 별도).
