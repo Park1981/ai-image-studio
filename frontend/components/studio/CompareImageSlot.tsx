@@ -11,7 +11,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import Icon from "@/components/ui/Icon";
+import Icon, { type IconName } from "@/components/ui/Icon";
 import StudioUploadSlot from "@/components/studio/StudioUploadSlot";
 import { toast } from "@/stores/useToastStore";
 import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
@@ -30,6 +30,11 @@ export function CompareImageSlot({
   onClear: () => void;
 }) {
   const [pickFn, setPickFn] = useState<(() => void) | null>(null);
+
+  // 시안 매칭 (2026-05-03): SourceImageCard 와 통일 — 파일명/크기·형식 라벨 추출.
+  const filename = value?.label || "";
+  const formatExt =
+    (filename.split(".").pop() || "png").toUpperCase().slice(0, 5) || "PNG";
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
@@ -104,9 +109,13 @@ export function CompareImageSlot({
               height: 160,
               objectFit: "contain",
               display: "block",
+              // SourceImageCard 와 동일 — contain fallback 배경 (외곽 transparent 보완).
+              background: "var(--bg-2)",
             }}
           />
+          {/* A/B 배지 — Compare 고유 (보존). */}
           <CompareSlotBadge floating>{badge}</CompareSlotBadge>
+          {/* 우상단 변경/해제 — SourceImageCard 와 동일 RoundIconBtn 패턴 (시안 통일 2026-05-03). */}
           <div
             style={{
               position: "absolute",
@@ -116,32 +125,102 @@ export function CompareImageSlot({
               gap: 6,
             }}
           >
-            <ActionPill onClick={() => pickFn?.()} title="이미지 변경">
-              <Icon name="refresh" size={11} /> 변경
-            </ActionPill>
-            <ActionPill onClick={onClear} title="해제">
-              <Icon name="x" size={11} />
-            </ActionPill>
+            <RoundIconBtn
+              title="이미지 변경"
+              icon="refresh"
+              onClick={() => pickFn?.()}
+            />
+            <RoundIconBtn title="이미지 해제" icon="x" onClick={onClear} />
           </div>
+          {/* 하단 파일명 + 크기·형식 — 배경 없이 텍스트 그림자만 (시안 통일 2026-05-03).
+           *  SourceImageCard 와 동일 패턴이지만 padding 은 160px 슬롯에 맞춰 약간 좁게. */}
           <div
-            className="mono"
             style={{
               position: "absolute",
-              bottom: 6,
-              left: 8,
-              fontSize: 10,
-              color: "rgba(255,255,255,.85)",
-              background: "rgba(0,0,0,.5)",
-              padding: "2px 6px",
-              borderRadius: 4,
-              backdropFilter: "blur(4px)",
+              left: 0,
+              right: 0,
+              bottom: 0,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 10,
+              padding: "8px 12px",
+              color: "#fff",
+              fontSize: 11,
+              fontWeight: 500,
+              textShadow:
+                "0 2px 6px rgba(0,0,0,.85), 0 0 4px rgba(0,0,0,.6)",
+              pointerEvents: "none",
             }}
           >
-            {value.width}×{value.height}
+            <span
+              style={{
+                flex: 1,
+                minWidth: 0,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+                letterSpacing: "0.01em",
+              }}
+              title={filename}
+            >
+              {filename}
+            </span>
+            <span
+              className="mono"
+              style={{
+                fontSize: 10,
+                color: "rgba(255,255,255,.92)",
+                letterSpacing: ".04em",
+                flexShrink: 0,
+              }}
+            >
+              {value.width} × {value.height} · {formatExt}
+            </span>
           </div>
         </>
       )}
     </StudioUploadSlot>
+  );
+}
+
+/** RoundIconBtn — 시안 통일 (2026-05-03 · SourceImageCard 와 동일 패턴).
+ *  frosted glass 둥근 아이콘 버튼 — 클릭 affordance 보존을 위해 배경 유지. */
+function RoundIconBtn({
+  icon,
+  onClick,
+  title,
+}: {
+  icon: IconName;
+  onClick: () => void;
+  title?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      title={title}
+      style={{
+        all: "unset",
+        cursor: "pointer",
+        width: 28,
+        height: 28,
+        borderRadius: "50%",
+        background: "rgba(0,0,0,.35)",
+        backdropFilter: "blur(14px) saturate(180%)",
+        WebkitBackdropFilter: "blur(14px) saturate(180%)",
+        border: "1px solid rgba(255,255,255,.20)",
+        boxShadow: "0 4px 12px rgba(0,0,0,.20)",
+        color: "#fff",
+        display: "grid",
+        placeItems: "center",
+      }}
+    >
+      <Icon name={icon} size={12} />
+    </button>
   );
 }
 
@@ -198,35 +277,3 @@ export function CompareSlotBadge({
   );
 }
 
-function ActionPill({
-  children,
-  onClick,
-  title,
-}: {
-  children: ReactNode;
-  onClick: () => void;
-  title?: string;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      title={title}
-      style={{
-        all: "unset",
-        cursor: "pointer",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 4,
-        padding: "4px 8px",
-        background: "rgba(0,0,0,.55)",
-        backdropFilter: "blur(6px)",
-        color: "#fff",
-        fontSize: 11,
-        borderRadius: "var(--radius-full)",
-      }}
-    >
-      {children}
-    </button>
-  );
-}

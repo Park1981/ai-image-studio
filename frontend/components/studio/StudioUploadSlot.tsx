@@ -151,9 +151,12 @@ export default function StudioUploadSlot({
         {...hoverHandlers}
         style={{
           ...common,
-          background: "var(--bg-2)",
-          border: drag ? "1px solid var(--accent)" : "1px solid var(--line)",
-          boxShadow: "var(--shadow-sm)",
+          // 시안 매칭 (2026-05-03): 카드 외곽 배경/테두리 제거 + 그림자만으로 띄우기.
+          // 빈 영역은 자식 img 의 `background: var(--bg-2)` (contain fallback) 가 채움.
+          // drag 시는 accent border 만 활성화 (드롭 가능 신호 보존).
+          background: "transparent",
+          border: drag ? "1px solid var(--accent)" : "1px solid transparent",
+          boxShadow: "var(--shadow-md)",
         }}
       >
         {children}

@@ -134,8 +134,9 @@ export default function SourceImageCard({
                 background: "var(--bg-2)",
               }}
             />
-            {/* 시안 매칭 (2026-05-02): 하단 어두운 frosted bar — 좌 파일명 / 우 크기·형식.
-             *  옛 ⓘ 정보 팝오버 + 좌하단 사이즈 배지 → 통합 (정보 한 곳). */}
+            {/* 시안 매칭 (2026-05-03): 하단 라벨 — frosted 띠 배경 제거 + 텍스트 그림자만.
+             *  옛 ⓘ 정보 팝오버 + 좌하단 사이즈 배지 → 통합 (정보 한 곳).
+             *  4 페이지 (Edit/Video/Vision/Compare) 통일 패턴. */}
             <div
               style={{
                 position: "absolute",
@@ -147,12 +148,11 @@ export default function SourceImageCard({
                 justifyContent: "space-between",
                 gap: 12,
                 padding: "10px 14px",
-                background: "rgba(0,0,0,.35)",
-                backdropFilter: "blur(14px) saturate(180%)",
-                WebkitBackdropFilter: "blur(14px) saturate(180%)",
                 color: "#fff",
                 fontSize: 12,
                 fontWeight: 500,
+                textShadow:
+                  "0 2px 6px rgba(0,0,0,.85), 0 0 4px rgba(0,0,0,.6)",
                 pointerEvents: "none",
               }}
             >
@@ -174,7 +174,7 @@ export default function SourceImageCard({
                   className="mono"
                   style={{
                     fontSize: 11,
-                    color: "rgba(255,255,255,.85)",
+                    color: "rgba(255,255,255,.92)",
                     letterSpacing: ".04em",
                     flexShrink: 0,
                   }}
