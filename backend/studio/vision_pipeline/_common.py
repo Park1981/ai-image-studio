@@ -6,7 +6,7 @@ edit_source.py / image_detail.py 둘 다 의존하는 항목:
   - VISION_SYSTEM (Edit 짧은 캡션 system · _describe_image 의 default system prompt)
   - _describe_image (qwen2.5vl 캡션 호출 — Edit 폴백 + Vision Analyzer 폴백 + reference_storage / video_pipeline lazy import)
   - _to_base64 (image → base64 PNG)
-  - _aspect_label (codex C2 fix · Edit `_call_vision_edit_source` + Vision Analyzer `_call_vision_recipe_v2` 둘 다 사용)
+  - _aspect_label (codex C2 fix · Edit `_call_vision_edit_source` + Vision Analyzer `observe_image` 둘 다 사용)
 
 prompt_pipeline alias:
   - _DEFAULT_OLLAMA_URL (Ollama 기본 URL)

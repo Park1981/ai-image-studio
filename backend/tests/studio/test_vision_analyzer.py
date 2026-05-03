@@ -32,6 +32,22 @@ def _tiny_png_bytes() -> bytes:
 # ───────── 유틸 상수 검증 ─────────
 
 
+def test_vision_progress_includes_prompt_synthesize_stage() -> None:
+    """Phase 5 신규 prompt-synthesize 단계가 vision_analyze 의 progress/label/stage_type_map 에 등록되어야 한다."""
+    from studio.pipelines.vision_analyze import (
+        _STAGE_TYPE_MAP,
+        _VISION_LABEL,
+        _VISION_PROGRESS,
+    )
+
+    assert "prompt-synthesize" in _VISION_PROGRESS
+    assert "prompt-synthesize" in _VISION_LABEL
+    assert "prompt-synthesize" in _STAGE_TYPE_MAP
+    # 순서: vision-call(20) < prompt-synthesize(45) < translation(70)
+    assert _VISION_PROGRESS["vision-call"] < _VISION_PROGRESS["prompt-synthesize"]
+    assert _VISION_PROGRESS["prompt-synthesize"] < _VISION_PROGRESS["translation"]
+
+
 def test_aspect_label_common_ratios() -> None:
     """_aspect_label — 권장 비율들이 사람 친화 라벨로 매핑."""
     from studio.vision_pipeline import _aspect_label
