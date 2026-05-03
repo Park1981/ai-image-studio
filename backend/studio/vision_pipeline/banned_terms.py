@@ -93,7 +93,7 @@ def filter_banned(positive_prompt: str, observation: dict[str, Any]) -> str:
             continue
         result = pattern.sub("", result)
         removed.append(phrase)
-        log.warning("banned_terms removed (no observation evidence): %r", phrase)
+        log.info("banned_terms removed (no observation evidence): %r", phrase)
 
     if removed:
         # 디버그 모드에서만 상세 출력

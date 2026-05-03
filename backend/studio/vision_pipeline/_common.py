@@ -17,8 +17,9 @@ from __future__ import annotations
 
 import base64
 import logging
+import os
 from pathlib import Path
-from typing import Awaitable, Callable
+from typing import Any, Awaitable, Callable
 
 from .._ollama_client import call_chat_payload
 
@@ -132,13 +133,10 @@ def _to_base64(image: Path | str | bytes) -> str:
 # 디버그 헬퍼 (ChatGPT 2차 리뷰 채택 · 2026-05-03)
 # ──────────────────────────────────────────────
 
-import os  # noqa: E402 — 파일 하단 추가, 전체 re-import 없이 최소 변경
-from typing import Any as _DebugAny  # 기존 Callable/Awaitable 과 충돌 방지 alias
-
 _DEBUG_TRUTHY = ("1", "true", "yes", "on")
 
 
-def debug_log(stage: str, payload: _DebugAny) -> None:
+def debug_log(stage: str, payload: Any) -> None:
     """STUDIO_VISION_DEBUG=1 일 때만 stage + payload 를 log 에 출력.
 
     개발/디버깅용 헬퍼. 운영 배포 시 환경 변수를 켜지 않으면 noop.
