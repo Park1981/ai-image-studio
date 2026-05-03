@@ -22,9 +22,6 @@ interface Props {
   entries: VisionEntry[];
   onSelect: (id: string) => void;
   onDelete: (id: string) => void;
-  onClear: () => void;
-  /** localStorage 상한 (2026-04-24 G1: 100) */
-  maxEntries: number;
 }
 
 function formatTime(ms: number): string {
@@ -38,8 +35,6 @@ export default function VisionHistoryList({
   entries,
   onSelect,
   onDelete,
-  onClear,
-  maxEntries,
 }: Props) {
   // nowMs 는 mount 시점 기준 (React 19 purity: useState lazy init).
   const [nowMs] = useState(() => Date.now());
@@ -58,32 +53,9 @@ export default function VisionHistoryList({
 
   return (
     <div className="ais-vision-history">
-      {/* 상단 헤더 — Vision 전용 (옛 시각 유지 · Archive Header 패턴 미적용 · plan 명시 X) */}
-      <div className="ais-vision-history-header">
-        <div className="ais-vision-history-title-row">
-          <h3 className="ais-vision-history-title">최근 분석</h3>
-          <span className="ais-vision-history-count mono">
-            {entries.length} / {maxEntries}
-          </span>
-        </div>
-        {entries.length > 0 && (
-          <button
-            type="button"
-            className="ais-vision-history-clear"
-            onClick={() => {
-              if (typeof window !== "undefined") {
-                const ok = window.confirm("모든 분석 기록을 지울까?");
-                if (!ok) return;
-              }
-              onClear();
-            }}
-          >
-            모두 지우기
-          </button>
-        )}
-      </div>
-
-      {/* 리스트 — 갤러리 스크롤 박스 · 날짜 섹션 그룹핑 */}
+      {/* 2026-05-03: 옛 자체 헤더 (.ais-vision-history-header) 제거.
+       *  HistorySectionHeader (Archive Header) 가 페이지 레벨에서 통일 — Edit/Generate 패턴.
+       *  "모두 지우기" 는 페이지의 actions 슬롯으로, count "/ 100" 은 countLabel 로 이전. */}
       {entries.length === 0 ? (
         <div className="ais-vision-history-empty">아직 분석 기록이 없습니다.</div>
       ) : (

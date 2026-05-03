@@ -35,16 +35,54 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
   const { running, pipelineLabel } = useVideoRunning();
   const items = useHistoryStore((s) => s.items);
   const videoResults = items.filter((x) => x.mode === "video");
-  // 2026-05-02: count 출처 store length → backend stats (DB 정확값) — limit 100 fetch 누락 영향 회피.
+  // 2026-05-03: 카운트는 그리드와 1:1 매칭되는 store length 사용 (보이는 수 = 표시 수).
+  // sizeBytes 는 DB 디스크 사용량이라 stats 만이 알 수 있음 → 그대로 stats 의존.
   const stats = useHistoryStats();
-  const videoCount = stats?.byMode.video.count ?? videoResults.length;
+  const videoCount = videoResults.length;
+  const videoSizeBytes = stats?.byMode.video.sizeBytes;
 
   /** 현재 재생할 mp4: lastVideoRef (세션) — 진입 시 빈 상태 (히스토리 fallback 제거) */
   const playingRef = lastVideoRef ?? null;
+  const playingItem = playingRef
+    ? videoResults.find((v) => v.imageRef === playingRef)
+    : undefined;
+
+  // V5 result-meta-pills (Generate/Edit 와 통일 · 2026-05-03):
+  //   해상도 (violet) · 실제 영상 메타 (확장자 / duration / fps · HistoryItem video 필드)
+  //   · Lightning (amber) · NSFW (있으면).
+  //   playing 이 없으면 fallback 으로 빈 spec.
+  const ext = playingItem
+    ? (playingItem.imageRef.split(".").pop() || "mp4").toUpperCase()
+    : "MP4";
+  const specParts: string[] = [ext];
+  if (playingItem?.durationSec) specParts.push(`${playingItem.durationSec}s`);
+  if (playingItem?.fps) specParts.push(`${playingItem.fps}fps`);
+  const specLabel = specParts.join(" · ");
+
+  const metaPills = playingItem ? (
+    <>
+      <span className="ais-result-pill ais-pill-violet mono">
+        {playingItem.width} × {playingItem.height}
+      </span>
+      <span className="ais-result-pill mono">{specLabel}</span>
+      {playingItem.lightning && (
+        <span className="ais-result-pill ais-pill-amber mono">Lightning</span>
+      )}
+      {playingItem.adult && (
+        <span className="ais-result-pill mono">NSFW</span>
+      )}
+    </>
+  ) : (
+    <span className="ais-result-pill mono">MP4</span>
+  );
 
   return (
     <StudioRightPanel>
-      <StudioResultHeader title="영상 결과" meta="MP4 · 5s · 25fps" />
+      <StudioResultHeader
+        title="영상 결과"
+        titleEn="Rendered"
+        meta={metaPills}
+      />
 
       <VideoPlayerCard
         src={playingRef}
@@ -66,7 +104,12 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
         }
       />
 
-      <HistorySectionHeader title="영상 히스토리" count={videoCount} />
+      <HistorySectionHeader
+        title="보관"
+        titleEn="History"
+        count={videoCount}
+        sizeBytes={videoSizeBytes}
+      />
 
       <HistoryGallery
         items={videoResults}

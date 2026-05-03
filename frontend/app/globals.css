@@ -2606,20 +2606,27 @@ button {
   color: var(--ink-4);
   letter-spacing: 0.04em;
 }
+/* 2026-05-03: Archive Header actions 슬롯에서 ais-archive-pill 과 시각 정합 매칭
+ *  옛: margin-top 6px + radius-sm + ink-4 (옛 자체 헤더 잔재).
+ *  신: margin 0 + radius-full + 동일 padding/font → archive-pill 과 같은 라인. */
 .ais-vision-history-clear {
   all: unset;
   cursor: pointer;
-  font-size: 11px;
-  color: var(--ink-4);
-  padding: 4px 8px;
-  border-radius: var(--radius-sm);
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+  padding: 4px 11px;
+  border-radius: var(--radius-full);
   border: 1px solid var(--line);
-  margin-top: 6px;
-  transition: color 0.15s, border-color 0.15s;
+  background: var(--surface);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
 }
 .ais-vision-history-clear:hover {
   color: var(--ink-2);
   border-color: var(--line-2);
+  background: var(--bg-2);
 }
 .ais-vision-history-empty {
   padding: 20px 16px;
@@ -2638,6 +2645,14 @@ button {
   display: flex;
   flex-direction: column;
   gap: 18px;
+}
+/* 2026-05-03: SectionHeader (어제/Yesterday) 와 그리드 사이 자연스러운 간격
+ *  옛: section 내 자식 spacing 0 → 헤더 박스와 카드가 붙어있어 답답함.
+ *  신: flex column + gap 14 → 헤더 ↔ 카드 사이 시각상 충분히 띄움. */
+.ais-vision-history-scroll > section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
 }
 
 /* ── Section 11: AppHeader (Phase 1.4 · 결정 M)

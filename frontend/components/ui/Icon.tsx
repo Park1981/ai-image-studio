@@ -39,7 +39,8 @@ export type IconName =
   | "power"
   | "dots-grid"
   | "stars"
-  | "bolt";
+  | "bolt"
+  | "flame";
 
 interface IconProps {
   name: IconName;
@@ -318,6 +319,14 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
           <path d="M6 3h12l4 6-10 13L2 9Z" />
           <path d="M2 9h20" />
           <path d="M9 9l3-6 3 6" />
+        </svg>
+      );
+    // 불꽃 — 성인 모드 카드 icon-box (Video 전용 · crimson 시그니처와 매칭).
+    case "flame":
+      return (
+        <svg {...common}>
+          <path d="M12 2c-1 3-3 5-3 8a4 4 0 0 0 8 0c0-2-2-4-2-6 0 2-1 3-2 3 0-2 0-3-1-5z" />
+          <path d="M11 14a2 2 0 0 0 2 2 2 2 0 0 0 0-4c-1 1-2 1-2 2z" />
         </svg>
       );
     default:

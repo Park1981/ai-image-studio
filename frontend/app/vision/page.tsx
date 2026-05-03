@@ -9,9 +9,12 @@
 "use client";
 
 import AppHeader from "@/components/chrome/AppHeader";
+import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ProgressModal from "@/components/studio/ProgressModal";
 import SourceImageCard from "@/components/studio/SourceImageCard";
-import StudioResultHeader from "@/components/studio/StudioResultHeader";
+import StudioResultHeader, {
+  SectionAccentBar,
+} from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -27,6 +30,58 @@ import { useVisionPipeline } from "@/hooks/useVisionPipeline";
 import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
 import { toast } from "@/stores/useToastStore";
 import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
+
+/* dataURL 의 base64 길이로 byte 추정 (URL 이면 0). */
+function estimateDataUrlBytes(dataUrl: string | null): number {
+  if (!dataUrl || !dataUrl.startsWith("data:")) return 0;
+  const comma = dataUrl.indexOf(",");
+  if (comma === -1) return 0;
+  return Math.round((dataUrl.length - comma - 1) * 0.75);
+}
+
+/* bytes → 사람이 읽는 단위 (B/KB/MB). */
+function formatBytes(bytes: number): string {
+  if (bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+/* 분석 결과 헤더 메타 pills — 파일명 / 해상도(violet) / 확장자 / 파일 크기. */
+function renderVisionMeta(
+  image: string | null,
+  label: string,
+  width: number | null,
+  height: number | null,
+) {
+  if (!image) return null;
+  const filename = label.split(" · ")[0] || "";
+  const ext = filename.includes(".")
+    ? (filename.split(".").pop() || "").toUpperCase()
+    : "";
+  const truncatedName =
+    filename.length > 22
+      ? `${filename.slice(0, 14)}…${filename.slice(-5)}`
+      : filename;
+  const bytes = estimateDataUrlBytes(image);
+  const sizeLabel = formatBytes(bytes);
+  return (
+    <>
+      {filename && (
+        <span className="ais-result-pill mono" title={filename}>
+          {truncatedName}
+        </span>
+      )}
+      {width && height && (
+        <span className="ais-result-pill ais-pill-violet mono">
+          {width} × {height}
+        </span>
+      )}
+      {ext && <span className="ais-result-pill mono">{ext}</span>}
+      {sizeLabel && <span className="ais-result-pill mono">{sizeLabel}</span>}
+    </>
+  );
+}
 
 export default function VisionPage() {
   /* ── store ── */
@@ -111,24 +166,17 @@ export default function VisionPage() {
             </div>
           </div>
 
+          {/* ── 원본 이미지 (Edit/Video 와 통일 — .ais-field-header + SectionAccentBar) ── */}
           <div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "baseline",
-                justifyContent: "space-between",
-                marginBottom: 10,
-              }}
-            >
+            <div className="ais-field-header">
               <label
-                style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}
+                className="ais-field-label"
+                style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
               >
+                <SectionAccentBar accent="blue" />
                 원본 이미지
               </label>
-              <span
-                className="mono"
-                style={{ fontSize: 10.5, color: "var(--ink-4)" }}
-              >
+              <span className="mono ais-field-meta">
                 {currentWidth && currentHeight
                   ? `${currentWidth}×${currentHeight}`
                   : "—"}
@@ -183,28 +231,42 @@ export default function VisionPage() {
           <StudioResultHeader
             title="분석 결과"
             titleEn="Analysis"
-            meta={
-              currentWidth && currentHeight ? (
-                <>
-                  <span className="ais-result-pill ais-pill-violet mono">
-                    {currentWidth} × {currentHeight}
-                  </span>
-                  <span className="ais-result-pill mono">EN + KO</span>
-                </>
-              ) : (
-                <span className="ais-result-pill mono">EN + KO</span>
-              )
-            }
+            meta={renderVisionMeta(currentImage, currentLabel, currentWidth, currentHeight)}
           />
 
           <VisionResultCard result={lastResult} running={analyzing} />
+
+          {/* ── V5 Archive Header (Edit/Generate 와 통일 · 2026-05-03) ──
+           *  "모두 지우기" 액션은 actions 슬롯으로. countLabel "/ 100" 으로
+           *  Vision 만의 localStorage cap 정보 유지. */}
+          <HistorySectionHeader
+            title="보관"
+            titleEn="History"
+            count={entries.length}
+            countLabel={`/ ${MAX_VISION_HISTORY}`}
+            actions={
+              entries.length > 0 ? (
+                <button
+                  type="button"
+                  className="ais-vision-history-clear"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      const ok = window.confirm("모든 분석 기록을 지울까?");
+                      if (!ok) return;
+                    }
+                    clearEntries();
+                  }}
+                >
+                  모두 지우기
+                </button>
+              ) : null
+            }
+          />
 
           <VisionHistoryList
             entries={entries}
             onSelect={loadEntry}
             onDelete={removeEntry}
-            onClear={clearEntries}
-            maxEntries={MAX_VISION_HISTORY}
           />
         </StudioRightPanel>
       </StudioWorkspace>

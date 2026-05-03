@@ -212,67 +212,68 @@ export default function VideoLeftPanel({
        *  신: AI → 퀄리티 → 성인 → 영상해상도 (맨 아래) — 사이즈 카드와 페어 의도.
        *  속도 chip 4단계는 video-res-card *내부에* 유지 (결정 E). */}
 
-      {/* AI 보정 카드 — V5 시그니처 (.ais-sig-ai · violet/blue).
+      {/* AI 보정 카드 — Generate/Edit 와 통일 (V5 시그니처 .ais-sig-ai · violet/blue).
+       *  카드 자체 onClick 으로 토글 작동 + tooltip + icon-box (stars) + desc 제거.
        *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약 (기본 OFF). */}
       <V5MotionCard
         className="ais-toggle-card ais-sig-ai"
         data-active={!skipUpgrade}
+        onClick={() => setSkipUpgrade(!skipUpgrade)}
+        tooltip={
+          skipUpgrade
+            ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약)"
+            : "ON · 이미지 분석 + 한국어 → 영문 정제"
+        }
       >
         <Toggle
           flat
+          icon="stars"
           checked={!skipUpgrade}
           onChange={(v) => setSkipUpgrade(!v)}
           align="right"
           label="🪄 AI 프롬프트 보정"
-          desc={
-            skipUpgrade
-              ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약 · 기본)"
-              : "ON · 이미지 분석 + 한국어 → 영문 정제"
-          }
         />
         {!skipUpgrade && (
           <PromptModeRadio value={promptMode} onChange={setPromptMode} />
         )}
       </V5MotionCard>
 
-      {/* 퀄리티 모드 토글 — V5 시그니처 (.ais-sig-fast · lime/cyan).
-       *  OFF=Lightning 빠름 (기본) / ON=💎 퀄리티 모드 (강화 옵션 · 얼굴 보존 우선) */}
+      {/* 퀄리티 모드 — Generate/Edit 와 통일 (V5 시그니처 .ais-sig-fast · lime/cyan).
+       *  라벨 "💎 퀄리티 모드" 고정 + onClick + tooltip + icon=bolt + desc 제거.
+       *  카드 OFF = Lightning 빠른 모드 (기본) / ON = 퀄리티 모드 (얼굴 보존 우선). */}
       <V5MotionCard
         className="ais-toggle-card ais-sig-fast"
         data-active={!lightning}
+        onClick={() => setLightning(!lightning)}
+        tooltip="ON 시 Lightning 끄고 풀 디테일 · 약 4배 느림 (얼굴 보존 우선)"
       >
         <Toggle
           flat
+          icon="bolt"
           checked={!lightning}
           onChange={(v) => setLightning(!v)}
           align="right"
-          label={lightning ? "⚡ 빠른 모드" : "💎 퀄리티 모드"}
-          desc={
-            lightning
-              ? "Lightning 4-step · 약 5분 · 얼굴 변할 수 있음 (기본)"
-              : "Full step · 약 20분+ · 얼굴 보존 우선"
-          }
+          label="💎 퀄리티 모드"
         />
       </V5MotionCard>
 
       {/* 성인 모드 — V5 .ais-adult-card (crimson 시그니처 · Video 전용).
+       *  Generate/Edit 패턴 통일 (onClick + tooltip + desc 제거).
        *  활성 시 aspect-ratio 16/9 자동 적용 (globals.css line 1066) — 인물 풀 노출.
        *  framer-motion layout 으로 16:9 변화 시 다른 카드 reflow spring 보간 (가장 큰 효과). */}
       <V5MotionCard
         className="ais-toggle-card ais-adult-card"
         data-active={adult}
+        onClick={() => setAdult(!adult)}
+        tooltip="ON 시 NSFW LoRA + 에로틱 모션 · OFF 는 SFW + 얼굴 보존"
       >
         <Toggle
           flat
+          icon="flame"
           checked={adult}
           onChange={setAdult}
           align="right"
           label="🔞 성인 모드"
-          desc={
-            adult
-              ? "에로틱 모션 + NSFW LoRA 적용"
-              : "SFW 프롬프트 · 얼굴 보존 안정"
-          }
         />
       </V5MotionCard>
 
@@ -341,21 +342,35 @@ function VideoResolutionSlider({
         transition: "opacity .2s",
       }}
     >
+      {/* size-header 구조 (Generate SizeCard 와 통일 · 2026-05-03):
+       *  40x40 사각 icon-box (coral 시그니처 cascade) + 메타 (제목 + 출력 사이즈 chip). */}
+      <div className="ais-size-header">
+        <span className="ais-size-header-icon" aria-hidden>
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <rect x="3" y="3" width="18" height="18" rx="1.5" />
+            <path d="M3 9h18M9 3v18" />
+          </svg>
+        </span>
+        <span className="ais-size-header-meta">
+          <span className="ais-size-header-title">영상 해상도</span>
+          <span className="ais-size-header-chip">
+            {hasSource
+              ? `${expected.width}×${expected.height} · ${ratio}`
+              : `긴 변 ${longerEdge}px`}
+          </span>
+        </span>
+      </div>
+
+      {/* 원본 + 속도 chip 묶음 — 헤더 아래 별도 줄 우측 정렬 */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
+          justifyContent: "flex-end",
+          gap: 6,
           marginBottom: 8,
         }}
       >
-        <label
-          style={{ fontSize: 12.5, fontWeight: 600, color: "var(--ink-2)" }}
-        >
-          영상 해상도
-        </label>
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           {/* 원본 크기 버튼 — clamp + step snap (오빠 피드백) */}
           <button
             type="button"
@@ -412,7 +427,6 @@ function VideoResolutionSlider({
             />
             {speed.label}
           </span>
-        </div>
       </div>
       <input
         type="range"
