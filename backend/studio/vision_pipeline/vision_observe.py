@@ -135,15 +135,23 @@ async def observe_image(
             ollama_url=ollama_url,
             payload=payload,
             timeout=timeout,
+            allow_thinking_fallback=False,  # vision 모델은 thinking 없음; 미래 reasoning 모델 swap 시 thinking leak 방지
         )
     except Exception as e:
         log.warning("vision_observe call failed (%s): %s", vision_model, e)
         return {}
 
-    parsed = _parse_strict_json(raw) if raw else None
+    # 빈 응답 vs JSON parse 실패를 별도 분기로 구분 (다른 실패 모드)
+    if not raw:
+        log.warning("vision_observe empty response from %s", vision_model)
+        _c.debug_log("vision_observe.empty_response", vision_model)
+        return {}
+
+    parsed = _parse_strict_json(raw)
     if not isinstance(parsed, dict):
         log.warning("vision_observe JSON parse failed (raw len=%d)", len(raw))
-        _c.debug_log("vision_observe.parse_failed", raw[:500] if raw else "")
+        _c.debug_log("vision_observe.parse_failed", raw[:500])
         return {}
+
     _c.debug_log("vision_observe.observation", parsed)
     return parsed

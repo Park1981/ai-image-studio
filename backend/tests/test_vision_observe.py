@@ -73,11 +73,28 @@ class TestVisionObserve:
             )
         assert result == {}
 
+    async def test_returns_empty_dict_on_empty_response(self) -> None:
+        """Ollama 가 빈 문자열 반환 시 빈 dict (parse 시도 없이 별도 분기)."""
+        with patch(
+            "studio.vision_pipeline.vision_observe.call_chat_payload",
+            new=AsyncMock(return_value=""),
+        ):
+            result = await observe_image(
+                b"fake",
+                width=512,
+                height=512,
+                vision_model="qwen3-vl:8b",
+                timeout=60.0,
+                ollama_url="http://localhost:11434",
+                keep_alive="5m",
+            )
+        assert result == {}
+
     async def test_payload_uses_format_json_and_observation_sampling(self) -> None:
         """Ollama payload 가 format=json + temperature 0.2 + num_ctx 4096 로 호출되는지."""
         captured: dict = {}
 
-        async def capture(*, ollama_url: str, payload: dict, timeout: float) -> str:
+        async def capture(*, ollama_url: str, payload: dict, timeout: float, allow_thinking_fallback: bool = True) -> str:
             captured.update(payload)
             return "{}"
 
@@ -95,6 +112,7 @@ class TestVisionObserve:
                 keep_alive="5m",
             )
         assert captured["format"] == "json"
+        assert captured["stream"] is False
         assert captured["keep_alive"] == "5m"
         assert captured["options"]["temperature"] == 0.2
         assert captured["options"]["num_ctx"] == 4096
