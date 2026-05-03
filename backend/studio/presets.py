@@ -352,7 +352,7 @@ class VideoModelPreset:
     negative_prompt: str
 
 
-VIDEO_MODEL = VideoModelPreset(
+LTX_VIDEO_PRESET = VideoModelPreset(
     display_name="LTX Video 2.3",
     tag="22B · A/V",
     files=VideoFiles(
@@ -389,6 +389,11 @@ VIDEO_MODEL = VideoModelPreset(
         "pc game, console game, video game, cartoon, childish, ugly"
     ),
 )
+
+
+# 호환 alias — 기존 import (router/builder/pipeline/test) 가 그대로 작동.
+# Phase 3 에서 LTX 명시 호출로 갱신 후 본 spec Phase 6 cleanup 단계에서 제거 검토.
+VIDEO_MODEL = LTX_VIDEO_PRESET
 
 
 def resolve_video_unet_name(env_override: str | None = None) -> str:
@@ -506,3 +511,148 @@ def compute_video_resize(
     w = max(8, (w // 8) * 8)
     h = max(8, (h // 8) * 8)
     return w, h
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Wan 2.2 i2v Image-to-Video 프리셋 (2026-05-03 추가)
+# ══════════════════════════════════════════════════════════════════════
+# 출처: Next Diffusion 의 ComfyUI GGUF + LightX2V workflow + 사용자 실증
+#  https://www.nextdiffusion.ai/tutorials/how-to-run-wan22-image-to-video-gguf-models-in-comfyui-low-vram
+# 16GB VRAM 환경에서 high → low noise 순차 swap 으로 5초 영상 약 320초 생성.
+# spec: docs/superpowers/specs/2026-05-03-video-model-selection-wan22.md
+# ══════════════════════════════════════════════════════════════════════
+
+
+@dataclass(frozen=True)
+class Wan22LoraEntry:
+    """Wan 2.2 의 LoRA 엔트리.
+
+    high noise / low noise 두 모델 분기에 각각 적용. 일부 LoRA (Lightning) 는
+    실제로 high/low 분리 학습된 별 파일을 가지고, 일부 (BounceHigh 모션) 는
+    동일 파일을 양쪽에 모두 적용 — 통일된 인터페이스로 빌더 코드가 단순.
+    """
+
+    name_high: str  # high noise 모델 stage 의 LoraLoaderModelOnly 에 전달
+    name_low: str   # low noise 모델 stage 의 LoraLoaderModelOnly 에 전달
+    strength: float
+    role: Literal["lightning", "motion"] = "motion"
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class Wan22Files:
+    """Wan 2.2 i2v 모델 파일 묶음.
+
+    high/low noise UNET 두 개를 KSamplerAdvanced 두 단계에 각각 적용하는
+    MoE 구조. text_encoder 와 vae 는 공통.
+    """
+
+    unet_high: str  # GGUF (city96/ComfyUI-GGUF 의 UnetLoaderGGUF 노드 사용)
+    unet_low: str   # GGUF
+    text_encoder: str  # umt5_xxl_fp8_e4m3fn_scaled.safetensors
+    vae: str           # wan_2.1_vae.safetensors
+
+
+@dataclass(frozen=True)
+class Wan22Sampling:
+    """Wan 2.2 KSamplerAdvanced 두 단계 + ModelSamplingSD3 파라미터.
+
+    Lightning ON (4-step 가속): cfg=1, total 4 step, split=2 (high 0→2 / low 2→10000)
+    Lightning OFF (정밀):       cfg=3.5, total 20 step, split=10 (high 0→10 / low 10→10000)
+
+    출력 fps 는 학습 fps (16) 그대로 — 다른 값으로 재생하면 모션 부자연.
+    """
+
+    sampler: str = "euler"
+    scheduler: str = "simple"
+    shift: float = 8.0  # ModelSamplingSD3 — GGUF 권장 (safetensors fp8 는 5)
+    base_fps: int = 16  # Wan 학습 fps · CreateVideo 노드 fps widget
+    default_length: int = 81   # 5초 @ 16fps + 1
+    default_width: int = 832   # 16GB VRAM sweet spot (사용자 실증)
+    default_height: int = 480
+
+    # Lightning ON (default)
+    lightning_steps: int = 4
+    lightning_cfg: float = 1.0
+    lightning_split: int = 2  # high noise KSamplerAdvanced.end_at_step
+
+    # Lightning OFF (정밀)
+    precise_steps: int = 20
+    precise_cfg: float = 3.5
+    precise_split: int = 10
+
+
+@dataclass(frozen=True)
+class Wan22ModelPreset:
+    """Wan 2.2 i2v 통합 프리셋 (LTX VideoModelPreset 과 구조 다름 — 별 dataclass)."""
+
+    display_name: str
+    tag: str
+    files: Wan22Files
+    loras: list[Wan22LoraEntry]
+    sampling: Wan22Sampling
+    negative_prompt: str
+
+
+WAN22_VIDEO_PRESET = Wan22ModelPreset(
+    display_name="Wan 2.2 i2v",
+    tag="Q6_K · GGUF",
+    files=Wan22Files(
+        unet_high="Wan2.2-I2V-A14B-HighNoise-Q6_K.gguf",
+        unet_low="Wan2.2-I2V-A14B-LowNoise-Q6_K.gguf",
+        text_encoder="umt5_xxl_fp8_e4m3fn_scaled.safetensors",
+        vae="wan_2.1_vae.safetensors",
+    ),
+    loras=[
+        # Lightning 4-step 가속 LoRA — Lightning 토글 ON 시만 활성.
+        # high/low noise 각각 별 파일 (학습 분리됨).
+        Wan22LoraEntry(
+            name_high="wan2.2_i2v_lightx2v_4steps_lora_v1_high_noise.safetensors",
+            name_low="wan2.2_i2v_lightx2v_4steps_lora_v1_low_noise.safetensors",
+            strength=1.0,
+            role="lightning",
+            note="4-step 가속 (Lightning ON 시만 적용)",
+        ),
+        # BounceHigh 모션 LoRA — 항상 ON (사용자 결정 #3 · spec §2).
+        # 모션 LoRA 는 high/low 분리 학습 안 됨 → 동일 파일을 양쪽 stage 에 적용.
+        # strength 0.8 은 spec 박제값 (Phase 6 사용자 실측 후 0.6/0.7/0.8/0.9 비교 튜닝).
+        Wan22LoraEntry(
+            name_high="BounceHighWan2_2.safetensors",
+            name_low="BounceHighWan2_2.safetensors",
+            strength=0.8,
+            role="motion",
+            note="BounceHigh 모션 (항상 ON · 동일 파일 high+low 양쪽 적용)",
+        ),
+    ],
+    sampling=Wan22Sampling(),
+    negative_prompt=(
+        "deformed hands, mutated hands, extra fingers, missing fingers, fused fingers, "
+        "malformed limbs, bad anatomy, distorted hands, twisted fingers, blurry hands, "
+        "low quality, jpeg artifacts, watermark, text"
+    ),
+)
+
+
+# ── 영상 모델 ID 리터럴 + dispatch (spec §4.1) ──
+VideoModelId = Literal["ltx", "wan22"]
+
+# 사용자 결정 #1 — 기본 모델 (settings persist)
+DEFAULT_VIDEO_MODEL_ID: VideoModelId = "wan22"
+
+
+def get_video_preset(
+    model_id: VideoModelId,
+) -> VideoModelPreset | Wan22ModelPreset:
+    """model_id → preset 인스턴스 dispatch.
+
+    Pipeline / builder / routes 가 공통으로 호출. 두 preset 의 dataclass 가
+    구조적으로 다르므로 호출부에서 isinstance 또는 model_id 분기 필요.
+
+    Raises:
+        ValueError: 알 수 없는 model_id (frontend mirror 의 VideoModelId 와 sync 깨짐)
+    """
+    if model_id == "ltx":
+        return LTX_VIDEO_PRESET
+    if model_id == "wan22":
+        return WAN22_VIDEO_PRESET
+    raise ValueError(f"unknown video model_id: {model_id!r}")

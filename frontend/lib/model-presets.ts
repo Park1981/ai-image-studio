@@ -215,3 +215,83 @@ export function activeLoras(
 ): LoraEntry[] {
   return model.loras.filter((l) => (l.role === "lightning" ? lightningOn : true));
 }
+
+/* ──────────────────────────────────────────────────────
+   영상 모델: Wan 2.2 i2v + LTX Video 2.3 듀얼 (2026-05-03)
+
+   원본 워크플로우:
+    - Wan 2.2: ComfyUI Desktop · Q6_K GGUF + LightX2V LoRA (Next Diffusion 가이드 기반)
+    - LTX 2.3: backend/workflows/video_ltx2_3_i2v.json (Comfy-Org 공식 템플릿)
+
+   백엔드 backend/studio/presets.py 의 LTX_VIDEO_PRESET / WAN22_VIDEO_PRESET 와 동기화 유지.
+   spec: docs/superpowers/specs/2026-05-03-video-model-selection-wan22.md §5.1
+   ────────────────────────────────────────────────────── */
+
+export type VideoModelId = "wan22" | "ltx";
+
+export interface VideoModelPresetMirror {
+  id: VideoModelId;
+  /** UI 라벨 (모델 세그먼트 / History 배지) */
+  displayName: string;
+  /** 보조 라벨 (예: "Q6_K · GGUF") */
+  tag: string;
+  /** 모델별 sweet spot 시작 width (사용자 미override 시 자동 채움) */
+  defaultWidth: number;
+  defaultHeight: number;
+  /** 영상 frame 수 (Wan: 81 @ 16fps ≈ 5초 / LTX: 126 @ 25fps ≈ 5초) */
+  defaultLength: number;
+  /** 학습 fps · CreateVideo 노드의 fps widget 값으로 사용 */
+  baseFps: number;
+  /** Lightning 토글 ON 시 sampling */
+  lightning: { steps: number; cfg: number };
+  /** Lightning 토글 OFF 시 sampling (정밀 모드) */
+  precise: { steps: number; cfg: number };
+  /** UI 도움말 (해상도 슬라이더 옆 표시) */
+  recommendedSweetSpot?: string;
+  /** UI 배너 (VRAM 부담 알림) */
+  vramHint?: string;
+  /** ETA 텍스트 (Lightning ON/OFF 별 1세대 추정 시간) */
+  speedHint: { lightning: string; precise: string };
+}
+
+export const VIDEO_MODEL_PRESETS: Record<VideoModelId, VideoModelPresetMirror> = {
+  wan22: {
+    id: "wan22",
+    displayName: "Wan 2.2 i2v",
+    tag: "Q6_K · GGUF",
+    defaultWidth: 832,
+    defaultHeight: 480,
+    defaultLength: 81, // 5초 @ 16fps + 1 (실측 검증된 값)
+    baseFps: 16, // Wan 2.2 학습 fps (이걸로 출력 안 하면 영상 속도 부자연)
+    lightning: { steps: 4, cfg: 1.0 },
+    precise: { steps: 20, cfg: 3.5 },
+    recommendedSweetSpot: "832×480 ~ 1024×576",
+    vramHint: "high → low 순차 swap · 16GB 안에 fit",
+    speedHint: { lightning: "약 5분", precise: "약 20분" },
+  },
+  ltx: {
+    id: "ltx",
+    displayName: "LTX Video 2.3",
+    tag: "22B · A/V · upscale",
+    defaultWidth: 1024,
+    defaultHeight: 576,
+    defaultLength: 126, // 5초 @ 25fps + 1 (LTX 공식 템플릿 값)
+    baseFps: 25,
+    lightning: { steps: 4, cfg: 1.0 },
+    precise: { steps: 30, cfg: 1.0 },
+    recommendedSweetSpot: "1024×576 ~ 1536 long-edge",
+    vramHint: "29GB fp8 · 16GB 환경은 sysmem swap (느림)",
+    speedHint: { lightning: "5~10분", precise: "25~40분" },
+  },
+};
+
+/** 기본 영상 모델 — settings persist + 페이지 진입 시 적용 (spec §2 결정 #1) */
+export const DEFAULT_VIDEO_MODEL_ID: VideoModelId = "wan22";
+
+/** model_id → 미러 lookup (안전 fallback: Wan22) */
+export function getVideoPresetMirror(
+  id: VideoModelId | string | undefined | null,
+): VideoModelPresetMirror {
+  if (id === "ltx") return VIDEO_MODEL_PRESETS.ltx;
+  return VIDEO_MODEL_PRESETS.wan22;
+}
