@@ -141,15 +141,15 @@ export default function HistoryTile({
         }}
       />
 
-      {/* Phase 5 (2026-05-03 · spec §5.7) — Video mode 시 모델 배지 (top-left).
-       *  modelId 누락 (옛 row 또는 generate/edit) → cyan (LTX 가정 fallback).
-       *  modelId="wan22" → violet, "ltx" → cyan. */}
+      {/* Phase 5 (2026-05-03 · spec §5.7) — Video mode 시 모델 배지.
+       *  - 위치: top-RIGHT (옛 left 는 "● 선택" 칩과 충돌 — top:9, left:9 z-index:4)
+       *  - modelId="wan22" → violet, "ltx" 또는 누락 → cyan (옛 row fallback) */}
       {item.mode === "video" && item.model && (
         <div
           style={{
             position: "absolute",
             top: 8,
-            left: 8,
+            right: 8,
             pointerEvents: "none",
             zIndex: 2,
           }}

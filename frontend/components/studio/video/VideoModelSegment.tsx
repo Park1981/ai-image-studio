@@ -46,33 +46,40 @@ export default function VideoModelSegment({ value, onChange, disabled }: Props) 
             aria-checked={active}
             disabled={disabled}
             onClick={() => onChange(id)}
+            className="ais-video-model-segment-btn"
+            data-active={active}
             style={{
               flex: 1,
               padding: "10px 12px",
               borderRadius: 8,
               border: "none",
               cursor: disabled ? "not-allowed" : "pointer",
+              // 가독성 개선 (2026-05-03 fix): 비활성도 충분히 어두운 배경 위에서 잘 보이도록.
               background: active
-                ? "rgba(139, 92, 246, 0.18)"
-                : "transparent",
-              color: active ? "#e2e8f0" : "#94a3b8",
+                ? "rgba(139, 92, 246, 0.28)"
+                : "rgba(30, 41, 59, 0.55)",
+              color: active ? "#f8fafc" : "#e2e8f0",
               fontSize: 13,
-              fontWeight: active ? 600 : 400,
-              transition: "background 150ms ease, color 150ms ease",
+              fontWeight: active ? 600 : 500,
+              transition: "background 150ms ease, color 150ms ease, border 150ms ease",
               opacity: disabled ? 0.5 : 1,
               display: "flex",
               flexDirection: "column",
               alignItems: "flex-start",
               gap: 3,
               textAlign: "left",
-              outline: active ? "1px solid rgba(139, 92, 246, 0.45)" : "none",
+              outline: "none",
+              boxShadow: active
+                ? "0 0 0 1.5px rgba(167, 139, 250, 0.7)"
+                : "0 0 0 1px rgba(148, 163, 184, 0.2)",
             }}
           >
             <span>{preset.displayName}</span>
             <span
               style={{
                 fontSize: 10,
-                color: active ? "#a78bfa" : "#64748b",
+                // 비활성 sub-tag 도 충분히 보이도록 (옛: #64748b 너무 옅음)
+                color: active ? "#c4b5fd" : "#94a3b8",
                 fontWeight: 400,
               }}
             >

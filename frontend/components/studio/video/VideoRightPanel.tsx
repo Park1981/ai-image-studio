@@ -59,11 +59,35 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
   if (playingItem?.fps) specParts.push(`${playingItem.fps}fps`);
   const specLabel = specParts.join(" · ");
 
+  // Phase 5 후속 (2026-05-03 fix · 사용자 피드백) — 모델명 pill 추가.
+  // tone 색상은 HistoryTile 배지와 동일 매핑 (Wan 22 violet · LTX cyan).
+  const modelToneStyle =
+    playingItem?.modelId === "wan22"
+      ? {
+          background: "rgba(139, 92, 246, 0.15)",
+          color: "#a78bfa",
+          border: "1px solid rgba(139, 92, 246, 0.35)",
+        }
+      : {
+          background: "rgba(34, 211, 238, 0.15)",
+          color: "#67e8f9",
+          border: "1px solid rgba(34, 211, 238, 0.35)",
+        };
+
   const metaPills = playingItem ? (
     <>
       <span className="ais-result-pill ais-pill-violet mono">
         {playingItem.width} × {playingItem.height}
       </span>
+      {playingItem.model && (
+        <span
+          className="ais-result-pill mono"
+          title={`영상 모델: ${playingItem.model}`}
+          style={modelToneStyle}
+        >
+          {playingItem.model}
+        </span>
+      )}
       <span className="ais-result-pill mono">{specLabel}</span>
       {playingItem.lightning && (
         <span className="ais-result-pill ais-pill-amber mono">Lightning</span>
