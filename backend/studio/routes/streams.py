@@ -24,11 +24,14 @@ from ..pipelines import (
     _run_video_pipeline_task,
 )
 from ..presets import (
+    DEFAULT_VIDEO_MODEL_ID,
     EDIT_MODEL,
     GENERATE_MODEL,
     VIDEO_LONGER_EDGE_MAX,
     VIDEO_LONGER_EDGE_MIN,
-    VIDEO_MODEL,
+    VIDEO_MODEL,  # 호환 alias (== LTX_VIDEO_PRESET)
+    VideoModelId,
+    get_video_preset,
 )
 from ..reference_pool import save_to_pool
 from ..reference_storage import reference_path_from_url
@@ -343,6 +346,14 @@ async def create_video_task(
                 min(VIDEO_LONGER_EDGE_MAX, (longer_edge // 8) * 8),
             )
 
+    # Phase 3 (2026-05-03) — modelId 분기 (Wan 2.2 default)
+    model_id_raw = meta_obj.get("modelId") or meta_obj.get("model_id")
+    model_id: VideoModelId = (
+        "ltx" if isinstance(model_id_raw, str) and model_id_raw == "ltx"
+        else DEFAULT_VIDEO_MODEL_ID  # "wan22"
+    )
+    preset = get_video_preset(model_id)
+
     image_bytes = await image.read()
     if not image_bytes:
         raise HTTPException(400, "empty image")
@@ -357,8 +368,8 @@ async def create_video_task(
     source_w, source_h = _extract_image_dims(image_bytes)
 
     task = await _new_task()
-    # 헤더 VRAM breakdown 오버레이용 — ComfyUI 마지막 dispatch 모델 기록
-    dispatch_state.record("video", VIDEO_MODEL.display_name)
+    # 헤더 VRAM breakdown 오버레이용 — ComfyUI 마지막 dispatch 모델 기록 (모델별 display_name)
+    dispatch_state.record("video", preset.display_name)
     task.worker = _spawn(
         _run_video_pipeline_task(
             task,
@@ -372,6 +383,7 @@ async def create_video_task(
             source_h,
             longer_edge,
             lightning,
+            model_id=model_id,
             pre_upgraded_prompt=pre_upgraded_prompt,
             prompt_mode=video_prompt_mode,
         )
