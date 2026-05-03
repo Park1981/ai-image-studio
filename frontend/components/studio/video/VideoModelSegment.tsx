@@ -17,6 +17,7 @@
 
 "use client";
 
+import { motion } from "framer-motion";
 import { VIDEO_MODEL_PRESETS, type VideoModelId } from "@/lib/model-presets";
 
 interface Props {
@@ -27,12 +28,22 @@ interface Props {
 
 const MODEL_IDS: readonly VideoModelId[] = ["wan22", "ltx"] as const;
 
-/** 모델별 배경 이미지 (frontend/public/images/) — 사용자 매칭:
- *  wan22 = 부드러운 wave dreamy (gold) / ltx = 빛줄기 cyber (gold)
- */
+/** 모델별 배경 이미지 (frontend/public/images/). */
 const MODEL_BG_IMAGES: Record<VideoModelId, string> = {
   wan22: "/images/video-model-wan22-bg.png",
   ltx: "/images/video-model-ltx-bg.png",
+};
+
+/** Phase 5 follow-up 3 (2026-05-03) — 활성/비활성 flexGrow 비율.
+ *  활성 카드가 1.7 배 넓어져서 사용자 선택이 시각적으로 강조 (역동적 reflow).
+ *  V5MotionCard 의 spring 톤과 동일 (stiffness 320 / damping 26).
+ */
+const ACTIVE_FLEX = 1.7;
+const INACTIVE_FLEX = 1;
+const SPRING_TRANSITION = {
+  type: "spring" as const,
+  stiffness: 320,
+  damping: 26,
 };
 
 export default function VideoModelSegment({ value, onChange, disabled }: Props) {
@@ -50,7 +61,7 @@ export default function VideoModelSegment({ value, onChange, disabled }: Props) 
         const preset = VIDEO_MODEL_PRESETS[id];
         const active = value === id;
         return (
-          <button
+          <motion.button
             key={id}
             type="button"
             role="radio"
@@ -60,8 +71,16 @@ export default function VideoModelSegment({ value, onChange, disabled }: Props) 
             onClick={() => onChange(id)}
             className="ais-video-model-card"
             data-active={active}
+            // framer-motion: 활성/비활성 flexGrow 변화를 spring 으로 부드럽게.
+            // layout 만으로는 flex 형제 reflow 가 jump — animate prop 명시.
+            animate={{
+              flexGrow: active ? ACTIVE_FLEX : INACTIVE_FLEX,
+              scale: active ? 1 : 0.97,
+            }}
+            transition={SPRING_TRANSITION}
             style={{
-              flex: 1,
+              flexBasis: 0, // flexGrow 만으로 너비 결정 (initial width 0)
+              minWidth: 0, // grid item shrink 허용
               position: "relative",
               minHeight: 88,
               borderRadius: 14,
@@ -74,14 +93,13 @@ export default function VideoModelSegment({ value, onChange, disabled }: Props) 
               backgroundPosition: "center right",
               backgroundRepeat: "no-repeat",
               transition:
-                "transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1), filter 200ms ease, box-shadow 200ms ease",
+                "filter 220ms ease, box-shadow 220ms ease",
               opacity: disabled ? 0.5 : 1,
               outline: "none",
               boxShadow: active
                 ? "0 0 0 2px rgba(167, 139, 250, 0.85), 0 6px 18px rgba(139, 92, 246, 0.32)"
                 : "0 0 0 1px rgba(148, 163, 184, 0.22), 0 1px 4px rgba(0, 0, 0, 0.18)",
-              transform: active ? "scale(1)" : "scale(0.97)",
-              filter: active ? "none" : "saturate(0.7) brightness(0.78)",
+              filter: active ? "none" : "saturate(0.65) brightness(0.72)",
             }}
           >
             {/* 좌측 어두운 gradient overlay — 모델명 텍스트 가독성 (인물은 우측 위치).
@@ -110,12 +128,13 @@ export default function VideoModelSegment({ value, onChange, disabled }: Props) 
                 lineHeight: 1.2,
                 textShadow: "0 2px 8px rgba(0, 0, 0, 0.55)",
                 pointerEvents: "none",
-                maxWidth: "60%",
+                maxWidth: "70%",
+                whiteSpace: "nowrap",
               }}
             >
               {preset.displayName}
             </div>
-          </button>
+          </motion.button>
         );
       })}
     </div>

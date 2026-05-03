@@ -143,7 +143,9 @@ export default function HistoryTile({
 
       {/* Phase 5 (2026-05-03 · spec §5.7) — Video mode 시 모델 배지.
        *  - 위치: top-RIGHT (옛 left 는 "● 선택" 칩과 충돌 — top:9, left:9 z-index:4)
-       *  - modelId="wan22" → violet, "ltx" 또는 누락 → cyan (옛 row fallback) */}
+       *  - tone 결정: modelId 우선 → 누락 시 model 문자열 fallback (Wan 포함 → violet)
+       *    Phase 5 follow-up 3 (2026-05-03 fix): 옛 row (서버 재로드 후 modelId 없음) 도
+       *    시각 일관 위해 display_name 기반 추론. */}
       {item.mode === "video" && item.model && (
         <div
           style={{
@@ -155,7 +157,12 @@ export default function HistoryTile({
           }}
         >
           <Badge
-            tone={item.modelId === "wan22" ? "violet" : "cyan"}
+            tone={
+              item.modelId === "wan22" ||
+              (item.modelId == null && /wan/i.test(item.model))
+                ? "violet"
+                : "cyan"
+            }
             title={`영상 모델: ${item.model}`}
           >
             {item.model}
