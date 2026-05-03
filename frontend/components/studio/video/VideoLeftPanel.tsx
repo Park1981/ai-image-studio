@@ -31,6 +31,7 @@ import {
 } from "@/components/studio/StudioLayout";
 import V5MotionCard from "@/components/studio/V5MotionCard";
 import VideoModelSegment from "@/components/studio/video/VideoModelSegment";
+import { VIDEO_MODEL_PRESETS } from "@/lib/model-presets";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
 import {
@@ -220,15 +221,28 @@ export default function VideoLeftPanel({
       </div>
 
       {/* Phase 5 (2026-05-03 · spec §5.6) — 영상 모델 선택 세그먼트 (Wan 2.2 / LTX 2.3).
-       *  2026-05-04: 사용자 피드백 — CTA 위 → 영상 지시 하단으로 이동
-       *  (Vision 페이지의 모델 카드 위치와 일관 · 원본/지시 이후 모델 선택 흐름).
-       *  Trade-off: CTA 와 거리가 생겨 ETA 변화 즉시 인지는 약간 약화 — but
-       *  영상 지시 작성 후 자연스러운 흐름 (입력 → 모델 → 생성). */}
-      <VideoModelSegment
-        value={selectedVideoModel}
-        onChange={setSelectedVideoModel}
-        disabled={running}
-      />
+       *  2026-05-04: 사용자 피드백 — CTA 위 → 영상 지시 하단으로 이동 (Vision 페이지와 일관)
+       *  + 헤더 ("영상 모델" + 현재 선택 모델명 meta) 추가 (Vision 카드 헤더와 통일). */}
+      <div>
+        <div className="ais-field-header">
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="violet" />
+            영상 모델
+          </label>
+          <span className="mono ais-field-meta">
+            {VIDEO_MODEL_PRESETS[selectedVideoModel]?.displayName ??
+              selectedVideoModel}
+          </span>
+        </div>
+        <VideoModelSegment
+          value={selectedVideoModel}
+          onChange={setSelectedVideoModel}
+          disabled={running}
+        />
+      </div>
 
       {/* ── 카드 순서 (Phase 1.5.4 · 결정 B · 2026-05-02) ──
        *  옛: AI → 영상해상도 → 퀄리티 → 성인
