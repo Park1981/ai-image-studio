@@ -109,6 +109,7 @@ Before filling the JSON, inspect the image for small but important visual anchor
 Face and expression:
 - Check whether both eyes are open, one eye is closed, or one eye is partially closed.
 - If one eye is closed or nearly closed while the other is open, describe it as "winking" or "one eye closed".
+- Use "left_eye" and "right_eye" fields to describe each eye separately when they differ (e.g., left_eye="open", right_eye="closed" for a winking subject).
 - Describe mouth state separately: closed mouth, open mouth, drinking, cup covering mouth, smile, neutral.
 
 Object interaction:
@@ -126,6 +127,7 @@ Framing:
 
 Background:
 - Look for rain, wet surfaces, transparent raincoats, plastic ponchos, stage lights, neon signs, concert or festival structures.
+- For "people_visible", write an approximate count or descriptor: "none", "a few", "5-10", "dozens", "hundreds", "dense crowd".
 
 Rules:
 - Use short concrete phrases.
@@ -179,7 +181,9 @@ async def observe_image(
         "stream": False,
         "format": "json",
         "keep_alive": resolved_keep_alive,
-        "options": {"temperature": 0.2, "num_ctx": 4096},
+        # 2026-05-03 Recall Phase 1: system prompt 521→1150 토큰 + 이미지 512~1024 +
+        # response → 약 3000+ 토큰. 안전 margin 위해 4096 → 6144.
+        "options": {"temperature": 0.2, "num_ctx": 6144},
     }
     try:
         raw = await call_chat_payload(

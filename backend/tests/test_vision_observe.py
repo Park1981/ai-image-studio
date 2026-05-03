@@ -91,7 +91,7 @@ class TestVisionObserve:
         assert result == {}
 
     async def test_payload_uses_format_json_and_observation_sampling(self) -> None:
-        """Ollama payload 가 format=json + temperature 0.2 + num_ctx 4096 로 호출되는지."""
+        """Ollama payload 가 format=json + temperature 0.2 + num_ctx 6144 로 호출되는지."""
         captured: dict = {}
 
         async def capture(*, ollama_url: str, payload: dict, timeout: float, allow_thinking_fallback: bool = True) -> str:
@@ -116,7 +116,7 @@ class TestVisionObserve:
         assert captured["stream"] is False
         assert captured["keep_alive"] == "5m"
         assert captured["options"]["temperature"] == 0.2
-        assert captured["options"]["num_ctx"] == 4096
+        assert captured["options"]["num_ctx"] == 6144
         assert captured["__allow_thinking_fallback"] is False  # 명시적 False 전달 검증
 
     def test_system_prompt_forbids_boilerplate(self) -> None:
@@ -154,7 +154,8 @@ class TestVisionObserve:
             )
 
     def test_system_prompt_schema_includes_new_detail_slots(self) -> None:
-        """Schema 에 새 4 슬롯 (face_detail / object_interaction / clothing_detail / crowd_detail) 이 있다."""
+        """Schema 에 새 4 nested object (face_detail / object_interaction /
+        clothing_detail / crowd_detail) + 5 inner key 가 명시되어 있다 (총 9 검증)."""
         for slot in [
             "face_detail",
             "object_interaction",
