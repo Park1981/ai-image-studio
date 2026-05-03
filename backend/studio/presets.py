@@ -8,6 +8,7 @@ runtime 에 type 체크를 받는 이점. /api/studio/models 엔드포인트로
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Literal
 
@@ -248,12 +249,34 @@ EDIT_MODEL = EditModelPreset(
 @dataclass(frozen=True)
 class OllamaRoles:
     text: str  # 프롬프트 업그레이드용 (gemma4-un 류)
-    vision: str  # 수정 모드 이미지 분석용 (vision-q4km)
+    vision: str  # 수정 모드 이미지 분석용 (qwen3-vl 류)
+
+
+def _env_or(default: str, env_key: str) -> str:
+    """env var 있으면 그것, 없으면 default 반환 (양쪽 strip).
+
+    빈 문자열이나 공백만 있는 경우도 default 로 처리.
+    """
+    value = (os.environ.get(env_key) or "").strip()
+    return value if value else default
+
+
+def resolve_ollama_keep_alive() -> str:
+    """STUDIO_OLLAMA_KEEP_ALIVE env var 우선 (default '5m').
+
+    ChatGPT 2차 리뷰 — keep_alive '0' 은 매 요청마다 모델 swap 발생해서
+    사용자 체감 느림. 실사용 default '5m'. 개발 중엔
+    `set STUDIO_OLLAMA_KEEP_ALIVE=0` 으로 swap.
+    """
+    return _env_or("5m", "STUDIO_OLLAMA_KEEP_ALIVE")
 
 
 DEFAULT_OLLAMA_ROLES = OllamaRoles(
-    text="gemma4-un:latest",
-    vision="qwen2.5vl:7b",  # 표준 vision 모델 (Ollama 0.20.2 llama.cpp 지원)
+    # 2026-05-03 vision default qwen2.5vl:7b → qwen3-vl:8b (ChatGPT 정공법)
+    # env var STUDIO_VISION_MODEL / STUDIO_TEXT_MODEL 로 runtime swap 가능
+    # MVP A안 — auto-detect fallback chain 안 만듦 (모델 없으면 Ollama 가 알아서 에러)
+    vision=_env_or("qwen3-vl:8b", "STUDIO_VISION_MODEL"),
+    text=_env_or("gemma4-un:latest", "STUDIO_TEXT_MODEL"),
 )
 
 
