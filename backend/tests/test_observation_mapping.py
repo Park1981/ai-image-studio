@@ -1,8 +1,6 @@
 # backend/tests/test_observation_mapping.py
 """observation_mapping — observation JSON → 9 슬롯 5개 매핑 단위 테스트."""
 
-import pytest
-
 from studio.vision_pipeline.observation_mapping import map_observation_to_slots
 
 
@@ -84,3 +82,34 @@ class TestObservationMapping:
         assert "subject 2:" in slots["subject"]
         assert "young adult female" in slots["subject"]
         assert "middle-aged male" in slots["subject"]
+
+    def test_handles_subject_none_item_gracefully(self) -> None:
+        """subjects[] 안 None 항목이 있어도 AttributeError 없이 처리된다 (LLM 비정상 출력 가드)."""
+        observation = {
+            "subjects": [
+                None,
+                {"apparent_age_group": "young adult", "broad_visible_appearance": "female"},
+                None,
+            ]
+        }
+        slots = map_observation_to_slots(observation)
+        # None 은 skip, dict 만 처리 — enumerate idx=1 → "subject 2"
+        assert "young adult female" in slots["subject"]
+        assert "subject 2:" in slots["subject"]
+
+    def test_handles_clothing_as_string_gracefully(self) -> None:
+        """clothing 필드가 list 가 아닌 str 이어도 character-iterate 버그 안 발생 (LLM 비정상 출력 가드)."""
+        observation = {
+            "subjects": [
+                {
+                    "apparent_age_group": "young adult",
+                    "clothing": "blue jeans",  # str (LLM 비정상 — list 가 정상)
+                    "accessories_or_objects": "watch",  # str (비정상)
+                }
+            ]
+        }
+        slots = map_observation_to_slots(observation)
+        # str 은 skip — clothing_or_materials 빈 문자열
+        assert slots["clothing_or_materials"] == ""
+        # subject 는 정상 처리
+        assert "young adult" in slots["subject"]

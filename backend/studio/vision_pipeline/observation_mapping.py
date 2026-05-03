@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any
 
 
-def _join_nonempty(items: list[str | None] | tuple[str | None, ...], sep: str = ", ") -> str:
+def _join_nonempty(items: list[Any] | tuple[Any, ...], sep: str = ", ") -> str:
     """None / 빈 문자열 제외 후 join. 항상 string 반환."""
     parts = [str(x).strip() for x in items if x and str(x).strip()]
     return sep.join(parts)
@@ -67,17 +67,24 @@ def map_observation_to_slots(observation: dict[str, Any]) -> dict[str, str]:
         framing.get("subject_position"),
     ])
 
-    # subject: subjects 배열 → 다중 처리
+    # subject: subjects 배열 → 다중 처리 (None / non-dict 항목 skip)
     subjects = observation.get("subjects", []) or []
     subject = "; ".join(filter(None, [
-        _format_subject(s, i + 1) for i, s in enumerate(subjects)
+        _format_subject(s, i + 1) for i, s in enumerate(subjects) if isinstance(s, dict)
     ]))
 
     # clothing_or_materials: 모든 subject 의 clothing + accessories 합본
+    # str 로 오는 경우 character-iterate 방지 → isinstance(list) 체크
     clothing_items: list[str] = []
     for s in subjects:
-        clothing_items.extend(s.get("clothing", []) or [])
-        clothing_items.extend(s.get("accessories_or_objects", []) or [])
+        if not isinstance(s, dict):
+            continue
+        clothing_raw = s.get("clothing") or []
+        if isinstance(clothing_raw, list):
+            clothing_items.extend(clothing_raw)
+        accessories_raw = s.get("accessories_or_objects") or []
+        if isinstance(accessories_raw, list):
+            clothing_items.extend(accessories_raw)
     clothing_or_materials = _join_nonempty(clothing_items)
 
     # environment: location + foreground/middle/background + weather
