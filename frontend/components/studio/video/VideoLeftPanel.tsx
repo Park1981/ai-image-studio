@@ -128,14 +128,6 @@ export default function VideoLeftPanel({
         flowLabel="영상 생성 프롬프트 흐름 보기"
       />
 
-      {/* Phase 5 (2026-05-03 · spec §5.6) — 영상 모델 선택 세그먼트 (Wan 2.2 / LTX 2.3).
-       *  CTA 위에 배치 — ETA 텍스트가 모델 따라 즉시 변하는 시각적 일관성. */}
-      <VideoModelSegment
-        value={selectedVideoModel}
-        onChange={setSelectedVideoModel}
-        disabled={running}
-      />
-
       {/* Primary CTA — sticky 상단 (Generate / Edit 와 통일).
        *  Phase 1.5.4 (결정 K) — 텍스트 영문 통일 (Render). shortcut 표시 X.
        *  Phase 5 follow-up 4 (2026-05-03 fix) — ETA description 제거 (Generate/Edit 와 통일). */}
@@ -226,6 +218,17 @@ export default function VideoLeftPanel({
         {/* 번역/분리 결과 카드 — textarea 외부 아래에 펼침. */}
         <PromptToolsResults tools={promptTools} />
       </div>
+
+      {/* Phase 5 (2026-05-03 · spec §5.6) — 영상 모델 선택 세그먼트 (Wan 2.2 / LTX 2.3).
+       *  2026-05-04: 사용자 피드백 — CTA 위 → 영상 지시 하단으로 이동
+       *  (Vision 페이지의 모델 카드 위치와 일관 · 원본/지시 이후 모델 선택 흐름).
+       *  Trade-off: CTA 와 거리가 생겨 ETA 변화 즉시 인지는 약간 약화 — but
+       *  영상 지시 작성 후 자연스러운 흐름 (입력 → 모델 → 생성). */}
+      <VideoModelSegment
+        value={selectedVideoModel}
+        onChange={setSelectedVideoModel}
+        disabled={running}
+      />
 
       {/* ── 카드 순서 (Phase 1.5.4 · 결정 B · 2026-05-02) ──
        *  옛: AI → 영상해상도 → 퀄리티 → 성인
