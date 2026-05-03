@@ -20,6 +20,7 @@
 import { useEffect, useState } from "react";
 import AppHeader from "@/components/chrome/AppHeader";
 import ProgressModal from "@/components/studio/ProgressModal";
+import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import CompareAnalysisPanel from "@/components/studio/compare/CompareAnalysisPanel";
 import CompareLeftPanel from "@/components/studio/compare/CompareLeftPanel";
 import CompareViewer from "@/components/studio/compare/CompareViewer";
@@ -212,6 +213,37 @@ export default function VisionComparePage() {
         </StudioLeftPanel>
 
         <StudioRightPanel>
+          {/* V5 결과 헤더 (Generate/Edit/Vision/Video 와 통일 · 2026-05-03) —
+           *  meta pills: A 사이즈 (violet) · B 사이즈 (violet) · 모드 · 종합점수 (analysis amber). */}
+          <StudioResultHeader
+            title="비교 결과"
+            titleEn="Comparison"
+            meta={
+              <>
+                {imageA && (
+                  <span className="ais-result-pill ais-pill-violet mono">
+                    A · {imageA.width} × {imageA.height}
+                  </span>
+                )}
+                {imageB && (
+                  <span className="ais-result-pill ais-pill-violet mono">
+                    B · {imageB.width} × {imageB.height}
+                  </span>
+                )}
+                {imageA && imageB && (
+                  <span className="ais-result-pill mono">
+                    {viewerMode === "slider" ? "SLIDER" : "SIDE BY SIDE"}
+                  </span>
+                )}
+                {analysis && !analysis.fallback && (
+                  <span className="ais-result-pill ais-pill-amber mono">
+                    종합 {analysis.overall}%
+                  </span>
+                )}
+              </>
+            }
+          />
+
           <CompareViewer
             imageA={imageA}
             imageB={imageB}

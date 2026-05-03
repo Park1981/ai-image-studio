@@ -20,7 +20,6 @@ import {
   CompareSlotBadge,
 } from "@/components/studio/CompareImageSlot";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
-import Icon from "@/components/ui/Icon";
 import { SegControl } from "@/components/ui/primitives";
 import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
 
@@ -63,25 +62,24 @@ export default function CompareViewer({
         minHeight: 304,
       }}
     >
+      {/* 2026-05-03: 페이지 레벨에 StudioResultHeader 추가됨 → 자체 "비교 뷰어" 라벨 제거.
+       *  비율 경고 (amber chip) 는 좌측에, SegControl 은 우측에. */}
       <div
         style={{
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
+          gap: 8,
         }}
       >
         <div
           style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: "var(--ink-2)",
             display: "flex",
             alignItems: "center",
             gap: 8,
+            minHeight: 28,
           }}
         >
-          <Icon name="zoom-in" size={13} />
-          비교 뷰어
           {ratioDiverges && mode === "slider" && (
             <span
               style={{
