@@ -126,3 +126,27 @@ def _to_base64(image: Path | str | bytes) -> str:
     else:
         data = image
     return base64.b64encode(data).decode("ascii")
+
+
+# ──────────────────────────────────────────────
+# 디버그 헬퍼 (ChatGPT 2차 리뷰 채택 · 2026-05-03)
+# ──────────────────────────────────────────────
+
+import os  # noqa: E402 — 파일 하단 추가, 전체 re-import 없이 최소 변경
+from typing import Any as _DebugAny  # 기존 Callable/Awaitable 과 충돌 방지 alias
+
+_DEBUG_TRUTHY = ("1", "true", "yes", "on")
+
+
+def debug_log(stage: str, payload: _DebugAny) -> None:
+    """STUDIO_VISION_DEBUG=1 일 때만 stage + payload 를 log 에 출력.
+
+    개발/디버깅용 헬퍼. 운영 배포 시 환경 변수를 켜지 않으면 noop.
+
+    ChatGPT 2차 리뷰 — env var 를 함수 내부에서 읽어서
+    재시작 없이도 런타임 ON/OFF 즉시 반영. module-level 캐싱 X.
+    """
+    enabled = os.environ.get("STUDIO_VISION_DEBUG", "").strip().lower() in _DEBUG_TRUTHY
+    if not enabled:
+        return
+    log.warning("[VISION_DEBUG][%s] %s", stage, payload)
