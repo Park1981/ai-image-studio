@@ -606,14 +606,16 @@ it("CompareAnalysisPanel — analysis 있을 때 .ais-result-hero-plain 적용",
   expect(root!.className).not.toContain("ais-compare-analysis-card");
 });
 
-it("CompareAnalysisPanel — running 시 (StudioLoadingState) 도 동일하게 처리", () => {
+it("CompareAnalysisPanel — running 시에도 outer wrapper 에 .ais-result-hero-plain 적용", () => {
   const { container } = render(
     <CompareAnalysisPanel running={true} analysis={null} />,
   );
-  // 현재 구현: running 시 StudioLoadingState 직접 반환 — wrapper 없음 (Vision 패턴과 통일).
+  // 현재 구현: running 시 외곽 <div> 안에 AnalysisLoading 렌더 — root 는 여전히 외곽 wrapper.
+  // VisionResultCard 와 다른 패턴 (CompareAnalysisPanel 의 header 가 항상 wrapper 안에 보존되어야 함).
   const root = container.firstChild as HTMLElement | null;
   expect(root).not.toBeNull();
-  expect(root!.className).not.toContain("ais-result-hero-plain");
+  expect(root!.className).toContain("ais-result-hero-plain");        // positive — wrapper 항상 적용
+  expect(root!.className).not.toContain("ais-compare-analysis-card"); // 옛 class 부재
 });
 ```
 
