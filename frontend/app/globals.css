@@ -2964,6 +2964,11 @@ button {
 }
 @media (min-width: 1280px) {
   .ais-studio-workspace {
+    /* 2026-05-04 좁음 fix: width 100% 명시.
+     *  width 미지정 시 grid 가 children intrinsic max-content 로 sizing —
+     *  children 작은 페이지 (Compare) 가 children 큰 페이지 (Vision) 보다 좁아짐.
+     *  width:100% + max-width 조합이 표준 박스 가운데 정렬 패턴. */
+    width: 100%;
     max-width: min(95vw, 1600px);
     margin: 0 auto;
     padding: 22px 24px 30px;
