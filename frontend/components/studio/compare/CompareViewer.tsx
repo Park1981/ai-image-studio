@@ -51,14 +51,13 @@ export default function CompareViewer({
 
   return (
     <div
+      className="ais-result-hero ais-result-hero-edit"
       style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius-lg)",
-        padding: 14,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
+        // 동적 보존: minHeight 304 (Compare 시각 cap · plan §9 박제).
+        // 나머지 (background/border/radius/padding/flex column/gap) 는 className 의
+        // .ais-result-hero + .ais-result-hero-edit 가 처리.
+        // -edit modifier 의 align-items:stretch 가 SliderViewer/SideBySideViewer
+        // inner wrapper 폭 100% 자동 보장 → 좁음 fix 의 핵심 메커니즘.
         minHeight: 304,
       }}
     >
