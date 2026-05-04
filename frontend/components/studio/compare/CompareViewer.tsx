@@ -140,10 +140,14 @@ function SliderViewer({
 }) {
   // 비율은 A 기준 (B 는 contain 으로 박스 안에서 알아서 맞춰짐)
   // /edit 패턴: 바깥 flex center + 안쪽 BeforeAfterSlider · maxHeight 기본 70vh
+  // 2026-05-04 좁음 fix supplemental: inner wrapper 에 width 100% 명시
+  // (외곽 .ais-result-hero-edit 의 stretch 는 직접 자식까지만 보장 — Compare 는
+  // 본문 div(row flex) → SliderViewer outer → inner 3 단계라 inner 가 row flex
+  // item 으로 content-based width 수축. width:100% 명시로 부모 폭 점유 강제).
   const aspect = `${imageA.width} / ${imageA.height}`;
   return (
     <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative", width: "100%" }}>
         <BeforeAfterSlider
           beforeSrc={imageA.dataUrl}
           afterSeed="vision-compare"
@@ -168,6 +172,9 @@ function SideBySideViewer({
   return (
     <div
       style={{
+        // 2026-05-04 좁음 fix supplemental: width 100% 명시 (SliderViewer 와 동일 사유 —
+        // 본문 div row flex 의 자식이라 grid container 도 content-based 로 수축).
+        width: "100%",
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
         gap: 10,
