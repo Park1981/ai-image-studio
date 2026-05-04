@@ -639,6 +639,12 @@ grep -n "ais-compare-analysis-card" components/studio/compare/CompareAnalysisPan
 <div className="ais-result-hero-plain" style={{ minHeight: 262 }}>
 ```
 
+**downstream sideeffect 박제** (Task 1 code review minor finding · 2026-05-04):
+- 옛 `.ais-compare-analysis-card` 의 `padding: 16px` → 새 `.ais-result-hero-plain` 의 `padding: 24px` 로 자동 변경 (시각 8px 여유 ↑).
+- spec §3.2 박제대로 의도된 통일 (Edit/Video matt 카드 padding 24 와 통일). 추가 inline override 불필요.
+- 사용자 시각 검증 (Task 6 Step 6.2 의 Compare 페이지) 시 padding 변경 인지하고 OK 받기.
+- 옛 `gap: 14px` 는 Plain base 에 동일하게 정의됨 (변경 0).
+
 - [ ] **Step 5.5: globals.css 에서 `.ais-compare-analysis-card` 정의 제거**
 
 `frontend/app/globals.css` 의 line 1980 부근 `.ais-compare-analysis-card { ... }` 블록 전체 삭제. 직전/직후 빈 줄 정리.
@@ -710,7 +716,7 @@ cd frontend; npm run dev
 2. `/edit` — Edit 결과 카드 회귀 0 + BeforeAfter 슬라이더 정상 (변경 없음)
 3. `/video` — Video Filled 매트 톤 유지 (시각 거의 동일) + Mock/Empty 분기 정상
 4. `/vision` — Plain 외곽 박스로 결과 영역 시각 무게 ↑ + 텍스트 가독성 OK
-5. `/vision/compare` — Compare viewer 가 우패널 폭 100% 점유 (좁음 fix 확인 핵심) + analysis panel plain 톤 유지
+5. `/vision/compare` — Compare viewer 가 우패널 폭 100% 점유 (좁음 fix 확인 핵심) + analysis panel plain 톤 유지 (**padding 16 → 24 자동 변경** — Task 5 Step 5.4 박제대로 의도된 통일. 시각 8px 여유 ↑ 사용자 OK 받기)
 
 5 페이지 모두 사용자 OK 받기.
 
