@@ -17,7 +17,7 @@
 
 "use client";
 
-import { useEffect, useRef, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
@@ -44,6 +44,8 @@ import {
 } from "@/stores/useVideoStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
+import VideoSizeWarnModal from "@/components/studio/video/VideoSizeWarnModal";
+import { shouldWarnVideoSize, simplifyRatio } from "@/lib/video-size";
 
 interface Props {
   /** prompt textarea ref — useAutoGrowTextarea 훅이 부모에서 관리 */
@@ -116,10 +118,54 @@ export default function VideoLeftPanel({
     toast.info("이미지 해제됨");
   };
 
+  // 단일 진실원 — slider + warn modal 둘 다 이 expected 사용 (불일치 race 차단).
+  // useMemo: sourceWidth/sourceHeight/longerEdge 변동 시만 재계산.
+  const expected = useMemo(() => {
+    if (!sourceWidth || !sourceHeight) return { width: 0, height: 0 };
+    return computeVideoResize(sourceWidth, sourceHeight, longerEdge);
+  }, [sourceWidth, sourceHeight, longerEdge]);
+
+  // 큰 사이즈 경고 모달 노출 state.
+  const [warnOpen, setWarnOpen] = useState(false);
+
   const ctaDisabled = running || !sourceImage || !prompt.trim();
 
+  /**
+   * Render CTA 클릭 — 사이즈 임계 충족 시 경고 모달, 미만이면 즉시 onGenerate.
+   * 방어 가드: running / warnOpen / ctaDisabled 중 하나라도 truthy 면 early return.
+   */
+  const handleCtaClick = () => {
+    if (running || warnOpen || ctaDisabled) return;
+
+    if (shouldWarnVideoSize(expected.width, expected.height)) {
+      setWarnOpen(true);
+      return;
+    }
+
+    onGenerate();
+  };
+
+  /** 모달 [그대로 진행] — 닫고 → 즉시 onGenerate (모달 잔류 프레임 ↓). */
+  const handleConfirmWarn = () => {
+    setWarnOpen(false);
+    onGenerate();
+  };
+
+  /** 모달 [취소] / ESC / overlay — 닫기만, generate 미호출. */
+  const handleCancelWarn = () => {
+    setWarnOpen(false);
+  };
+
   return (
-    <StudioLeftPanel>
+    <>
+      <VideoSizeWarnModal
+        open={warnOpen}
+        width={expected.width}
+        height={expected.height}
+        onCancel={handleCancelWarn}
+        onConfirm={handleConfirmWarn}
+      />
+      <StudioLeftPanel>
       <StudioModeHeader
         titleKo="영상"
         titleEn="Video"
@@ -135,7 +181,7 @@ export default function VideoLeftPanel({
       <div className="ais-cta-sticky-top">
         <button
           type="button"
-          onClick={onGenerate}
+          onClick={handleCtaClick}
           disabled={ctaDisabled}
           className="ais-cta-primary"
         >
@@ -322,9 +368,11 @@ export default function VideoLeftPanel({
         setLongerEdge={setLongerEdge}
         sourceWidth={sourceWidth}
         sourceHeight={sourceHeight}
+        expected={expected}
       />
 
-    </StudioLeftPanel>
+      </StudioLeftPanel>
+    </>
   );
 }
 
@@ -339,16 +387,16 @@ function VideoResolutionSlider({
   setLongerEdge,
   sourceWidth,
   sourceHeight,
+  expected,
 }: {
   longerEdge: number;
   setLongerEdge: (v: number) => void;
   sourceWidth: number | null;
   sourceHeight: number | null;
+  expected: { width: number; height: number };
 }) {
   const hasSource = !!(sourceWidth && sourceHeight);
-  const expected = hasSource
-    ? computeVideoResize(sourceWidth!, sourceHeight!, longerEdge)
-    : { width: 0, height: 0 };
+  // 신: prop 으로 받음 (단일 진실원 — 부모 VideoLeftPanel 의 useMemo expected 공유).
   // 시간 가중치 — 1536 기준 대비 (픽셀수 제곱 근사)
   const timeFactor = Math.pow(longerEdge / VIDEO_LONGER_EDGE_MAX, 2);
   const speed = pickSpeedTone(timeFactor);
@@ -572,9 +620,4 @@ function pickSpeedTone(timeFactor: number): {
   };
 }
 
-/** 정수 비율 근사 — "16:9" / "3:4" 등 */
-function simplifyRatio(w: number, h: number): string {
-  const gcd = (a: number, b: number): number => (b === 0 ? a : gcd(b, a % b));
-  const g = gcd(w, h);
-  return `${w / g}:${h / g}`;
-}
+// simplifyRatio 는 @/lib/video-size 에서 import (단일 진실원 — 파일 내 중복 제거)
