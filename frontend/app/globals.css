@@ -1347,6 +1347,21 @@ button {
   aspect-ratio: auto;
 }
 
+/* ── Plain 카드 — .ais-result-hero 패밀리 확장 (2026-05-04 통일 plan).
+ *  텍스트 결과 (Vision / Compare-analysis) 용. dot-grid X · 약한 shadow.
+ *  매트 (.ais-result-hero base) 와 분기 — 이미지/영상 = 매트 / 텍스트 = plain. */
+.ais-result-hero-plain {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-sm);
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+
 /* SegControl row (Edit Hero 우상단 — 슬라이더/나란히 토글) */
 .ais-hero-seg-row {
   display: flex;
