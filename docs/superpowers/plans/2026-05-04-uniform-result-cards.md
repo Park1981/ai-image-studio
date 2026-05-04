@@ -134,10 +134,11 @@ it("Filled 분기 — outermost element 가 .ais-result-hero className 보유", 
   const { container } = render(
     <VideoPlayerCard src="http://example.com/test.mp4" running={false} />,
   );
-  // 첫 직계 자식 (root element) 가 .ais-result-hero 갖는지
+  // 첫 직계 자식 (root element) 가 .ais-result-hero-edit 갖는지 (매트+edit 정확한 조합)
   const root = container.firstChild as HTMLElement | null;
   expect(root).not.toBeNull();
-  expect(root!.className).toContain("ais-result-hero");
+  expect(root!.className).toContain("ais-result-hero-edit");
+  expect(root!.className).not.toContain("ais-result-hero-plain");
 });
 
 it("Mock 분기 — .ais-result-hero className 적용 X (별도 inline dashed 박스 유지)", () => {
@@ -152,10 +153,18 @@ it("Mock 분기 — .ais-result-hero className 적용 X (별도 inline dashed �
 it("Empty 분기 (src 없음) — StudioEmptyState 마운트 (.ais-result-hero 없음)", () => {
   const { container } = render(<VideoPlayerCard src="" running={false} />);
   const root = container.firstChild as HTMLElement | null;
-  // StudioEmptyState 의 root 가 .ais-result-hero 안 가짐
-  if (root) {
-    expect(root.className).not.toContain("ais-result-hero");
-  }
+  // StudioEmptyState 가 실제로 마운트됨을 명시 검증 (conditional 이면 null 시 silent pass)
+  expect(root).not.toBeNull();
+  expect(root!.className).not.toContain("ais-result-hero");
+});
+
+it("Loading 분기 (running=true) — .ais-result-hero className 없음 (StudioLoadingState)", () => {
+  const { container } = render(
+    <VideoPlayerCard src="http://example.com/test.mp4" running={true} />,
+  );
+  const root = container.firstChild as HTMLElement | null;
+  expect(root).not.toBeNull();
+  expect(root!.className).not.toContain("ais-result-hero");
 });
 ```
 
@@ -235,7 +244,7 @@ cd frontend
 npm test && npx tsc --noEmit && npm run lint
 ```
 
-Expected: `Tests  219 passed (219)` (216 + 신규 3) · tsc clean · lint clean.
+Expected: `Tests  220 passed (220)` (216 + 신규 4) · tsc clean · lint clean.
 
 - [ ] **Step 2.6: commit**
 
@@ -247,7 +256,7 @@ inline style → .ais-result-hero + .ais-result-hero-edit (Edit 패턴 재사용
 aspect-ratio:auto + padding 24 + flex column + stretch 자동 적용.
 Mock / Empty 분기 무변경 (StudioEmptyState 그대로).
 
-vitest +3 test (216 → 219).
+vitest +4 test (216 → 220).
 "
 ```
 
@@ -306,17 +315,15 @@ it("V1 분기 (positivePrompt 빈값) — 동일하게 .ais-result-hero-plain wr
 it("Empty 분기 (result null) — wrapper 없음 (StudioEmptyState 그대로)", () => {
   const { container } = render(<VisionResultCard result={null} running={false} />);
   const root = container.firstChild as HTMLElement | null;
-  if (root) {
-    expect(root.className).not.toContain("ais-result-hero-plain");
-  }
+  expect(root).not.toBeNull();
+  expect(root!.className).not.toContain("ais-result-hero-plain");
 });
 
 it("Loading 분기 (running true) — wrapper 없음 (StudioLoadingState 그대로)", () => {
   const { container } = render(<VisionResultCard result={null} running={true} />);
   const root = container.firstChild as HTMLElement | null;
-  if (root) {
-    expect(root.className).not.toContain("ais-result-hero-plain");
-  }
+  expect(root).not.toBeNull();
+  expect(root!.className).not.toContain("ais-result-hero-plain");
 });
 ```
 
@@ -599,15 +606,16 @@ it("CompareAnalysisPanel — analysis 있을 때 .ais-result-hero-plain 적용",
   expect(root!.className).not.toContain("ais-compare-analysis-card");
 });
 
-it("CompareAnalysisPanel — running 시 (StudioLoadingState) 도 동일하게 처리", () => {
+it("CompareAnalysisPanel — running 시에도 outer wrapper 에 .ais-result-hero-plain 적용", () => {
   const { container } = render(
     <CompareAnalysisPanel running={true} analysis={null} />,
   );
-  // 현재 구현: running 시 StudioLoadingState 직접 반환 — wrapper 없음 (Vision 패턴과 통일).
+  // 현재 구현: running 시 외곽 <div> 안에 AnalysisLoading 렌더 — root 는 여전히 외곽 wrapper.
+  // VisionResultCard 와 다른 패턴 (CompareAnalysisPanel 의 header 가 항상 wrapper 안에 보존되어야 함).
   const root = container.firstChild as HTMLElement | null;
-  if (root) {
-    expect(root.className).not.toContain("ais-result-hero-plain");
-  }
+  expect(root).not.toBeNull();
+  expect(root!.className).toContain("ais-result-hero-plain");        // positive — wrapper 항상 적용
+  expect(root!.className).not.toContain("ais-compare-analysis-card"); // 옛 class 부재
 });
 ```
 
@@ -638,6 +646,12 @@ grep -n "ais-compare-analysis-card" components/studio/compare/CompareAnalysisPan
 ```tsx
 <div className="ais-result-hero-plain" style={{ minHeight: 262 }}>
 ```
+
+**downstream sideeffect 박제** (Task 1 code review minor finding · 2026-05-04):
+- 옛 `.ais-compare-analysis-card` 의 `padding: 16px` → 새 `.ais-result-hero-plain` 의 `padding: 24px` 로 자동 변경 (시각 8px 여유 ↑).
+- spec §3.2 박제대로 의도된 통일 (Edit/Video matt 카드 padding 24 와 통일). 추가 inline override 불필요.
+- 사용자 시각 검증 (Task 6 Step 6.2 의 Compare 페이지) 시 padding 변경 인지하고 OK 받기.
+- 옛 `gap: 14px` 는 Plain base 에 동일하게 정의됨 (변경 0).
 
 - [ ] **Step 5.5: globals.css 에서 `.ais-compare-analysis-card` 정의 제거**
 
@@ -710,7 +724,15 @@ cd frontend; npm run dev
 2. `/edit` — Edit 결과 카드 회귀 0 + BeforeAfter 슬라이더 정상 (변경 없음)
 3. `/video` — Video Filled 매트 톤 유지 (시각 거의 동일) + Mock/Empty 분기 정상
 4. `/vision` — Plain 외곽 박스로 결과 영역 시각 무게 ↑ + 텍스트 가독성 OK
-5. `/vision/compare` — Compare viewer 가 우패널 폭 100% 점유 (좁음 fix 확인 핵심) + analysis panel plain 톤 유지
+5. `/vision/compare` — Compare viewer 가 우패널 폭 100% 점유 (좁음 fix 확인 핵심).
+   - **CompareViewer 변경 사항** (Task 4 박제 · 사용자 OK 받기):
+     - border-radius: 16px → 14px (-2px · `--radius-lg` → `--radius-card` 표준화)
+     - padding: 14 → 24 (+10px · Edit/Video 매트 카드 통일)
+     - gap: 10 → 12 (+2px · Edit modifier 와 통일)
+     - overflow: visible → hidden (className 자동 — Compare 안 popover/tooltip 클립 가능성 점검)
+   - **CompareAnalysisPanel 변경 사항** (Task 5 박제 · 사용자 OK 받기):
+     - padding: 16 → 24 (+8px · Plain base 통일)
+     - 다른 속성 변경 X (gap 14, surface, border, shadow-sm 동일)
 
 5 페이지 모두 사용자 OK 받기.
 

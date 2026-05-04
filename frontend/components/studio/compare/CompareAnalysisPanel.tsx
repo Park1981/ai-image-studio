@@ -9,7 +9,8 @@
  *   - 정상: AxisRow 5개 + 총평 + transform_prompt + uncertain
  *
  * 2026-05-02 디자인 V5 Phase 7 격상:
- *  - 외곽 inline → className `.ais-compare-analysis-card` (surface + border + radius-card + padding 16 + flex column gap 14)
+ *  - 외곽 inline → className `.ais-result-hero-plain` (통일 plain base · padding 24 + flex column gap 14)
+ *    min-height 262 인라인 보존 (production UX cap · plan §7).
  *  - 헤더 → `.ais-cac-header` + `.ais-cac-title` + `.ais-cac-overall-chip` (violet gradient + violet text)
  *  - AxisRow → `.ais-axis-row` + `-head` + `-label` + `-score` + `-bar` + `-fill[data-tone]` + `-comment`
  *  - Summary 박스 → `.ais-cac-summary` + `.ais-cac-eyebrow`
@@ -59,7 +60,7 @@ function scoreTone(score: number | null): "green" | "amber" | "gray" {
 
 export default function CompareAnalysisPanel({ running, analysis }: Props) {
   return (
-    <div className="ais-compare-analysis-card">
+    <div className="ais-result-hero-plain" style={{ minHeight: 262 }}>
       <div className="ais-cac-header">
         <div className="ais-cac-title">
           <Icon name="grid" size={13} />

@@ -51,14 +51,15 @@ export default function CompareViewer({
 
   return (
     <div
+      className="ais-result-hero ais-result-hero-edit"
       style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius-lg)",
-        padding: 14,
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
+        // 동적 보존: minHeight 304 (Compare 시각 cap · plan §9 박제).
+        // 나머지 layout (background/border/radius/padding/flex column/gap/overflow) 는 className 의
+        // .ais-result-hero + .ais-result-hero-edit 가 처리. 옛 inline 대비 변경:
+        //   - border-radius: --radius-lg (16px) → --radius-card (14px · 표준화 -2px)
+        //   - padding: 14 → 24 (Edit/Video 매트 카드 통일 +10px)
+        //   - gap: 10 → 12 (Edit modifier 와 통일 +2px)
+        //   - overflow: visible → hidden (className 자동)
         minHeight: 304,
       }}
     >
@@ -139,10 +140,14 @@ function SliderViewer({
 }) {
   // 비율은 A 기준 (B 는 contain 으로 박스 안에서 알아서 맞춰짐)
   // /edit 패턴: 바깥 flex center + 안쪽 BeforeAfterSlider · maxHeight 기본 70vh
+  // 2026-05-04 좁음 fix supplemental: inner wrapper 에 width 100% 명시
+  // (외곽 .ais-result-hero-edit 의 stretch 는 직접 자식까지만 보장 — Compare 는
+  // 본문 div(row flex) → SliderViewer outer → inner 3 단계라 inner 가 row flex
+  // item 으로 content-based width 수축. width:100% 명시로 부모 폭 점유 강제).
   const aspect = `${imageA.width} / ${imageA.height}`;
   return (
     <div style={{ width: "100%", display: "flex", justifyContent: "center" }}>
-      <div style={{ position: "relative" }}>
+      <div style={{ position: "relative", width: "100%" }}>
         <BeforeAfterSlider
           beforeSrc={imageA.dataUrl}
           afterSeed="vision-compare"
@@ -167,6 +172,9 @@ function SideBySideViewer({
   return (
     <div
       style={{
+        // 2026-05-04 좁음 fix supplemental: width 100% 명시 (SliderViewer 와 동일 사유 —
+        // 본문 div row flex 의 자식이라 grid container 도 content-based 로 수축).
+        width: "100%",
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
         gap: 10,

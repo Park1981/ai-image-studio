@@ -2,11 +2,12 @@
  * VideoPlayerCard — LTX-2.3 i2v 결과 영상 재생 카드.
  * 2026-04-24 · V6 → audit P1b: loading 상태 축소 (progress bar + % 제거).
  *
- * 3 상태:
- *  - loading (running=true): Spinner + 단계 라벨 + 평균 소요시간 안내
+ * 4 상태:
+ *  - loading (running=true): StudioLoadingState 표시
  *    (상세 진행률은 ProgressModal 이 단일 primary — 중복 제거)
- *  - empty (src=null, !running): 업로드 후 생성 대기 안내
- *  - filled (src 존재): <video controls> 재생 + 저장/URL 복사 버튼
+ *  - mock (src="mock-seed://..."): 가짜 결과 안내 박스 (NEXT_PUBLIC_USE_MOCK 시)
+ *  - empty (src 없음, !running): StudioEmptyState 표시
+ *  - filled (valid src): 매트 카드 + video player
  */
 
 "use client";
@@ -89,27 +90,12 @@ export default function VideoPlayerCard({
     );
   }
 
-  // ── Filled ── 2026-04-27 매트 카드 + dot grid (Generate / Edit 와 통일)
+  // ── Filled ── 2026-05-04 통일 plan: .ais-result-hero 매트 카드 className 전환.
+  // .ais-result-hero base 의 aspect-ratio 1672/941 은 video 에 부적합 →
+  // .ais-result-hero-edit modifier 로 aspect-ratio:auto + flex column + stretch +
+  // padding 24 자동 적용 (Edit 패턴 재사용).
   return (
-    <div
-      style={{
-        // 카드 외관 = 매트 (var(--surface) + dot grid + border + shadow)
-        backgroundColor: "var(--surface)",
-        backgroundImage:
-          "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
-        backgroundSize: "16px 16px",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius-card)",
-        boxShadow: "var(--shadow-sm)",
-        overflow: "hidden",
-        // 매트 padding — video 가 떠있는 느낌 (사진 갤러리 톤)
-        padding: 24,
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
+    <div className="ais-result-hero ais-result-hero-edit">
       {/* video element — 매트 위 떠있는 영상 (자체 그림자 + 옅은 테두리) */}
       <video
         src={src}

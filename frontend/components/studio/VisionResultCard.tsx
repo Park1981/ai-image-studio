@@ -62,7 +62,13 @@ export default function VisionResultCard({ result, running }: Props) {
   }
 
   // ─── Branching: v2 vs v1 ───
+  // 2026-05-04 통일 plan: V2/V1 분기 모두 .ais-result-hero-plain wrapper 로 감싸
+  // Vision 결과 영역의 외곽 박스 톤을 다른 4 페이지와 통일. Loading/Empty 분기는
+  // StudioLoadingState/StudioEmptyState 자체 외곽이 있어 wrapper 없음.
   const isV2 = !!(result.positivePrompt && result.positivePrompt.trim());
-  if (isV2) return <RecipeV2View result={result} />;
-  return <LegacyV1View result={result} />;
+  return (
+    <div className="ais-result-hero-plain">
+      {isV2 ? <RecipeV2View result={result} /> : <LegacyV1View result={result} />}
+    </div>
+  );
 }
