@@ -2,11 +2,12 @@
  * VideoPlayerCard — LTX-2.3 i2v 결과 영상 재생 카드.
  * 2026-04-24 · V6 → audit P1b: loading 상태 축소 (progress bar + % 제거).
  *
- * 3 상태:
- *  - loading (running=true): Spinner + 단계 라벨 + 평균 소요시간 안내
+ * 4 상태:
+ *  - loading (running=true): StudioLoadingState 표시
  *    (상세 진행률은 ProgressModal 이 단일 primary — 중복 제거)
- *  - empty (src=null, !running): 업로드 후 생성 대기 안내
- *  - filled (src 존재): <video controls> 재생 + 저장/URL 복사 버튼
+ *  - mock (src="mock-seed://..."): 가짜 결과 안내 박스 (NEXT_PUBLIC_USE_MOCK 시)
+ *  - empty (src 없음, !running): StudioEmptyState 표시
+ *  - filled (valid src): 매트 카드 + video player
  */
 
 "use client";
