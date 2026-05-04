@@ -89,27 +89,12 @@ export default function VideoPlayerCard({
     );
   }
 
-  // ── Filled ── 2026-04-27 매트 카드 + dot grid (Generate / Edit 와 통일)
+  // ── Filled ── 2026-05-04 통일 plan: .ais-result-hero 매트 카드 className 전환.
+  // .ais-result-hero base 의 aspect-ratio 1672/941 은 video 에 부적합 →
+  // .ais-result-hero-edit modifier 로 aspect-ratio:auto + flex column + stretch +
+  // padding 24 자동 적용 (Edit 패턴 재사용).
   return (
-    <div
-      style={{
-        // 카드 외관 = 매트 (var(--surface) + dot grid + border + shadow)
-        backgroundColor: "var(--surface)",
-        backgroundImage:
-          "radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px)",
-        backgroundSize: "16px 16px",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius-card)",
-        boxShadow: "var(--shadow-sm)",
-        overflow: "hidden",
-        // 매트 padding — video 가 떠있는 느낌 (사진 갤러리 톤)
-        padding: 24,
-        boxSizing: "border-box",
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-      }}
-    >
+    <div className="ais-result-hero ais-result-hero-edit">
       {/* video element — 매트 위 떠있는 영상 (자체 그림자 + 옅은 테두리) */}
       <video
         src={src}
