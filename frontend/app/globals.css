@@ -1991,19 +1991,6 @@ button {
   color: var(--ink-2);
 }
 
-/* ── Section 9: Compare 5축 Analysis Card · Transform · Uncertain (Phase 7) */
-.ais-compare-analysis-card {
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  overflow: hidden;
-  min-height: 262px; /* production UX cap (옛 inline · plan §7 시각 cap 보존) */
-}
 /* body wrapper · running/empty/fallback/filled 분기 — overflow auto 로 좁은 우측 패널 스크롤 */
 .ais-cac-body {
   flex: 1;
