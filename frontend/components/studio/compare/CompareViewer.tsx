@@ -54,10 +54,12 @@ export default function CompareViewer({
       className="ais-result-hero ais-result-hero-edit"
       style={{
         // 동적 보존: minHeight 304 (Compare 시각 cap · plan §9 박제).
-        // 나머지 (background/border/radius/padding/flex column/gap) 는 className 의
-        // .ais-result-hero + .ais-result-hero-edit 가 처리.
-        // -edit modifier 의 align-items:stretch 가 SliderViewer/SideBySideViewer
-        // inner wrapper 폭 100% 자동 보장 → 좁음 fix 의 핵심 메커니즘.
+        // 나머지 layout (background/border/radius/padding/flex column/gap/overflow) 는 className 의
+        // .ais-result-hero + .ais-result-hero-edit 가 처리. 옛 inline 대비 변경:
+        //   - border-radius: --radius-lg (16px) → --radius-card (14px · 표준화 -2px)
+        //   - padding: 14 → 24 (Edit/Video 매트 카드 통일 +10px)
+        //   - gap: 10 → 12 (Edit modifier 와 통일 +2px)
+        //   - overflow: visible → hidden (className 자동)
         minHeight: 304,
       }}
     >

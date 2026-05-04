@@ -722,7 +722,15 @@ cd frontend; npm run dev
 2. `/edit` — Edit 결과 카드 회귀 0 + BeforeAfter 슬라이더 정상 (변경 없음)
 3. `/video` — Video Filled 매트 톤 유지 (시각 거의 동일) + Mock/Empty 분기 정상
 4. `/vision` — Plain 외곽 박스로 결과 영역 시각 무게 ↑ + 텍스트 가독성 OK
-5. `/vision/compare` — Compare viewer 가 우패널 폭 100% 점유 (좁음 fix 확인 핵심) + analysis panel plain 톤 유지 (**padding 16 → 24 자동 변경** — Task 5 Step 5.4 박제대로 의도된 통일. 시각 8px 여유 ↑ 사용자 OK 받기)
+5. `/vision/compare` — Compare viewer 가 우패널 폭 100% 점유 (좁음 fix 확인 핵심).
+   - **CompareViewer 변경 사항** (Task 4 박제 · 사용자 OK 받기):
+     - border-radius: 16px → 14px (-2px · `--radius-lg` → `--radius-card` 표준화)
+     - padding: 14 → 24 (+10px · Edit/Video 매트 카드 통일)
+     - gap: 10 → 12 (+2px · Edit modifier 와 통일)
+     - overflow: visible → hidden (className 자동 — Compare 안 popover/tooltip 클립 가능성 점검)
+   - **CompareAnalysisPanel 변경 사항** (Task 5 박제 · 사용자 OK 받기):
+     - padding: 16 → 24 (+8px · Plain base 통일)
+     - 다른 속성 변경 X (gap 14, surface, border, shadow-sm 동일)
 
 5 페이지 모두 사용자 OK 받기.
 

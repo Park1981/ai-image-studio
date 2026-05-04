@@ -47,4 +47,5 @@ it("Compare empty (이미지 없음) — 매트 className 보존 (Empty 분기 �
   const root = container.firstChild as HTMLElement | null;
   expect(root).not.toBeNull();
   expect(root!.className).toContain("ais-result-hero");
+  expect(root!.className).toContain("ais-result-hero-edit");
 });
