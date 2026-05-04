@@ -26,7 +26,6 @@ import ImageTile from "@/components/ui/ImageTile";
 import ResultHoverActionBar, {
   ActionBarButton,
 } from "@/components/studio/ResultHoverActionBar";
-import Badge from "@/components/ui/Badge";
 import { deleteHistoryItem } from "@/lib/api/history";
 import { copyText } from "@/lib/image-actions";
 import type { HistoryItem } from "@/lib/api/types";
@@ -132,6 +131,9 @@ export default function HistoryTile({
         seed={item.imageRef || item.id}
         onClick={onClick}
         aspect={aspect}
+        // 2026-05-04 (사용자 결정) — Video mode 히스토리 타일에선 좌하단 ▶ VIDEO 라벨 숨김.
+        //  히스토리 자체가 영상 모드라 video 라벨 중복 정보. 다른 ImageTile 사용처는 default 유지.
+        hideVideoBadge={item.mode === "video"}
         style={{
           width: "100%",
           height: "100%",
@@ -141,11 +143,11 @@ export default function HistoryTile({
         }}
       />
 
-      {/* Phase 5 (2026-05-03 · spec §5.7) — Video mode 시 모델 배지.
-       *  - 위치: top-RIGHT (옛 left 는 "● 선택" 칩과 충돌 — top:9, left:9 z-index:4)
-       *  - tone 결정: modelId 우선 → 누락 시 model 문자열 fallback (Wan 포함 → violet)
-       *    Phase 5 follow-up 3 (2026-05-03 fix): 옛 row (서버 재로드 후 modelId 없음) 도
-       *    시각 일관 위해 display_name 기반 추론. */}
+      {/* Video mode 모델 라벨 (2026-05-04 redesign · 사용자 결정).
+       *  - 옛: 우상단 violet/cyan Badge 박스 (영상 위 색상 충돌 → 가독성 ↓)
+       *  - 신: 박스 제거 · 흰 텍스트 + text-shadow 만 (어두운 영상 위에서도 가독)
+       *  - 위치 동일 (top:8 right:8)
+       *  - 텍스트: shortVideoModelLabel — modelId → "Wan 2.2" / "LTX 2.3" 매핑 (옛 row fallback 포함). */}
       {item.mode === "video" && item.model && (
         <div
           style={{
@@ -154,19 +156,18 @@ export default function HistoryTile({
             right: 8,
             pointerEvents: "none",
             zIndex: 2,
+            fontSize: 12,
+            fontWeight: 600,
+            letterSpacing: 0.2,
+            color: "rgba(255, 255, 255, 0.95)",
+            textShadow:
+              "0 1px 4px rgba(0, 0, 0, 0.75), 0 0 2px rgba(0, 0, 0, 0.55)",
+            fontFamily:
+              '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
           }}
+          title={`영상 모델: ${item.model}`}
         >
-          <Badge
-            tone={
-              item.modelId === "wan22" ||
-              (item.modelId == null && /wan/i.test(item.model))
-                ? "violet"
-                : "cyan"
-            }
-            title={`영상 모델: ${item.model}`}
-          >
-            {item.model}
-          </Badge>
+          {shortVideoModelLabel(item.modelId, item.model)}
         </div>
       )}
 
@@ -220,4 +221,23 @@ export default function HistoryTile({
       </div>
     </div>
   );
+}
+
+/**
+ * Video mode 모델명 short label — 우상단 라벨 표시용 (2026-05-04 사용자 결정).
+ *  modelId 우선 매핑 → 누락 시 (옛 row · server reload 후) model 문자열 추론 fallback.
+ *
+ * @param modelId  HistoryItem.modelId — 신규 row 박제 ("wan22" / "ltx").
+ * @param model    HistoryItem.model — display name fallback 추론 ("Wan ..." / "LTX ...").
+ */
+function shortVideoModelLabel(
+  modelId: string | undefined | null,
+  model: string,
+): string {
+  if (modelId === "wan22") return "Wan 2.2";
+  if (modelId === "ltx") return "LTX 2.3";
+  // 옛 row fallback — display name 첫 단어 추론.
+  if (/wan/i.test(model)) return "Wan 2.2";
+  if (/ltx/i.test(model)) return "LTX 2.3";
+  return model;
 }

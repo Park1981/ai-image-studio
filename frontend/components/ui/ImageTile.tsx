@@ -40,6 +40,12 @@ interface ImageTileProps {
   style?: CSSProperties;
   overlay?: ReactNode;
   onClick?: () => void;
+  /**
+   * Video 분기에서 좌하단 "▶ VIDEO" 라벨을 숨길지 여부 (2026-05-04).
+   * default false — 기존 동작 유지. HistoryTile 의 video mode 갤러리 타일은 true 전달
+   * (히스토리 자체가 영상 모드라 video 라벨 중복 정보).
+   */
+  hideVideoBadge?: boolean;
 }
 
 /** seed 가 실제 이미지 참조인지 (data URL · blob · http(s) · 로컬 path) 판별 */
@@ -74,6 +80,7 @@ export default function ImageTile({
   style,
   overlay,
   onClick,
+  hideVideoBadge = false,
 }: ImageTileProps) {
   // Video 면 <video muted preload="metadata"> 로 썸네일(+호버 시 autoPlay loop).
   if (isImageRef(seed) && isVideoRef(seed)) {
@@ -113,24 +120,26 @@ export default function ImageTile({
             display: "block",
           }}
         />
-        {/* 영상 표시 뱃지 */}
-        <div
-          style={{
-            position: "absolute",
-            left: 8,
-            bottom: 8,
-            fontSize: 10,
-            padding: "2px 6px",
-            borderRadius: 4,
-            background: "rgba(0,0,0,.6)",
-            color: "rgba(255,255,255,.95)",
-            letterSpacing: ".04em",
-            pointerEvents: "none",
-          }}
-          className="mono"
-        >
-          ▶ VIDEO
-        </div>
+        {/* 영상 표시 뱃지 — hideVideoBadge=true 일 때 렌더 안 함 (2026-05-04 · 히스토리 갤러리 전용 옵션). */}
+        {!hideVideoBadge && (
+          <div
+            style={{
+              position: "absolute",
+              left: 8,
+              bottom: 8,
+              fontSize: 10,
+              padding: "2px 6px",
+              borderRadius: 4,
+              background: "rgba(0,0,0,.6)",
+              color: "rgba(255,255,255,.95)",
+              letterSpacing: ".04em",
+              pointerEvents: "none",
+            }}
+            className="mono"
+          >
+            ▶ VIDEO
+          </div>
+        )}
         {label && (
           <div
             className="mono"
