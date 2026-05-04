@@ -83,6 +83,9 @@ export default function VideoSizeWarnModal({
           boxShadow: "var(--shadow-lg)",
           border: "1px solid var(--line)",
           width: "min(440px, 100%)",
+          // overflow: hidden — footer 의 var(--bg-2) 배경이 둥근 모서리 따라가게.
+          // (UpgradeConfirmModal:117 패턴 미러)
+          overflow: "hidden",
           display: "flex",
           flexDirection: "column",
         }}
