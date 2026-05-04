@@ -217,6 +217,9 @@ function usePipelineCtx(
   const videoPromptMode = useVideoStore((s) => s.promptMode);
   // Phase 5 follow-up (2026-05-03) — video stage 의 builder/모델 라벨 분기용.
   const videoModelId = useVideoStore((s) => s.selectedVideoModel);
+  // 2026-05-04 — Vision stage 의 subLabel 동적화 (Edit/Video/Compare 의 vision-analyze).
+  // settings.visionModel persist 값 그대로 — Vision 페이지에서 토글한 모델 반영.
+  const visionModel = useSettingsStore((s) => s.visionModel);
 
   // warmup stage 가 도착했는지 — Phase 5 자동 기동 시 활성. stageHistory 안 type 검사.
   const warmupArrived = stageHistory.some((s) => s.type === "comfyui-warmup");
@@ -249,6 +252,11 @@ function usePipelineCtx(
     intentRefineArrived: mode === "compare" ? intentRefineArrived : undefined,
     promptMode,
     videoModelId: mode === "video" ? videoModelId : undefined,
+    // visionModel — Edit/Video/Compare 모드만 채움 (Generate 는 vision 호출 없음, Vision 자체는 별 stage 없음).
+    visionModel:
+      mode === "edit" || mode === "video" || mode === "compare"
+        ? visionModel
+        : undefined,
   };
 }
 

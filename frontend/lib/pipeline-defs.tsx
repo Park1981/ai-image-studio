@@ -94,6 +94,14 @@ export interface PipelineCtx {
    *   - prompt-merge.detail: "Wan 프롬프트" / "LTX 프롬프트"
    */
   videoModelId?: "wan22" | "ltx";
+  /**
+   * 비전 모델 (2026-05-04 · subLabel 동적화).
+   * Edit/Video/Compare 의 vision-analyze / vision-pair stage subLabel 표시.
+   * useSettingsStore.visionModel persist 값 그대로 — 사용자가 Vision 페이지에서
+   * 토글한 모델 (qwen3-vl:8b / qwen3-vl:8b-thinking-q8_0) 이 그대로 반영됨.
+   * mode === "edit" / "video" / "compare" 에서 채워짐 (그 외 undefined).
+   */
+  visionModel?: string;
 }
 
 /**
@@ -113,6 +121,15 @@ const videoBuilderSubLabel = (c: PipelineCtx): string =>
 
 const videoModelSubLabel = (c: PipelineCtx): string =>
   c.videoModelId === "wan22" ? "wan2.2-14b-q6_k" : "ltx-2.3-22b-fp8";
+
+/**
+ * Vision 모델 stage 의 subLabel 콜백 (2026-05-04).
+ * Edit/Video/Compare 의 vision-analyze / vision-pair stage 표시.
+ * settings.visionModel 따라 사용자 토글한 모델 (qwen3-vl:8b 또는 thinking) 동적 표기.
+ * 미정의 시 default qwen3-vl:8b 폴백 (store 빈 상태 안전망).
+ */
+const visionSubLabel = (c: PipelineCtx): string =>
+  c.visionModel ?? "qwen3-vl:8b";
 
 const videoPromptTitleLabel = (c: PipelineCtx): string =>
   c.videoModelId === "wan22" ? "Wan" : "LTX";
@@ -156,7 +173,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     {
       type: "vision-analyze",
       label: "이미지 분석",
-      subLabel: "qwen2.5vl:7b",
+      subLabel: visionSubLabel,
       renderDetail: (p, c) => {
         if (c.hideEditPrompts) return null;
         // 구조 분석 (editVisionAnalysis) 있으면 chip UI, 없으면 description 단락.
@@ -229,7 +246,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     {
       type: "vision-analyze",
       label: "이미지 분석",
-      subLabel: "qwen2.5vl:7b",
+      subLabel: visionSubLabel,
       renderDetail: (p, c) => {
         // Phase 4 후속 (2026-04-27): hideVideoPrompts 토글 분기 (Edit 와 동일).
         if (c.hideVideoPrompts) return null;
@@ -356,7 +373,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     {
       type: "vision-pair",
       label: "이미지 비교 분석",
-      subLabel: "qwen2.5vl:7b",
+      subLabel: visionSubLabel,
       // Edit/Video 패턴 일관 — overall 점수 + summary_en 박스
       renderDetail: (p) => {
         const summaryEn = p.summaryEn as string | undefined;
