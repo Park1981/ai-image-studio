@@ -128,8 +128,11 @@ class TestAnalyzeImageDetailedV3:
         assert "asymmetric cross-strap" in result.clothing_or_materials
         assert "side cutouts" in result.clothing_or_materials
         assert "cargo pants" in result.clothing_or_materials
-        # object_interaction 흡수 (raised to lips 동작 보존)
-        assert "raised to lips" in result.clothing_or_materials
+        # object_interaction 은 v3 부터 의상 → 피사체 카드 (interaction: 라벨) 로 이동
+        assert "raised to lips" in result.subject
+        assert "interaction:" in result.subject
+        # 의상 카드에는 더 이상 안 들어감 (cup/drinking 누수 차단)
+        assert "raised to lips" not in result.clothing_or_materials
         # crowd_detail → environment 흡수
         assert "transparent plastic raincoats" in result.environment
 
