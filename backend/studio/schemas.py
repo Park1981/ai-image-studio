@@ -83,3 +83,75 @@ class ProcessAction(BaseModel):
 class TaskCreated(BaseModel):
     task_id: str
     stream_url: str
+
+
+# ── Vision Compare 재설계 V4 (2026-05-05) ──
+# CompareAnalysisResultV4 dataclass 의 to_dict camelCase 출력을 OpenAPI 로 박제.
+# SSE done payload (`{analysis, saved}`) 내 `analysis` 가 본 모델 형식으로 직렬화됨.
+class CompareCategoryDiffOut(BaseModel):
+    """5 카테고리 (composition / subject / clothing_or_materials / environment / lighting_camera_style) 별 image1/2/diff."""
+
+    image1: str
+    image2: str
+    diff: str
+    image1Ko: str
+    image2Ko: str
+    diffKo: str
+
+
+class CompareKeyAnchorOut(BaseModel):
+    """edit context 회귀 보조 — 안정적 시각 anchor 별 image1/2 비교."""
+
+    label: str
+    image1: str
+    image2: str
+    image1Ko: str
+    image2Ko: str
+
+
+class VisionCompareAnalysisV4(BaseModel):
+    """V4 본체 — analyze_pair_v4 의 to_dict 결과 (compare context 의 SSE done.analysis)."""
+
+    summaryEn: str
+    summaryKo: str
+    commonPointsEn: list[str]
+    commonPointsKo: list[str]
+    keyDifferencesEn: list[str]
+    keyDifferencesKo: list[str]
+    domainMatch: str
+    categoryDiffs: dict[str, CompareCategoryDiffOut]
+    categoryScores: dict[str, int | None]
+    keyAnchors: list[CompareKeyAnchorOut]
+    fidelityScore: int | None
+    transformPromptEn: str
+    transformPromptKo: str
+    uncertainEn: str
+    uncertainKo: str
+    observation1: dict
+    observation2: dict
+    provider: str
+    fallback: bool
+    analyzedAt: int
+    visionModel: str
+    textModel: str
+
+
+class PerImagePromptRequest(BaseModel):
+    """compare-analyze per-image-prompt 요청 body — Task 12 endpoint."""
+
+    observation: dict = Field(
+        ..., description="vision_observe JSON 결과 (observation1 또는 observation2)"
+    )
+    ollamaModel: str | None = Field(
+        default=None, description="text 모델 override (default: gemma4-un:latest)"
+    )
+
+
+class PerImagePromptResponse(BaseModel):
+    """compare-analyze per-image-prompt 응답 body — synthesize_prompt 5 슬롯 미러."""
+
+    summary: str
+    positive_prompt: str
+    negative_prompt: str
+    key_visual_anchors: list[str]
+    uncertain: list[str]

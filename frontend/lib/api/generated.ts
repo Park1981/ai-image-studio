@@ -71,6 +71,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/compare-analyze/per-image-prompt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Compare Per Image Prompt
+         * @description observation JSON → t2i prompt 합성 (단일 응답 · non-SSE).
+         *
+         *     on-demand 호출 — 메인 분석 후 사용자가 결과 화면에서 클릭. 약 10~20초.
+         *     gpu_slot('compare-per-image-prompt') 안에서 호출 → busy 시 503 + code=gpu_busy.
+         */
+        post: operations["compare_per_image_prompt_api_studio_compare_analyze_per_image_prompt_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/compare-analyze/stream/{task_id}": {
         parameters: {
             query?: never;
@@ -791,6 +814,40 @@ export interface components {
             /** Detail */
             detail?: components["schemas"]["ValidationError"][];
         };
+        /**
+         * PerImagePromptRequest
+         * @description compare-analyze per-image-prompt 요청 body — Task 12 endpoint.
+         */
+        PerImagePromptRequest: {
+            /**
+             * Observation
+             * @description vision_observe JSON 결과 (observation1 또는 observation2)
+             */
+            observation: {
+                [key: string]: unknown;
+            };
+            /**
+             * Ollamamodel
+             * @description text 모델 override (default: gemma4-un:latest)
+             */
+            ollamaModel?: string | null;
+        };
+        /**
+         * PerImagePromptResponse
+         * @description compare-analyze per-image-prompt 응답 body — synthesize_prompt 5 슬롯 미러.
+         */
+        PerImagePromptResponse: {
+            /** Key Visual Anchors */
+            key_visual_anchors: string[];
+            /** Negative Prompt */
+            negative_prompt: string;
+            /** Positive Prompt */
+            positive_prompt: string;
+            /** Summary */
+            summary: string;
+            /** Uncertain */
+            uncertain: string[];
+        };
         /** ProcessAction */
         ProcessAction: {
             /** Message */
@@ -958,6 +1015,39 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["TaskCreated"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    compare_per_image_prompt_api_studio_compare_analyze_per_image_prompt_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PerImagePromptRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PerImagePromptResponse"];
                 };
             };
             /** @description Validation Error */

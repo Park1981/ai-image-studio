@@ -31,9 +31,9 @@ export type {
   ComparisonCommentsLegacy,
   ComparisonSlotEntry,
   ComparisonAnalysis,
-  VisionCompareScores,
-  VisionCompareComments,
-  VisionCompareAnalysis,
+  VisionCompareAnalysisV4,
+  CompareCategoryDiffJSON,
+  CompareKeyAnchorJSON,
 } from "./api/types";
 
 export { USE_MOCK, STUDIO_BASE } from "./api/client";

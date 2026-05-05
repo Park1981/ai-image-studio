@@ -267,6 +267,74 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "PerImagePromptRequest": {
+        "description": "compare-analyze per-image-prompt 요청 body — Task 12 endpoint.",
+        "properties": {
+          "observation": {
+            "additionalProperties": true,
+            "description": "vision_observe JSON 결과 (observation1 또는 observation2)",
+            "title": "Observation",
+            "type": "object"
+          },
+          "ollamaModel": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "text 모델 override (default: gemma4-un:latest)",
+            "title": "Ollamamodel"
+          }
+        },
+        "required": [
+          "observation"
+        ],
+        "title": "PerImagePromptRequest",
+        "type": "object"
+      },
+      "PerImagePromptResponse": {
+        "description": "compare-analyze per-image-prompt 응답 body — synthesize_prompt 5 슬롯 미러.",
+        "properties": {
+          "key_visual_anchors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Key Visual Anchors",
+            "type": "array"
+          },
+          "negative_prompt": {
+            "title": "Negative Prompt",
+            "type": "string"
+          },
+          "positive_prompt": {
+            "title": "Positive Prompt",
+            "type": "string"
+          },
+          "summary": {
+            "title": "Summary",
+            "type": "string"
+          },
+          "uncertain": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncertain",
+            "type": "array"
+          }
+        },
+        "required": [
+          "summary",
+          "positive_prompt",
+          "negative_prompt",
+          "key_visual_anchors",
+          "uncertain"
+        ],
+        "title": "PerImagePromptResponse",
+        "type": "object"
+      },
       "ProcessAction": {
         "properties": {
           "message": {
@@ -615,6 +683,48 @@
           }
         },
         "summary": "Create Compare Analyze Task",
+        "tags": [
+          "studio"
+        ]
+      }
+    },
+    "/api/studio/compare-analyze/per-image-prompt": {
+      "post": {
+        "description": "observation JSON → t2i prompt 합성 (단일 응답 · non-SSE).\n\non-demand 호출 — 메인 분석 후 사용자가 결과 화면에서 클릭. 약 10~20초.\ngpu_slot('compare-per-image-prompt') 안에서 호출 → busy 시 503 + code=gpu_busy.",
+        "operationId": "compare_per_image_prompt_api_studio_compare_analyze_per_image_prompt_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PerImagePromptRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PerImagePromptResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Compare Per Image Prompt",
         "tags": [
           "studio"
         ]

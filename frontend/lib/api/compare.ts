@@ -3,9 +3,13 @@
  * 백엔드 POST /api/studio/compare-analyze 래퍼.
  *
  * Phase 6 (2026-04-27): 동기 JSON → task-based SSE 로 전환.
+ * Phase 6 V4 (2026-05-05): compare context 응답 V4 (VisionCompareAnalysisV4 · 2-stage observe + diff_synthesize).
  *   - POST → {task_id, stream_url} 받음 → SSE drain → done event payload 추출
  *   - opts.onStage 콜백으로 stage 이벤트 실시간 전달 (PipelineTimeline 연동)
- *   - 옛 호출자 호환 — compareAnalyze() 시그니처 + 반환 타입 유지.
+ *
+ * SSE 5 stage 시퀀스 (compare context):
+ *   compare-encoding → observe1 → observe2 → diff-synth → translation
+ * Edit context 는 옛 시퀀스 유지 (intent-refine + vision-pair + translation).
  *
  * USE_MOCK 모드에선 stage emit + sleep 후 가짜 결과 반환 (실 백엔드 패턴 모사).
  */
@@ -14,7 +18,7 @@ import { STUDIO_BASE, USE_MOCK, parseSSE } from "./client";
 import type { AnalyzeStageEvent } from "./vision";
 import type { TaskCreated } from "./generated-helpers";
 import { mockCompareAnalyze } from "./mocks/compare";
-import type { ComparisonAnalysis, VisionCompareAnalysis } from "./types";
+import type { ComparisonAnalysis, VisionCompareAnalysisV4 } from "./types";
 
 export interface CompareAnalyzeRequest {
   /** 원본 이미지 / IMAGE_A — File / data URL / 절대 URL */
@@ -31,7 +35,7 @@ export interface CompareAnalyzeRequest {
   ollamaModel?: string;
   /**
    * 코드 경로 분기 (백엔드 default "edit" · 미전송 시 Edit 경로 = 기존 동작 100%).
-   * "compare" → analyze_pair_generic 호출 + 5축 (composition/color/subject/mood/quality)
+   * "compare" → V4 pipeline (compare_pipeline_v4 · 2-stage observe + diff_synthesize)
    */
   context?: "edit" | "compare";
   /** Vision Compare 메뉴 전용 힌트 (context="compare" 일 때만 사용). */
@@ -39,19 +43,20 @@ export interface CompareAnalyzeRequest {
   /** Phase 6 — stage 이벤트 도착 시 호출 (PipelineTimeline 의 stageHistory 갱신). */
   onStage?: (e: AnalyzeStageEvent) => void;
   /**
-   * gemma4 보강 모드 (Phase 2 · 2026-05-01) — Edit 자동 트리거 케이스에서만 의미.
-   * cache miss 시 clarify_edit_intent 호출에 영향. Vision Compare 메뉴는 미전달 → fast.
+   * @deprecated spec §6.2 (2026-05-05) — V4 pipeline 은 promptMode 분기 없음.
+   * 필드는 caller 호환을 위해 유지하지만 compareAnalyze 가 더 이상 백엔드로 보내지 않음.
+   * 백엔드 v4 receiver 는 키 받아도 무시 (안전망).
    */
   promptMode?: "fast" | "precise";
 }
 
 export interface CompareAnalyzeResponse {
   /**
-   * 분석 결과. context="edit" → ComparisonAnalysis (Edit 5축),
-   * context="compare" → VisionCompareAnalysis (Vision Compare 5축).
+   * 분석 결과. context="edit" → ComparisonAnalysis (Edit v3 도메인 슬롯),
+   * context="compare" → VisionCompareAnalysisV4 (V4 · 2-stage observe + diff_synthesize).
    * 호출자가 context 를 알고 있으므로 적절히 narrow 가능.
    */
-  analysis: ComparisonAnalysis | VisionCompareAnalysis;
+  analysis: ComparisonAnalysis | VisionCompareAnalysisV4;
   /** historyItemId 가 DB 에 존재하고 갱신 성공 시 true. */
   saved: boolean;
 }
@@ -102,11 +107,8 @@ export async function compareAnalyze(
     metaPayload.context = "compare";
     metaPayload.compareHint = req.compareHint ?? "";
   }
-  // Phase 2 (2026-05-01) — Edit 자동 트리거 케이스에서 promptMode 전파.
-  // 미전달이면 백엔드 default fast.
-  if (req.promptMode) {
-    metaPayload.promptMode = req.promptMode;
-  }
+  // spec §6.2 (2026-05-05): promptMode 더 이상 백엔드로 보내지 않음.
+  // V4 pipeline 이 무관하고, Edit context 도 통일. caller 가 promptMode 넣어도 무시.
   form.append("meta", JSON.stringify(metaPayload));
 
   // Phase 6: POST 가 task_id + stream_url 반환 (옛처럼 직접 결과 X)
@@ -162,4 +164,44 @@ export async function compareAnalyze(
     }
   }
   throw new Error("compare-analyze: stream closed without done event");
+}
+
+/* ──────────────────────────────────────────────────────────────────────
+ * V4 on-demand t2i prompt 합성 (Task 30 · 2026-05-05).
+ * 메인 분석 결과의 observation1/2 중 하나로부터 prompt_synthesize 5 슬롯 합성.
+ * 단일 JSON 응답 (non-SSE) — 약 10~20초 + GPU lock (busy 시 503).
+ * ──────────────────────────────────────────────────────────────────── */
+
+export interface PerImagePromptResponse {
+  summary: string;
+  positive_prompt: string;
+  negative_prompt: string;
+  key_visual_anchors: string[];
+  uncertain: string[];
+}
+
+export async function compareAnalyzePerImagePrompt(
+  observation: Record<string, unknown>,
+  ollamaModel?: string,
+): Promise<PerImagePromptResponse> {
+  const res = await fetch(
+    `${STUDIO_BASE}/api/studio/compare-analyze/per-image-prompt`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ observation, ollamaModel }),
+    },
+  );
+  if (res.status === 503) {
+    const body = (await res.json().catch(() => ({}))) as {
+      detail?: { code?: string; message?: string };
+    };
+    throw new Error(
+      body.detail?.message || "GPU busy — 잠시 후 다시 시도해주세요",
+    );
+  }
+  if (!res.ok) {
+    throw new Error(`per-image-prompt failed: ${res.status}`);
+  }
+  return res.json();
 }

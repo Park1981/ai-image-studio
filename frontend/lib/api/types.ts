@@ -190,47 +190,68 @@ export const SLOT_LABELS_KO: Record<string, string> = {
   mood_style: "분위기·스타일",
 };
 
-/* ──────────── Vision Compare Analysis (임의 두 이미지 비교 · 신규) ──────────── */
+/* ──────────── Vision Compare Analysis V4 (2-stage observe + diff_synthesize · 2026-05-05) ──────────── */
 
-/** Vision Compare 5축 점수 (composition/color/subject/mood/quality) */
-export interface VisionCompareScores {
-  composition: number | null;
-  color: number | null;
-  subject: number | null;
-  mood: number | null;
-  quality: number | null;
+/**
+ * VisionCompareAnalysisV4 — Vision Compare 메뉴 결과 (V4 · 2-stage observe + diff_synthesize).
+ *
+ * backend `compare_pipeline_v4.CompareAnalysisResultV4.to_dict()` 미러.
+ * 옛 `VisionCompareAnalysis` (overall/scores/comments) 폐기됨.
+ */
+export interface CompareCategoryDiffJSON {
+  image1: string;
+  image2: string;
+  diff: string;
+  image1Ko: string;
+  image2Ko: string;
+  diffKo: string;
 }
 
-export type VisionCompareComments = {
-  [K in keyof VisionCompareScores]: string;
-};
+export interface CompareKeyAnchorJSON {
+  label: string;
+  image1: string;
+  image2: string;
+  image1Ko: string;
+  image2Ko: string;
+}
 
-/** Vision Compare 분석 단일 결과 (휘발 · DB 저장 X).
- *
- * 2026-04-26 v2.1 (Codex+Claude 안):
- *   - transform_prompt: B 를 만드려면 A 에 적용할 t2i 변형 지시
- *   - uncertain: 비전이 비교 못한 영역 명시 (없으면 빈 문자열)
- */
-export interface VisionCompareAnalysis {
-  scores: VisionCompareScores;
-  overall: number;
-  comments_en: VisionCompareComments;
-  comments_ko: VisionCompareComments;
-  summary_en: string;
-  summary_ko: string;
-  /** v2.1: A → B 변형 t2i 프롬프트 (영문) */
-  transform_prompt_en?: string;
-  /** v2.1: 변형 프롬프트 한국어 번역 */
-  transform_prompt_ko?: string;
-  /** v2.1: 비교 못한 영역 (영문) */
-  uncertain_en?: string;
-  /** v2.1: 비교 못한 영역 한국어 번역 */
-  uncertain_ko?: string;
+export interface VisionCompareAnalysisV4 {
+  summaryEn: string;
+  summaryKo: string;
+  commonPointsEn: string[];
+  commonPointsKo: string[];
+  keyDifferencesEn: string[];
+  keyDifferencesKo: string[];
+
+  domainMatch: "person" | "object_scene" | "mixed";
+  /** 5 카테고리 또는 빈 dict (mixed). */
+  categoryDiffs: Record<string, CompareCategoryDiffJSON>;
+  /** forward-compat — 카테고리별 점수 (없을 수도 있음). */
+  categoryScores: Record<string, number | null>;
+
+  keyAnchors: CompareKeyAnchorJSON[];
+
+  /** 0-100 또는 null */
+  fidelityScore: number | null;
+
+  transformPromptEn: string;
+  transformPromptKo: string;
+  uncertainEn: string;
+  uncertainKo: string;
+
+  /** on-demand prompt_synthesize 재사용용 raw observation. */
+  observation1: Record<string, unknown>;
+  observation2: Record<string, unknown>;
+
   provider: "ollama" | "fallback";
   fallback: boolean;
   analyzedAt: number;
   visionModel: string;
+  textModel: string;
 }
+
+// 옛 alias 폐기 — VisionCompareAnalysis / VisionCompareScores / VisionCompareComments 인터페이스는
+// 더 이상 export 안 함. import 하는 곳이 있으면 컴파일 fail → Task 16~30 에서 site 갱신.
 
 export interface HistoryItem {
   id: string;

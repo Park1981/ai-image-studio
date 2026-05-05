@@ -186,74 +186,44 @@ describe("useVisionCompareStore — stageHistory (Phase 6)", () => {
       arrivedAt: 1000,
     });
     pushStage({
-      type: "vision-pair",
-      label: "이미지 비교 분석",
-      progress: 25,
+      type: "observe1",
+      label: "Image1 관찰",
+      progress: 20,
       arrivedAt: 1100,
     });
 
     const { stageHistory } = useVisionCompareStore.getState();
     expect(stageHistory.map((s) => s.type)).toEqual([
       "compare-encoding",
-      "vision-pair",
+      "observe1",
     ]);
   });
 
-  it("intent-refine stage 는 옵셔널 (Edit 캐시 미스 시만)", () => {
-    // Vision Compare 메뉴: encoding → vision-pair → translation (intent-refine 없음)
+  it("Vision Compare V4 — 5 stage 시퀀스 누적 (compare-encoding/observe1/observe2/diff-synth/translation)", () => {
     const { pushStage } = useVisionCompareStore.getState();
-    pushStage({
-      type: "compare-encoding",
-      label: "이미지 A/B 인코딩",
-      progress: 5,
-      arrivedAt: 1000,
-    });
-    pushStage({
-      type: "vision-pair",
-      label: "이미지 비교 분석",
-      progress: 25,
-      arrivedAt: 1100,
-    });
-    pushStage({
-      type: "translation",
-      label: "한국어 번역",
-      progress: 75,
-      arrivedAt: 1200,
-    });
+    const v4Sequence = [
+      { type: "compare-encoding", label: "이미지 A/B 인코딩", progress: 5,  arrivedAt: 1000 },
+      { type: "observe1",         label: "Image1 관찰",      progress: 20, arrivedAt: 1100 },
+      { type: "observe2",         label: "Image2 관찰",      progress: 40, arrivedAt: 1200 },
+      { type: "diff-synth",       label: "차이 합성",        progress: 70, arrivedAt: 1300 },
+      { type: "translation",      label: "한국어 번역",      progress: 90, arrivedAt: 1400 },
+    ];
+    for (const s of v4Sequence) {
+      pushStage(s);
+    }
 
     const { stageHistory } = useVisionCompareStore.getState();
-    // 3 stage · intent-refine 없음 (Vision Compare 메뉴)
-    expect(stageHistory).toHaveLength(3);
+    expect(stageHistory).toHaveLength(5);
+    // V4 는 옛 vision-pair / intent-refine 시퀀스 폐기
+    expect(stageHistory.map((s) => s.type)).not.toContain("vision-pair");
     expect(stageHistory.map((s) => s.type)).not.toContain("intent-refine");
-  });
-
-  it("Edit 컨텍스트는 intent-refine stage 도착 — PipelineCtx.intentRefineArrived 게이트", () => {
-    const { pushStage } = useVisionCompareStore.getState();
-    pushStage({
-      type: "compare-encoding",
-      label: "이미지 A/B 인코딩",
-      progress: 5,
-      arrivedAt: 1000,
-    });
-    pushStage({
-      type: "intent-refine",
-      label: "수정 의도 정제",
-      progress: 10,
-      arrivedAt: 1050,
-    });
-    pushStage({
-      type: "vision-pair",
-      label: "이미지 비교 분석",
-      progress: 25,
-      arrivedAt: 1100,
-    });
-
-    const { stageHistory } = useVisionCompareStore.getState();
-    // intent-refine 포함 — PipelineTimeline 의 stageHistory.some(...) 검사로 row 표시
-    const hasIntentRefine = stageHistory.some(
-      (s) => s.type === "intent-refine",
-    );
-    expect(hasIntentRefine).toBe(true);
+    expect(stageHistory.map((s) => s.type)).toEqual([
+      "compare-encoding",
+      "observe1",
+      "observe2",
+      "diff-synth",
+      "translation",
+    ]);
   });
 
   it("resetStages 가 다른 필드 영향 X (analysis / hint 등 보존)", () => {
@@ -268,34 +238,29 @@ describe("useVisionCompareStore — stageHistory (Phase 6)", () => {
     });
     setHint("색감만 비교해줘");
     setAnalysis({
-      scores: {
-        composition: 80,
-        color: 80,
-        subject: 80,
-        mood: 80,
-        quality: 80,
-      },
-      overall: 80,
-      comments_en: {
-        composition: "ok",
-        color: "ok",
-        subject: "ok",
-        mood: "ok",
-        quality: "ok",
-      },
-      comments_ko: {
-        composition: "괜찮음",
-        color: "괜찮음",
-        subject: "괜찮음",
-        mood: "괜찮음",
-        quality: "괜찮음",
-      },
-      summary_en: "ok",
-      summary_ko: "좋음",
+      // V4 minimal fixture — analysis 필드 보존 verify 용 (내용 무관).
+      summaryEn: "ok",
+      summaryKo: "좋음",
+      commonPointsEn: [],
+      commonPointsKo: [],
+      keyDifferencesEn: [],
+      keyDifferencesKo: [],
+      domainMatch: "person",
+      categoryDiffs: {},
+      categoryScores: {},
+      keyAnchors: [],
+      fidelityScore: null,
+      transformPromptEn: "",
+      transformPromptKo: "",
+      uncertainEn: "",
+      uncertainKo: "",
+      observation1: {},
+      observation2: {},
       provider: "ollama",
       fallback: false,
       analyzedAt: 1000,
-      visionModel: "qwen2.5vl:7b",
+      visionModel: "qwen3-vl:8b",
+      textModel: "gemma4-un:latest",
     });
 
     useVisionCompareStore.getState().resetStages();
@@ -316,34 +281,29 @@ describe("useVisionCompareStore — stageHistory (Phase 6)", () => {
     });
     setHint("test hint");
     setAnalysis({
-      scores: {
-        composition: 80,
-        color: 80,
-        subject: 80,
-        mood: 80,
-        quality: 80,
-      },
-      overall: 80,
-      comments_en: {
-        composition: "ok",
-        color: "ok",
-        subject: "ok",
-        mood: "ok",
-        quality: "ok",
-      },
-      comments_ko: {
-        composition: "괜찮음",
-        color: "괜찮음",
-        subject: "괜찮음",
-        mood: "괜찮음",
-        quality: "괜찮음",
-      },
-      summary_en: "ok",
-      summary_ko: "좋음",
+      // V4 minimal fixture — analysis 필드 보존 verify 용 (내용 무관).
+      summaryEn: "ok",
+      summaryKo: "좋음",
+      commonPointsEn: [],
+      commonPointsKo: [],
+      keyDifferencesEn: [],
+      keyDifferencesKo: [],
+      domainMatch: "person",
+      categoryDiffs: {},
+      categoryScores: {},
+      keyAnchors: [],
+      fidelityScore: null,
+      transformPromptEn: "",
+      transformPromptKo: "",
+      uncertainEn: "",
+      uncertainKo: "",
+      observation1: {},
+      observation2: {},
       provider: "ollama",
       fallback: false,
       analyzedAt: 1000,
-      visionModel: "qwen2.5vl:7b",
+      visionModel: "qwen3-vl:8b",
+      textModel: "gemma4-un:latest",
     });
 
     useVisionCompareStore.getState().reset();
