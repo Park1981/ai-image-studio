@@ -62,7 +62,7 @@ export default function CompareLeftPanel({
         titleKo="비교"
         titleEn="Compare"
         eyebrow="MODE · COMPARE"
-        description="두 이미지의 차이와 품질을 5축 기준으로 비교합니다."
+        description="두 이미지의 차이를 관찰자 듀얼 + 차이 합성으로 자세히 분석합니다."
       />
 
       {/* Phase 1.5.5 (결정 F · 2026-05-02) — CTA 상단 sticky 로 변경.

@@ -147,7 +147,7 @@ export default function MainMenuPage() {
             <MenuCard
               icon="compare"
               title="Vision Compare"
-              desc="두 이미지를 비전 모델로 비교해 구성·색·피사체·분위기·품질 5축 차이를 분석합니다."
+              desc="두 이미지를 비전 모델로 깊이 관찰해 공통점·차이점·5 카테고리 비교를 자세히 분석합니다."
               bgImage="/menu/compare.png"
               onClick={() => router.push("/vision/compare")}
             />
