@@ -36,7 +36,7 @@ export interface VisionModelOption {
 }
 
 // ── 사용 가능한 Vision 모델 목록 ─────────────────────────────────────────────
-export const VISION_MODEL_OPTIONS: VisionModelOption[] = [
+export const VISION_MODEL_OPTIONS: readonly VisionModelOption[] = [
   {
     id: "qwen3-vl:8b",
     label: "8B",
@@ -68,6 +68,8 @@ interface Props {
   value: string;
   /** 모델 변경 콜백 */
   onChange: (next: string) => void;
+  /** true 일 때 카드 클릭 비활성화 (분석/비교 진행 중 등). default false. */
+  disabled?: boolean;
 }
 
 /**
@@ -77,7 +79,11 @@ interface Props {
  * 활성 카드가 flexGrow 1.7 로 확장 (framer-motion spring).
  * vision page · compare page 에서 동일하게 재사용.
  */
-export default function VisionModelSelector({ value, onChange }: Props) {
+export default function VisionModelSelector({
+  value,
+  onChange,
+  disabled = false,
+}: Props) {
   return (
     <div
       role="radiogroup"
@@ -97,6 +103,7 @@ export default function VisionModelSelector({ value, onChange }: Props) {
             role="radio"
             aria-checked={active}
             aria-label={`${opt.label} 모델 선택`}
+            disabled={disabled}
             onClick={() => onChange(opt.id)}
             animate={{
               flexGrow: active ? ACTIVE_FLEX : INACTIVE_FLEX,
@@ -111,7 +118,8 @@ export default function VisionModelSelector({ value, onChange }: Props) {
               borderRadius: 14,
               border: "none",
               padding: 0,
-              cursor: "pointer",
+              cursor: disabled ? "not-allowed" : "pointer",
+              opacity: disabled ? 0.55 : 1,
               overflow: "hidden",
               backgroundImage: `url("${opt.bgImage}")`,
               backgroundSize: "cover",

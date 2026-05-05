@@ -26,9 +26,22 @@ describe("VisionModelSelector", () => {
   it("카드 클릭 시 onChange 호출 + 선택 모델 ID 전달", () => {
     const onChange = vi.fn();
     render(<VisionModelSelector value="qwen3-vl:8b" onChange={onChange} />);
-    // Thinking 버튼 클릭 → onChange 에 Thinking 모델 ID 전달
+    // Thinking 버튼 클릭 → onChange 에 Thinking 모델 ID 전달 (정확 ID assertion)
     fireEvent.click(screen.getByText(/Thinking/i).closest("button")!);
-    expect(onChange).toHaveBeenCalledWith(expect.stringContaining("thinking"));
+    expect(onChange).toHaveBeenCalledWith("qwen3-vl:8b-thinking-q8_0");
+  });
+
+  it("disabled=true 시 카드 클릭 막힘 + HTML disabled 속성 부여", () => {
+    const onChange = vi.fn();
+    render(
+      <VisionModelSelector value="qwen3-vl:8b" onChange={onChange} disabled />,
+    );
+    // 모든 버튼이 HTML disabled 상태여야 함
+    const buttons = screen.getAllByRole("radio");
+    buttons.forEach((btn) => expect(btn).toBeDisabled());
+    // 클릭해도 onChange 미호출
+    fireEvent.click(screen.getByText(/Thinking/i).closest("button")!);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
 });
