@@ -111,7 +111,7 @@ from .routes._common import (  # noqa: F401
 # routes 안에서 사용하던 endpoint-bound 헬퍼/심볼들 — 패치 호환 목적.
 # (테스트가 `studio.router.X` 로 patch 하는 케이스 — 모두 routes/* 로 이동했지만
 #  re-export 로 import 자체는 깨지지 않게 한다.)
-from .comparison_pipeline import analyze_pair, analyze_pair_generic  # noqa: F401
+from .comparison_pipeline import analyze_pair  # noqa: F401  (analyze_pair_generic 은 Task 14 에서 v2_generic 과 함께 폐기)
 from .prompt_pipeline import clarify_edit_intent, upgrade_generate_prompt  # noqa: F401
 from .vision_pipeline import (  # noqa: F401
     analyze_image_detailed,

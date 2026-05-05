@@ -1,13 +1,16 @@
 """
-studio.routes.compare — compare-analyze (Edit 결과 vs 원본 5축 평가).
+studio.routes.compare — compare-analyze (Edit 결과 vs 원본 분석).
 
 context 분기:
   edit (default): analyze_pair v3 — 도메인 분기 + 5 슬롯 매트릭스 + 의도 점수
-  compare:       analyze_pair_generic — Vision Compare 메뉴 (5축 generic)
+  compare:       analyze_pair_v4 — Vision Compare 재설계 (관찰자→편집자 듀얼 + 5 카테고리 diff)
 
 Phase 6 (2026-04-27): 동기 JSON 응답 → task-based SSE 로 전환.
   POST /compare-analyze              → { task_id, stream_url }
   GET  /compare-analyze/stream/{id}  → SSE (event: stage / done / error)
+
+Task 12 (2026-05-05): per-image-prompt endpoint (단일 응답 · non-SSE).
+  POST /compare-analyze/per-image-prompt → PerImagePromptResponse
 
 GPU lock + ComfyUI 충돌 방지 정책은 백그라운드 파이프라인이 그대로 유지.
 """
@@ -22,7 +25,7 @@ from PIL import Image as PILImage
 
 # Phase 6: 백그라운드 파이프라인 import (compare 도메인 로직 자체는 변경 없음)
 from .._gpu_lock import GpuBusyError, gpu_slot
-from ..comparison_pipeline import analyze_pair, analyze_pair_generic  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치)
+from ..comparison_pipeline import analyze_pair  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치 · v3 edit context)
 from ..pipelines import _run_compare_analyze_pipeline
 from ..prompt_pipeline import clarify_edit_intent  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치)
 from ..schemas import PerImagePromptRequest, PerImagePromptResponse, TaskCreated

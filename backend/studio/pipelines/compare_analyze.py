@@ -4,18 +4,20 @@ studio.pipelines.compare_analyze — 비교 분석 백그라운드 파이프라�
 Phase 6 (2026-04-27): /api/studio/compare-analyze 를 task-based SSE 로 전환.
 
 context 분기:
-  - "edit" (default): analyze_pair v3 — 도메인 분기 + 5 슬롯 매트릭스 + 의도 점수
-  - "compare": analyze_pair_generic — Vision Compare 메뉴 (5축 generic)
+  - "edit" (default): analyze_pair v3 — 도메인 분기 + 5 슬롯 매트릭스 + 의도 점수 + DB persist
+  - "compare": analyze_pair_v4 — Vision Compare 재설계 (관찰자→편집자 듀얼 + 5 카테고리 · 휘발 정책)
 
-흐름:
-  1. emit "stage" type=compare-encoding (이미지 인코딩 마킹)
-  2. (edit context 만) refined_intent 캐시 조회 / fresh clarify_edit_intent
-     - emit "stage" type=intent-refine (있을 때만)
-  3. analyze_pair / analyze_pair_generic with progress_callback
-     - on_progress("vision-pair") → emit "stage" type=vision-pair
-     - on_progress("translation") → emit "stage" type=translation
-  4. (edit context + history_item_id 있음) DB persist
-  5. emit "done" with {analysis, saved}
+흐름 (compare context — Task 11 V4):
+  1. emit "stage" type=compare-encoding
+  2. analyze_pair_v4 with progress_callback (observe1 → observe2 → diff-synth → translation)
+  3. emit "done" {analysis, saved=False} (휘발)
+
+흐름 (edit context — v3 무변경):
+  1. emit "stage" type=compare-encoding
+  2. refined_intent 캐시 조회 / fresh clarify_edit_intent (intent-refine emit)
+  3. analyze_pair v3 with progress_callback (vision-pair → translation)
+  4. (history_item_id 매치 시) DB persist
+  5. emit "done" {analysis, saved}
 
 GPU lock: 옛 동작 그대로 (refine 은 별도 짧은 gate, 비교 분석은 30s 대기 후 busy).
 """
@@ -29,7 +31,7 @@ from typing import Any
 from .. import history_db, ollama_unload
 from .._gpu_lock import GpuBusyError, gpu_slot
 from ..compare_pipeline_v4 import analyze_pair_v4
-from ..comparison_pipeline import analyze_pair, analyze_pair_generic
+from ..comparison_pipeline import analyze_pair
 from ..prompt_pipeline import clarify_edit_intent
 from ..storage import HISTORY_ID_RE
 from ..tasks import Task
@@ -218,26 +220,18 @@ async def _run_compare_analyze_pipeline(
             )
 
         try:
+            # Task 14 (2026-05-05): compare context 는 위에서 V4 early return.
+            # 여기 도달하면 항상 edit context — analyze_pair v3 단일 호출.
             async with gpu_slot("compare-analyze"):
-                if context == "compare":
-                    result_obj = await analyze_pair_generic(
-                        image_a_bytes=source_bytes,
-                        image_b_bytes=result_bytes,
-                        compare_hint=compare_hint,
-                        vision_model=vision_override,
-                        text_model=text_override,
-                        progress_callback=on_progress,
-                    )
-                else:
-                    result_obj = await analyze_pair(
-                        source_bytes=source_bytes,
-                        result_bytes=result_bytes,
-                        edit_prompt=edit_prompt,
-                        vision_model=vision_override,
-                        text_model=text_override,
-                        refined_intent=refined_intent,
-                        progress_callback=on_progress,
-                    )
+                result_obj = await analyze_pair(
+                    source_bytes=source_bytes,
+                    result_bytes=result_bytes,
+                    edit_prompt=edit_prompt,
+                    vision_model=vision_override,
+                    text_model=text_override,
+                    refined_intent=refined_intent,
+                    progress_callback=on_progress,
+                )
 
                 # ── Phase 6 cleanup (시각 일관성): stage 완료 시점 결과 흡수 emit ──
                 # vision-pair done 시 overall 점수 + summary, translation done 시 한글 summary.
