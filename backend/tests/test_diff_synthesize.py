@@ -107,7 +107,9 @@ async def test_synthesize_diff_mixed_domain_empty_category_diffs():
         new=AsyncMock(return_value=fake_response),
     ):
         result = await synthesize_diff(
-            observation1={}, observation2={}, compare_hint="",
+            # non-empty observation 으로 early return 우회 (빈 입력 early return 테스트와 분리)
+            observation1={"type": "portrait"}, observation2={"type": "landscape"},
+            compare_hint="",
             text_model="gemma4-un:latest", timeout=120.0,
             ollama_url="http://localhost:11434",
         )
@@ -126,7 +128,8 @@ async def test_synthesize_diff_parse_failed_fallback():
         new=AsyncMock(return_value="not json {{"),
     ):
         result = await synthesize_diff(
-            observation1={}, observation2={}, compare_hint="",
+            # non-empty — early return 우회, 실제 parse 실패 경로 테스트
+            observation1={"x": 1}, observation2={"y": 2}, compare_hint="",
             text_model="gemma4-un:latest", timeout=120.0,
             ollama_url="http://localhost:11434",
         )
@@ -146,7 +149,8 @@ async def test_synthesize_diff_empty_response_fallback():
         new=AsyncMock(return_value=""),
     ):
         result = await synthesize_diff(
-            observation1={}, observation2={}, compare_hint="",
+            # non-empty — early return 우회, 실제 빈 응답 경로 테스트
+            observation1={"x": 1}, observation2={"y": 2}, compare_hint="",
             text_model="gemma4-un:latest", timeout=120.0,
             ollama_url="http://localhost:11434",
         )
@@ -179,7 +183,8 @@ async def test_synthesize_diff_with_hint_passes_to_user_payload():
         new=capture_payload,
     ):
         await synthesize_diff(
-            observation1={}, observation2={}, compare_hint="얼굴 표정만 집중",
+            # non-empty observation — early return 우회해야 payload 캡처 가능
+            observation1={"a": 1}, observation2={"b": 2}, compare_hint="얼굴 표정만 집중",
             text_model="gemma4-un:latest", timeout=120.0,
             ollama_url="http://localhost:11434",
         )
@@ -195,8 +200,56 @@ async def test_synthesize_diff_with_hint_passes_to_user_payload():
         new=capture_payload,
     ):
         await synthesize_diff(
-            observation1={}, observation2={}, compare_hint="",
+            observation1={"a": 1}, observation2={"b": 2}, compare_hint="",
             text_model="gemma4-un:latest", timeout=120.0,
             ollama_url="http://localhost:11434",
         )
     assert "not provided" in captured_payloads[0]["messages"][1]["content"].lower()
+
+
+# ── 빈 입력 early return (Important 1) ──
+@pytest.mark.asyncio
+async def test_synthesize_diff_skips_ollama_when_both_observations_empty():
+    """빈 입력 둘 다 → Ollama 호출 없이 즉시 fallback (비용 절약)."""
+    mock = AsyncMock()
+    with patch("studio.compare_pipeline_v4.diff_synthesize.call_chat_payload", new=mock):
+        result = await synthesize_diff(
+            observation1={}, observation2={}, compare_hint="",
+            text_model="gemma4-un:latest", timeout=120.0,
+            ollama_url="http://localhost:11434",
+        )
+    assert mock.call_count == 0
+    assert result.fallback is True
+
+
+# ── sentinel filter 일관성 (Important 2) ──
+@pytest.mark.asyncio
+async def test_synthesize_diff_summary_sentinel_filtered():
+    """모델이 'summary': 'none' / 'unknown' 같은 sentinel 흘려도 빈 문자열로 정규화."""
+    fake_response = json.dumps({
+        "summary": "unknown",          # sentinel
+        "common_points": [], "key_differences": [],
+        "domain_match": "person",
+        "category_diffs": {k: {"image1": "", "image2": "", "diff": ""} for k in
+                           ["composition", "subject", "clothing_or_materials", "environment", "lighting_camera_style"]},
+        "category_scores": {},
+        "key_anchors": [],
+        "fidelity_score": None,
+        "transform_prompt": "none",     # sentinel
+        "uncertain": "n/a",             # sentinel
+    })
+
+    with patch(
+        "studio.compare_pipeline_v4.diff_synthesize.call_chat_payload",
+        new=AsyncMock(return_value=fake_response),
+    ):
+        result = await synthesize_diff(
+            observation1={"x": 1}, observation2={"y": 2}, compare_hint="",
+            text_model="gemma4-un:latest", timeout=120.0,
+            ollama_url="http://localhost:11434",
+        )
+
+    # sentinel 모두 빈 문자열로 정규화
+    assert result.summary_en == ""
+    assert result.transform_prompt_en == ""
+    assert result.uncertain_en == ""

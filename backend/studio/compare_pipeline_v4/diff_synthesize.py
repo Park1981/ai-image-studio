@@ -27,6 +27,7 @@ from ._coerce import (
     coerce_fidelity_score,
     coerce_key_anchor,
     coerce_str_list,
+    _safe_str as _coerce_safe_str,    # sentinel filter 포함 버전 (로컬 _safe_str 대체)
 )
 from ._types import CompareAnalysisResultV4, CompareCategoryDiff
 
@@ -164,6 +165,12 @@ async def synthesize_diff(
 
     실패 (network / parse / 빈 응답) 시 fallback 결과 반환 (HTTP 200 원칙).
     """
+    # 두 observation 모두 비어있으면 Ollama 호출 없이 즉시 fallback
+    # (prompt_synthesize 의 빈 입력 early return 패턴과 일관 · 비용 절약)
+    if not observation1 and not observation2:
+        log.info("diff_synthesize skipped — both observations empty")
+        return _empty_v4_result(vision_model="", text_model=text_model, fallback=True)
+
     # keep_alive None 시 presets 에서 lazy 호출
     if keep_alive is None:
         from ..presets import resolve_ollama_keep_alive
@@ -236,7 +243,7 @@ async def synthesize_diff(
                 anchors.append(a)
 
     return CompareAnalysisResultV4(
-        summary_en=_safe_str(parsed.get("summary")),
+        summary_en=_coerce_safe_str(parsed.get("summary")),
         summary_ko="",
         common_points_en=coerce_str_list(parsed.get("common_points"), max_n=6),
         common_points_ko=[],
@@ -247,9 +254,9 @@ async def synthesize_diff(
         category_scores=cat_scores,
         key_anchors=anchors,
         fidelity_score=coerce_fidelity_score(parsed.get("fidelity_score")),
-        transform_prompt_en=_safe_str(parsed.get("transform_prompt")),
+        transform_prompt_en=_coerce_safe_str(parsed.get("transform_prompt")),
         transform_prompt_ko="",
-        uncertain_en=_safe_str(parsed.get("uncertain")),
+        uncertain_en=_coerce_safe_str(parsed.get("uncertain")),
         uncertain_ko="",
         observation1=observation1,
         observation2=observation2,
@@ -259,8 +266,3 @@ async def synthesize_diff(
         vision_model="",                          # pipeline 단계에서 채움
         text_model=text_model,
     )
-
-
-def _safe_str(value: Any) -> str:
-    """str 안전 추출 — None / 비문자열 → 빈 문자열."""
-    return value.strip() if isinstance(value, str) else ""
