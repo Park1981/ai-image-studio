@@ -32,7 +32,8 @@ describe("pipeline-defs · 모드 분기 (Phase 2)", () => {
     ["generate", "gemma4-upgrade"],
     ["edit", "prompt-merge"],
     ["video", "prompt-merge"],
-    ["compare", "intent-refine"],
+    // 2026-05-05 V4 재설계: compare.intent-refine 폐기 (compare_pipeline_v4 는
+    // promptMode 무관 · spec §6.2). compare 의 diff-synth/translation 은 정적 라벨.
   ] as const)(
     "%s.%s 의 subLabel 이 promptMode 에 따라 분기",
     (mode, type) => {
@@ -46,6 +47,16 @@ describe("pipeline-defs · 모드 분기 (Phase 2)", () => {
       expect(precise).not.toBe(fast);
     },
   );
+
+  it("compare V4 의 diff-synth 는 promptMode 무관 (정적 'gemma4-un (think:false)')", () => {
+    const stage = findStage("compare", "diff-synth");
+    expect(getSubLabel(stage, { promptMode: "fast" })).toBe(
+      "gemma4-un (think:false)",
+    );
+    expect(getSubLabel(stage, { promptMode: "precise" })).toBe(
+      "gemma4-un (think:false)",
+    );
+  });
 
   it("vision.translation 은 promptMode 와 무관하게 항상 'gemma4-un' (정책 §4.4)", () => {
     const stage = findStage("vision", "translation");

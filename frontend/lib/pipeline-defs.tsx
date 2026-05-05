@@ -359,38 +359,39 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     },
   ],
 
-  /* ── Compare (Edit 비교 + Vision Compare 공용 · 4 stage) — Phase 6 ── */
+  /* ── Compare (Vision Compare V4 · 5 stage · 2-stage observe + diff_synthesize) — Phase 6 V4 ──
+   * 2026-05-05 재설계: 옛 vision-pair (단일 호출) + intent-refine (Edit 공용) 폐기.
+   * V4 pipeline (compare_pipeline_v4) 의 5 stage 시퀀스를 그대로 미러:
+   *   compare-encoding → observe1 → observe2 → diff-synth → translation
+   * Edit 자동 트리거는 PipelineTimeline 미사용 (toast + busy indicator).
+   */
   compare: [
     { type: "compare-encoding", label: "이미지 A/B 인코딩", subLabel: "browser" },
     {
-      // refined_intent — Edit context 의 캐시 미스 + edit_prompt 있을 때만 도착.
-      // Vision Compare 메뉴는 이 stage emit 안 함 → enabled 가 false 라 row 안 보임.
-      type: "intent-refine",
-      label: "수정 의도 정제",
-      subLabel: gemmaSubLabel,
-      enabled: (c) => c.intentRefineArrived === true,
+      type: "observe1",
+      label: "Image1 관찰",
+      subLabel: visionSubLabel,
     },
     {
-      type: "vision-pair",
-      label: "이미지 비교 분석",
+      type: "observe2",
+      label: "Image2 관찰",
       subLabel: visionSubLabel,
-      // Edit/Video 패턴 일관 — overall 점수 + summary_en 박스
+    },
+    {
+      type: "diff-synth",
+      label: "차이 합성",
+      subLabel: "gemma4-un (think:false)",
+      // diff_synthesize stage 가 summaryEn 을 emit (spec §6.3).
       renderDetail: (p) => {
         const summaryEn = p.summaryEn as string | undefined;
-        const overall = p.overall as number | undefined;
         const provider = p.provider as string | undefined;
-        if (!summaryEn && overall == null) return null;
-        const title =
-          overall != null
-            ? `비교 요약 · 종합 ${overall}% (${provider ?? "?"})`
-            : `비교 요약 (${provider ?? "?"})`;
+        if (!summaryEn) return null;
         return (
           <DetailBox
-            // Phase 2 (2026-05-01) — fallback / fallback-precise-failed 둘 다 warn 톤
             kind={provider?.startsWith("fallback") ? "warn" : "info"}
-            title={title}
+            title="차이 요약 (영문)"
           >
-            {summaryEn ?? "—"}
+            {summaryEn}
           </DetailBox>
         );
       },

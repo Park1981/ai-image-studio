@@ -123,15 +123,15 @@ describe("PIPELINE_DEFS — 정적 일관성", () => {
     );
   });
 
-  it("compare 의 핵심 stage — encoding + pair + translation", () => {
+  it("compare 의 핵심 stage — V4 5 stage (encoding/observe1/observe2/diff-synth/translation)", () => {
     const types = PIPELINE_DEFS.compare.map((s) => s.type);
-    expect(types).toEqual(
-      expect.arrayContaining([
-        "compare-encoding",
-        "vision-pair",
-        "translation",
-      ]),
-    );
+    expect(types).toEqual([
+      "compare-encoding",
+      "observe1",
+      "observe2",
+      "diff-synth",
+      "translation",
+    ]);
   });
 
   it("ComfyUI 자동 기동 stage 는 항상 enabled 조건 있음", () => {
@@ -163,16 +163,20 @@ describe("PIPELINE_DEFS — 정적 일관성", () => {
     }
   });
 
-  it("compare 의 intent-refine 은 도착 게이트 (Vision Compare 메뉴 미표시)", () => {
-    const intentRefine = PIPELINE_DEFS.compare.find(
-      (s) => s.type === "intent-refine",
-    );
-    expect(intentRefine, "intent-refine stage 누락").toBeDefined();
-    expect(intentRefine?.enabled).toBeTypeOf("function");
-    // intentRefineArrived=false → 안 보임 (Vision Compare)
-    expect(intentRefine?.enabled?.({ intentRefineArrived: false })).toBe(false);
-    // intentRefineArrived=true → 보임 (Edit + 캐시 미스)
-    expect(intentRefine?.enabled?.({ intentRefineArrived: true })).toBe(true);
+  it("compare V4 — observe1/observe2 가 visionSubLabel 콜백 (settings.visionModel 반영)", () => {
+    // 2026-05-05 V4 재설계: 옛 intent-refine + vision-pair 폐기 → observe1/observe2
+    // 두 stage 모두 visionSubLabel 콜백 사용 — 사용자가 토글한 비전 모델 (8B/Thinking) 동적 표기.
+    for (const type of ["observe1", "observe2"] as const) {
+      const stage = PIPELINE_DEFS.compare.find((s) => s.type === type);
+      expect(stage, `compare.${type} stage 누락`).toBeDefined();
+      expect(stage?.subLabel).toBeTypeOf("function");
+      // visionModel 전달 시 그 값 그대로 반환
+      const cb = stage!.subLabel as (c: { visionModel?: string }) => string;
+      expect(cb({ visionModel: "qwen3-vl:8b-thinking-q8_0" })).toBe(
+        "qwen3-vl:8b-thinking-q8_0",
+      );
+      expect(cb({})).toBe("qwen3-vl:8b"); // 폴백
+    }
   });
 
   it("Generate 의 claude-research 는 research 토글 게이트", () => {
