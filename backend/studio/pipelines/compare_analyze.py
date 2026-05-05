@@ -28,6 +28,7 @@ from typing import Any
 
 from .. import history_db, ollama_unload
 from .._gpu_lock import GpuBusyError, gpu_slot
+from ..compare_pipeline_v4 import analyze_pair_v4
 from ..comparison_pipeline import analyze_pair, analyze_pair_generic
 from ..prompt_pipeline import clarify_edit_intent
 from ..storage import HISTORY_ID_RE
@@ -36,7 +37,7 @@ from ..tasks import Task
 log = logging.getLogger(__name__)
 
 
-# stage type → progress 매핑
+# stage type → progress 매핑 (v3 — edit context 전용)
 _PROGRESS = {
     "intent-refine": 10,
     "vision-pair": 25,
@@ -45,6 +46,21 @@ _PROGRESS = {
 _LABEL = {
     "intent-refine": "수정 의도 정제 (gemma4)",
     "vision-pair": "두 이미지 비교 분석 (qwen2.5vl)",
+    "translation": "한국어 번역 (gemma4)",
+}
+
+# Task 11 (V4 — compare context 전용) — 5 stage 매핑.
+# compare-encoding 은 본 pipeline 이 직접 emit (기점), 나머지 4 는 analyze_pair_v4 의 progress_callback 으로 전달.
+_V4_PROGRESS = {
+    "observe1": 20,
+    "observe2": 40,
+    "diff-synth": 70,
+    "translation": 90,
+}
+_V4_LABEL = {
+    "observe1": "Image1 관찰 (qwen3-vl)",
+    "observe2": "Image2 관찰 (qwen3-vl)",
+    "diff-synth": "차이 합성 (gemma4)",
     "translation": "한국어 번역 (gemma4)",
 }
 
@@ -77,7 +93,7 @@ async def _run_compare_analyze_pipeline(
     여기서는 refined_intent 준비 + GPU lock + analyze_* 호출 + DB persist + done emit.
     """
     try:
-        # ── 1단계: 인코딩 마킹 ──
+        # ── 1단계: 인코딩 마킹 (옛 호환 · v3/V4 공통) ──
         await task.emit(
             "stage",
             {
@@ -86,6 +102,59 @@ async def _run_compare_analyze_pipeline(
                 "stageLabel": "이미지 A/B 인코딩",
             },
         )
+
+        # ── Task 11 (V4): compare context 분기 ──
+        # 옛 v2_generic 흐름을 V4 (관찰자→편집자 듀얼) 로 교체.
+        # persist 안 함 (휘발 정책) + early return 으로 옛 edit 흐름과 격리.
+        if context == "compare":
+
+            async def _on_progress_v4(stage_type: str) -> None:
+                """analyze_pair_v4 의 4 stage 진행 callback 을 task SSE 로 forward."""
+                await task.emit(
+                    "stage",
+                    {
+                        "type": stage_type,
+                        "progress": _V4_PROGRESS.get(stage_type, 50),
+                        "stageLabel": _V4_LABEL.get(stage_type, stage_type),
+                    },
+                )
+
+            try:
+                async with gpu_slot("compare-analyze"):
+                    v4_result = await analyze_pair_v4(
+                        image1_bytes=source_bytes,
+                        image2_bytes=result_bytes,
+                        image1_w=source_w,
+                        image1_h=source_h,
+                        image2_w=result_w,
+                        image2_h=result_h,
+                        compare_hint=compare_hint,
+                        vision_model=vision_override or "qwen3-vl:8b",
+                        text_model=text_override or "gemma4-un:latest",
+                        progress_callback=_on_progress_v4,
+                    )
+                    # spec 19 후속 — gate 안에서 unload 보내야 다음 ComfyUI dispatch 와 race 0
+                    try:
+                        await ollama_unload.force_unload_all_loaded_models(
+                            wait_sec=0.0
+                        )
+                    except Exception as unload_err:
+                        log.info(
+                            "compare-v4 post-unload failed (non-fatal): %s",
+                            unload_err,
+                        )
+            except GpuBusyError as e:
+                await task.emit(
+                    "error", {"message": str(e), "code": "gpu_busy"}
+                )
+                return
+
+            # context='compare' — DB persist 차단 (휘발 정책).
+            # SSE done payload 는 옛 키 그대로 ({analysis, saved}) — frontend 호환.
+            await task.emit(
+                "done", {"analysis": v4_result.to_dict(), "saved": False}
+            )
+            return
 
         # ── 2단계: refined_intent 준비 (edit context 만) ──
         # - 캐시 조회 → 미스면 짧은 gpu_slot 안에서 clarify_edit_intent (gemma4)
