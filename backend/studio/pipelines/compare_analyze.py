@@ -123,6 +123,8 @@ async def _run_compare_analyze_pipeline(
 
             try:
                 async with gpu_slot("compare-analyze"):
+                    # ollama_url + timeout 은 settings.py 와 동일 default (config.py:63 미러).
+                    # 후속 plan 후보: config.py 에서 settings 주입 (현재는 다른 pipeline 들과 일관 hardcode).
                     v4_result = await analyze_pair_v4(
                         image1_bytes=source_bytes,
                         image2_bytes=result_bytes,
@@ -133,6 +135,8 @@ async def _run_compare_analyze_pipeline(
                         compare_hint=compare_hint,
                         vision_model=vision_override or "qwen3-vl:8b",
                         text_model=text_override or "gemma4-un:latest",
+                        ollama_url="http://127.0.0.1:11434",
+                        timeout=90.0,
                         progress_callback=_on_progress_v4,
                     )
                     # spec 19 후속 — gate 안에서 unload 보내야 다음 ComfyUI dispatch 와 race 0
