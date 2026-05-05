@@ -25,6 +25,7 @@ from ._types import (
     CompareKeyAnchor,
 )
 from .diff_synthesize import DIFF_SYNTHESIZE_SYSTEM, synthesize_diff
+from .pipeline import analyze_pair_v4
 
 __all__ = [
     "COMPARE_V4_AXES",
@@ -32,6 +33,7 @@ __all__ = [
     "CompareCategoryDiff",
     "CompareKeyAnchor",
     "DIFF_SYNTHESIZE_SYSTEM",
+    "analyze_pair_v4",
     "coerce_category_diff",
     "coerce_domain_match",
     "coerce_fidelity_score",
