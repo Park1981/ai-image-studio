@@ -8,8 +8,6 @@
 
 "use client";
 
-import { motion } from "framer-motion";
-
 import AppHeader from "@/components/chrome/AppHeader";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ProgressModal from "@/components/studio/ProgressModal";
@@ -25,6 +23,9 @@ import {
   StudioWorkspace,
 } from "@/components/studio/StudioLayout";
 import VisionHistoryList from "@/components/studio/VisionHistoryList";
+import VisionModelSelector, {
+  VISION_MODEL_OPTIONS,
+} from "@/components/studio/VisionModelSelector";
 import VisionResultCard from "@/components/studio/VisionResultCard";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
@@ -34,35 +35,6 @@ import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
 
-// 임시 비교 카드 (2026-05-04) — qwen3-vl:8b vs 8b-thinking-q8_0 검증용.
-// Ollama 재시동 없이 분석 시점에 모델 변경 가능 (useSettingsStore.visionModel persist).
-// 시그니처 색: 8B = Cyan (#06b6d4 · Cool/빠름) / Thinking = Amber (#f59e0b · Warm/사색).
-// 영상 모델 카드 패턴 채택 (framer-motion flexGrow 1.7/1.0 spring + filter dim).
-const VISION_MODEL_OPTIONS = [
-  {
-    id: "qwen3-vl:8b",
-    label: "8B",
-    bgImage: "/vision-models/8b.png",
-    accentColor: "#06b6d4",
-    glowRgba: "rgba(6, 182, 212, 0.45)",
-  },
-  {
-    id: "qwen3-vl:8b-thinking-q8_0",
-    label: "Thinking",
-    bgImage: "/vision-models/thinking.png",
-    accentColor: "#f59e0b",
-    glowRgba: "rgba(245, 158, 11, 0.45)",
-  },
-] as const;
-
-// 영상 카드 패턴 (Phase 5 follow-up 3 · 2026-05-03) 그대로 채택.
-const ACTIVE_FLEX = 1.7;
-const INACTIVE_FLEX = 1;
-const SPRING_TRANSITION = {
-  type: "spring" as const,
-  stiffness: 320,
-  damping: 26,
-};
 
 /* dataURL 의 base64 길이로 byte 추정 (URL 이면 0). */
 function estimateDataUrlBytes(dataUrl: string | null): number {
@@ -227,7 +199,7 @@ export default function VisionPage() {
             />
           </div>
 
-          {/* ── 모델 비교 카드 (2026-05-04 · 영상 카드 패턴 채택 · framer-motion flexGrow) ── */}
+          {/* ── Vision 모델 선택 (VisionModelSelector 공용 컴포넌트 · 2026-05-05) ── */}
           <div>
             <div className="ais-field-header">
               <label
@@ -242,89 +214,12 @@ export default function VisionPage() {
                   visionModel}
               </span>
             </div>
-            <div
-              role="radiogroup"
-              aria-label="Vision 모델 선택"
-              style={{
-                display: "flex",
-                gap: 8,
-                width: "100%",
-              }}
-            >
-              {VISION_MODEL_OPTIONS.map((opt) => {
-                const active = visionModel === opt.id;
-                return (
-                  <motion.button
-                    key={opt.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    aria-label={`${opt.label} 모델 선택`}
-                    disabled={analyzing}
-                    onClick={() => setVisionModel(opt.id)}
-                    animate={{
-                      flexGrow: active ? ACTIVE_FLEX : INACTIVE_FLEX,
-                      scale: active ? 1 : 0.97,
-                    }}
-                    transition={SPRING_TRANSITION}
-                    style={{
-                      flexBasis: 0,
-                      minWidth: 0,
-                      position: "relative",
-                      minHeight: 88,
-                      borderRadius: 14,
-                      border: "none",
-                      padding: 0,
-                      cursor: analyzing ? "not-allowed" : "pointer",
-                      overflow: "hidden",
-                      backgroundImage: `url("${opt.bgImage}")`,
-                      backgroundSize: "cover",
-                      backgroundPosition: "center right",
-                      backgroundRepeat: "no-repeat",
-                      transition: "filter 220ms ease, box-shadow 220ms ease",
-                      opacity: analyzing ? 0.55 : 1,
-                      outline: "none",
-                      boxShadow: active
-                        ? `0 0 0 2px ${opt.accentColor}, 0 6px 18px ${opt.glowRgba}`
-                        : "0 0 0 1px rgba(148, 163, 184, 0.22), 0 1px 4px rgba(0, 0, 0, 0.18)",
-                      filter: active ? "none" : "saturate(0.65) brightness(0.72)",
-                    }}
-                  >
-                    {/* 좌측 어두운 gradient overlay — 모델명 가독성 (인물/사진은 우측에 위치). */}
-                    <div
-                      aria-hidden="true"
-                      style={{
-                        position: "absolute",
-                        inset: 0,
-                        background:
-                          "linear-gradient(90deg, rgba(15,23,42,0.72) 0%, rgba(15,23,42,0.42) 42%, rgba(15,23,42,0) 70%)",
-                        pointerEvents: "none",
-                      }}
-                    />
-                    {/* 모델명 — 좌측 세로 중앙 (영상 카드 패턴). */}
-                    <div
-                      style={{
-                        position: "absolute",
-                        left: 16,
-                        top: "50%",
-                        transform: "translateY(-50%)",
-                        color: "#f8fafc",
-                        fontSize: 16,
-                        fontWeight: 700,
-                        letterSpacing: "-0.005em",
-                        lineHeight: 1.2,
-                        textShadow: "0 2px 8px rgba(0, 0, 0, 0.55)",
-                        pointerEvents: "none",
-                        maxWidth: "70%",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {opt.label}
-                    </div>
-                  </motion.button>
-                );
-              })}
-            </div>
+            {/* 8B / Thinking 카드 세그먼트 — vision · compare 공용 컴포넌트 */}
+            <VisionModelSelector
+              value={visionModel}
+              onChange={setVisionModel}
+              disabled={analyzing}
+            />
           </div>
 
           {/* 안내 배너 — 이 기능의 성격 (옛 그대로 유지). */}
