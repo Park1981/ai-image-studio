@@ -268,34 +268,29 @@ describe("useVisionCompareStore — stageHistory (Phase 6)", () => {
     });
     setHint("색감만 비교해줘");
     setAnalysis({
-      scores: {
-        composition: 80,
-        color: 80,
-        subject: 80,
-        mood: 80,
-        quality: 80,
-      },
-      overall: 80,
-      comments_en: {
-        composition: "ok",
-        color: "ok",
-        subject: "ok",
-        mood: "ok",
-        quality: "ok",
-      },
-      comments_ko: {
-        composition: "괜찮음",
-        color: "괜찮음",
-        subject: "괜찮음",
-        mood: "괜찮음",
-        quality: "괜찮음",
-      },
-      summary_en: "ok",
-      summary_ko: "좋음",
+      // V4 minimal fixture — analysis 필드 보존 verify 용 (내용 무관).
+      summaryEn: "ok",
+      summaryKo: "좋음",
+      commonPointsEn: [],
+      commonPointsKo: [],
+      keyDifferencesEn: [],
+      keyDifferencesKo: [],
+      domainMatch: "person",
+      categoryDiffs: {},
+      categoryScores: {},
+      keyAnchors: [],
+      fidelityScore: null,
+      transformPromptEn: "",
+      transformPromptKo: "",
+      uncertainEn: "",
+      uncertainKo: "",
+      observation1: {},
+      observation2: {},
       provider: "ollama",
       fallback: false,
       analyzedAt: 1000,
-      visionModel: "qwen2.5vl:7b",
+      visionModel: "qwen3-vl:8b",
+      textModel: "gemma4-un:latest",
     });
 
     useVisionCompareStore.getState().resetStages();
@@ -316,34 +311,29 @@ describe("useVisionCompareStore — stageHistory (Phase 6)", () => {
     });
     setHint("test hint");
     setAnalysis({
-      scores: {
-        composition: 80,
-        color: 80,
-        subject: 80,
-        mood: 80,
-        quality: 80,
-      },
-      overall: 80,
-      comments_en: {
-        composition: "ok",
-        color: "ok",
-        subject: "ok",
-        mood: "ok",
-        quality: "ok",
-      },
-      comments_ko: {
-        composition: "괜찮음",
-        color: "괜찮음",
-        subject: "괜찮음",
-        mood: "괜찮음",
-        quality: "괜찮음",
-      },
-      summary_en: "ok",
-      summary_ko: "좋음",
+      // V4 minimal fixture — analysis 필드 보존 verify 용 (내용 무관).
+      summaryEn: "ok",
+      summaryKo: "좋음",
+      commonPointsEn: [],
+      commonPointsKo: [],
+      keyDifferencesEn: [],
+      keyDifferencesKo: [],
+      domainMatch: "person",
+      categoryDiffs: {},
+      categoryScores: {},
+      keyAnchors: [],
+      fidelityScore: null,
+      transformPromptEn: "",
+      transformPromptKo: "",
+      uncertainEn: "",
+      uncertainKo: "",
+      observation1: {},
+      observation2: {},
       provider: "ollama",
       fallback: false,
       analyzedAt: 1000,
-      visionModel: "qwen2.5vl:7b",
+      visionModel: "qwen3-vl:8b",
+      textModel: "gemma4-un:latest",
     });
 
     useVisionCompareStore.getState().reset();
