@@ -2370,7 +2370,9 @@ async def test_compare_context_does_not_persist_to_db():
             context="compare",
             edit_prompt="",
             compare_hint="",
-            history_item_id_raw="gen-1234567890ab",   # 매치되지만 compare 라 무시
+            # HISTORY_ID_RE 매치 (8자리 hex) — 매치되지만 compare 라 무시.
+            # 정정 (Task 11): 12자리 hex 는 매치 X (정확 8자리). 옛 통합 테스트 'edit-aaaaaaaa' 패턴 일치.
+            history_item_id_raw="gen-12345678",
             vision_override="qwen3-vl:8b",
             text_override="gemma4-un:latest",
         )
@@ -2413,7 +2415,8 @@ async def test_edit_context_persists_to_db():
             context="edit",
             edit_prompt="brighten",
             compare_hint="",
-            history_item_id_raw="edit-1234567890ab",
+            # HISTORY_ID_RE 매치 — 옛 통합 테스트 (test_comparison_pipeline.py:1229) 와 동일 8자리 hex.
+            history_item_id_raw="edit-aaaaaaaa",
             vision_override="qwen2.5vl:7b",
             text_override="gemma4-un:latest",
         )
