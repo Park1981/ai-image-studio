@@ -1,87 +1,93 @@
 /**
- * CompareAnalysisPanel — /vision/compare 우 하단 분석 결과.
- * 2026-04-27 (C2-P1-1): vision/compare/page.tsx 분해 — 페이지에서 추출.
+ * CompareAnalysisPanel — /vision/compare 우 패널 V4 결과.
  *
- * 헤더 (5축 비교 분석 라벨 + 종합 점수 chip) + 본문 분기:
- *   - running: 로딩 상태
- *   - !analysis: 빈 상태
- *   - analysis.fallback: amber 폴백 카드
- *   - 정상: AxisRow 5개 + 총평 + transform_prompt + uncertain
+ * 2026-05-05 Block 2 Phase 8 Task 29: 옛 5축 score 매트릭스 폐기 + V4 컴포넌트 7개 통합.
+ *  - CompareResultHeader (summary + fidelity chip)
+ *  - CompareImageDual (분리 thumbnail + on-demand 버튼)
+ *  - CompareSliderViewer (BeforeAfter wipe)
+ *  - CompareCommonDiffChips (공통점 cyan / 차이점 amber)
+ *  - CompareCategoryMatrix (5 카테고리 × 3-col · mixed 면 skip)
+ *  - CompareKeyAnchors (mixed 메인 / 동도메인 보조)
+ *  - CompareTransformBox (transform_prompt + 복사)
+ *  - CompareUncertainBox (페이지 끝 회색 박스)
  *
- * 2026-05-02 디자인 V5 Phase 7 격상:
- *  - 외곽 inline → className `.ais-result-hero-plain` (통일 plain base · padding 24 + flex column gap 14)
- *    min-height 262 인라인 보존 (production UX cap · plan §7).
- *  - 헤더 → `.ais-cac-header` + `.ais-cac-title` + `.ais-cac-overall-chip` (violet gradient + violet text)
- *  - AxisRow → `.ais-axis-row` + `-head` + `-label` + `-score` + `-bar` + `-fill[data-tone]` + `-comment`
- *  - Summary 박스 → `.ais-cac-summary` + `.ais-cac-eyebrow`
- *  - Transform/Uncertain → CompareExtraBoxes V5 격상 (CompareExtraBoxes.tsx)
+ * 외곽: .ais-result-hero-plain (5 페이지 통일 · plain base).
+ *  - running: 로딩
+ *  - !analysis: 빈 상태
+ *  - analysis.fallback: amber 폴백 카드
+ *  - 정상: V4 composition
  */
 
 "use client";
 
-import {
-  TransformPromptBox,
-  UncertainBox,
-} from "@/components/studio/CompareExtraBoxes";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
 import StudioLoadingState from "@/components/studio/StudioLoadingState";
-import Icon from "@/components/ui/Icon";
-import type { VisionCompareAnalysis } from "@/lib/api/types";
+import type { VisionCompareAnalysisV4 } from "@/lib/api/types";
+import type {
+  PerImagePromptResult,
+  PerImageWhich,
+} from "@/stores/useVisionCompareStore";
 
-const AXIS_LABELS_KO: Record<keyof VisionCompareAnalysis["scores"], string> = {
-  composition: "구성",
-  color: "색감",
-  subject: "피사체",
-  mood: "분위기",
-  quality: "품질",
-};
-
-const AXIS_ORDER: Array<keyof VisionCompareAnalysis["scores"]> = [
-  "composition",
-  "color",
-  "subject",
-  "mood",
-  "quality",
-];
+import CompareCategoryMatrix from "./CompareCategoryMatrix";
+import CompareCommonDiffChips from "./CompareCommonDiffChips";
+import CompareImageDual from "./CompareImageDual";
+import CompareKeyAnchors from "./CompareKeyAnchors";
+import CompareResultHeader from "./CompareResultHeader";
+import CompareSliderViewer from "./CompareSliderViewer";
+import CompareTransformBox from "./CompareTransformBox";
+import CompareUncertainBox from "./CompareUncertainBox";
 
 interface Props {
   running: boolean;
-  analysis: VisionCompareAnalysis | null;
+  analysis: VisionCompareAnalysisV4 | null;
+  image1Url: string | null;
+  image2Url: string | null;
+  perImageInFlight: PerImageWhich | null;
+  perImagePromptImage1: PerImagePromptResult | null;
+  perImagePromptImage2: PerImagePromptResult | null;
+  onPerImagePromptRequest: (which: PerImageWhich) => void;
+  onPerImagePromptReset: (which: PerImageWhich) => void;
 }
 
-/** 점수 → tone 매핑 (V5 .ais-axis-fill[data-tone] CSS 분기용).
- *  임계: ≥80 green / ≥60 amber / <60 또는 null gray */
-function scoreTone(score: number | null): "green" | "amber" | "gray" {
-  if (score == null) return "gray";
-  if (score >= 80) return "green";
-  if (score >= 60) return "amber";
-  return "gray";
-}
-
-export default function CompareAnalysisPanel({ running, analysis }: Props) {
+export default function CompareAnalysisPanel({
+  running,
+  analysis,
+  image1Url,
+  image2Url,
+  perImageInFlight,
+  perImagePromptImage1,
+  perImagePromptImage2,
+  onPerImagePromptRequest,
+  onPerImagePromptReset,
+}: Props) {
   return (
-    <div className="ais-result-hero-plain" style={{ minHeight: 262 }}>
-      <div className="ais-cac-header">
-        <div className="ais-cac-title">
-          <Icon name="grid" size={13} />
-          5축 비교 분석
-        </div>
-        {analysis && !analysis.fallback && (
-          <div className="ais-cac-overall-chip">종합 {analysis.overall}%</div>
-        )}
-      </div>
-
-      <div className="ais-cac-body">
-        {running ? (
-          <AnalysisLoading />
-        ) : !analysis ? (
-          <AnalysisEmpty />
-        ) : analysis.fallback ? (
-          <AnalysisFallback summary={analysis.summary_ko} />
-        ) : (
-          <AnalysisFilled analysis={analysis} />
-        )}
-      </div>
+    <div
+      className="ais-result-hero-plain"
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 20,
+        minHeight: 262,
+      }}
+    >
+      {running ? (
+        <AnalysisLoading />
+      ) : !analysis ? (
+        <AnalysisEmpty />
+      ) : analysis.fallback ? (
+        <AnalysisFallback summary={analysis.summaryKo} />
+      ) : (
+        <AnalysisFilled
+          analysis={analysis}
+          image1Url={image1Url}
+          image2Url={image2Url}
+          perImageInFlight={perImageInFlight}
+          perImagePromptImage1={perImagePromptImage1}
+          perImagePromptImage2={perImagePromptImage2}
+          onPerImagePromptRequest={onPerImagePromptRequest}
+          onPerImagePromptReset={onPerImagePromptReset}
+        />
+      )}
     </div>
   );
 }
@@ -91,7 +97,7 @@ function AnalysisLoading() {
     <StudioLoadingState
       size="panel"
       title="비교 분석 중…"
-      description="qwen2.5vl 이 두 이미지를 비교하는 중입니다 · 5~10초 소요"
+      description="2-stage 관찰자 + 차이 합성 진행 중 · 약 30~60초 소요"
     />
   );
 }
@@ -116,84 +122,80 @@ function AnalysisFallback({ summary }: { summary: string }) {
   );
 }
 
-function AnalysisFilled({ analysis }: { analysis: VisionCompareAnalysis }) {
-  return (
-    <div className="ais-cac-filled">
-      {/* 5축 막대 + 코멘트 */}
-      <div className="ais-axis-rows">
-        {AXIS_ORDER.map((axis) => (
-          <AxisRow
-            key={axis}
-            label={AXIS_LABELS_KO[axis]}
-            score={analysis.scores[axis]}
-            comment={analysis.comments_ko[axis] || analysis.comments_en[axis]}
-          />
-        ))}
-      </div>
-
-      {/* 총평 (5축 종합) */}
-      {analysis.summary_ko && (
-        <div className="ais-cac-summary">
-          <div className="ais-cac-eyebrow">SUMMARY</div>
-          {analysis.summary_ko}
-        </div>
-      )}
-
-      {/* 2026-04-26 v2.1 — Transform Prompt (B 만들기 t2i 변형 가이드) */}
-      {(analysis.transform_prompt_ko || analysis.transform_prompt_en) && (
-        <TransformPromptBox
-          textKo={analysis.transform_prompt_ko}
-          textEn={analysis.transform_prompt_en}
-        />
-      )}
-
-      {/* 2026-04-26 v2.1 — Uncertain (비교 못한 영역) */}
-      {(analysis.uncertain_ko || analysis.uncertain_en) && (
-        <UncertainBox
-          textKo={analysis.uncertain_ko}
-          textEn={analysis.uncertain_en}
-        />
-      )}
-    </div>
-  );
-}
-
-function AxisRow({
-  label,
-  score,
-  comment,
+function AnalysisFilled({
+  analysis,
+  image1Url,
+  image2Url,
+  perImageInFlight,
+  perImagePromptImage1,
+  perImagePromptImage2,
+  onPerImagePromptRequest,
+  onPerImagePromptReset,
 }: {
-  label: string;
-  score: number | null;
-  comment: string;
+  analysis: VisionCompareAnalysisV4;
+  image1Url: string | null;
+  image2Url: string | null;
+  perImageInFlight: PerImageWhich | null;
+  perImagePromptImage1: PerImagePromptResult | null;
+  perImagePromptImage2: PerImagePromptResult | null;
+  onPerImagePromptRequest: (which: PerImageWhich) => void;
+  onPerImagePromptReset: (which: PerImageWhich) => void;
 }) {
-  const pct = score ?? 0;
-  const tone = scoreTone(score);
   return (
-    <div className="ais-axis-row">
-      <div className="ais-axis-row-head">
-        <span className="ais-axis-label">{label}</span>
-        <span className="ais-axis-score">
-          {score === null ? "—" : `${score}%`}
-        </span>
-      </div>
-      <div className="ais-axis-bar">
-        <div
-          className="ais-axis-fill"
-          data-tone={tone}
-          style={{ width: `${pct}%` }}
-          role="meter"
-          aria-valuenow={score ?? 0}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={
-            score === null
-              ? `${label} — 분석 안 됨`
-              : `${label} ${score}%`
-          }
-        />
-      </div>
-      {comment && <div className="ais-axis-comment">{comment}</div>}
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* 1. 결과 헤더 (summary + fidelity chip) */}
+      <CompareResultHeader
+        summaryKo={analysis.summaryKo}
+        fidelityScore={analysis.fidelityScore}
+        domainMatch={analysis.domainMatch}
+      />
+
+      {/* 2. 이미지 영역 — 분리 thumbnail + 슬라이더 동시 (이미지 둘 다 있을 때만) */}
+      {image1Url && image2Url && (
+        <>
+          <CompareImageDual
+            image1Url={image1Url}
+            image2Url={image2Url}
+            image1Prompt={perImagePromptImage1}
+            image2Prompt={perImagePromptImage2}
+            inFlight={perImageInFlight}
+            onPromptRequest={onPerImagePromptRequest}
+            onPromptReset={onPerImagePromptReset}
+          />
+          <CompareSliderViewer image1Url={image1Url} image2Url={image2Url} />
+        </>
+      )}
+
+      {/* 3. 공통점 / 차이점 칩 */}
+      <CompareCommonDiffChips
+        commonPointsKo={analysis.commonPointsKo}
+        commonPointsEn={analysis.commonPointsEn}
+        keyDifferencesKo={analysis.keyDifferencesKo}
+        keyDifferencesEn={analysis.keyDifferencesEn}
+      />
+
+      {/* 4. 5 카테고리 매트릭스 — mixed 면 skip */}
+      {analysis.domainMatch !== "mixed" && (
+        <CompareCategoryMatrix categoryDiffs={analysis.categoryDiffs} />
+      )}
+
+      {/* 5. Key Anchors — mixed 메인 / 동도메인 보조 */}
+      <CompareKeyAnchors
+        anchors={analysis.keyAnchors}
+        domainMatch={analysis.domainMatch}
+      />
+
+      {/* 6. transform_prompt 박스 */}
+      <CompareTransformBox
+        transformPromptEn={analysis.transformPromptEn}
+        transformPromptKo={analysis.transformPromptKo}
+      />
+
+      {/* 7. uncertain 박스 (페이지 끝) */}
+      <CompareUncertainBox
+        uncertainEn={analysis.uncertainEn}
+        uncertainKo={analysis.uncertainKo}
+      />
     </div>
   );
 }
