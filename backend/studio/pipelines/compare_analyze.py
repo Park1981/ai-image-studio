@@ -54,6 +54,13 @@ async def _run_compare_analyze_pipeline(
     *,
     source_bytes: bytes,
     result_bytes: bytes,
+    # Task 10 (V4): route 가 PIL verify + size 추출해서 넘김.
+    # Task 11 에서 V4 (compare context) 가 observe_image 호출 시 사용.
+    # v3 (edit context) 는 사용 안 함 (옛 동작 유지).
+    source_w: int = 0,
+    source_h: int = 0,
+    result_w: int = 0,
+    result_h: int = 0,
     context: str,
     edit_prompt: str,
     compare_hint: str,

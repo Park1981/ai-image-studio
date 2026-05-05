@@ -14,8 +14,11 @@ GPU lock + ComfyUI 충돌 방지 정책은 백그라운드 파이프라인이 �
 
 from __future__ import annotations
 
+import io
+
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
+from PIL import Image as PILImage
 
 # Phase 6: 백그라운드 파이프라인 import (compare 도메인 로직 자체는 변경 없음)
 from ..comparison_pipeline import analyze_pair, analyze_pair_generic  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치)
@@ -69,12 +72,40 @@ async def create_compare_analyze_task(
     ):
         raise HTTPException(413, "image too large")
 
+    # ── Task 10 (V4): PIL verify + size 추출 ──
+    # 옛 코드는 bytes 길이만 체크 → text 위장 / 손상 PNG 우회 가능했음.
+    # V4 의 observe_image 가 width/height 인자를 요구 (per-image 슬롯 계산용).
+    try:
+        img_a = PILImage.open(io.BytesIO(source_bytes))
+        img_a.verify()
+        # verify() 후엔 stream 이 닫혀 size 접근 불가 → 재 open 필수
+        img_a = PILImage.open(io.BytesIO(source_bytes))
+        source_w, source_h = img_a.size
+        if source_w <= 0 or source_h <= 0:
+            raise ValueError("zero size")
+    except Exception:
+        raise HTTPException(400, "invalid image (source)")
+
+    try:
+        img_b = PILImage.open(io.BytesIO(result_bytes))
+        img_b.verify()
+        img_b = PILImage.open(io.BytesIO(result_bytes))
+        result_w, result_h = img_b.size
+        if result_w <= 0 or result_h <= 0:
+            raise ValueError("zero size")
+    except Exception:
+        raise HTTPException(400, "invalid image (result)")
+
     task = await _new_task()
     task.worker = _spawn(
         _run_compare_analyze_pipeline(
             task,
             source_bytes=source_bytes,
             result_bytes=result_bytes,
+            source_w=source_w,
+            source_h=source_h,
+            result_w=result_w,
+            result_h=result_h,
             context=context,
             edit_prompt=edit_prompt,
             compare_hint=compare_hint,
