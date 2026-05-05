@@ -217,26 +217,41 @@ describe("compareAnalyze (Phase 6 SSE drain)", () => {
         task_id: "tsk-cmp-001",
         stream_url: "/api/studio/compare-analyze/stream/tsk-cmp-001",
       }),
-      // GET stream → 4 stage + done
+      // GET stream → V4 5 stage + done (compare-encoding/observe1/observe2/diff-synth/translation)
       makeStreamResponse(
         sseBody([
-          { event: "stage", data: { type: "compare-encoding", progress: 5, stageLabel: "이미지 A/B 인코딩" } },
-          { event: "stage", data: { type: "vision-pair", progress: 25, stageLabel: "이미지 비교 분석" } },
-          { event: "stage", data: { type: "translation", progress: 75, stageLabel: "한국어 번역" } },
+          { event: "stage", data: { type: "compare-encoding", progress: 5,  stageLabel: "이미지 A/B 인코딩" } },
+          { event: "stage", data: { type: "observe1",         progress: 20, stageLabel: "Image1 관찰" } },
+          { event: "stage", data: { type: "observe2",         progress: 40, stageLabel: "Image2 관찰" } },
+          { event: "stage", data: { type: "diff-synth",       progress: 70, stageLabel: "차이 합성" } },
+          { event: "stage", data: { type: "translation",      progress: 90, stageLabel: "한국어 번역" } },
           {
             event: "done",
             data: {
+              // V4 done payload — compare_pipeline_v4.CompareAnalysisResultV4.to_dict() 미러
               analysis: {
-                scores: { composition: 80, color: 75 },
-                overall: 78,
-                comments_en: { composition: "Similar framing" },
-                comments_ko: { composition: "비슷한 프레이밍" },
-                summary_en: "A and B are similar",
-                summary_ko: "A·B 유사",
+                summaryEn: "A and B differ in pose",
+                summaryKo: "A·B 자세 차이",
+                commonPointsEn: ["same outfit"],
+                commonPointsKo: ["같은 의상"],
+                keyDifferencesEn: ["winking"],
+                keyDifferencesKo: ["윙크"],
+                domainMatch: "person",
+                categoryDiffs: {},
+                categoryScores: {},
+                keyAnchors: [],
+                fidelityScore: 88,
+                transformPromptEn: "close left eye",
+                transformPromptKo: "왼쪽 눈을 감으세요",
+                uncertainEn: "",
+                uncertainKo: "",
+                observation1: {},
+                observation2: {},
                 provider: "ollama",
                 fallback: false,
                 analyzedAt: 1700000000000,
-                visionModel: "qwen2.5vl:7b",
+                visionModel: "qwen3-vl:8b",
+                textModel: "gemma4-un:latest",
               },
               saved: false,
             },
@@ -257,16 +272,23 @@ describe("compareAnalyze (Phase 6 SSE drain)", () => {
       },
     });
 
-    // onStage 호출 순서 — Vision Compare 메뉴는 intent-refine 안 거침
+    // onStage 호출 순서 — V4 5 stage (Vision Compare 메뉴는 intent-refine 안 거침)
     expect(stages).toEqual([
       "compare-encoding",
-      "vision-pair",
+      "observe1",
+      "observe2",
+      "diff-synth",
       "translation",
     ]);
     expect(stages).not.toContain("intent-refine");
-    // analysis 반환 + saved=false (historyItemId 미전송)
+    // V4 analysis 반환 + saved=false (historyItemId 미전송 · compare context 휘발)
     expect(analysis).toBeDefined();
-    expect((analysis as { overall: number }).overall).toBe(78);
+    expect(
+      (analysis as { domainMatch: string }).domainMatch,
+    ).toBe("person");
+    expect(
+      (analysis as { fidelityScore: number }).fidelityScore,
+    ).toBe(88);
     expect(saved).toBe(false);
   });
 
