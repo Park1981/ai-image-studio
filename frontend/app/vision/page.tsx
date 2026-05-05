@@ -218,7 +218,6 @@ export default function VisionPage() {
             <VisionModelSelector
               value={visionModel}
               onChange={setVisionModel}
-              disabled={analyzing}
             />
           </div>
 

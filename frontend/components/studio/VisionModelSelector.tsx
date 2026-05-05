@@ -68,8 +68,6 @@ interface Props {
   value: string;
   /** 모델 변경 콜백 */
   onChange: (next: string) => void;
-  /** true 일 때 카드 클릭 비활성화 (분석 진행 중 등) */
-  disabled?: boolean;
 }
 
 /**
@@ -79,11 +77,7 @@ interface Props {
  * 활성 카드가 flexGrow 1.7 로 확장 (framer-motion spring).
  * vision page · compare page 에서 동일하게 재사용.
  */
-export default function VisionModelSelector({
-  value,
-  onChange,
-  disabled = false,
-}: Props) {
+export default function VisionModelSelector({ value, onChange }: Props) {
   return (
     <div
       role="radiogroup"
@@ -103,8 +97,7 @@ export default function VisionModelSelector({
             role="radio"
             aria-checked={active}
             aria-label={`${opt.label} 모델 선택`}
-            disabled={disabled}
-            onClick={() => !disabled && onChange(opt.id)}
+            onClick={() => onChange(opt.id)}
             animate={{
               flexGrow: active ? ACTIVE_FLEX : INACTIVE_FLEX,
               scale: active ? 1 : 0.97,
@@ -118,14 +111,13 @@ export default function VisionModelSelector({
               borderRadius: 14,
               border: "none",
               padding: 0,
-              cursor: disabled ? "not-allowed" : "pointer",
+              cursor: "pointer",
               overflow: "hidden",
               backgroundImage: `url("${opt.bgImage}")`,
               backgroundSize: "cover",
               backgroundPosition: "center right",
               backgroundRepeat: "no-repeat",
               transition: "filter 220ms ease, box-shadow 220ms ease",
-              opacity: disabled ? 0.55 : 1,
               outline: "none",
               boxShadow: active
                 ? `0 0 0 2px ${opt.accentColor}, 0 6px 18px ${opt.glowRgba}`

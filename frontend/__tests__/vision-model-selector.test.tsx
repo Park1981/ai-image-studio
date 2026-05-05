@@ -31,13 +31,4 @@ describe("VisionModelSelector", () => {
     expect(onChange).toHaveBeenCalledWith(expect.stringContaining("thinking"));
   });
 
-  it("disabled prop 전달 시 버튼 클릭 비활성화", () => {
-    const onChange = vi.fn();
-    render(
-      <VisionModelSelector value="qwen3-vl:8b" onChange={onChange} disabled />,
-    );
-    fireEvent.click(screen.getByText(/Thinking/i).closest("button")!);
-    // disabled 상태에서는 onChange 호출 안 됨
-    expect(onChange).not.toHaveBeenCalled();
-  });
 });
