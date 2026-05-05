@@ -99,7 +99,7 @@ frontend/components/studio/compare/
 **Files:**
 - Create: `frontend/components/studio/VisionModelSelector.tsx`
 - Modify: `frontend/app/vision/page.tsx` (inline 제거 + 컴포넌트 사용)
-- Test: `frontend/components/studio/__tests__/VisionModelSelector.test.tsx`
+- Test: `frontend/__tests__/vision-model-selector.test.tsx` (frontend 테스트 일관 패턴 — `frontend/__tests__/` 에 모든 test 위치)
 
 - [ ] **Step 1: feature branch 생성**
 
@@ -156,78 +156,32 @@ Expected: FAIL — "Cannot find module '@/components/studio/VisionModelSelector'
 
 - [ ] **Step 5: 컴포넌트 구현**
 
-`frontend/components/studio/VisionModelSelector.tsx`:
+> ⚠️ **2026-05-05 정정 박제** — 본 step 의 옛 코드 example 은 단순 텍스트 카드 + css transition 으로 잘못 작성됐었음. 실제로는 **옛 vision page 의 framer-motion + 배경이미지 카드 디자인을 그대로 보존** (시각 회귀 0). 아래 구현 가이드라인 참고 + `frontend/components/studio/video/VideoModelSegment.tsx` 패턴 미러링.
 
-```tsx
-/**
- * VisionModelSelector — 8B / Thinking 모델 선택 세그먼트 (vision · compare 공용).
- * 사용자가 분석 시점에 모델 선택. useSettingsStore.visionModel persist 와 연동.
- */
-"use client";
+`frontend/components/studio/VisionModelSelector.tsx` 구현 가이드:
 
-export type VisionModelId = "qwen3-vl:8b" | "qwen3-vl:thinking";
-
-export interface VisionModelOption {
-  id: VisionModelId;
-  label: string;
-  description: string;
-}
-
-export const VISION_MODEL_OPTIONS: VisionModelOption[] = [
-  {
-    id: "qwen3-vl:8b",
-    label: "8B 표준",
-    description: "빠르고 안정적 — 일반 분석",
-  },
-  {
-    id: "qwen3-vl:thinking",
-    label: "Thinking 정밀",
-    description: "느리지만 negative anchor 보존 강함",
-  },
-];
-
-interface Props {
-  value: VisionModelId;
-  onChange: (next: VisionModelId) => void;
-}
-
-export default function VisionModelSelector({ value, onChange }: Props) {
-  // 8B / Thinking 두 카드 — framer-motion 없이 css transition (vision page 패턴 그대로)
-  return (
-    <div style={{ display: "flex", gap: 8 }}>
-      {VISION_MODEL_OPTIONS.map((opt) => {
-        const active = value === opt.id;
-        return (
-          <button
-            key={opt.id}
-            type="button"
-            onClick={() => onChange(opt.id)}
-            style={{
-              flex: active ? 1.7 : 1.0,
-              padding: "12px 14px",
-              borderRadius: 10,
-              border: active
-                ? "1px solid var(--color-accent)"
-                : "1px solid var(--color-border)",
-              background: active
-                ? "var(--color-accent-soft)"
-                : "var(--color-surface)",
-              cursor: "pointer",
-              transition: "flex 240ms ease, border 160ms ease, background 160ms ease",
-              textAlign: "left",
-            }}
-          >
-            <div style={{ fontSize: 13, fontWeight: 600 }}>{opt.label}</div>
-            <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>
-              {opt.description}
-            </div>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-```
+- **Props 시그니처** (3 필드):
+  - `value: string` — settings store binding
+  - `onChange: (next: string) => void`
+  - `disabled?: boolean` — 분석/비교 진행 중 카드 클릭 막기 (옛 inline `disabled={analyzing}` 동작 보존). default false.
+- **Type**:
+  - `VisionModelId = "qwen3-vl:8b" | "qwen3-vl:8b-thinking-q8_0" | (string & {})` — 실 Ollama 모델 ID + escape hatch (옛 코드 호환)
+  - `VisionModelOption = { id, label, bgImage, accentColor, glowRgba }` (5 필드)
+- **Options export**:
+  ```tsx
+  export const VISION_MODEL_OPTIONS: readonly VisionModelOption[] = [
+    { id: "qwen3-vl:8b", label: "8B", bgImage: "...", accentColor: "cyan", glowRgba: "..." },
+    { id: "qwen3-vl:8b-thinking-q8_0", label: "Thinking", bgImage: "...", accentColor: "amber", glowRgba: "..." },
+  ] as const;
+  ```
+  옛 inline 의 `as const` readonly tuple 패턴 보존. vision page 헤더 meta 라벨 표시에서도 import 재사용.
+- **JSX 패턴** (VideoModelSegment 미러):
+  - 컨테이너: `role="radiogroup"` + flex display
+  - 각 카드: `<motion.button role="radio" aria-checked={active} aria-label={label}>` + `animate={{ flexGrow: active ? ACTIVE_FLEX : INACTIVE_FLEX }}` + SPRING_TRANSITION (stiffness 320 damping 26)
+  - 좌측 gradient overlay (`pointerEvents:none`) + 좌측 16px 세로 중앙 모델명 + textShadow
+  - `disabled` 시: `cursor: "not-allowed"` + `opacity: 0.55` + HTML `disabled` 속성 (자동 onClick 가드)
+- **참고 파일**: `frontend/components/studio/video/VideoModelSegment.tsx` — 거의 byte-identical 패턴.
+- **사용자 결정 박제** (2026-05-05): 옛 시각 디자인 그대로 보존. 단순화 X.
 
 - [ ] **Step 6: 테스트 통과 확인**
 

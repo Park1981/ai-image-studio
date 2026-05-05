@@ -578,9 +578,13 @@ def to_dict(self) -> dict[str, Any]:
 - 한글 주석 / narrow union 가치 있는 타입은 `lib/api/types.ts` 손편집 유지 (CLAUDE.md rule). `Schemas["..."]` alias 는 V4 analysis 에 적용 X (TaskCreated 만 잡힘).
 
 **VisionModelSelector 컴포넌트 추출** ⭐ (Codex 권장):
-- 현재 `app/vision/page.tsx:241-260` inline 코드 (8B / Thinking 카드 세그먼트). 컴포넌트 파일 없음.
+- 현재 `app/vision/page.tsx:241-260` inline 코드 (8B / Thinking 카드 세그먼트 · framer-motion `<motion.button>` + 배경이미지 + accent color + glow rgba 디자인). 컴포넌트 파일 없음.
 - 본 spec 에서 Compare 페이지가 같은 UI 재사용 → **컴포넌트 추출 선행**:
-  - 신설: `frontend/components/studio/VisionModelSelector.tsx` (props: `value`, `onChange`)
+  - 신설: `frontend/components/studio/VisionModelSelector.tsx` (props: `value: string`, `onChange: (next: string) => void`, `disabled?: boolean`)
+  - `disabled?` 는 분석/비교 진행 중 카드 클릭 막기 위함 (옛 `disabled={analyzing}` 동작 보존). VideoModelSegment 와 패턴 일관.
+  - 옛 vision page 시각 디자인 (framer-motion + 배경이미지 + 좌측 gradient overlay + accent/glow color) **그대로 보존** — 추출 본질은 코드 재사용성이지 디자인 변경이 아님.
+  - `VISION_MODEL_OPTIONS` (5 필드: id/label/bgImage/accentColor/glowRgba) `as const` + `readonly` export — vision page 헤더 meta 라벨 표시에서도 import 재사용.
+  - 모델 ID: 실 Ollama 모델명 (`"qwen3-vl:8b"` + `"qwen3-vl:8b-thinking-q8_0"`) — `VisionModelId = "qwen3-vl:8b" | "qwen3-vl:8b-thinking-q8_0" | (string & {})` (escape hatch 는 옛 코드 호환).
   - `app/vision/page.tsx` inline 코드 제거 + 새 컴포넌트 사용
   - `CompareLeftPanel` 도 동일 컴포넌트 사용 (settings.visionModel persist 공유)
 - 추출 작업은 본 redesign plan 의 Phase 0 (선행 정리) 로 분리 가능 — 다른 페이지 (vision/edit 자동 트리거) 영향 없는 lint/test 확인 후.
