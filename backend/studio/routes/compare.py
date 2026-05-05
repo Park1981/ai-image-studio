@@ -19,14 +19,13 @@ import io
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from PIL import Image as PILImage
-from pydantic import BaseModel, Field
 
 # Phase 6: 백그라운드 파이프라인 import (compare 도메인 로직 자체는 변경 없음)
 from .._gpu_lock import GpuBusyError, gpu_slot
 from ..comparison_pipeline import analyze_pair, analyze_pair_generic  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치)
 from ..pipelines import _run_compare_analyze_pipeline
 from ..prompt_pipeline import clarify_edit_intent  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치)
-from ..schemas import TaskCreated
+from ..schemas import PerImagePromptRequest, PerImagePromptResponse, TaskCreated
 from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..tasks import TASKS, _new_task
 # Task 12 (V4): per-image t2i prompt endpoint — vision 정공법의 prompt_synthesize 재사용.
@@ -143,27 +142,7 @@ async def compare_analyze_stream(task_id: str, request: Request):
 # ── Task 12 (V4): per-image t2i prompt endpoint ──
 # 메인 분석 결과의 observation1/2 중 하나로부터 t2i prompt 5 슬롯을 합성.
 # on-demand 호출 (사용자가 결과 화면에서 클릭) — 단일 JSON 응답 (non-SSE).
-class PerImagePromptRequest(BaseModel):
-    """compare-analyze per-image-prompt 요청 body."""
-
-    observation: dict = Field(
-        ..., description="vision_observe JSON 결과 (observation1 또는 observation2)"
-    )
-    ollamaModel: str | None = Field(
-        default=None, description="text 모델 override (default: gemma4-un:latest)"
-    )
-
-
-class PerImagePromptResponse(BaseModel):
-    """compare-analyze per-image-prompt 응답 body — synthesize_prompt 5 슬롯 미러."""
-
-    summary: str
-    positive_prompt: str
-    negative_prompt: str
-    key_visual_anchors: list[str]
-    uncertain: list[str]
-
-
+# Pydantic 모델은 ..schemas 에 박제 (Task 13).
 @router.post(
     "/compare-analyze/per-image-prompt",
     response_model=PerImagePromptResponse,

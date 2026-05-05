@@ -1532,7 +1532,7 @@
       "type": "object"
     },
     "PerImagePromptRequest": {
-      "description": "compare-analyze per-image-prompt 요청 body.",
+      "description": "compare-analyze per-image-prompt 요청 body — Task 12 endpoint.",
       "properties": {
         "observation": {
           "additionalProperties": true,
