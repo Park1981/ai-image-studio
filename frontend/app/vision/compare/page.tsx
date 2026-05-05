@@ -1,18 +1,18 @@
 /**
- * /vision/compare — 비전 비교 메뉴 (사용자가 임의로 고른 두 이미지 5축 비교).
- * 2026-04-24 신설 · 2026-04-27 (C2-P1-1) 분해 — 좌 패널/뷰어/분석 패널 추출.
+ * /vision/compare — 비전 비교 메뉴 V4 (2-stage observe + diff_synthesize).
+ * 2026-04-24 신설 · 2026-04-27 분해 · 2026-05-05 V4 wiring (Phase 8 Task 30).
  *
  * 레이아웃:
- *   400px 좌 패널 (CompareLeftPanel)
- *   1fr 우 패널 (CompareViewer + CompareAnalysisPanel)
+ *   400px 좌 패널 (CompareLeftPanel · VisionModelSelector 포함)
+ *   1fr 우 패널 (CompareAnalysisPanel V4 — Phase 7 컴포넌트 7개 통합)
  *
  * 데이터:
- *   - useVisionCompareStore (완전 휘발 · DB 저장 X · 페이지 떠나면 모두 사라짐)
- *   - 비전 모델은 useSettingsStore.visionModel (설정 드로어 공용 · 페이지에 노출 X)
+ *   - useVisionCompareStore V4 (완전 휘발 · DB 저장 X · perImagePrompt 캐시)
+ *   - 비전 모델 useSettingsStore.visionModel (좌패널 카드 세그먼트로 노출)
  *
  * 백엔드:
- *   - POST /api/studio/compare-analyze · meta.context="compare"
- *   - analyze_pair_generic 호출 (Edit 코드 경로 무영향)
+ *   - POST /api/studio/compare-analyze · meta.context="compare" → V4 5 stage SSE
+ *   - POST /api/studio/compare-analyze/per-image-prompt · on-demand t2i 합성
  */
 
 "use client";
@@ -23,7 +23,6 @@ import ProgressModal from "@/components/studio/ProgressModal";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import CompareAnalysisPanel from "@/components/studio/compare/CompareAnalysisPanel";
 import CompareLeftPanel from "@/components/studio/compare/CompareLeftPanel";
-import CompareViewer from "@/components/studio/compare/CompareViewer";
 import {
   StudioLeftPanel,
   StudioPage,
@@ -33,14 +32,18 @@ import {
 import {
   useVisionCompareStore,
   type VisionCompareImage,
+  type PerImageWhich,
 } from "@/stores/useVisionCompareStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useProcessStore } from "@/stores/useProcessStore";
 import { usePromptHistoryStore } from "@/stores/usePromptHistoryStore";
-import { compareAnalyze } from "@/lib/api/compare";
+import {
+  compareAnalyze,
+  compareAnalyzePerImagePrompt,
+} from "@/lib/api/compare";
 import { useImagePasteTarget } from "@/hooks/useImagePasteTarget";
 import { toast } from "@/stores/useToastStore";
-import type { VisionCompareAnalysis } from "@/lib/api/types";
+import type { VisionCompareAnalysisV4 } from "@/lib/api/types";
 
 /* ──────────────────────────────────────────────────────────────────────
  * 파일 → VisionCompareImage 로더 (paste fallback 용)
@@ -79,17 +82,20 @@ export default function VisionComparePage() {
   const hint = useVisionCompareStore((s) => s.hint);
   const running = useVisionCompareStore((s) => s.running);
   const analysis = useVisionCompareStore((s) => s.analysis);
-  const viewerMode = useVisionCompareStore((s) => s.viewerMode);
   const setImageA = useVisionCompareStore((s) => s.setImageA);
   const setImageB = useVisionCompareStore((s) => s.setImageB);
   const swapImages = useVisionCompareStore((s) => s.swapImages);
   const setHint = useVisionCompareStore((s) => s.setHint);
   const setRunning = useVisionCompareStore((s) => s.setRunning);
   const setAnalysis = useVisionCompareStore((s) => s.setAnalysis);
-  const setViewerMode = useVisionCompareStore((s) => s.setViewerMode);
   // Phase 6 (2026-04-27): 진행 모달 통일 — stage 이벤트 store 누적
   const pushStage = useVisionCompareStore((s) => s.pushStage);
   const resetStages = useVisionCompareStore((s) => s.resetStages);
+  // V4 perImagePrompt — on-demand t2i 합성 캐시 + 전역 직렬화
+  const perImagePrompt = useVisionCompareStore((s) => s.perImagePrompt);
+  const setPerImagePrompt = useVisionCompareStore((s) => s.setPerImagePrompt);
+  const setPerImageInFlight = useVisionCompareStore((s) => s.setPerImageInFlight);
+  const clearPerImagePrompts = useVisionCompareStore((s) => s.clearPerImagePrompts);
   const addPromptHistory = usePromptHistoryStore((s) => s.add);
 
   const visionModel = useSettingsStore((s) => s.visionModel);
@@ -147,6 +153,7 @@ export default function VisionComparePage() {
     setRunning(true);
     setAnalysis(null);
     resetStages();
+    clearPerImagePrompts(); // 새 분석 시작 시 휘발 캐시 초기화
     addPromptHistory("compare", hint);
 
     try {
@@ -170,14 +177,15 @@ export default function VisionComparePage() {
         // historyItemId 미전송 → 백엔드가 DB 저장 자동 스킵 = 완전 휘발 보장
       });
 
-      // compare context 응답은 VisionCompareAnalysis 5축
-      const a = rawAnalysis as VisionCompareAnalysis;
+      // compare context 응답은 V4 (2-stage observe + diff_synthesize)
+      const a = rawAnalysis as VisionCompareAnalysisV4;
       setAnalysis(a);
 
       if (a.fallback) {
-        toast.warn("비교 분석 fallback", a.summary_ko || "비전 응답 부족");
+        toast.warn("비교 분석 fallback", a.summaryKo || "비전 응답 부족");
       } else {
-        toast.success("비교 분석 완료", `종합 ${a.overall}%`);
+        const meta = a.fidelityScore !== null ? `유사도 ${a.fidelityScore}%` : a.domainMatch;
+        toast.success("비교 분석 완료", meta);
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
@@ -185,6 +193,43 @@ export default function VisionComparePage() {
     } finally {
       setRunning(false);
     }
+  };
+
+  /* ── On-demand t2i prompt 합성 (per-image · 전역 직렬화) ── */
+  const onPerImagePromptRequest = async (which: PerImageWhich) => {
+    if (!analysis || analysis.fallback) return;
+    if (perImagePrompt.inFlight !== null) {
+      // 전역 직렬화 — UI 단에서 disabled 처리하지만 안전망
+      return;
+    }
+    const observation = which === "image1" ? analysis.observation1 : analysis.observation2;
+    if (!observation || Object.keys(observation).length === 0) {
+      toast.warn("observation 없음", "메인 분석을 먼저 실행해 주세요");
+      return;
+    }
+    setPerImageInFlight(which);
+    try {
+      const result = await compareAnalyzePerImagePrompt(observation, ollamaModel);
+      setPerImagePrompt(which, result);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error("프롬프트 합성 실패 — 다시 시도해주세요", msg);
+      setPerImageInFlight(null);
+    }
+  };
+
+  const onPerImagePromptReset = (which: PerImageWhich) => {
+    // 캐시만 비우는 것이 아니라 새 합성을 트리거 (재합성 UX)
+    if (which === "image1") {
+      useVisionCompareStore.setState((s) => ({
+        perImagePrompt: { ...s.perImagePrompt, image1: null },
+      }));
+    } else {
+      useVisionCompareStore.setState((s) => ({
+        perImagePrompt: { ...s.perImagePrompt, image2: null },
+      }));
+    }
+    void onPerImagePromptRequest(which);
   };
 
   const canRun = !!imageA && !!imageB && !running;
@@ -213,8 +258,7 @@ export default function VisionComparePage() {
         </StudioLeftPanel>
 
         <StudioRightPanel>
-          {/* V5 결과 헤더 (Generate/Edit/Vision/Video 와 통일 · 2026-05-03) —
-           *  meta pills: A 사이즈 (violet) · B 사이즈 (violet) · 모드 · 종합점수 (analysis amber). */}
+          {/* V5 결과 헤더 (Generate/Edit/Vision/Video 와 통일) — V4 fidelity 표시 */}
           <StudioResultHeader
             title="비교 결과"
             titleEn="Comparison"
@@ -230,27 +274,35 @@ export default function VisionComparePage() {
                     B · {imageB.width} × {imageB.height}
                   </span>
                 )}
-                {imageA && imageB && (
-                  <span className="ais-result-pill mono">
-                    {viewerMode === "slider" ? "SLIDER" : "SIDE BY SIDE"}
+                {analysis && !analysis.fallback && analysis.fidelityScore !== null && (
+                  <span className="ais-result-pill ais-pill-amber mono">
+                    유사도 {analysis.fidelityScore}%
                   </span>
                 )}
                 {analysis && !analysis.fallback && (
-                  <span className="ais-result-pill ais-pill-amber mono">
-                    종합 {analysis.overall}%
+                  <span className="ais-result-pill mono">
+                    {analysis.domainMatch === "person"
+                      ? "PERSON"
+                      : analysis.domainMatch === "object_scene"
+                      ? "OBJECT/SCENE"
+                      : "MIXED"}
                   </span>
                 )}
               </>
             }
           />
 
-          <CompareViewer
-            imageA={imageA}
-            imageB={imageB}
-            mode={viewerMode}
-            onModeChange={setViewerMode}
+          <CompareAnalysisPanel
+            running={running}
+            analysis={analysis}
+            image1Url={imageA?.dataUrl ?? null}
+            image2Url={imageB?.dataUrl ?? null}
+            perImageInFlight={perImagePrompt.inFlight}
+            perImagePromptImage1={perImagePrompt.image1}
+            perImagePromptImage2={perImagePrompt.image2}
+            onPerImagePromptRequest={onPerImagePromptRequest}
+            onPerImagePromptReset={onPerImagePromptReset}
           />
-          <CompareAnalysisPanel running={running} analysis={analysis} />
         </StudioRightPanel>
       </StudioWorkspace>
     </StudioPage>

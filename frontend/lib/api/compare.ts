@@ -165,3 +165,43 @@ export async function compareAnalyze(
   }
   throw new Error("compare-analyze: stream closed without done event");
 }
+
+/* ──────────────────────────────────────────────────────────────────────
+ * V4 on-demand t2i prompt 합성 (Task 30 · 2026-05-05).
+ * 메인 분석 결과의 observation1/2 중 하나로부터 prompt_synthesize 5 슬롯 합성.
+ * 단일 JSON 응답 (non-SSE) — 약 10~20초 + GPU lock (busy 시 503).
+ * ──────────────────────────────────────────────────────────────────── */
+
+export interface PerImagePromptResponse {
+  summary: string;
+  positive_prompt: string;
+  negative_prompt: string;
+  key_visual_anchors: string[];
+  uncertain: string[];
+}
+
+export async function compareAnalyzePerImagePrompt(
+  observation: Record<string, unknown>,
+  ollamaModel?: string,
+): Promise<PerImagePromptResponse> {
+  const res = await fetch(
+    `${STUDIO_BASE}/api/studio/compare-analyze/per-image-prompt`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ observation, ollamaModel }),
+    },
+  );
+  if (res.status === 503) {
+    const body = (await res.json().catch(() => ({}))) as {
+      detail?: { code?: string; message?: string };
+    };
+    throw new Error(
+      body.detail?.message || "GPU busy — 잠시 후 다시 시도해주세요",
+    );
+  }
+  if (!res.ok) {
+    throw new Error(`per-image-prompt failed: ${res.status}`);
+  }
+  return res.json();
+}

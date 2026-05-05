@@ -19,7 +19,11 @@ import { CompareImageSlot } from "@/components/studio/CompareImageSlot";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import { StudioModeHeader } from "@/components/studio/StudioLayout";
+import VisionModelSelector, {
+  VISION_MODEL_OPTIONS,
+} from "@/components/studio/VisionModelSelector";
 import Icon from "@/components/ui/Icon";
+import { useSettingsStore } from "@/stores/useSettingsStore";
 import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
 
 interface Props {
@@ -48,6 +52,9 @@ export default function CompareLeftPanel({
   onAnalyze,
 }: Props) {
   const hintTextareaRef = useAutoGrowTextarea(hint);
+  // V4 Phase 8: 비전 모델 카드 — vision/compare 공용 (settings persist 공유)
+  const visionModel = useSettingsStore((s) => s.visionModel);
+  const setVisionModel = useSettingsStore((s) => s.setVisionModel);
 
   return (
     <>
@@ -127,6 +134,28 @@ export default function CompareLeftPanel({
         onChange={setImageB}
         onClear={() => setImageB(null)}
       />
+
+      {/* Vision 모델 카드 (V4 Phase 8 추가 · vision 페이지와 공용) */}
+      <div>
+        <div className="ais-field-header">
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="violet" />
+            Vision 모델
+          </label>
+          <span className="mono ais-field-meta">
+            {VISION_MODEL_OPTIONS.find((o) => o.id === visionModel)?.label ??
+              visionModel}
+          </span>
+        </div>
+        <VisionModelSelector
+          value={visionModel}
+          onChange={setVisionModel}
+          disabled={running}
+        />
+      </div>
 
       {/* 비교 지시 (선택) */}
       <div style={{ marginTop: 6 }}>
