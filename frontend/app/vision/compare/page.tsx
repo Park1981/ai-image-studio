@@ -42,38 +42,29 @@ import {
   compareAnalyzePerImagePrompt,
 } from "@/lib/api/compare";
 import { useImagePasteTarget } from "@/hooks/useImagePasteTarget";
+import { loadImageFile } from "@/lib/image-actions";
 import { toast } from "@/stores/useToastStore";
 import type { VisionCompareAnalysisV4 } from "@/lib/api/types";
 
 /* ──────────────────────────────────────────────────────────────────────
  * 파일 → VisionCompareImage 로더 (paste fallback 용)
- * CompareImageSlot.handleFiles 와 동일 로직. 페이지 paste 핸들러 재사용.
+ * CompareImageSlot.handleFiles 와 동일 로직 — `lib/image-actions:loadImageFile`
+ * helper 공유. 한국어 toast 메시지는 페이지 정책 (호출자) 책임.
  * ──────────────────────────────────────────────────────────────────── */
-function loadCompareImageFromFile(
+async function loadCompareImageFromFile(
   file: File,
   onLoad: (img: VisionCompareImage) => void,
 ) {
-  if (!file.type.startsWith("image/")) {
-    toast.error("이미지 파일만 업로드 가능합니다.");
-    return;
+  try {
+    const { dataUrl, width, height } = await loadImageFile(file);
+    onLoad({ dataUrl, label: file.name, width, height });
+  } catch (e) {
+    const code = e instanceof Error ? e.message : "";
+    if (code === "not-image") toast.error("이미지 파일만 업로드 가능합니다.");
+    else if (code === "image-load-failed" || code === "image-decode-failed")
+      toast.error("이미지 로드 실패");
+    else toast.error("파일 읽기 실패");
   }
-  const reader = new FileReader();
-  reader.onload = () => {
-    const dataUrl = reader.result as string;
-    const img = new Image();
-    img.onload = () => {
-      onLoad({
-        dataUrl,
-        label: file.name,
-        width: img.naturalWidth,
-        height: img.naturalHeight,
-      });
-    };
-    img.onerror = () => toast.error("이미지 로드 실패");
-    img.src = dataUrl;
-  };
-  reader.onerror = () => toast.error("파일 읽기 실패");
-  reader.readAsDataURL(file);
 }
 
 export default function VisionComparePage() {

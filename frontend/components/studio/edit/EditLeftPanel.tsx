@@ -20,12 +20,13 @@
 
 import dynamic from "next/dynamic";
 import type { RefObject } from "react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import HistoryPicker from "@/components/studio/HistoryPicker";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
 import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
+import { usePromptModeInit } from "@/hooks/usePromptModeInit";
 import { usePromptTools } from "@/hooks/usePromptTools";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
@@ -95,14 +96,9 @@ export default function EditLeftPanel({
     disabled: running,
   });
 
-  // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store sync.
-  // Codex Phase 4 리뷰 Medium #2 fix — session-only 정책 정합 (settings 변경은 다음 mount 부터 반영).
-  const promptModeInitRef = useRef(false);
-  useEffect(() => {
-    if (promptModeInitRef.current) return;
-    promptModeInitRef.current = true;
-    setPromptMode(useSettingsStore.getState().promptEnhanceMode);
-  }, [setPromptMode]);
+  // Phase 2 (2026-05-01 · 2026-05-06 hook 추출) — session-only 정책 sync.
+  // 자세한 배경은 `hooks/usePromptModeInit.ts` 주석.
+  usePromptModeInit(setPromptMode);
 
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
   // v8 라이브러리 plan: 라이브러리 Drawer open 토글.
