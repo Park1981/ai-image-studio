@@ -16,6 +16,7 @@
 import { useState } from "react";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import StudioUploadSlot from "@/components/studio/StudioUploadSlot";
+import { loadImageFile } from "@/lib/image-actions";
 
 interface SourceImageCardProps {
   sourceImage: string | null;
@@ -52,31 +53,19 @@ export default function SourceImageCard({
   const formatExt =
     (filename.split(".").pop() || "png").toUpperCase().slice(0, 5) || "PNG";
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
-    if (!file.type.startsWith("image/")) {
-      onError("이미지 파일만 업로드 가능");
-      return;
+    try {
+      const { dataUrl, width, height } = await loadImageFile(file);
+      onChange(dataUrl, `${file.name} · ${width}×${height}`, width, height);
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "";
+      if (code === "not-image") onError("이미지 파일만 업로드 가능");
+      else if (code === "image-load-failed" || code === "image-decode-failed")
+        onError("이미지 로드 실패");
+      else onError("파일 읽기 실패");
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      // 이미지 크기 읽기 — "use client" 가드 하에 window.Image 사용 (SSR 무관)
-      const img = new Image();
-      img.onload = () => {
-        onChange(
-          dataUrl,
-          `${file.name} · ${img.naturalWidth}×${img.naturalHeight}`,
-          img.naturalWidth,
-          img.naturalHeight,
-        );
-      };
-      img.onerror = () => onError("이미지 로드 실패");
-      img.src = dataUrl;
-    };
-    reader.onerror = () => onError("파일 읽기 실패");
-    reader.readAsDataURL(file);
   };
 
   const handleClear = () => {

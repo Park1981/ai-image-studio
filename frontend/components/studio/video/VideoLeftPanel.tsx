@@ -5,14 +5,15 @@
  *  - StudioModeHeader (Video Generate)
  *  - 원본 이미지 카드 (SourceImageCard)
  *  - 영상 지시 textarea (PromptHistoryPeek + 비우기)
- *  - VideoResolutionSlider (긴 변 픽셀 + 원본 비율 유지)
+ *  - VideoResolutionCard (긴 변 픽셀 + 원본 비율 유지 · 2026-05-06 분리)
  *  - Lightning / Adult 토글
  *  - 16GB VRAM 주의 배너
  *  - Primary CTA (sticky · 처리 중 spinner + ETA)
  *
  * 2026-04-26: video/page.tsx 591줄 → 분해 step 1.
- *  - VideoResolutionSlider + simplifyRatio 도 같이 이동
  *  - Store 직접 구독 (useVideoInputs/useVideoRunning) → page 의 prop drilling 차단
+ *
+ * 2026-05-06 (Codex finding 6): 영상 해상도 카드 분리 → 좌패널은 조립 역할만 유지.
  */
 
 "use client";
@@ -22,6 +23,7 @@ import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
 import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
+import { usePromptModeInit } from "@/hooks/usePromptModeInit";
 import { usePromptTools } from "@/hooks/usePromptTools";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
@@ -31,6 +33,7 @@ import {
 } from "@/components/studio/StudioLayout";
 import V5MotionCard from "@/components/studio/V5MotionCard";
 import VideoModelSegment from "@/components/studio/video/VideoModelSegment";
+import VideoResolutionCard from "@/components/studio/video/VideoResolutionCard";
 import { VIDEO_MODEL_PRESETS } from "@/lib/model-presets";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
@@ -38,14 +41,11 @@ import {
   computeVideoResize,
   useVideoInputs,
   useVideoRunning,
-  VIDEO_LONGER_EDGE_MAX,
-  VIDEO_LONGER_EDGE_MIN,
-  VIDEO_LONGER_EDGE_STEP,
 } from "@/stores/useVideoStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import VideoSizeWarnModal from "@/components/studio/video/VideoSizeWarnModal";
-import { shouldWarnVideoSize, simplifyRatio } from "@/lib/video-size";
+import { shouldWarnVideoSize } from "@/lib/video-size";
 
 interface Props {
   /** prompt textarea ref — useAutoGrowTextarea 훅이 부모에서 관리 */
@@ -95,14 +95,9 @@ export default function VideoLeftPanel({
     disabled: running,
   });
 
-  // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store sync.
-  // Codex Phase 4 리뷰 Medium #2 fix — session-only 정책 정합 (settings 변경은 다음 mount 부터 반영).
-  const promptModeInitRef = useRef(false);
-  useEffect(() => {
-    if (promptModeInitRef.current) return;
-    promptModeInitRef.current = true;
-    setPromptMode(useSettingsStore.getState().promptEnhanceMode);
-  }, [setPromptMode]);
+  // Phase 2 (2026-05-01 · 2026-05-06 hook 추출) — session-only 정책 sync.
+  // 자세한 배경은 `hooks/usePromptModeInit.ts` 주석.
+  usePromptModeInit(setPromptMode);
 
   const handleSourceChange = (
     image: string,
@@ -361,9 +356,9 @@ export default function VideoLeftPanel({
       </V5MotionCard>
 
       {/* ── 영상 해상도 슬라이더 (맨 아래 · 결정 B + D) ──
-       *  V5 .ais-size-card-v + .ais-video-res-card (coral 시그니처 · 사이즈 카드와 페어).
-       *  속도 chip 4단계는 *내부에* 유지 (결정 E · v4 명시). */}
-      <VideoResolutionSlider
+       *  2026-05-06 (Codex finding 6): VideoResolutionCard 로 분리.
+       *  V5 .ais-size-card-v + .ais-video-res-card (coral 시그니처 · 사이즈 카드와 페어). */}
+      <VideoResolutionCard
         longerEdge={longerEdge}
         setLongerEdge={setLongerEdge}
         sourceWidth={sourceWidth}
@@ -375,249 +370,3 @@ export default function VideoLeftPanel({
     </>
   );
 }
-
-/* ────────────────────────────────────────────────
-   영상 해상도 슬라이더 (Video 전용 — 외부 노출 불필요)
-   - 긴 변을 512~1536 (step 128) 범위로 선택
-   - 원본 비율 유지: 예상 출력 해상도 실시간 계산
-   - 이미지 없으면 disabled (비율 계산 불가)
-   ──────────────────────────────────────────────── */
-function VideoResolutionSlider({
-  longerEdge,
-  setLongerEdge,
-  sourceWidth,
-  sourceHeight,
-  expected,
-}: {
-  longerEdge: number;
-  setLongerEdge: (v: number) => void;
-  sourceWidth: number | null;
-  sourceHeight: number | null;
-  expected: { width: number; height: number };
-}) {
-  const hasSource = !!(sourceWidth && sourceHeight);
-  // 신: prop 으로 받음 (단일 진실원 — 부모 VideoLeftPanel 의 useMemo expected 공유).
-  // 시간 가중치 — 1536 기준 대비 (픽셀수 제곱 근사)
-  const timeFactor = Math.pow(longerEdge / VIDEO_LONGER_EDGE_MAX, 2);
-  const speed = pickSpeedTone(timeFactor);
-  const ratio = hasSource ? simplifyRatio(sourceWidth!, sourceHeight!) : "—";
-
-  /** 원본 해상도로 longerEdge 설정 — clamp + step 스냅 */
-  const useOriginalSize = () => {
-    if (!hasSource) return;
-    const longer = Math.max(sourceWidth!, sourceHeight!);
-    const clamped = Math.min(
-      VIDEO_LONGER_EDGE_MAX,
-      Math.max(VIDEO_LONGER_EDGE_MIN, longer),
-    );
-    const stepped =
-      Math.round(clamped / VIDEO_LONGER_EDGE_STEP) * VIDEO_LONGER_EDGE_STEP;
-    setLongerEdge(stepped);
-  };
-
-  return (
-    // Phase 1.5.4 (V5 · 결정 D + E) — 옛 surface inline style → .ais-size-card-v.ais-video-res-card.
-    // size-card-v 가 base (padding/blur/glass) + video-res-card 가 시그니처 var override (coral).
-    // 속도 chip 4단계는 내부에 유지 (결정 E · 별도 카드 X).
-    // hasSource=false 시 opacity 만 동적 (V5 시각 대상 inline 잔여 — Codex 2차 허용 범위).
-    <div
-      className="ais-size-card-v ais-video-res-card"
-      style={{
-        opacity: hasSource ? 1 : 0.55,
-        transition: "opacity .2s",
-      }}
-    >
-      {/* size-header 구조 (Generate SizeCard 와 통일 · 2026-05-03):
-       *  40x40 사각 icon-box (coral 시그니처 cascade) + 메타 (제목 + 출력 사이즈 chip). */}
-      <div className="ais-size-header">
-        <span className="ais-size-header-icon" aria-hidden>
-          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.6">
-            <rect x="3" y="3" width="18" height="18" rx="1.5" />
-            <path d="M3 9h18M9 3v18" />
-          </svg>
-        </span>
-        <span className="ais-size-header-meta">
-          <span className="ais-size-header-title">영상 해상도</span>
-          <span className="ais-size-header-chip">
-            {hasSource
-              ? `${expected.width}×${expected.height} · ${ratio}`
-              : `긴 변 ${longerEdge}px`}
-          </span>
-        </span>
-      </div>
-
-      {/* 원본 + 속도 chip 묶음 — 헤더 아래 별도 줄 우측 정렬 */}
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "flex-end",
-          gap: 6,
-          marginBottom: 8,
-        }}
-      >
-          {/* 원본 크기 버튼 — clamp + step snap (오빠 피드백) */}
-          <button
-            type="button"
-            onClick={useOriginalSize}
-            disabled={!hasSource}
-            title={
-              hasSource
-                ? `원본 크기로 (${Math.max(sourceWidth!, sourceHeight!)}px)`
-                : "원본 이미지 업로드 후 사용 가능"
-            }
-            style={{
-              all: "unset",
-              cursor: hasSource ? "pointer" : "not-allowed",
-              fontSize: 10.5,
-              fontWeight: 600,
-              padding: "3px 9px",
-              borderRadius: "var(--radius-full)",
-              border: "1px solid var(--line)",
-              background: "var(--bg-2)",
-              color: hasSource ? "var(--ink-2)" : "var(--ink-4)",
-              transition: "all .15s",
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 3,
-            }}
-          >
-            📐 원본
-          </button>
-          {/* 속도 chip — 색상 dot + 라벨 (시간 트레이드오프 시각화) */}
-          <span
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              gap: 5,
-              padding: "3px 9px",
-              borderRadius: "var(--radius-full)",
-              background: speed.bg,
-              border: `1px solid ${speed.border}`,
-              fontSize: 10.5,
-              fontWeight: 600,
-              color: speed.ink,
-            }}
-            title={`${longerEdge}px 긴 변 · 처리 속도 ${speed.label}`}
-          >
-            <span
-              aria-hidden
-              style={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                background: speed.dot,
-                flexShrink: 0,
-              }}
-            />
-            {speed.label}
-          </span>
-      </div>
-      <input
-        type="range"
-        min={VIDEO_LONGER_EDGE_MIN}
-        max={VIDEO_LONGER_EDGE_MAX}
-        step={VIDEO_LONGER_EDGE_STEP}
-        value={longerEdge}
-        disabled={!hasSource}
-        onChange={(e) => setLongerEdge(Number(e.target.value))}
-        style={{
-          width: "100%",
-          // V5 시그니처 (.ais-video-res-card → coral) cascade 활용. 외부 사용처는 fallback var(--accent) 유지.
-          accentColor: "var(--ais-range-accent, var(--accent))",
-          cursor: hasSource ? "pointer" : "not-allowed",
-        }}
-      />
-      {/* 눈금 + 현재 값 */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          fontSize: 10,
-          color: "var(--ink-4)",
-          marginTop: 2,
-        }}
-        className="mono"
-      >
-        <span>{VIDEO_LONGER_EDGE_MIN}</span>
-        <span style={{ color: "var(--ink-2)", fontWeight: 600 }}>
-          긴 변 {longerEdge}px
-        </span>
-        <span>{VIDEO_LONGER_EDGE_MAX}</span>
-      </div>
-      <div
-        style={{
-          marginTop: 6,
-          fontSize: 11,
-          color: "var(--ink-3)",
-          lineHeight: 1.5,
-        }}
-      >
-        {hasSource ? (
-          <>
-            원본 <span className="mono">{sourceWidth}×{sourceHeight}</span>
-            {" → "}
-            출력{" "}
-            <span
-              className="mono"
-              style={{ color: "var(--accent-ink)", fontWeight: 600 }}
-            >
-              {expected.width}×{expected.height}
-            </span>{" "}
-            <span style={{ color: "var(--ink-4)" }}>({ratio})</span>
-          </>
-        ) : (
-          "원본 이미지를 업로드하면 예상 출력 해상도가 표시됩니다."
-        )}
-      </div>
-    </div>
-  );
-}
-
-/** 처리 속도 → 색상 톤 매핑 (오빠 피드백 — 추상 라벨 → 색상 chip).
- *  매우 빠름 = emerald · 빠름 = cyan · 표준 = amber · 고품질 = rose
- *  배경/테두리는 옅게, dot 만 진한 색 → 시각 노이즈 ↓ */
-function pickSpeedTone(timeFactor: number): {
-  label: string;
-  bg: string;
-  border: string;
-  ink: string;
-  dot: string;
-} {
-  if (timeFactor > 0.8) {
-    return {
-      label: "고품질",
-      bg: "rgba(244,63,94,.08)",
-      border: "rgba(244,63,94,.32)",
-      ink: "#be123c",
-      dot: "#f43f5e",
-    };
-  }
-  if (timeFactor > 0.4) {
-    return {
-      label: "표준",
-      bg: "rgba(245,158,11,.10)",
-      border: "rgba(245,158,11,.32)",
-      ink: "#b45309",
-      dot: "#f59e0b",
-    };
-  }
-  if (timeFactor > 0.18) {
-    return {
-      label: "빠름",
-      bg: "rgba(6,182,212,.10)",
-      border: "rgba(6,182,212,.32)",
-      ink: "#0e7490",
-      dot: "#06b6d4",
-    };
-  }
-  return {
-    label: "매우 빠름",
-    bg: "rgba(34,197,94,.10)",
-    border: "rgba(34,197,94,.32)",
-    ink: "#15803d",
-    dot: "#22c55e",
-  };
-}
-
-// simplifyRatio 는 @/lib/video-size 에서 import (단일 진실원 — 파일 내 중복 제거)

@@ -19,11 +19,12 @@
 
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
 import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
+import { usePromptModeInit } from "@/hooks/usePromptModeInit";
 import { usePromptTools } from "@/hooks/usePromptTools";
 import ResearchBanner from "@/components/studio/ResearchBanner";
 import SnippetLibraryModal from "@/components/studio/SnippetLibraryModal";
@@ -90,16 +91,9 @@ export default function GenerateLeftPanel({
     disabled: generating,
   });
 
-  // Phase 2 (2026-05-01) — settings 의 promptEnhanceMode 를 *마운트 시 1회만* store 로 sync.
-  // Codex Phase 4 리뷰 Medium #2 fix: settings 변경이 페이지 session 토글을 즉시 덮어쓰던
-  // 옛 동작 차단. settings 변경 효과는 페이지 재진입 시점부터 반영 (= "session-only" 정책 정합).
-  // ref 로 mount 1회만 실행 — settings 값이 바뀌어도 effect 재실행 안 함.
-  const promptModeInitRef = useRef(false);
-  useEffect(() => {
-    if (promptModeInitRef.current) return;
-    promptModeInitRef.current = true;
-    setPromptMode(useSettingsStore.getState().promptEnhanceMode);
-  }, [setPromptMode]);
+  // Phase 2 (2026-05-01 · 2026-05-06 hook 추출) — session-only 정책 sync.
+  // 자세한 배경은 `hooks/usePromptModeInit.ts` 주석.
+  usePromptModeInit(setPromptMode);
 
   // 2026-04-30 (Phase 2B Task 7 + 후속 UX): 라이브러리 모달 state 만 유지.
   // [+ 라이브러리에 등록] 별도 버튼 제거 — LibraryModal 안 [+ 새 등록] 으로 통합.

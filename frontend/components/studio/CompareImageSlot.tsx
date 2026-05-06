@@ -13,6 +13,7 @@
 import { useState, type ReactNode } from "react";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import StudioUploadSlot from "@/components/studio/StudioUploadSlot";
+import { loadImageFile } from "@/lib/image-actions";
 import { toast } from "@/stores/useToastStore";
 import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
 
@@ -36,30 +37,19 @@ export function CompareImageSlot({
   const formatExt =
     (filename.split(".").pop() || "png").toUpperCase().slice(0, 5) || "PNG";
 
-  const handleFiles = (files: FileList | null) => {
+  const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0) return;
     const file = files[0];
-    if (!file.type.startsWith("image/")) {
-      toast.error("이미지 파일만 업로드 가능합니다.");
-      return;
+    try {
+      const { dataUrl, width, height } = await loadImageFile(file);
+      onChange({ dataUrl, label: file.name, width, height });
+    } catch (e) {
+      const code = e instanceof Error ? e.message : "";
+      if (code === "not-image") toast.error("이미지 파일만 업로드 가능합니다.");
+      else if (code === "image-load-failed" || code === "image-decode-failed")
+        toast.error("이미지 로드 실패");
+      else toast.error("파일 읽기 실패");
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
-      const img = new Image();
-      img.onload = () => {
-        onChange({
-          dataUrl,
-          label: file.name,
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-      img.onerror = () => toast.error("이미지 로드 실패");
-      img.src = dataUrl;
-    };
-    reader.onerror = () => toast.error("파일 읽기 실패");
-    reader.readAsDataURL(file);
   };
 
   return (

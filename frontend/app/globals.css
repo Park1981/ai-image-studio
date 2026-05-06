@@ -525,38 +525,9 @@ button {
   transform: scale(0.95);
 }
 
-.ais-cta-primary {
-  all: unset;
-  cursor: pointer;
-  text-align: center;
-  background: var(--accent);
-  color: #fff;
-  padding: 14px 20px;
-  border-radius: var(--radius-full);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  box-sizing: border-box;
-  box-shadow:
-    0 4px 18px rgba(74, 158, 255, 0.42),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  transition: all .18s;
-  position: relative;
-  overflow: hidden;
-}
-.ais-cta-primary:hover:not(:disabled) {
-  background: var(--accent-ink);
-}
-.ais-cta-primary:disabled {
-  cursor: not-allowed;
-  background: var(--accent-disabled);
-  box-shadow: none;
-}
+/* 2026-05-06 (Codex finding 5): 옛 V1 .ais-cta-primary 정의 삭제 (블루 단색 dead).
+   V5 Aurora Glass 정의 (Section 4) 가 단독 진실원. 옛 cascade override 도 같이 청소.
+   .ais-cta-progress 는 보존 (CTA 진행 바 — 클래스 별개). */
 .ais-cta-progress {
   position: absolute;
   left: 0;
@@ -682,8 +653,8 @@ button {
    결정: A~R (project_design_v5_pending_decisions.md)
    ───────────────────────────────────────────────────────────────────
    네임스페이스: 모두 .ais-* 통일 (Codex 1차 🟡 — 전역 충돌 회피)
-   주의: 기존 .ais-cta-primary (line 503~534 블루 단색) 은 아래 V5
-        Aurora Glass 정의로 cascade override (specificity 동일, 위치 후행).
+   .ais-cta-primary 는 Section 4 (Aurora Glass) 가 단독 진실원
+   (2026-05-06 finding 5: 옛 V1 블루 단색 정의 삭제 · cascade override 청소).
    ═══════════════════════════════════════════════════════════════════ */
 
 /* ── Section 1: V5 시그니처 컬러 토큰 (8 시그니처 × 4 var)
@@ -821,9 +792,9 @@ button {
   margin-top: 6px;
 }
 
-/* ── Section 4: V5 Aurora Glass CTA (.ais-cta-primary 재정의 · 결정 ⓒ K)
-   기존 line 503~534 블루 단색 (var(--accent)) → V5 violet→blue Aurora Glass 로 override.
-   light sweep 0.7s pseudo-element keyframe + 호버 시 -2px lift.
+/* ── Section 4: V5 Aurora Glass CTA (.ais-cta-primary 단독 진실원 · 결정 ⓒ K)
+   2026-05-06 (Codex finding 5): 옛 V1 블루 단색 정의 + cascade override 박제 청소 — V5 단독.
+   violet→blue Aurora Glass · light sweep 0.7s pseudo-element keyframe · 호버 -2px lift.
    shortcut (.ais-cta-shortcut) 표시는 컴포넌트 prop 으로 제거 (결정 K · CSS 보존) */
 .ais-cta-primary {
   all: unset;

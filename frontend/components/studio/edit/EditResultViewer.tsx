@@ -71,21 +71,31 @@ export default function EditResultViewer({
   //   버그로 *After 사이즈* 가 잘못 저장됨 → 옛 fallback chain 은 wrapper 비율을 After 로 잡아
   //   Before(원본) 가 letterbox 되며 슬라이더 좌우가 어긋나 보였음.
   //   Compare (CompareViewer:144) 는 imageA.width/height 가 본래 정확해서 정합 OK 였던 것.
+  // 2026-05-06 리팩토링 (Codex finding 1):
+  //   src 를 측정 결과에 포함 → 렌더 시 현재 sourceImage 와 일치할 때만 사용.
+  //   즉시 setSourceNat(null) 호출 제거 (react-hooks/set-state-in-effect 회귀 fix).
+  //   cancelled flag 로 stale 결과 race 차단.
   // fallback: 측정 끝나기 전엔 afterItem 비율 → 16/10.
-  const [sourceNat, setSourceNat] = useState<{ w: number; h: number } | null>(null);
+  const [sourceNat, setSourceNat] = useState<{ src: string; w: number; h: number } | null>(null);
   useEffect(() => {
-    setSourceNat(null);
     if (!sourceImage) return;
+    let cancelled = false;
     const img = new Image();
     img.onload = () => {
+      if (cancelled) return;
       if (img.naturalWidth > 0 && img.naturalHeight > 0) {
-        setSourceNat({ w: img.naturalWidth, h: img.naturalHeight });
+        setSourceNat({ src: sourceImage, w: img.naturalWidth, h: img.naturalHeight });
       }
     };
     img.src = sourceImage;
+    return () => {
+      cancelled = true;
+    };
   }, [sourceImage]);
-  const aspectRatio = sourceNat
-    ? `${sourceNat.w} / ${sourceNat.h}`
+  // 옛 결과 (src !== sourceImage) 는 무시 → fallback 으로.
+  const matchedNat = sourceNat && sourceNat.src === sourceImage ? sourceNat : null;
+  const aspectRatio = matchedNat
+    ? `${matchedNat.w} / ${matchedNat.h}`
     : afterItem.width && afterItem.height
       ? `${afterItem.width} / ${afterItem.height}`
       : "16 / 10";

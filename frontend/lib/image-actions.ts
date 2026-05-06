@@ -134,6 +134,56 @@ export async function resizeImageToThumbnail(
   }
 }
 
+/** 로컬 File → dataURL + 자연 크기 측정 결과. */
+export interface LoadImageFileResult {
+  dataUrl: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * 로컬 File 을 dataURL + 자연 크기로 디코드.
+ *
+ * 2026-05-06 (Codex finding 4): SourceImageCard / CompareImageSlot /
+ *   vision/compare/page.tsx 의 FileReader+Image 패턴 dedup. 호출자별 에러 처리 정책
+ *   (onError 콜백 vs toast) 이 다르므로 helper 는 Error 만 throw — 호출자가 한국어 메시지 매핑.
+ *
+ * 에러 message 코드:
+ *   - "not-image"           : MIME 이 image/* 가 아님
+ *   - "image-decode-failed" : naturalWidth/Height 0 (디코드 실패)
+ *   - "image-load-failed"   : Image.onerror
+ *   - "file-read-failed"    : FileReader.onerror
+ */
+export function loadImageFile(file: File): Promise<LoadImageFileResult> {
+  return new Promise((resolve, reject) => {
+    if (!file.type.startsWith("image/")) {
+      reject(new Error("not-image"));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      // "use client" 가드 하에 window.Image 사용 (SSR 무관)
+      const img = new Image();
+      img.onload = () => {
+        if (img.naturalWidth > 0 && img.naturalHeight > 0) {
+          resolve({
+            dataUrl,
+            width: img.naturalWidth,
+            height: img.naturalHeight,
+          });
+        } else {
+          reject(new Error("image-decode-failed"));
+        }
+      };
+      img.onerror = () => reject(new Error("image-load-failed"));
+      img.src = dataUrl;
+    };
+    reader.onerror = () => reject(new Error("file-read-failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
 /**
  * 이미지 URL 을 data URL 로 변환 (CORS 허용 범위 내).
  * edit 모드로 전송 · 템플릿 저장 등 브라우저 로컬 처리를 위해 사용.
