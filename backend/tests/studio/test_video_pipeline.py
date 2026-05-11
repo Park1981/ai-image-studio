@@ -79,6 +79,7 @@ def test_run_video_pipeline_unloads_vision_before_text_spec19() -> None:
                 "panning shot",
                 vision_model="qwen2.5vl:7b",
                 text_model="gemma4-un:latest",
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
 
@@ -251,7 +252,7 @@ def test_run_video_pipeline_success() -> None:
         patch("studio.video_pipeline.upgrade_video_prompt", new=upgrade_mock),
     ):
         result: VideoPipelineResult = asyncio.run(
-            run_video_pipeline(_tiny_png_bytes(), "dusk mood")
+            run_video_pipeline(_tiny_png_bytes(), "dusk mood", model_id="ltx")
         )
     assert result.vision_ok is True
     assert "dusk" in result.image_description.lower()
@@ -275,7 +276,7 @@ def test_run_video_pipeline_vision_fail_still_upgrades() -> None:
         patch("studio.video_pipeline._describe_image", new=desc_mock),
         patch("studio.video_pipeline.upgrade_video_prompt", new=upgrade_mock),
     ):
-        result = asyncio.run(run_video_pipeline(_tiny_png_bytes(), "x"))
+        result = asyncio.run(run_video_pipeline(_tiny_png_bytes(), "x", model_id="ltx"))
     assert result.vision_ok is False
     assert "vision model unavailable" in result.image_description
     # upgrade 는 호출됐음 (실패한 설명 포함)

@@ -141,6 +141,7 @@ async def _run_video_pipeline_task(
                 video_res = await run_video_pipeline(
                     image_bytes,
                     prompt,
+                    model_id=model_id,  # 3단 전파 (spec v1.1 Codex Finding 2)
                     vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
                     text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
                     adult=adult,
