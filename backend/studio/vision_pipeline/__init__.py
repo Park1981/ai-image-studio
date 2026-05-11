@@ -34,6 +34,7 @@ from __future__ import annotations
 from ._common import (  # noqa: F401
     DEFAULT_TIMEOUT,
     ProgressCallback,
+    VIDEO_VISION_SYSTEM,  # NEW (2026-05-11 · i2v 영상 전용)
     VISION_SYSTEM,
     _DEFAULT_OLLAMA_URL,
     _aspect_label,
@@ -91,6 +92,7 @@ __all__ = [
     # _common
     "DEFAULT_TIMEOUT",
     "ProgressCallback",
+    "VIDEO_VISION_SYSTEM",  # NEW (2026-05-11)
     "VISION_SYSTEM",
     "_DEFAULT_OLLAMA_URL",
     "_aspect_label",

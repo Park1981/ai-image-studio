@@ -26,7 +26,7 @@ from .prompt_pipeline import (
     UpgradeResult,
     upgrade_video_prompt,
 )
-from .vision_pipeline import _describe_image  # 기존 비전 헬퍼 재사용
+from .vision_pipeline import VIDEO_VISION_SYSTEM, _describe_image  # 기존 비전 헬퍼 재사용
 
 log = logging.getLogger(__name__)
 
@@ -76,6 +76,8 @@ async def run_video_pipeline(
         vision_model=resolved_vision,
         timeout=timeout,
         ollama_url=resolved_url,
+        system_prompt=VIDEO_VISION_SYSTEM,  # spec 2026-05-11 v1.1 · i2v 영상 전용
+        temperature=0.2,                    # i2v anchor 일관성 (기존 0.4 → 0.2)
     )
     vision_ok = bool(description.strip())
     if not vision_ok:
