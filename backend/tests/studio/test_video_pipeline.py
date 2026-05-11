@@ -21,7 +21,6 @@ from studio.history_db import (
     _migrate_add_video_mode,
 )
 from studio.prompt_pipeline import (
-    SYSTEM_VIDEO,
     UpgradeResult,
     build_system_video,
     upgrade_video_prompt,
@@ -96,20 +95,21 @@ def _tiny_png_bytes() -> bytes:
 
 
 # ═════════════════════════════════════════════
-# SYSTEM_VIDEO 상수 검증
+# SYSTEM_VIDEO 상수 검증 (LTX 기준 · v1.1 이후 build_system_video(model_id="ltx") 경유)
 # ═════════════════════════════════════════════
 
 
 def test_system_video_has_required_cues() -> None:
     """LTX-2.3 영상 프롬프트 지시 키워드가 포함됐는지."""
-    assert "60-150 words" in SYSTEM_VIDEO
+    system_ltx = build_system_video(adult=False, model_id="ltx")
+    assert "60-150 words" in system_ltx
     for cue in ("motion", "camera", "lighting", "ambient"):
-        assert cue in SYSTEM_VIDEO.lower()
+        assert cue in system_ltx.lower()
     # 금지 지시
-    assert "cartoon" in SYSTEM_VIDEO.lower()
-    assert "game" in SYSTEM_VIDEO.lower()
+    assert "cartoon" in system_ltx.lower()
+    assert "game" in system_ltx.lower()
     # 출력 포맷 강제
-    assert "no bullets" in SYSTEM_VIDEO.lower()
+    assert "no bullets" in system_ltx.lower()
 
 
 # ═════════════════════════════════════════════
@@ -134,6 +134,7 @@ def test_upgrade_video_success() -> None:
             upgrade_video_prompt(
                 user_direction="피사체 클로즈업",
                 image_description="A woman in soft window light",
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
     assert result.fallback is False
@@ -154,6 +155,7 @@ def test_upgrade_video_fallback_on_ollama_fail() -> None:
             upgrade_video_prompt(
                 user_direction="카메라가 위로 팬",
                 image_description="A landscape",
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
     assert result.fallback is True
@@ -165,13 +167,13 @@ def test_upgrade_video_fallback_on_ollama_fail() -> None:
 def test_upgrade_video_empty_direction() -> None:
     """빈 direction 은 즉시 fallback."""
     result = asyncio.run(
-        upgrade_video_prompt(user_direction="  ", image_description="x")
+        upgrade_video_prompt(user_direction="  ", image_description="x", model_id="ltx")
     )
     assert result.fallback is True
 
 
 def test_upgrade_video_uses_system_video_prompt() -> None:
-    """adult=False (기본) 호출 시 SFW SYSTEM_VIDEO 전달."""
+    """adult=False (기본) 호출 시 SFW build_system_video(model_id="ltx") 전달."""
     chat_mock = AsyncMock(return_value="out")
     translate_mock = AsyncMock(return_value=None)
     with (
@@ -182,10 +184,11 @@ def test_upgrade_video_uses_system_video_prompt() -> None:
             upgrade_video_prompt(
                 user_direction="move",
                 image_description="desc",
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
     _, kwargs = chat_mock.call_args
-    assert kwargs["system"] == SYSTEM_VIDEO
+    assert kwargs["system"] == build_system_video(adult=False, model_id="ltx")
     # SFW 에선 ADULT_CLAUSE 미포함
     assert "ADULT MODE" not in kwargs["system"]
 
@@ -203,6 +206,7 @@ def test_upgrade_video_adult_injects_nsfw_clause() -> None:
                 user_direction="move",
                 image_description="desc",
                 adult=True,
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
     _, kwargs = chat_mock.call_args
@@ -217,8 +221,8 @@ def test_upgrade_video_adult_injects_nsfw_clause() -> None:
 
 def test_build_system_video_sfw_vs_adult_divergence() -> None:
     """SFW 버전은 ADULT 블록이 없고, 나머지는 동일 패턴 유지."""
-    sfw = build_system_video(adult=False)
-    nsfw = build_system_video(adult=True)
+    sfw = build_system_video(adult=False, model_id="ltx")
+    nsfw = build_system_video(adult=True, model_id="ltx")
     assert "ADULT MODE" not in sfw
     assert "ADULT MODE" in nsfw
     # 둘 다 RULES 섹션은 끝에 있어야 함

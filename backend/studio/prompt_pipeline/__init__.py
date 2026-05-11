@@ -57,7 +57,6 @@ from .upgrade import (  # noqa: F401 — facade re-export
     ROLE_TO_SLOTS,
     SYSTEM_EDIT,
     SYSTEM_GENERATE,
-    SYSTEM_VIDEO,
     SYSTEM_VIDEO_ADULT_CLAUSE,
     SYSTEM_VIDEO_BASE,
     SYSTEM_VIDEO_RULES,
@@ -104,7 +103,6 @@ __all__ = [
     "SYSTEM_VIDEO_WAN22_BASE",  # NEW (2026-05-11)
     "SYSTEM_VIDEO_ADULT_CLAUSE",
     "SYSTEM_VIDEO_RULES",
-    "SYSTEM_VIDEO",
     # upgrade — role/clause
     "ROLE_INSTRUCTIONS",
     "ROLE_TO_SLOTS",

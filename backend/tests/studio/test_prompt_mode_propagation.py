@@ -166,6 +166,7 @@ async def test_upgrade_video_precise_failure_marks_provider() -> None:
             user_direction="zoom in slowly",
             image_description="a person",
             prompt_mode="precise",
+            model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
         )
 
     assert result.provider == "fallback-precise-failed"

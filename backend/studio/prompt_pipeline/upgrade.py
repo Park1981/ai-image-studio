@@ -444,17 +444,33 @@ RULES:
 - Never repeat phrases (except the identity clause above, which is required)."""
 
 
-def build_system_video(adult: bool = False) -> str:
-    """Video 시스템 프롬프트 구성. adult=True 면 NSFW clause 주입."""
-    return (
-        SYSTEM_VIDEO_BASE
-        + (SYSTEM_VIDEO_ADULT_CLAUSE if adult else "")
-        + SYSTEM_VIDEO_RULES
-    )
+# VideoModelId 는 presets.py 의 Literal 과 동일 — 순환 import 회피 위해 string 만 검사.
+# 실 타입 체크는 호출자 (pipelines/video.py) 가 VideoModelId 로 받아 전달.
+def build_system_video(*, adult: bool, model_id: str) -> str:
+    """Video 시스템 프롬프트 구성 (spec 2026-05-11 v1.1).
+
+    Codex Finding 1 (v1.1) — keyword-only required.
+    기존 `model_id="ltx"` default 가 `DEFAULT_VIDEO_MODEL_ID="wan22"` 와
+    충돌해 silent Wan→LTX prompt 사고 위험. default 제거 + keyword-only 로
+    누락 호출자를 TypeError 즉시 노출.
+
+    model_id 분기:
+      - "ltx"   → SYSTEM_VIDEO_BASE (cinematic paragraph 60~150 단어)
+      - "wan22" → SYSTEM_VIDEO_WAN22_BASE (concise 50~80 단어 + Wan 가이드)
+    """
+    if model_id == "wan22":
+        base = SYSTEM_VIDEO_WAN22_BASE
+    elif model_id == "ltx":
+        base = SYSTEM_VIDEO_BASE
+    else:
+        raise ValueError(f"unknown video model_id: {model_id!r}")
+
+    return base + (SYSTEM_VIDEO_ADULT_CLAUSE if adult else "") + SYSTEM_VIDEO_RULES
 
 
-# 하위 호환: SYSTEM_VIDEO 레퍼런스 유지 (adult=False 기본값).
-SYSTEM_VIDEO = build_system_video(adult=False)
+# 기존 `SYSTEM_VIDEO = build_system_video(adult=False)` 하위 호환 alias 제거됨
+# (v1.1 · spec §5.2). 외부 호출자 grep 결과 프로덕션 코드 0건 (테스트 일부만 참조)
+# 확인 후 안전 제거. 테스트는 `build_system_video(adult=False, model_id="ltx")` 로 갱신.
 
 async def _run_upgrade_call(
     *,
@@ -828,12 +844,13 @@ async def upgrade_edit_prompt(
 async def upgrade_video_prompt(
     user_direction: str,
     image_description: str,
+    *,
+    model_id: str,  # spec 2026-05-11 v1.1 · keyword-only required (Codex Finding 1)
     model: str = "gemma4-un:latest",
     timeout: float = DEFAULT_TIMEOUT,
     ollama_url: str | None = None,
     include_translation: bool = True,
     adult: bool = False,
-    *,
     prompt_mode: PromptEnhanceMode | str | None = "fast",
 ) -> UpgradeResult:
     """Video i2v 용 프롬프트 업그레이드 (v3: 2-call).
@@ -860,7 +877,7 @@ async def upgrade_video_prompt(
     )
 
     return await _run_upgrade_call(
-        system=build_system_video(adult=adult),
+        system=build_system_video(adult=adult, model_id=model_id),
         user_msg=user_msg,
         original=user_direction,
         model=model,
