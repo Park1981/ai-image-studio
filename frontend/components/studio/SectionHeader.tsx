@@ -24,8 +24,8 @@ interface Props {
 }
 
 /**
- * 알려진 한글 라벨 → 영문 매핑 (Fraunces italic bilingual 시그니처).
- * date-sections 의 today/yesterday/thisWeek 만 매핑 — 동적 날짜 ("5월 1일" 등) 는 영문 미표시.
+ * 알려진 한글 라벨 → 영문 단독 표시.
+ * 동적 날짜 ("5월 1일" 등) 는 아래 numeric label 로 변환한다.
  */
 const KNOWN_EN: Record<string, string> = {
   "오늘": "Today",
@@ -33,8 +33,21 @@ const KNOWN_EN: Record<string, string> = {
   "이번 주": "This week",
 };
 
+function toNumericDateLabel(label: string): string {
+  const full = label.match(/^(\d{4})년\s+(\d{1,2})월\s+(\d{1,2})일$/);
+  if (full) {
+    return `${full[1]}.${full[2].padStart(2, "0")}.${full[3].padStart(2, "0")}`;
+  }
+  const short = label.match(/^(\d{1,2})월\s+(\d{1,2})일$/);
+  if (short) {
+    return `${short[1].padStart(2, "0")}.${short[2].padStart(2, "0")}`;
+  }
+  return label;
+}
+
 export default function SectionHeader({ label, count, closed, onToggle }: Props) {
   const labelEn = KNOWN_EN[label];
+  const displayLabel = labelEn ?? toNumericDateLabel(label);
   return (
     <button
       type="button"
@@ -47,8 +60,7 @@ export default function SectionHeader({ label, count, closed, onToggle }: Props)
         <Icon name="chevron-down" size={14} />
       </span>
       <span className="ais-title">
-        <strong>{label}</strong>
-        {labelEn ? ` · ${labelEn}` : null}
+        <strong>{displayLabel}</strong>
       </span>
       <span className="ais-count mono">{count}</span>
     </button>
