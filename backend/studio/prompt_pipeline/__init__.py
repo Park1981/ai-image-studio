@@ -61,6 +61,7 @@ from .upgrade import (  # noqa: F401 — facade re-export
     SYSTEM_VIDEO_ADULT_CLAUSE,
     SYSTEM_VIDEO_BASE,
     SYSTEM_VIDEO_RULES,
+    SYSTEM_VIDEO_WAN22_BASE,  # NEW (2026-05-11 · Wan 2.2 전용)
     _build_matrix_directive_block,
     _role_target_slots,
     _run_upgrade_call,
@@ -100,6 +101,7 @@ __all__ = [
     "SYSTEM_GENERATE",
     "SYSTEM_EDIT",
     "SYSTEM_VIDEO_BASE",
+    "SYSTEM_VIDEO_WAN22_BASE",  # NEW (2026-05-11)
     "SYSTEM_VIDEO_ADULT_CLAUSE",
     "SYSTEM_VIDEO_RULES",
     "SYSTEM_VIDEO",
