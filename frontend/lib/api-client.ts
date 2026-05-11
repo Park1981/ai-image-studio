@@ -34,6 +34,8 @@ export type {
   VisionCompareAnalysisV4,
   CompareCategoryDiffJSON,
   CompareKeyAnchorJSON,
+  PromptFavorite,
+  PromptFavoriteMode,
 } from "./api/types";
 
 export { USE_MOCK, STUDIO_BASE } from "./api/client";
@@ -43,6 +45,11 @@ export { editImageStream } from "./api/edit";
 export { videoImageStream } from "./api/video";
 export { analyzeImage, type AnalyzeImageOptions } from "./api/vision";
 export { listHistory, deleteHistoryItem, clearHistory } from "./api/history";
+export {
+  listPromptFavorites,
+  createPromptFavorite,
+  deletePromptFavorite,
+} from "./api/prompt-favorites";
 export {
   fetchProcessStatus,
   interruptCurrent,

@@ -16,6 +16,7 @@ studio/router.py — facade. 실제 endpoint 정의는 studio.routes 패키지�
   POST /api/studio/upgrade-only      → { upgradedPrompt, ... } (sync)
   POST /api/studio/research          → { hints: [] } (sync)
   POST /api/studio/interrupt         → { ok }
+  GET/POST/DELETE /api/studio/prompt-favorites → prompt history 즐겨찾기
   POST /api/studio/vision-analyze    → { en, ko, provider, ... } (multipart, sync)
   POST /api/studio/compare-analyze   → { analysis, saved } (multipart, sync · mutex 보호)
   GET  /api/studio/models            → 모델 프리셋 (프론트 lib/model-presets.ts 미러)

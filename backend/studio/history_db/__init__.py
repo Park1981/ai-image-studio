@@ -12,7 +12,7 @@ Phase 4.1 (2026-04-30) — 단일 파일 history_db.py (886줄) 를 sub-module �
 본 facade `__init__.py` 는 외부 호환을 위해 모든 public 항목을 re-export.
 sub-module 은 `from . import _config as _cfg` + `_cfg._DB_PATH` 패턴 (codex C2 fix · monkeypatch 친화).
 
-Schema version: SCHEMA_VERSION = 8 (자세한 버전 이력은 schema.py docstring 참조).
+Schema version: SCHEMA_VERSION = 9 (자세한 버전 이력은 schema.py docstring 참조).
 """
 
 from __future__ import annotations
@@ -21,12 +21,15 @@ from __future__ import annotations
 from .schema import (  # noqa: F401
     CREATE_IDX_CREATED,
     CREATE_IDX_MODE,
+    CREATE_IDX_PROMPT_FAVORITES_MODE,
     CREATE_IDX_REF_LASTUSED,
+    CREATE_PROMPT_FAVORITES,
     CREATE_REFERENCE_TEMPLATES,
     CREATE_TABLE,
     SCHEMA_VERSION,
     _get_schema_version,
     _migrate_add_video_mode,
+    _migrate_create_prompt_favorites,
     _migrate_create_reference_templates,
     _needs_video_mode_migration,
     _set_schema_version,
@@ -72,6 +75,17 @@ from .templates import (  # noqa: F401
     touch_reference_template,
 )
 
+# v9 (2026-05-11) — prompt_favorites CRUD.
+from .prompt_favorites import (  # noqa: F401
+    VALID_PROMPT_FAVORITE_MODES,
+    _prompt_hash,
+    _row_to_prompt_favorite,
+    delete_prompt_favorite,
+    get_prompt_favorite,
+    list_prompt_favorites,
+    upsert_prompt_favorite,
+)
+
 
 # 명시 export 목록 — 외부 도구가 `from studio.history_db import *` 시 노출 항목.
 # 사용자 코드가 호출하는 항목만 (private helper / DDL 상수도 test 직접 import 패턴 보호 위해 포함).
@@ -79,12 +93,15 @@ __all__ = [
     # schema
     "CREATE_IDX_CREATED",
     "CREATE_IDX_MODE",
+    "CREATE_IDX_PROMPT_FAVORITES_MODE",
     "CREATE_IDX_REF_LASTUSED",
+    "CREATE_PROMPT_FAVORITES",
     "CREATE_REFERENCE_TEMPLATES",
     "CREATE_TABLE",
     "SCHEMA_VERSION",
     "_get_schema_version",
     "_migrate_add_video_mode",
+    "_migrate_create_prompt_favorites",
     "_migrate_create_reference_templates",
     "_needs_video_mode_migration",
     "_set_schema_version",
@@ -116,4 +133,12 @@ __all__ = [
     "insert_reference_template",
     "list_reference_templates",
     "touch_reference_template",
+    # prompt favorites
+    "VALID_PROMPT_FAVORITE_MODES",
+    "_prompt_hash",
+    "_row_to_prompt_favorite",
+    "delete_prompt_favorite",
+    "get_prompt_favorite",
+    "list_prompt_favorites",
+    "upsert_prompt_favorite",
 ]

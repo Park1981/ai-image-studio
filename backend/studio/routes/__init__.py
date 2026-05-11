@@ -7,6 +7,7 @@ router.py 가 921줄까지 줄었지만 여전히 endpoint 들이 한 파일에 
   routes/_common.py    — 공용 SSE/태스크 유틸 (_stream_task, _spawn 등)
   routes/streams.py    — generate/edit/video 태스크 생성 + SSE 스트림
   routes/prompt.py     — upgrade-only + research + interrupt
+  routes/prompt_favorites.py — 프롬프트 히스토리 즐겨찾기
   routes/vision.py     — vision-analyze (단일 이미지 분석)
   routes/compare.py    — compare-analyze (mutex + 2 context)
   routes/system.py     — process status / ollama models / process action / models / history
@@ -21,6 +22,7 @@ from fastapi import APIRouter
 from . import (
     compare,
     prompt,
+    prompt_favorites,
     reference_pool,
     reference_templates,
     streams,
@@ -34,6 +36,7 @@ studio_router = APIRouter(prefix="/api/studio", tags=["studio"])
 # 다만 동일 path 충돌 방지 위해 그룹별 명시적 prefix 안 씀 (전부 /api/studio 직속).
 studio_router.include_router(streams.router)
 studio_router.include_router(prompt.router)
+studio_router.include_router(prompt_favorites.router)
 studio_router.include_router(vision.router)
 studio_router.include_router(compare.router)
 studio_router.include_router(system.router)

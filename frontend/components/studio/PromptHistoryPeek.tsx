@@ -8,9 +8,9 @@
  * 동작:
  *  - 프롬프트 입력창 우상단 📜 트리거 → 클릭 시 패널 toggle
  *  - 패널 외부 클릭 → 자동 닫기
- *  - 리스트: usePromptHistoryStore.entries 에서 mode 로 필터 + dedupe + 최근 20개
- *  - 각 행: prompt 클램프 + 상대 시간 + [복사] + [사용] + [X] 삭제
- *  - 빈 상태 안내 + 하단 [전체 비우기] (이 mode 만)
+ *  - 리스트: DB 즐겨찾기 상단 + usePromptHistoryStore.entries 최근 prompt
+ *  - 각 행: prompt 클램프 + 상대 시간 + [별] + [복사] + [사용] + [X]
+ *  - 빈 상태 안내 + 하단 [최근 비우기] (즐겨찾기는 유지)
  */
 
 "use client";
@@ -18,6 +18,10 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Icon from "@/components/ui/Icon";
+import {
+  promptFavoriteKey,
+  usePromptFavoritesStore,
+} from "@/stores/usePromptFavoritesStore";
 import {
   usePromptHistoryStore,
   type PromptHistoryMode,
@@ -40,11 +44,15 @@ const MODE_LABEL: Record<Props["mode"], string> = {
 };
 
 const MAX_ITEMS = 20;
+const PEEK_PANEL_WIDTH = 380;
+const PEEK_PANEL_RIGHT_NUDGE = -30;
 
 interface PromptPeekItem {
   id: string;
   prompt: string;
   createdAt: number;
+  favoriteId?: string;
+  isFavorite: boolean;
 }
 
 export default function PromptHistoryPeek({
@@ -55,12 +63,42 @@ export default function PromptHistoryPeek({
   const promptEntries = usePromptHistoryStore((s) => s.entries);
   const removeOne = usePromptHistoryStore((s) => s.removeOne);
   const clearMode = usePromptHistoryStore((s) => s.clearMode);
+  const favoriteEntries = usePromptFavoritesStore((s) => s.entries);
+  const hydrateFavorites = usePromptFavoritesStore((s) => s.hydrate);
+  const toggleFavorite = usePromptFavoritesStore((s) => s.toggle);
   const [open, setOpen] = useState(false);
   const [triggerHover, setTriggerHover] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    if (!open) return;
+    void hydrateFavorites().catch(() => {
+      toast.warn("즐겨찾기 불러오기 실패", "백엔드 상태를 확인해줘.");
+    });
+  }, [open, hydrateFavorites]);
+
+  const favoriteByPrompt = useMemo(() => {
+    const map = new Map<string, (typeof favoriteEntries)[number]>();
+    for (const e of favoriteEntries) {
+      map.set(promptFavoriteKey(e.mode, e.prompt), e);
+    }
+    return map;
+  }, [favoriteEntries]);
+
+  const favoritePrompts = useMemo<PromptPeekItem[]>(() => {
+    return favoriteEntries
+      .filter((e) => e.mode === mode)
+      .map((e) => ({
+        id: `fav-row-${e.id}`,
+        prompt: e.prompt,
+        createdAt: e.updatedAt,
+        favoriteId: e.id,
+        isFavorite: true,
+      }));
+  }, [favoriteEntries, mode]);
+
   // mode 별 prompt 추출 + dedupe (최신 우선) — 단일 source.
-  const prompts = useMemo(() => {
+  const recentPrompts = useMemo(() => {
     const seen = new Set<string>();
     const out: PromptPeekItem[] = [];
     for (const e of promptEntries) {
@@ -68,15 +106,20 @@ export default function PromptHistoryPeek({
       const key = e.prompt.trim();
       if (!key || seen.has(key)) continue;
       seen.add(key);
+      const favorite = favoriteByPrompt.get(promptFavoriteKey(mode, key));
+      if (favorite) continue;
       out.push({
         id: e.id,
         prompt: e.prompt,
         createdAt: e.createdAt,
+        isFavorite: false,
       });
       if (out.length >= MAX_ITEMS) break;
     }
     return out;
-  }, [promptEntries, mode]);
+  }, [promptEntries, mode, favoriteByPrompt]);
+
+  const visibleCount = favoritePrompts.length + recentPrompts.length;
 
   // 외부 클릭 → 패널 자동 닫기 (Task 2)
   useEffect(() => {
@@ -105,10 +148,24 @@ export default function PromptHistoryPeek({
     toast.info("프롬프트 적용", prompt.slice(0, 40));
   };
 
+  const handleToggleFavorite = async (prompt: string) => {
+    try {
+      const active = await toggleFavorite(mode, prompt);
+      toast.info(
+        active ? "즐겨찾기 저장" : "즐겨찾기 해제",
+        prompt.slice(0, 40),
+      );
+    } catch {
+      toast.warn("즐겨찾기 변경 실패", "백엔드 상태를 확인해줘.");
+    }
+  };
+
   const handleClearAll = () => {
     if (
       typeof window !== "undefined" &&
-      window.confirm(`${MODE_LABEL[mode]} 히스토리 전체를 비울까요? (실행 취소 X)`)
+      window.confirm(
+        `${MODE_LABEL[mode]} 최근 프롬프트를 비울까요? 즐겨찾기는 유지돼요.`,
+      )
     ) {
       clearMode(mode);
       setOpen(false);
@@ -124,7 +181,7 @@ export default function PromptHistoryPeek({
         position: "absolute",
         top: 10,
         [alignRight ? "right" : "left"]: 10,
-        zIndex: 5,
+        zIndex: open ? 8 : 5,
       }}
     >
       {/* 트리거 아이콘 */}
@@ -133,7 +190,7 @@ export default function PromptHistoryPeek({
         onClick={() => setOpen((v) => !v)}
         onMouseEnter={() => setTriggerHover(true)}
         onMouseLeave={() => setTriggerHover(false)}
-        title={`이전 ${MODE_LABEL[mode]} 프롬프트 (${prompts.length}개)`}
+        title={`이전 ${MODE_LABEL[mode]} 프롬프트 (${visibleCount}개)`}
         style={{
           all: "unset",
           cursor: "pointer",
@@ -185,8 +242,10 @@ export default function PromptHistoryPeek({
             style={{
               position: "absolute",
               top: 34,
-              [alignRight ? "right" : "left"]: 0,
-              width: 340,
+              [alignRight ? "right" : "left"]: alignRight
+                ? PEEK_PANEL_RIGHT_NUDGE
+                : 0,
+              width: PEEK_PANEL_WIDTH,
               maxHeight: 360,
               overflow: "hidden",
               display: "flex",
@@ -228,11 +287,11 @@ export default function PromptHistoryPeek({
                 className="mono"
                 style={{ fontSize: 10, color: "var(--ink-4)" }}
               >
-                {prompts.length}
+                {visibleCount}
               </span>
             </div>
 
-            {prompts.length === 0 ? (
+            {visibleCount === 0 ? (
               <div
                 style={{
                   padding: "20px 16px",
@@ -255,12 +314,33 @@ export default function PromptHistoryPeek({
                     flex: 1,
                   }}
                 >
-                  {prompts.map((it) => (
+                  {favoritePrompts.length > 0 && (
+                    <PeekSectionLabel label="즐겨찾기" />
+                  )}
+                  {favoritePrompts.map((it) => (
                     <PeekRow
                       key={it.id}
                       item={it}
                       onCopy={() => handleCopy(it.prompt)}
                       onSelect={() => handleSelect(it.prompt)}
+                      onToggleFavorite={() => handleToggleFavorite(it.prompt)}
+                      onRemove={() => {
+                        if (it.favoriteId) {
+                          void handleToggleFavorite(it.prompt);
+                        }
+                      }}
+                    />
+                  ))}
+                  {favoritePrompts.length > 0 && recentPrompts.length > 0 && (
+                    <PeekSectionLabel label="최근 프롬프트" />
+                  )}
+                  {recentPrompts.map((it) => (
+                    <PeekRow
+                      key={it.id}
+                      item={it}
+                      onCopy={() => handleCopy(it.prompt)}
+                      onSelect={() => handleSelect(it.prompt)}
+                      onToggleFavorite={() => handleToggleFavorite(it.prompt)}
                       onRemove={() => removeOne(it.id)}
                     />
                   ))}
@@ -286,7 +366,7 @@ export default function PromptHistoryPeek({
                       borderRadius: "var(--radius-sm)",
                     }}
                   >
-                    전체 비우기
+                    최근 비우기
                   </button>
                 </div>
               </>
@@ -298,19 +378,39 @@ export default function PromptHistoryPeek({
   );
 }
 
+function PeekSectionLabel({ label }: { label: string }) {
+  return (
+    <li
+      style={{
+        padding: "8px 12px 4px",
+        fontSize: 10,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: ".08em",
+        color: "var(--ink-4)",
+      }}
+    >
+      {label}
+    </li>
+  );
+}
+
 /* ── 개별 행 ── */
 function PeekRow({
   item,
   onCopy,
   onSelect,
+  onToggleFavorite,
   onRemove,
 }: {
   item: PromptPeekItem;
   onCopy: () => void;
   onSelect: () => void;
+  onToggleFavorite: () => Promise<void>;
   onRemove: () => void;
 }) {
   const [rowHover, setRowHover] = useState(false);
+  const [favoritePending, setFavoritePending] = useState(false);
   return (
     <li
       onMouseEnter={() => setRowHover(true)}
@@ -356,11 +456,25 @@ function PeekRow({
       <div
         style={{
           display: "flex",
-          gap: 4,
+          gap: 2,
           opacity: rowHover ? 1 : 0.45,
           transition: "opacity .12s",
         }}
       >
+        <StarBtn
+          active={item.isFavorite}
+          disabled={favoritePending}
+          onClick={async (e) => {
+            e.stopPropagation();
+            if (favoritePending) return;
+            setFavoritePending(true);
+            try {
+              await onToggleFavorite();
+            } finally {
+              setFavoritePending(false);
+            }
+          }}
+        />
         <IconBtn
           onClick={(e) => {
             e.stopPropagation();
@@ -389,6 +503,48 @@ function PeekRow({
   );
 }
 
+function StarBtn({
+  active,
+  disabled,
+  onClick,
+}: {
+  active: boolean;
+  disabled: boolean;
+  onClick: (e: React.MouseEvent) => void | Promise<void>;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      aria-label={active ? "즐겨찾기 해제" : "즐겨찾기 저장"}
+      title={active ? "즐겨찾기 해제" : "즐겨찾기 저장"}
+      disabled={disabled}
+      style={{
+        all: "unset",
+        cursor: disabled ? "wait" : "pointer",
+        width: 22,
+        height: 22,
+        borderRadius: "var(--radius-sm)",
+        display: "grid",
+        placeItems: "center",
+        color: active ? "#d97706" : "var(--ink-4)",
+        opacity: disabled ? 0.55 : 1,
+        transition: "background .12s, color .12s, transform .12s",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background =
+          active ? "rgba(217,119,6,.12)" : "var(--surface)";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+      }}
+    >
+      <Icon name="star" size={13} stroke={active ? 1.9 : 1.5} />
+    </button>
+  );
+}
+
 function IconBtn({
   onClick,
   title,
@@ -408,8 +564,8 @@ function IconBtn({
       style={{
         all: "unset",
         cursor: "pointer",
-        width: 24,
-        height: 24,
+        width: 22,
+        height: 22,
         borderRadius: "var(--radius-sm)",
         display: "grid",
         placeItems: "center",
@@ -440,8 +596,8 @@ function RemoveBtn({ onClick }: { onClick: (e: React.MouseEvent) => void }) {
       style={{
         all: "unset",
         cursor: "pointer",
-        width: 24,
-        height: 24,
+        width: 22,
+        height: 22,
         display: "grid",
         placeItems: "center",
         borderRadius: "var(--radius-sm)",

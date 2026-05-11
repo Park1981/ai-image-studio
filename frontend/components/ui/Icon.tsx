@@ -38,6 +38,7 @@ export type IconName =
   | "home"
   | "power"
   | "dots-grid"
+  | "star"
   | "stars"
   | "bolt"
   | "flame";
@@ -305,6 +306,12 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
       );
     // 별 두 개 — AI 보정 카드 icon-box (시안 pair-generate.html v7 sparkle stars).
     // 큰 다이아몬드 별 + 작은 다이아몬드 별. 기존 sparkle (4방향 광선) 과 시각 구분.
+    case "star":
+      return (
+        <svg {...common}>
+          <path d="M12 3.5 14.6 8.8l5.8.8-4.2 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z" />
+        </svg>
+      );
     case "stars":
       return (
         <svg {...common}>

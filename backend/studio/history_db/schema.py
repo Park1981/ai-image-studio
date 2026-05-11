@@ -5,7 +5,7 @@ studio_history + reference_templates 두 테이블의 CREATE/ALTER 와
 PRAGMA user_version 기반 마이그레이션 진입점 (`init_studio_history_db`).
 
 Schema version (2026-04-27 · C2-P2-3 도입):
-    SCHEMA_VERSION = 8 (현재).
+    SCHEMA_VERSION = 9 (현재).
     PRAGMA user_version 으로 추적 — SQLite 빌트인 (별도 schema_version 테이블 불필요).
 
     버전 이력:
@@ -16,6 +16,7 @@ Schema version (2026-04-27 · C2-P2-3 도입):
       v6 (2026-04-26) — refined_intent (Edit 한 사이클 gemma4 정제 캐시)
       v7 (2026-04-27) — reference_ref + reference_role (Edit multi-reference)
       v8 (2026-04-28) — reference_templates 테이블 + 인덱스 (라이브러리 plan)
+      v9 (2026-05-11) — prompt_favorites 테이블 + 인덱스
 
     신규 버전 추가 정책:
       1) 컬럼 추가 (`ALTER TABLE ... ADD COLUMN ...`) — try/except 로 idempotent.
@@ -38,7 +39,7 @@ from ._config import log
 
 # Schema version — 2026-04-27 (C2-P2-3) 도입.
 # 신규 마이그레이션 추가 시 + 1 + init 함수에 idempotent 적용 함수 추가.
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 
 async def _get_schema_version(db: aiosqlite.Connection) -> int:
@@ -114,6 +115,25 @@ CREATE TABLE IF NOT EXISTS reference_templates (
 CREATE_IDX_REF_LASTUSED = (
     "CREATE INDEX IF NOT EXISTS idx_reference_templates_lastused "
     "ON reference_templates(last_used_at DESC)"
+)
+
+# v9 (2026-05-11): 시계 아이콘 프롬프트 히스토리용 즐겨찾기.
+# studio_history 는 "실행 결과" 보관이고, prompt_favorites 는 "재사용할 사용자 원문"
+# 보관이라 별도 테이블로 둔다. compare 는 결과 history 에 없지만 prompt picker mode 로 존재.
+CREATE_PROMPT_FAVORITES = """
+CREATE TABLE IF NOT EXISTS prompt_favorites (
+  id TEXT PRIMARY KEY,
+  mode TEXT NOT NULL CHECK(mode IN ('generate','edit','video','compare')),
+  prompt TEXT NOT NULL,
+  prompt_hash TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE(mode, prompt_hash)
+);
+"""
+CREATE_IDX_PROMPT_FAVORITES_MODE = (
+    "CREATE INDEX IF NOT EXISTS idx_prompt_favorites_mode "
+    "ON prompt_favorites(mode, updated_at DESC)"
 )
 
 
@@ -195,6 +215,17 @@ async def _migrate_create_reference_templates(db: aiosqlite.Connection) -> None:
     await db.commit()
 
 
+async def _migrate_create_prompt_favorites(db: aiosqlite.Connection) -> None:
+    """v9 (2026-05-11): prompt_favorites 테이블 + 인덱스.
+
+    CREATE IF NOT EXISTS 라 idempotent — current_version 이 이미 최신이어도
+    init 경로에서 실행해 누락 테이블을 보완할 수 있다.
+    """
+    await db.execute(CREATE_PROMPT_FAVORITES)
+    await db.execute(CREATE_IDX_PROMPT_FAVORITES_MODE)
+    await db.commit()
+
+
 async def init_studio_history_db() -> None:
     """테이블/인덱스 생성 (idempotent) + 증분 마이그레이션.
 
@@ -205,6 +236,7 @@ async def init_studio_history_db() -> None:
         await db.execute(CREATE_TABLE)
         await db.execute(CREATE_IDX_CREATED)
         await db.execute(CREATE_IDX_MODE)
+        await _migrate_create_prompt_favorites(db)
         await db.commit()
 
         current_version = await _get_schema_version(db)
@@ -298,6 +330,10 @@ async def init_studio_history_db() -> None:
     async with aiosqlite.connect(_cfg._DB_PATH) as db:
         await _migrate_create_reference_templates(db)
         log.info("Migrated: reference_templates 테이블 + 인덱스 생성")
+    # v9 (2026-05-11): prompt_favorites 테이블 + 인덱스 신규.
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
+        await _migrate_create_prompt_favorites(db)
+        log.info("Migrated: prompt_favorites 테이블 + 인덱스 생성")
         # 모든 마이그레이션 적용 후 schema version 마킹 (다음 부팅에서 skip).
         await _set_schema_version(db, SCHEMA_VERSION)
         await db.commit()

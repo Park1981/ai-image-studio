@@ -20,6 +20,19 @@ export type StudioMode = "generate" | "edit" | "video" | "vision";
 /** History 에 저장 가능한 모드 (vision 제외). */
 export type HistoryMode = "generate" | "edit" | "video";
 
+/** PromptHistoryPeek 즐겨찾기 모드. compare 는 결과 히스토리는 없지만 prompt picker 는 존재한다. */
+export type PromptFavoriteMode = HistoryMode | "compare";
+
+export interface PromptFavorite {
+  id: string;
+  mode: PromptFavoriteMode;
+  /** 사용자가 입력한 원문 prompt. AI 보강 후 최종 prompt 가 아니다. */
+  prompt: string;
+  promptHash: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
 /* ──────────── Comparison Analysis (Edit 결과 vs 원본) ──────────── */
 
 /** v1 (옛 형식 · 호환만 유지) — 5축 유사도 점수 */
