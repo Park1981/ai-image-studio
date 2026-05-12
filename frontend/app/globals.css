@@ -480,6 +480,92 @@ button {
   color: var(--ink-2);
 }
 
+/* Video adult auto-NSFW segmented — PromptModeRadio 와 같은 외형, 4-option 전용 레이아웃. */
+.ais-nsfw-mode-segmented {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0;
+  padding: 3px;
+  width: min(100%, 360px);
+  max-width: 100%;
+  align-self: center;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+}
+.ais-nsfw-mode-thumb {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(25% - 6px);
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(255,255,255,0.85));
+  box-shadow:
+    0 0 0 0.5px var(--card-from),
+    0 2px 6px rgba(0, 0, 0, 0.10),
+    0 1px 2px rgba(0, 0, 0, 0.06);
+  transition: left .28s cubic-bezier(.32, .72, 0, 1), box-shadow .2s ease;
+  pointer-events: none;
+  z-index: 0;
+}
+.ais-nsfw-mode-segmented[data-value="l1"] .ais-nsfw-mode-thumb {
+  left: calc(25% + 3px);
+}
+.ais-nsfw-mode-segmented[data-value="l2"] .ais-nsfw-mode-thumb {
+  left: calc(50% + 3px);
+}
+.ais-nsfw-mode-segmented[data-value="l3"] .ais-nsfw-mode-thumb {
+  left: calc(75% + 3px);
+}
+.ais-nsfw-mode-seg-btn {
+  position: relative;
+  z-index: 1;
+  min-width: 0;
+  width: 100%;
+  height: 28px;
+  padding: 0 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  white-space: nowrap;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink-2);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0;
+  transition:
+    color .22s ease,
+    font-weight .22s ease,
+    transform .15s ease;
+}
+.ais-nsfw-mode-seg-btn:hover:not([data-active="true"]) {
+  color: var(--ink);
+}
+.ais-nsfw-mode-seg-btn:active:not([data-active="true"]) {
+  transform: scale(0.96);
+}
+.ais-nsfw-mode-seg-btn[data-active="true"] {
+  color: var(--card-from);
+  font-weight: 600;
+}
+.ais-toggle-card[data-active="true"] .ais-nsfw-mode-segmented[data-enabled="false"] .ais-nsfw-mode-thumb {
+  box-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.08),
+    0 1px 3px rgba(0, 0, 0, 0.06);
+}
+.ais-toggle-card[data-active="true"] .ais-nsfw-mode-segmented[data-enabled="false"] .ais-nsfw-mode-seg-btn[data-active="true"] {
+  color: var(--ink-2);
+}
+
 /* 시안 pair-generate.html v7 line 614/625 일치 — active 카드 안에선 segmented 톤이 카드 시그니처 색을 따름.
    thumb 배경 = white gradient (배경 카드 화이트 그라디언트와 자연스러운 중첩) ·
    active btn 컬러 = 카드 시그니처 시작 색 (var(--card-from) — ai violet · claude amber · fast lime). */

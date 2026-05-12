@@ -12,6 +12,7 @@
 
 "use client";
 
+import type { MouseEvent } from "react";
 import type { NsfwIntensity } from "@/stores/useSettingsStore";
 
 export interface VideoAutoNsfwCardProps {
@@ -39,9 +40,6 @@ const OPTIONS: ReadonlyArray<Option> = [
   { idx: 3, label: "3단계", enabled: true, intensity: 3 },
 ];
 
-const TEXT_DIM = "rgba(255, 255, 255, 0.55)";
-const CRIMSON_INK = "#ff5f6d";
-
 export default function VideoAutoNsfwCard({
   autoNsfwEnabled,
   nsfwIntensity,
@@ -50,8 +48,9 @@ export default function VideoAutoNsfwCard({
 }: VideoAutoNsfwCardProps) {
   // 현재 selected idx: OFF=0, ON 이면 intensity (1/2/3)
   const selectedIdx = autoNsfwEnabled ? nsfwIntensity : 0;
+  const selectedValue = autoNsfwEnabled ? `l${nsfwIntensity}` : "off";
 
-  const handleSelect = (opt: Option, e: React.MouseEvent) => {
+  const handleSelect = (opt: Option, e: MouseEvent<HTMLButtonElement>) => {
     // V5MotionCard onClick (adult 토글) bubble 차단
     e.stopPropagation();
     if (opt.enabled) {
@@ -65,65 +64,33 @@ export default function VideoAutoNsfwCard({
   };
 
   return (
-    // 카드 wrapper 없이 PromptModeRadio 패턴처럼 segmented 만 inline
-    // (adult V5MotionCard 의 children 영역에 들어감)
+    // PromptModeRadio 와 같은 segmented 외형을 쓰되 4칸 레이아웃은 독립 CSS 로 고정한다.
     <div
+      className="ais-nsfw-mode-segmented"
       role="radiogroup"
       aria-label="자동 NSFW 시나리오 강도"
+      data-value={selectedValue}
+      data-enabled={autoNsfwEnabled ? "true" : "false"}
       onClick={(e) => e.stopPropagation()}
-      style={{
-        position: "relative",
-        display: "grid",
-        gridTemplateColumns: "repeat(4, 1fr)",
-        padding: 3,
-        background: "rgba(0, 0, 0, 0.28)",
-        borderRadius: 999,
-        height: 32,
-      }}
     >
-        {/* slide thumb — 25% width, left = idx * 25% */}
-        <span
-          aria-hidden
-          style={{
-            position: "absolute",
-            top: 3,
-            bottom: 3,
-            left: `calc(${selectedIdx * 25}% + 3px)`,
-            width: "calc(25% - 6px)",
-            background: autoNsfwEnabled ? CRIMSON_INK : "rgba(255,255,255,0.16)",
-            borderRadius: 999,
-            transition: "left .18s ease, background .18s",
-            boxShadow: autoNsfwEnabled
-              ? "0 2px 6px rgba(255,95,109,0.35)"
-              : "0 1px 3px rgba(0,0,0,0.2)",
-          }}
-        />
-        {OPTIONS.map((opt) => {
-          const active = opt.idx === selectedIdx;
-          return (
-            <button
-              key={opt.idx}
-              type="button"
-              role="radio"
-              aria-checked={active}
-              onClick={(e) => handleSelect(opt, e)}
-              style={{
-                position: "relative",
-                zIndex: 1,
-                background: "transparent",
-                border: 0,
-                cursor: "pointer",
-                fontSize: 11.5,
-                fontWeight: active ? 700 : 500,
-                color: active ? "#fff" : TEXT_DIM,
-                padding: "0 4px",
-                transition: "color .15s, font-weight .15s",
-              }}
-            >
-              {opt.label}
-            </button>
-          );
-        })}
+      <span aria-hidden className="ais-nsfw-mode-thumb" />
+      {OPTIONS.map((opt) => {
+        const active = opt.idx === selectedIdx;
+        return (
+          <button
+            key={opt.idx}
+            type="button"
+            role="radio"
+            aria-checked={active}
+            data-active={active}
+            title={opt.enabled ? `자동 NSFW ${opt.label}` : "자동 NSFW 끄기"}
+            onClick={(e) => handleSelect(opt, e)}
+            className="ais-nsfw-mode-seg-btn"
+          >
+            {opt.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
