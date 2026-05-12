@@ -447,6 +447,143 @@ ADULT MODE (EXPLICIT NSFW — user explicitly enabled · uncensored):
   Stay visually elegant — not clinical, not medical.
 - Preserve the identity clause above verbatim regardless of NSFW content."""
 
+# ══════════════════════════════════════════════════════════════════════
+# Auto NSFW 시나리오 vocabulary pools (spec 2026-05-12 v1.1)
+# ══════════════════════════════════════════════════════════════════════
+# 강도 3단:
+#   L1 SUGGESTIVE — 옷 유지, 자세/표정/암시만
+#   L2 UNDRESS    — 탈의 reveal 까지. 자기 손길 NO
+#   L3 UNDRESS + INTIMATE — L2 + 누드 후 self-caress / 애무
+# Codex Finding 6: format string 자리표시 위험 → 전체 concat 으로 조립
+# Codex Finding 7: L3 = L2 + extra 코드 레벨 합치기
+
+_AUTO_NSFW_L1_POOL = """
+- Pose: arched back, hip sway, chest thrust forward, kneeling pose,
+  leaning forward to deepen cleavage, slow leg crossing
+- Hands: hands sliding down body, fingers tracing collarbone,
+  self-caress over clothes, gripping fabric tightly
+- Expression: half-lidded eyes, parted lips, slow lip bite,
+  sultry gaze, flushed cheeks, breathy mouth
+- Clothing interaction: pulling neckline lower, tugging waistband,
+  fabric slipping briefly without exposing skin
+"""
+
+_AUTO_NSFW_L2_POOL = """
+- Undress motion: slowly unzipping, unbuttoning top button by button,
+  sliding straps off shoulders, pulling dress down past chest,
+  pulling top over head, stepping out of skirt,
+  dropping garment to floor, peeling off lingerie
+- Reveal result: fully topless, completely nude, garments removed,
+  no clothing remaining, bare body revealed
+- Expression: sultry, slow deliberate pace, confident reveal
+"""
+
+_AUTO_NSFW_L3_POOL_EXTRA = """
+- Post-nude motion: hands cupping bare breasts, fingers tracing
+  nude skin, self-caress over bare body, nude hips grinding,
+  arched back while nude, naked body writhing slowly,
+  squeezing own thighs, sliding hand down stomach,
+  touching collarbone and down chest
+- Camera: intimate close-up of bare skin, slow pan over nude body,
+  focus on touching hand
+"""
+
+
+def _intensity_block_l1() -> str:
+    return (
+        "Compose a clip where the subject performs seductive posing and\n"
+        "clothing interaction WITHOUT removing any garments. 5 seconds of\n"
+        "arched back / hip sway / sultry gaze / fabric play. Use ONLY the\n"
+        "L1 vocabulary below. The clip must NOT contain nudity, topless reveal, or garment removal.\n\n"
+        "L1 vocabulary:"
+        + _AUTO_NSFW_L1_POOL
+    )
+
+
+def _intensity_block_l2() -> str:
+    return (
+        "Compose a clip where the subject removes their clothing during the\n"
+        "5-second window OR starts the clip already mid-undress. The clip\n"
+        "ENDS at full reveal. CRITICAL NEGATIVE RULES:\n"
+        "- NO self-caress after nudity\n"
+        "- NO hand-on-body touching after reveal\n"
+        "- NO hip grinding or arched-back motion after reveal\n"
+        "The camera may linger on the bare body but the body itself stays\n"
+        "still or only breathes naturally. The reveal IS the climax.\n\n"
+        "L2 vocabulary:"
+        + _AUTO_NSFW_L2_POOL
+    )
+
+
+def _intensity_block_l3() -> str:
+    return (
+        "Compose a clip that combines undress with intimate self-touch\n"
+        "AFTER reveal. The first ~half of the clip is undress (~2.5 seconds);\n"
+        "the latter ~half is nude self-caress / arched back / hip motion /\n"
+        "hand-on-body. Pacing matters — do not skip the undress phase.\n\n"
+        "Combined vocabulary (L2 + L3):"
+        + _AUTO_NSFW_L2_POOL
+        + _AUTO_NSFW_L3_POOL_EXTRA
+    )
+
+
+_INTENSITY_BLOCK_FACTORY = {
+    1: _intensity_block_l1,
+    2: _intensity_block_l2,
+    3: _intensity_block_l3,
+}
+
+
+_AUTO_NSFW_CLAUSE_PREAMBLE = """
+
+AUTO NSFW MODE (intensity L{intensity_label} — uncensored · explicit allowed):
+The user may NOT have written a primary direction (or only a brief side-note).
+Your job: INVENT an explicit scenario grounded in the ANCHOR (subject,
+outfit, setting) from the image analysis.
+
+Steps:
+1. Identify what the subject is wearing in ANCHOR (dress / shirt /
+   swimsuit / lingerie / casual / sportswear / etc.).
+2. Choose action narrative appropriate to the intensity level below.
+3. Ground every action in the visible outfit — if subject wears a
+   dress, the dress is the garment that slips. If a bikini, the
+   bikini straps. NEVER invent garments not in ANCHOR.
+
+INTENSITY:
+"""
+
+
+_AUTO_NSFW_CLAUSE_GRAFTING = """
+
+USER DIRECTION GRAFTING:
+If user_direction is non-empty, weave it as a SECONDARY detail
+(e.g. "샤워 배경" → "in a steamy shower setting", "키스" → "leaning
+in for a slow kiss"). The auto NSFW action remains the PRIMARY narrative.
+Do NOT let user_direction override the intensity level.
+If user_direction is empty, derive the entire scenario from the
+image analysis alone.
+
+NON-HUMAN SUBJECT FALLBACK:
+If ANCHOR describes a landscape / object / non-human subject (no
+person), SKIP the auto NSFW directives above and fall back to the
+user_direction only. Do not invent human nudity on top of non-human
+scenes.
+"""
+
+
+def build_auto_nsfw_clause(intensity: int) -> str:
+    """L{1|2|3} 분기 + grafting/fallback rule + preamble 조립 (spec 2026-05-12 v1.1).
+
+    format string 의 단일 자리표시 ({intensity_label}) 는 한 자리만 받음 —
+    KeyError 방지 위해 다른 {} 는 절대 안 둠. block 본문은 별도 함수가
+    완성된 문자열을 반환 (function call 결과를 concat).
+    """
+    if intensity not in (1, 2, 3):
+        raise ValueError(f"intensity must be 1|2|3, got {intensity}")
+    preamble = _AUTO_NSFW_CLAUSE_PREAMBLE.format(intensity_label=intensity)
+    block = _INTENSITY_BLOCK_FACTORY[intensity]()
+    return preamble + block + _AUTO_NSFW_CLAUSE_GRAFTING
+
 SYSTEM_VIDEO_RULES = """
 
 RULES:

@@ -65,6 +65,7 @@ from .upgrade import (  # noqa: F401 — facade re-export
     _role_target_slots,
     _run_upgrade_call,
     _slot_label,
+    build_auto_nsfw_clause,
     build_reference_clause,
     build_system_video,
     upgrade_edit_prompt,
@@ -108,6 +109,7 @@ __all__ = [
     "ROLE_TO_SLOTS",
     "DOMAIN_VALID_SLOTS",
     "_role_target_slots",
+    "build_auto_nsfw_clause",
     "build_reference_clause",
     "build_system_video",
     # upgrade — pipeline

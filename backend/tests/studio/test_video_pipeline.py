@@ -415,3 +415,59 @@ async def test_migration_rejects_invalid_mode(tmp_path: Path) -> None:
                 "VALUES ('bad', 'foobar', 'p', 'l', 300, '/x')"
             )
             await db.commit()
+
+
+from studio.prompt_pipeline.upgrade import (
+    build_auto_nsfw_clause,
+    _AUTO_NSFW_L2_POOL,
+    _AUTO_NSFW_L3_POOL_EXTRA,
+)
+
+
+class TestAutoNsfwClause:
+    """spec 2026-05-12 v1.1 §6.1 단위 테스트"""
+
+    def test_auto_nsfw_l1_clause_no_removal(self):
+        """L1 은 옷 안 벗음 — 명시 negative rule 포함"""
+        clause = build_auto_nsfw_clause(1)
+        assert "WITHOUT removing any garments" in clause
+        assert "NOT contain nudity, topless reveal, or garment removal" in clause
+        assert "L1 vocabulary:" in clause
+        # L2/L3 어휘는 없어야 함
+        assert "Undress motion:" not in clause
+        assert "Post-nude motion:" not in clause
+
+    def test_auto_nsfw_l2_no_caress_after_nudity(self):
+        """L2 는 옷벗음 reveal 까지만 — 자기 손길 금지"""
+        clause = build_auto_nsfw_clause(2)
+        assert "NO self-caress after nudity" in clause
+        assert "reveal IS the climax" in clause
+        assert "Undress motion:" in clause  # L2 pool 포함
+        assert "Post-nude motion:" not in clause  # L3 extra 미포함
+
+    def test_auto_nsfw_l3_combined_vocabulary(self):
+        """L3 는 L2 + L3 어휘 둘 다 코드 레벨로 concat"""
+        clause = build_auto_nsfw_clause(3)
+        # L2 pool substring (Codex Finding 7 fix)
+        assert "Undress motion:" in clause
+        assert "Reveal result:" in clause
+        # L3 extra substring
+        assert "Post-nude motion:" in clause
+        assert "intimate close-up of bare skin" in clause
+        # 타이밍 명시
+        assert "first ~half of the clip is undress" in clause
+
+    def test_auto_nsfw_grafting_and_fallback(self):
+        """grafting + 비-인물 fallback 섹션 포함"""
+        clause = build_auto_nsfw_clause(2)
+        assert "USER DIRECTION GRAFTING" in clause
+        assert "NON-HUMAN SUBJECT FALLBACK" in clause
+        assert "PRIMARY narrative" in clause
+
+    def test_auto_nsfw_invalid_intensity_raises(self):
+        """범위 밖 intensity → ValueError"""
+        import pytest
+        with pytest.raises(ValueError, match="intensity must be 1\\|2\\|3"):
+            build_auto_nsfw_clause(0)
+        with pytest.raises(ValueError, match="intensity must be 1\\|2\\|3"):
+            build_auto_nsfw_clause(4)
