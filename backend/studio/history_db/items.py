@@ -30,8 +30,9 @@ async def insert_item(item: dict[str, Any]) -> None:
              prompt_provider, research_hints, vision_description, comfy_error,
              source_ref, comparison_analysis,
              adult, duration_sec, fps, frame_count, refined_intent,
-             reference_ref, reference_role)
-            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+             reference_ref, reference_role,
+             auto_nsfw, nsfw_intensity)
+            VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (
                 item["id"],
                 item["mode"],
@@ -66,6 +67,9 @@ async def insert_item(item: dict[str, Any]) -> None:
                 # reference_ref = Library plan 의 영구 URL (Phase 5 단계는 항상 None).
                 item.get("referenceRef"),
                 item.get("referenceRole"),
+                # v10 (spec 2026-05-12 v1.1): Video 자동 NSFW 시나리오 — video 모드만 의미.
+                1 if item.get("autoNsfw") else 0,
+                item.get("nsfwIntensity"),
             ),
         )
         await db.commit()
@@ -196,6 +200,9 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
     # v7 (2026-04-27) — multi-reference (Edit 모드만 채워짐 · 옛 row + generate/video 는 None)
     reference_ref = _safe("reference_ref")
     reference_role = _safe("reference_role")
+    # v10 (spec 2026-05-12 v1.1) — Video 자동 NSFW 시나리오 (video 모드만 채움)
+    auto_nsfw_raw = _safe("auto_nsfw")
+    nsfw_intensity = _safe("nsfw_intensity")
 
     item: dict[str, Any] = {
         "id": row["id"],
@@ -238,4 +245,10 @@ def _row_to_item(row: aiosqlite.Row) -> dict[str, Any]:
         item["referenceRef"] = reference_ref
     if reference_role is not None:
         item["referenceRole"] = reference_role
+    # v10 (spec 2026-05-12 v1.1) — Video 자동 NSFW 시나리오 (video 모드만 채움)
+    # auto_nsfw 컬럼은 DEFAULT 0 라 video row 는 항상 0 또는 1. 0 이면 노출 안 함.
+    if auto_nsfw_raw:
+        item["autoNsfw"] = bool(auto_nsfw_raw)
+        if nsfw_intensity is not None:
+            item["nsfwIntensity"] = int(nsfw_intensity)
     return item
