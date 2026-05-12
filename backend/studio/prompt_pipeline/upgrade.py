@@ -651,6 +651,7 @@ async def _run_upgrade_call(
     include_translation: bool,
     log_label: str,
     prompt_mode: PromptEnhanceMode | str | None = "fast",
+    temperature: float = 0.6,  # spec 2026-05-12 v1.1 · keyword-only · auto_nsfw 일 때만 0.8 override
 ) -> UpgradeResult:
     """upgrade_*_prompt 공통 흐름 헬퍼 (Claude E · 2026-04-27).
 
@@ -682,6 +683,7 @@ async def _run_upgrade_call(
             timeout=opts["timeout"],
             think=opts["think"],
             num_predict=opts["num_predict"],
+            temperature=temperature,  # spec 2026-05-12 v1.1
         )
         en = _strip_repeat_noise(upgraded_raw.strip()).strip()
         if not en:
@@ -1014,6 +1016,8 @@ async def upgrade_video_prompt(
     image_description: str,
     *,
     model_id: str,  # spec 2026-05-11 v1.1 · keyword-only required (Codex Finding 1)
+    auto_nsfw: bool = False,        # spec 2026-05-12 v1.1
+    nsfw_intensity: int = 2,         # spec 2026-05-12 v1.1
     model: str = "gemma4-un:latest",
     timeout: float = DEFAULT_TIMEOUT,
     ollama_url: str | None = None,
@@ -1029,8 +1033,13 @@ async def upgrade_video_prompt(
     Args:
         adult: 성인 모드 토글. True 면 system prompt 에 NSFW clause 주입 →
             gemma4-un 이 sensual/seductive/intimate 모션 자연스럽게 포함.
+        auto_nsfw: 자동 NSFW 시나리오 (spec 2026-05-12 v1.1). True 면
+            adult clause 대체 → build_auto_nsfw_clause(nsfw_intensity).
+            빈 user_direction 허용 (vision + gemma4 자율 시나리오 작성).
+        nsfw_intensity: 강도 1~3 (1: 은근 · 2: 옷벗음 · 3: 옷벗음+애무).
     """
-    if not user_direction.strip():
+    # spec 2026-05-12 v1.1 §4.3 — auto_nsfw=True 면 빈 user_direction 허용 (4곳 우회 중 하나)
+    if not user_direction.strip() and not auto_nsfw:
         return UpgradeResult(
             upgraded=user_direction,
             fallback=True,
@@ -1039,13 +1048,23 @@ async def upgrade_video_prompt(
         )
 
     resolved_url = ollama_url or _DEFAULT_OLLAMA_URL
+    direction_label = (
+        user_direction.strip()
+        if user_direction.strip()
+        else "(none — auto NSFW mode · synthesize entirely from ANCHOR)"
+    )
     user_msg = (
         f"[Image description]\n{image_description.strip()}\n\n"
-        f"[User direction]\n{user_direction.strip()}"
+        f"[User direction]\n{direction_label}"
     )
 
     return await _run_upgrade_call(
-        system=build_system_video(adult=adult, model_id=model_id),
+        system=build_system_video(
+            adult=adult,
+            model_id=model_id,
+            auto_nsfw=auto_nsfw,
+            intensity=nsfw_intensity,
+        ),
         user_msg=user_msg,
         original=user_direction,
         model=model,
@@ -1054,6 +1073,8 @@ async def upgrade_video_prompt(
         include_translation=include_translation,
         log_label="Video prompt upgrade",
         prompt_mode=prompt_mode,
+        # spec 2026-05-12 v1.1 §4.3 · Codex Finding 8 — auto_nsfw 일 때만 0.8 (variant 다양성)
+        temperature=0.8 if auto_nsfw else 0.6,
     )
 
 

@@ -55,6 +55,8 @@ async def run_video_pipeline(
     timeout: float = DEFAULT_TIMEOUT,
     ollama_url: str | None = None,
     adult: bool = False,
+    auto_nsfw: bool = False,        # spec 2026-05-12 v1.1
+    nsfw_intensity: int = 2,         # spec 2026-05-12 v1.1
     # Phase 2 (2026-05-01) — gemma4 보강 모드 ("fast" | "precise") · upgrade 단계로 패스스루.
     prompt_mode: str = "fast",
 ) -> VideoPipelineResult:
@@ -96,10 +98,12 @@ async def run_video_pipeline(
         user_direction=user_direction,
         image_description=description,
         model_id=model_id,  # 3단 전파 (spec v1.1 Codex Finding 2)
+        adult=adult,
+        auto_nsfw=auto_nsfw,             # spec 2026-05-12 v1.1
+        nsfw_intensity=nsfw_intensity,   # spec 2026-05-12 v1.1
         model=resolved_text,
         timeout=timeout,
         ollama_url=resolved_url,
-        adult=adult,
         prompt_mode=prompt_mode,
     )
 
