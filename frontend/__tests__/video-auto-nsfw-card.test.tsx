@@ -1,15 +1,15 @@
 /**
  * video-auto-nsfw-card — spec 2026-05-12 v1.1 §6.4
  *
- * 카드 단위 테스트. Codex Finding 11 — adult prop 없음 (호출자 책임).
- * "adult OFF 미렌더" 는 VideoLeftPanel integration 에서 검증.
+ * UX 변경 (2026-05-12): 토글+슬라이더 → 4-option segmented (OFF/1단계/2단계/3단계).
+ * Codex Finding 11 — adult prop 없음 (호출자 책임).
  */
 import { describe, it, expect, vi } from "vitest";
 import { render, fireEvent, screen } from "@testing-library/react";
 import VideoAutoNsfwCard from "@/components/studio/video/VideoAutoNsfwCard";
 
-describe("VideoAutoNsfwCard (spec 2026-05-12 v1.1)", () => {
-  it("토글 OFF 일 때 슬라이더 미렌더", () => {
+describe("VideoAutoNsfwCard (spec 2026-05-12 v1.1 · 4-option segmented)", () => {
+  it("4 옵션 (OFF / 1단계 / 2단계 / 3단계) 모두 radio 로 렌더", () => {
     render(
       <VideoAutoNsfwCard
         autoNsfwEnabled={false}
@@ -18,51 +18,85 @@ describe("VideoAutoNsfwCard (spec 2026-05-12 v1.1)", () => {
         onIntensityChange={vi.fn()}
       />,
     );
-    expect(screen.queryByRole("slider")).toBeNull();
+    const radios = screen.getAllByRole("radio");
+    expect(radios).toHaveLength(4);
+    expect(screen.getByRole("radio", { name: "OFF" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "1단계" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "2단계" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "3단계" })).toBeInTheDocument();
   });
 
-  it("토글 ON 일 때 슬라이더 노출", () => {
+  it("autoNsfwEnabled=false → OFF 가 aria-checked", () => {
+    render(
+      <VideoAutoNsfwCard
+        autoNsfwEnabled={false}
+        nsfwIntensity={2}
+        onToggle={vi.fn()}
+        onIntensityChange={vi.fn()}
+      />,
+    );
+    expect(screen.getByRole("radio", { name: "OFF" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "2단계" })).toHaveAttribute("aria-checked", "false");
+  });
+
+  it("autoNsfwEnabled=true + intensity=3 → 3단계가 aria-checked", () => {
     render(
       <VideoAutoNsfwCard
         autoNsfwEnabled={true}
-        nsfwIntensity={2}
+        nsfwIntensity={3}
         onToggle={vi.fn()}
         onIntensityChange={vi.fn()}
       />,
     );
-    expect(screen.getByRole("slider")).toBeInTheDocument();
-    // 강도 라벨도 확인 — 디폴트 2 = "옷벗음" (라벨 + 슬라이더 marker 등 N 곳)
-    expect(screen.getAllByText(/옷벗음/).length).toBeGreaterThan(0);
+    expect(screen.getByRole("radio", { name: "3단계" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "OFF" })).toHaveAttribute("aria-checked", "false");
   });
 
-  it("토글 클릭 → onToggle 콜백 (true)", () => {
+  it("OFF → 2단계 클릭 → onToggle(true) + onIntensityChange(2)", () => {
     const onToggle = vi.fn();
+    const onIntensityChange = vi.fn();
     render(
       <VideoAutoNsfwCard
         autoNsfwEnabled={false}
-        nsfwIntensity={2}
+        nsfwIntensity={1}
         onToggle={onToggle}
-        onIntensityChange={vi.fn()}
+        onIntensityChange={onIntensityChange}
       />,
     );
-    // Toggle 컴포넌트 안 단일 checkbox — getByRole 으로 직접 찾기
-    const toggleInput = screen.getByRole("checkbox");
-    fireEvent.click(toggleInput);
+    fireEvent.click(screen.getByRole("radio", { name: "2단계" }));
     expect(onToggle).toHaveBeenCalledWith(true);
+    expect(onIntensityChange).toHaveBeenCalledWith(2);
   });
 
-  it("슬라이더 변경 → onIntensityChange(3) 콜백", () => {
+  it("3단계 → OFF 클릭 → onToggle(false) (intensity 변경 X)", () => {
+    const onToggle = vi.fn();
     const onIntensityChange = vi.fn();
     render(
       <VideoAutoNsfwCard
         autoNsfwEnabled={true}
-        nsfwIntensity={2}
-        onToggle={vi.fn()}
+        nsfwIntensity={3}
+        onToggle={onToggle}
         onIntensityChange={onIntensityChange}
       />,
     );
-    const slider = screen.getByRole("slider");
-    fireEvent.change(slider, { target: { value: "3" } });
+    fireEvent.click(screen.getByRole("radio", { name: "OFF" }));
+    expect(onToggle).toHaveBeenCalledWith(false);
+    expect(onIntensityChange).not.toHaveBeenCalled();
+  });
+
+  it("1단계 → 3단계 클릭 → onIntensityChange(3) (이미 ON 이라 onToggle 무호출)", () => {
+    const onToggle = vi.fn();
+    const onIntensityChange = vi.fn();
+    render(
+      <VideoAutoNsfwCard
+        autoNsfwEnabled={true}
+        nsfwIntensity={1}
+        onToggle={onToggle}
+        onIntensityChange={onIntensityChange}
+      />,
+    );
+    fireEvent.click(screen.getByRole("radio", { name: "3단계" }));
     expect(onIntensityChange).toHaveBeenCalledWith(3);
+    expect(onToggle).not.toHaveBeenCalled();
   });
 });
