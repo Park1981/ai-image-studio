@@ -32,12 +32,6 @@ const INTENSITY_LABEL: Record<NsfwIntensity, string> = {
   3: "옷벗음+애무",
 };
 
-const INTENSITY_DESC: Record<NsfwIntensity, string> = {
-  1: "옷 유지 · 자세·표정·암시만",
-  2: "탈의 reveal 까지 (자기 손길 없음)",
-  3: "탈의 + 누드 후 intimate self-touch",
-};
-
 export default function VideoAutoNsfwCard({
   autoNsfwEnabled,
   nsfwIntensity,
@@ -100,28 +94,16 @@ export default function VideoAutoNsfwCard({
             border: 0,
           }}
         />
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span
-            style={{
-              display: "block",
-              fontSize: 13,
-              fontWeight: 600,
-              color: TEXT_PRIMARY,
-              marginBottom: 2,
-            }}
-          >
-            🤖 자동 NSFW 시나리오
-          </span>
-          <span
-            style={{
-              display: "block",
-              fontSize: 11,
-              color: TEXT_SECONDARY,
-              lineHeight: 1.4,
-            }}
-          >
-            AI 가 이미지 보고 알아서 시나리오 작성 (지시 비워도 OK)
-          </span>
+        <span
+          style={{
+            flex: 1,
+            minWidth: 0,
+            fontSize: 13,
+            fontWeight: 600,
+            color: TEXT_PRIMARY,
+          }}
+        >
+          🤖 자동 NSFW 시나리오
         </span>
         <span
           style={{
@@ -172,7 +154,7 @@ export default function VideoAutoNsfwCard({
                 borderTop: `1px solid ${CRIMSON_SOFT}`,
               }}
             >
-              {/* 라벨 1줄: "강도: 옷벗음+애무" — desc 는 그 아래로 분리 (overlap 회피) */}
+              {/* 강도 라벨 — 한 줄 (desc 제거 · 단순화) */}
               <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
                 <span
                   style={{
@@ -193,15 +175,6 @@ export default function VideoAutoNsfwCard({
                   {INTENSITY_LABEL[nsfwIntensity]}
                 </span>
               </div>
-              <span
-                style={{
-                  fontSize: 11,
-                  color: TEXT_SECONDARY,
-                  lineHeight: 1.4,
-                }}
-              >
-                {INTENSITY_DESC[nsfwIntensity]}
-              </span>
               <input
                 type="range"
                 min={1}
