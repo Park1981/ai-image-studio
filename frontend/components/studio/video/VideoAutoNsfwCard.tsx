@@ -8,6 +8,9 @@
  * 동작:
  *   - 토글 ON → AI 가 이미지 분석 후 자율 시나리오 작성 (사용자 지시 비워도 OK)
  *   - 강도: 1 은근 / 2 옷벗음 / 3 옷벗음+애무 (사용자 디폴트 = 2)
+ *
+ * 2026-05-12 fix: adult V5MotionCard 안 nested 통합. outer section 의
+ * onClick stopPropagation 으로 부모 V5MotionCard onClick (adult 토글) bubble 차단.
  */
 
 "use client";
@@ -43,6 +46,8 @@ export default function VideoAutoNsfwCard({
 }: VideoAutoNsfwCardProps) {
   return (
     <section
+      // V5MotionCard onClick (adult 토글) bubble 차단 — nested 영역 클릭이 부모 토글로 전파되지 않게.
+      onClick={(e) => e.stopPropagation()}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -50,11 +55,11 @@ export default function VideoAutoNsfwCard({
         padding: "10px 12px",
         borderRadius: "var(--radius-sm)",
         background: autoNsfwEnabled
-          ? "rgba(218, 109, 158, 0.08)" // 매트 핑크 (NSFW 시그니처)
-          : "var(--bg-2)",
+          ? "rgba(255, 255, 255, 0.06)" // V5MotionCard 안 nested — 살짝 밝게
+          : "rgba(0, 0, 0, 0.12)",
         border: autoNsfwEnabled
-          ? "1px solid rgba(218, 109, 158, 0.35)"
-          : "1px solid var(--line-2)",
+          ? "1px solid rgba(255, 255, 255, 0.18)"
+          : "1px solid rgba(255, 255, 255, 0.08)",
         transition: "background .2s, border-color .2s",
       }}
     >

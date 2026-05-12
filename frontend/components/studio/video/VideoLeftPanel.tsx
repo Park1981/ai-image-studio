@@ -401,29 +401,30 @@ export default function VideoLeftPanel({
           align="right"
           label="🔞 성인 모드"
         />
+        {/* spec 2026-05-12 v1.1 §4.9 (2026-05-12 fix: adult 카드 안 nested 통합).
+         *  adult ON 일 때만 노출. 토글 + 강도 슬라이더 (1: 은근 / 2: 옷벗음 / 3: 옷벗음+애무).
+         *  VideoAutoNsfwCard 의 outer section onClick stopPropagation 으로
+         *  부모 V5MotionCard onClick (adult 토글) bubble 차단. */}
+        <AnimatePresence initial={false}>
+          {adult && (
+            <motion.div
+              key="auto-nsfw-card"
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{ overflow: "hidden", marginTop: 8 }}
+            >
+              <VideoAutoNsfwCard
+                autoNsfwEnabled={autoNsfwEnabled}
+                nsfwIntensity={nsfwIntensity}
+                onToggle={setAutoNsfwEnabled}
+                onIntensityChange={setNsfwIntensity}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </V5MotionCard>
-
-      {/* spec 2026-05-12 v1.1 §4.9 — 자동 NSFW 시나리오 카드.
-       *  adult ON 일 때만 노출. 토글 + 강도 슬라이더 (1: 은근 / 2: 옷벗음 / 3: 옷벗음+애무). */}
-      <AnimatePresence initial={false}>
-        {adult && (
-          <motion.div
-            key="auto-nsfw-card"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.2 }}
-            style={{ overflow: "hidden" }}
-          >
-            <VideoAutoNsfwCard
-              autoNsfwEnabled={autoNsfwEnabled}
-              nsfwIntensity={nsfwIntensity}
-              onToggle={setAutoNsfwEnabled}
-              onIntensityChange={setNsfwIntensity}
-            />
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* ── 영상 해상도 슬라이더 (맨 아래 · 결정 B + D) ──
        *  2026-05-06 (Codex finding 6): VideoResolutionCard 로 분리.
