@@ -42,6 +42,13 @@ env/
 data/
 *.db
 *.sqlite
+# SQLite sidecars (rollback journal / WAL / shared memory)
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
 
 # Logs
 *.log
