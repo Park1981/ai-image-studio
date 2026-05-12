@@ -471,3 +471,31 @@ class TestAutoNsfwClause:
             build_auto_nsfw_clause(0)
         with pytest.raises(ValueError, match="intensity must be 1\\|2\\|3"):
             build_auto_nsfw_clause(4)
+
+
+class TestBuildSystemVideoAutoNsfw:
+    """spec 2026-05-12 v1.1 §4.2 — build_system_video 시그니처 확장"""
+
+    def test_auto_nsfw_replaces_adult_clause(self):
+        """auto_nsfw=True 면 SYSTEM_VIDEO_ADULT_CLAUSE 대신 auto clause"""
+        result = build_system_video(
+            adult=True, model_id="wan22", auto_nsfw=True, intensity=2,
+        )
+        assert "AUTO NSFW MODE" in result
+        assert "L2 vocabulary:" in result
+        # 기존 ADULT_CLAUSE 의 시그니처 키워드는 없어야
+        assert "Be direct and graphic" not in result
+
+    def test_auto_nsfw_requires_adult_value_error(self):
+        """adult=False 인데 auto_nsfw=True → ValueError"""
+        import pytest
+        with pytest.raises(ValueError, match="auto_nsfw requires adult"):
+            build_system_video(
+                adult=False, model_id="wan22", auto_nsfw=True, intensity=2,
+            )
+
+    def test_auto_nsfw_default_false_preserves_existing(self):
+        """auto_nsfw=False (default) 면 기존 ADULT_CLAUSE 유지 (회귀 0)"""
+        result = build_system_video(adult=True, model_id="wan22")
+        assert "ADULT MODE" in result
+        assert "AUTO NSFW MODE" not in result
