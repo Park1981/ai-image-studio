@@ -454,8 +454,12 @@ class TestAutoNsfwClause:
         # L3 extra substring
         assert "Post-nude motion:" in clause
         assert "intimate close-up of bare skin" in clause
-        # 타이밍 명시
-        assert "first ~half of the clip is undress" in clause
+        # 타이밍 명시 (2026-05-12 강화 phrasing — "(~2.5 seconds) is full undress reveal")
+        assert "first ~half of the clip" in clause
+        assert "undress reveal" in clause
+        # 강화: AT LEAST TWO explicit phrases 강제 + 명시 hard rule
+        assert "AT LEAST TWO" in clause
+        assert "DO NOT SETTLE FOR SOFT TOUCH" in clause
 
     def test_auto_nsfw_grafting_and_fallback(self):
         """grafting + 비-인물 fallback 섹션 포함"""

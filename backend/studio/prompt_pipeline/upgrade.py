@@ -517,10 +517,26 @@ def _intensity_block_l2() -> str:
 
 def _intensity_block_l3() -> str:
     return (
-        "Compose a clip that combines undress with intimate self-touch\n"
-        "AFTER reveal. The first ~half of the clip is undress (~2.5 seconds);\n"
-        "the latter ~half is nude self-caress / arched back / hip motion /\n"
-        "hand-on-body. Pacing matters — do not skip the undress phase.\n\n"
+        "Compose an EXPLICIT clip that combines undress with intense\n"
+        "intimate self-touch AFTER reveal. The first ~half of the clip\n"
+        "(~2.5 seconds) is full undress reveal; the latter ~half MUST\n"
+        "contain AT LEAST TWO explicit phrases from this required set:\n"
+        "  - hands cupping bare breasts\n"
+        "  - nude hips grinding (or hip thrusting)\n"
+        "  - arched back while nude\n"
+        "  - squeezing own thighs\n"
+        "  - sliding hand down stomach toward hip / pelvis\n"
+        "  - fingers tracing nipple / areola\n"
+        "  - naked body writhing or undulating slowly\n"
+        "\n"
+        "CRITICAL — DO NOT SETTLE FOR SOFT TOUCH:\n"
+        "Words like 'caress collarbone' or 'touch chest gently' are NOT\n"
+        "enough at L3. The clip must go further into explicit nude motion.\n"
+        "Bare breasts / nipples / hips MUST be the focus, not collarbone.\n"
+        "Length target for L3: 80-120 words (override the base 50-80\n"
+        "guidance — explicit motion needs more vocabulary space).\n"
+        "\n"
+        "Pacing matters — do not skip the undress phase.\n\n"
         "Combined vocabulary (L2 + L3):"
         + _AUTO_NSFW_L2_POOL
         + _AUTO_NSFW_L3_POOL_EXTRA
