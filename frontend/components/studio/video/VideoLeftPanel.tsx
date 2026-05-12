@@ -35,6 +35,8 @@ import {
 import V5MotionCard from "@/components/studio/V5MotionCard";
 import VideoModelSegment from "@/components/studio/video/VideoModelSegment";
 import VideoResolutionCard from "@/components/studio/video/VideoResolutionCard";
+import VideoAutoNsfwCard from "@/components/studio/video/VideoAutoNsfwCard";
+import { AnimatePresence, motion } from "framer-motion";
 import { VIDEO_MODEL_PRESETS } from "@/lib/model-presets";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
@@ -90,6 +92,12 @@ export default function VideoLeftPanel({
   // Codex Phase 5 fix Medium — settings 의 ollamaModel override 를 도구로 전파.
   const ollamaModelForTools = useSettingsStore((s) => s.ollamaModel);
 
+  // spec 2026-05-12 v1.1 — 자동 NSFW 시나리오 (adult ON 일 때만 노출)
+  const autoNsfwEnabled = useSettingsStore((s) => s.autoNsfwEnabled);
+  const nsfwIntensity = useSettingsStore((s) => s.nsfwIntensity);
+  const setAutoNsfwEnabled = useSettingsStore((s) => s.setAutoNsfwEnabled);
+  const setNsfwIntensity = useSettingsStore((s) => s.setNsfwIntensity);
+
   // Phase 5 후속 (2026-05-01) — 프롬프트 도구 (번역/분리) state + 핸들러 통합 hook.
   const promptTools = usePromptTools({
     prompt,
@@ -127,7 +135,11 @@ export default function VideoLeftPanel({
   const [warnOpen, setWarnOpen] = useState(false);
   const [imageHistoryOpen, setImageHistoryOpen] = useState(false);
 
-  const ctaDisabled = running || !sourceImage || !prompt.trim();
+  // spec 2026-05-12 v1.1 §4.9 — autoNsfwEnabled 면 prompt 검증 skip
+  // (vision + gemma4 가 이미지 보고 자율 시나리오 작성)
+  const promptRequired = !autoNsfwEnabled;
+  const ctaDisabled =
+    running || !sourceImage || (promptRequired && !prompt.trim());
 
   /**
    * Render CTA 클릭 — 사이즈 임계 충족 시 경고 모달, 미만이면 즉시 onGenerate.
@@ -325,23 +337,29 @@ export default function VideoLeftPanel({
        *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약 (기본 OFF). */}
       <V5MotionCard
         className="ais-toggle-card ais-sig-ai"
-        data-active={!skipUpgrade}
-        onClick={() => setSkipUpgrade(!skipUpgrade)}
+        data-active={!skipUpgrade || autoNsfwEnabled}
+        onClick={
+          // spec 2026-05-12 v1.1 §5.7 Layer 2 — autoNsfwEnabled 면 클릭 차단
+          autoNsfwEnabled ? undefined : () => setSkipUpgrade(!skipUpgrade)
+        }
         tooltip={
-          skipUpgrade
-            ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약)"
-            : "ON · 이미지 분석 + 한국어 → 영문 정제"
+          autoNsfwEnabled
+            ? "자동 NSFW 모드는 항상 AI 보강을 사용합니다"
+            : skipUpgrade
+              ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약)"
+              : "ON · 이미지 분석 + 한국어 → 영문 정제"
         }
       >
         <Toggle
           flat
           icon="stars"
-          checked={!skipUpgrade}
+          checked={!skipUpgrade || autoNsfwEnabled}
           onChange={(v) => setSkipUpgrade(!v)}
           align="right"
           label="🪄 AI 프롬프트 보정"
+          disabled={autoNsfwEnabled}
         />
-        {!skipUpgrade && (
+        {(!skipUpgrade || autoNsfwEnabled) && (
           <PromptModeRadio value={promptMode} onChange={setPromptMode} />
         )}
       </V5MotionCard>
@@ -384,6 +402,28 @@ export default function VideoLeftPanel({
           label="🔞 성인 모드"
         />
       </V5MotionCard>
+
+      {/* spec 2026-05-12 v1.1 §4.9 — 자동 NSFW 시나리오 카드.
+       *  adult ON 일 때만 노출. 토글 + 강도 슬라이더 (1: 은근 / 2: 옷벗음 / 3: 옷벗음+애무). */}
+      <AnimatePresence initial={false}>
+        {adult && (
+          <motion.div
+            key="auto-nsfw-card"
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            style={{ overflow: "hidden" }}
+          >
+            <VideoAutoNsfwCard
+              autoNsfwEnabled={autoNsfwEnabled}
+              nsfwIntensity={nsfwIntensity}
+              onToggle={setAutoNsfwEnabled}
+              onIntensityChange={setNsfwIntensity}
+            />
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── 영상 해상도 슬라이더 (맨 아래 · 결정 B + D) ──
        *  2026-05-06 (Codex finding 6): VideoResolutionCard 로 분리.
