@@ -38,11 +38,13 @@ describe("VideoLeftPanel auto NSFW integration (spec 2026-05-12 v1.1)", () => {
     render(
       <VideoLeftPanel promptTextareaRef={ref} onGenerate={vi.fn()} />,
     );
-    // 카드 헤더 라벨 "🤖 자동 NSFW 시나리오" 가 없어야
-    expect(screen.queryByText(/자동 NSFW 시나리오/)).toBeNull();
+    // 2026-05-12 UX 변경: 헤더 텍스트 제거 → "자동 NSFW 시나리오 강도" radiogroup 으로 검증
+    expect(
+      screen.queryByRole("radiogroup", { name: /자동 NSFW 시나리오 강도/ }),
+    ).toBeNull();
   });
 
-  it("adult ON → VideoAutoNsfwCard 노출", () => {
+  it("adult ON → VideoAutoNsfwCard (4-segmented) 노출", () => {
     const ref = createRef<HTMLTextAreaElement>();
     act(() => {
       useVideoStore.getState().setAdult(true);
@@ -50,7 +52,9 @@ describe("VideoLeftPanel auto NSFW integration (spec 2026-05-12 v1.1)", () => {
     render(
       <VideoLeftPanel promptTextareaRef={ref} onGenerate={vi.fn()} />,
     );
-    expect(screen.getByText(/자동 NSFW 시나리오/)).toBeInTheDocument();
+    expect(
+      screen.getByRole("radiogroup", { name: /자동 NSFW 시나리오 강도/ }),
+    ).toBeInTheDocument();
   });
 
   it("autoNsfwEnabled ON → AI 프롬프트 보정 시각적 ON 강제 + PromptModeRadio 노출", () => {

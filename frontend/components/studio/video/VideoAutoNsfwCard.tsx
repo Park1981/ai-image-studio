@@ -39,7 +39,6 @@ const OPTIONS: ReadonlyArray<Option> = [
   { idx: 3, label: "3단계", enabled: true, intensity: 3 },
 ];
 
-const TEXT_PRIMARY = "rgba(255, 255, 255, 0.92)";
 const TEXT_DIM = "rgba(255, 255, 255, 0.55)";
 const CRIMSON_INK = "#ff5f6d";
 
@@ -66,50 +65,22 @@ export default function VideoAutoNsfwCard({
   };
 
   return (
-    <section
+    // 카드 wrapper 없이 PromptModeRadio 패턴처럼 segmented 만 inline
+    // (adult V5MotionCard 의 children 영역에 들어감)
+    <div
+      role="radiogroup"
+      aria-label="자동 NSFW 시나리오 강도"
       onClick={(e) => e.stopPropagation()}
       style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        padding: "12px 14px",
-        borderRadius: "var(--radius-sm)",
-        background: autoNsfwEnabled
-          ? "rgba(20, 6, 10, 0.62)"
-          : "rgba(10, 4, 6, 0.5)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-        border: autoNsfwEnabled
-          ? "1px solid rgba(255, 95, 109, 0.32)"
-          : "1px solid rgba(255, 255, 255, 0.1)",
-        transition: "background .2s, border-color .2s",
+        position: "relative",
+        display: "grid",
+        gridTemplateColumns: "repeat(4, 1fr)",
+        padding: 3,
+        background: "rgba(0, 0, 0, 0.28)",
+        borderRadius: 999,
+        height: 32,
       }}
     >
-      <span
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: TEXT_PRIMARY,
-        }}
-      >
-        🤖 자동 NSFW 시나리오
-      </span>
-
-      {/* 4-option segmented (PromptModeRadio 패턴 4 옵션 확장).
-       *  active thumb 가 crimson 톤으로 slide. */}
-      <div
-        role="radiogroup"
-        aria-label="자동 NSFW 시나리오 강도"
-        style={{
-          position: "relative",
-          display: "grid",
-          gridTemplateColumns: "repeat(4, 1fr)",
-          padding: 3,
-          background: "rgba(0, 0, 0, 0.28)",
-          borderRadius: 999,
-          height: 32,
-        }}
-      >
         {/* slide thumb — 25% width, left = idx * 25% */}
         <span
           aria-hidden
@@ -153,7 +124,6 @@ export default function VideoAutoNsfwCard({
             </button>
           );
         })}
-      </div>
-    </section>
+    </div>
   );
 }
