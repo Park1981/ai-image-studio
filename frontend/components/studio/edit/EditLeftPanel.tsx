@@ -21,7 +21,7 @@
 import dynamic from "next/dynamic";
 import type { RefObject } from "react";
 import { useState } from "react";
-import HistoryPicker from "@/components/studio/HistoryPicker";
+import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
@@ -182,22 +182,23 @@ export default function EditLeftPanel({
               gap: 4,
             }}
           >
-            <Icon name="grid" size={11} /> 히스토리에서 선택
+            <Icon name="grid" size={11} /> 이미지 히스토리
           </button>
         </div>
 
-        {/* History picker overlay — video 항목은 Edit 의 원본으로 부적절 → 제외 */}
-        <HistoryPicker
+        {/* Image history drawer — Generate/Edit 결과만 원본으로 재사용. Video 항목은 제외. */}
+        <ImageHistoryPickerDrawer
           open={historyPickerOpen}
-          items={items.filter((i) => i.mode !== "video")}
-          onSelect={(it) => {
+          items={items}
+          selectedImageRef={sourceImage}
+          onClose={() => setHistoryPickerOpen(false)}
+          onPick={(it) => {
             setSource(
               it.imageRef,
               `${it.label} · ${it.width}×${it.height}`,
               it.width,
               it.height,
             );
-            setHistoryPickerOpen(false);
             toast.info("원본으로 지정", it.label);
           }}
         />

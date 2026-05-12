@@ -26,10 +26,7 @@ from ..comfy_api_builder import build_video_from_request
 from ..presets import (
     DEFAULT_OLLAMA_ROLES,
     DEFAULT_VIDEO_MODEL_ID,
-    LTX_VIDEO_PRESET,
-    VIDEO_MODEL,  # 호환 alias (== LTX_VIDEO_PRESET)
     VideoModelId,
-    WAN22_VIDEO_PRESET,
     Wan22ModelPreset,
     compute_video_resize,
     get_video_preset,

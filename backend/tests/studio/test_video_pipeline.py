@@ -194,6 +194,27 @@ def test_upgrade_video_uses_system_video_prompt() -> None:
     assert "ADULT MODE" not in kwargs["system"]
 
 
+def test_upgrade_video_uses_wan22_system_video_prompt() -> None:
+    """model_id='wan22' 호출 시 Wan 2.2 전용 system prompt 전달."""
+    chat_mock = AsyncMock(return_value="out")
+    translate_mock = AsyncMock(return_value=None)
+    with (
+        patch("studio.prompt_pipeline._ollama._call_ollama_chat", new=chat_mock),
+        patch("studio.prompt_pipeline.translate.translate_to_korean", new=translate_mock),
+    ):
+        asyncio.run(
+            upgrade_video_prompt(
+                user_direction="move",
+                image_description="desc",
+                model_id="wan22",
+            )
+        )
+    _, kwargs = chat_mock.call_args
+    assert kwargs["system"] == build_system_video(adult=False, model_id="wan22")
+    assert "Wan 2.2" in kwargs["system"]
+    assert "LTX-2.3" not in kwargs["system"]
+
+
 def test_upgrade_video_adult_injects_nsfw_clause() -> None:
     """adult=True 시 시스템 프롬프트에 ADULT MODE clause 주입."""
     chat_mock = AsyncMock(return_value="out")

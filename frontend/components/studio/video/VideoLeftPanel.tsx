@@ -20,6 +20,7 @@
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
 import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
@@ -42,6 +43,7 @@ import {
   useVideoInputs,
   useVideoRunning,
 } from "@/stores/useVideoStore";
+import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import VideoSizeWarnModal from "@/components/studio/video/VideoSizeWarnModal";
@@ -70,6 +72,7 @@ export default function VideoLeftPanel({
     selectedVideoModel, setSelectedVideoModel,
   } = useVideoInputs();
   const { running } = useVideoRunning();
+  const items = useHistoryStore((s) => s.items);
 
   // Phase 5 (2026-05-03) — 페이지 마운트 시 1회 settings.videoModel 로 sync.
   // setSelectedVideoModel 은 cross-store fan-out (옵션 A) 이라 settings 에서 store 로 회수만 필요.
@@ -122,6 +125,7 @@ export default function VideoLeftPanel({
 
   // 큰 사이즈 경고 모달 노출 state.
   const [warnOpen, setWarnOpen] = useState(false);
+  const [imageHistoryOpen, setImageHistoryOpen] = useState(false);
 
   const ctaDisabled = running || !sourceImage || !prompt.trim();
 
@@ -203,12 +207,38 @@ export default function VideoLeftPanel({
             <SectionAccentBar accent="blue" />
             원본 이미지
           </label>
-          <span className="mono ais-field-meta">
-            {sourceWidth && sourceHeight
-              ? `${sourceWidth}×${sourceHeight}`
-              : "—"}
-          </span>
+          <button
+            type="button"
+            onClick={() => setImageHistoryOpen(true)}
+            style={{
+              all: "unset",
+              cursor: "pointer",
+              fontSize: 11,
+              color: "var(--ink-3)",
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+              whiteSpace: "nowrap",
+            }}
+          >
+            <Icon name="grid" size={11} /> 이미지 히스토리
+          </button>
         </div>
+        <ImageHistoryPickerDrawer
+          open={imageHistoryOpen}
+          items={items}
+          selectedImageRef={sourceImage}
+          onClose={() => setImageHistoryOpen(false)}
+          onPick={(it) => {
+            setSource(
+              it.imageRef,
+              `${it.label} · ${it.width}×${it.height}`,
+              it.width,
+              it.height,
+            );
+            toast.info("원본으로 지정", it.label);
+          }}
+        />
         <SourceImageCard
           sourceImage={sourceImage}
           sourceLabel={sourceLabel}

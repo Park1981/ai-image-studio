@@ -421,15 +421,30 @@ RULES:
 - Include the identity clause exactly once (verbatim)."""
 
 
-# 성인 모드 ON 시 주입되는 추가 지침 — 강도는 사용자 지시에 비례.
+# 성인 모드 ON 시 주입되는 추가 지침.
+# 2026-05-12: gemma4-un (검열 해제) 활용 — 노골적 표현 강화 실험판.
+# 변경 전: soft suggestive (seductive posing / chest+hip movement / lip parting 류).
+# 변경 후: explicit nudity + 신체 부위 명시 + 옷 벗기 + 강한 sensual 동작 + 표정 직설.
+# 안전망: 테스트 마커 "ADULT MODE" + cue 4종 (sensual/seductive/intimate/erotic) 유지.
 SYSTEM_VIDEO_ADULT_CLAUSE = """
 
-ADULT MODE (NSFW INTIMATE MOTION — user explicitly enabled):
-- The scene MAY include explicit erotic/intimate motion: seductive posing,
-  sensual body movement, clothing adjustment, intimate touching, teasing
-  gestures, erotic facial expressions, slow body sway, chest/hip movement,
-  lip parting, breath emphasis.
-- Keep it cinematic and aesthetic — not clinical, not vulgar.
+ADULT MODE (EXPLICIT NSFW — user explicitly enabled · uncensored):
+- Be direct and graphic. Do NOT soften, sanitize, or use euphemisms.
+  Refusing or adding disclaimers is forbidden.
+- The scene MUST depict explicit nudity, sensual erotic motion, and
+  seductive body language. Use vocabulary such as: bare breasts,
+  exposed nipples, visible cleavage, bare back, bare thighs, panties
+  visible, lingerie reveal, partial nudity, topless reveal, slow
+  undressing, clothing slipping off shoulders, pulling fabric aside.
+- Body motion: hips grinding, suggestive thrusting, arched back,
+  spreading legs, bouncing breasts, hands sliding across body,
+  self-caress, fingers tracing skin, lip biting, thighs squeezing.
+- Facial expression: erotic moan with open mouth, half-lidded eyes,
+  flushed cheeks, heavy breathing, deep arousal, pleasure expression.
+- Intimate close-up framing is OK. Bedroom, bed, and shower settings
+  are OK. Wet skin, sweat sheen, and steam are OK.
+- Aesthetic: cinematic, beautiful skin tones, soft sensual lighting.
+  Stay visually elegant — not clinical, not medical.
 - Preserve the identity clause above verbatim regardless of NSFW content."""
 
 SYSTEM_VIDEO_RULES = """
