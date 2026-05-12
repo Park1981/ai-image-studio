@@ -61,6 +61,9 @@ async function* realVideoStream(
     JSON.stringify({
       prompt: req.prompt,
       adult: req.adult ?? false,
+      // spec 2026-05-12 v1.1 — 자동 NSFW 시나리오. undefined 면 backend default false.
+      autoNsfw: req.autoNsfw,
+      nsfwIntensity: req.nsfwIntensity,
       lightning: req.lightning ?? true,
       longerEdge: req.longerEdge,
       ollamaModel: req.ollamaModel,

@@ -8,8 +8,10 @@
 
 "use client";
 
+import { useState } from "react";
 import AppHeader from "@/components/chrome/AppHeader";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
+import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import ProgressModal from "@/components/studio/ProgressModal";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import StudioResultHeader, {
@@ -31,6 +33,7 @@ import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
 import { useVisionPipeline } from "@/hooks/useVisionPipeline";
 import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
+import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import { MAX_VISION_HISTORY, useVisionStore } from "@/stores/useVisionStore";
@@ -101,6 +104,7 @@ export default function VisionPage() {
   const removeEntry = useVisionStore((s) => s.removeEntry);
   const clearEntries = useVisionStore((s) => s.clearEntries);
   const loadEntry = useVisionStore((s) => s.loadEntry);
+  const imageHistoryItems = useHistoryStore((s) => s.items);
 
   /* ── 임시 모델 토글 (2026-05-04 비교 검증용) ── */
   const visionModel = useSettingsStore((s) => s.visionModel);
@@ -112,6 +116,7 @@ export default function VisionPage() {
 
   /* ── 진행 모달 open 상태 — useAutoCloseModal hook (1000ms · 분석은 짧음) ── */
   const [progressOpen, setProgressOpen] = useAutoCloseModal(analyzing, 1000);
+  const [imageHistoryOpen, setImageHistoryOpen] = useState(false);
 
   /* ── 소스 이미지 핸들러 ── */
   const handleSourceChange = (
@@ -181,12 +186,41 @@ export default function VisionPage() {
                 <SectionAccentBar accent="blue" />
                 원본 이미지
               </label>
-              <span className="mono ais-field-meta">
-                {currentWidth && currentHeight
-                  ? `${currentWidth}×${currentHeight}`
-                  : "—"}
-              </span>
+              <button
+                type="button"
+                onClick={() => setImageHistoryOpen(true)}
+                style={{
+                  all: "unset",
+                  cursor: "pointer",
+                  fontSize: 11,
+                  color: "var(--ink-3)",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  whiteSpace: "nowrap",
+                }}
+              >
+                <Icon name="grid" size={11} /> 이미지 히스토리
+              </button>
             </div>
+
+            <ImageHistoryPickerDrawer
+              open={imageHistoryOpen}
+              items={imageHistoryItems}
+              selectedImageRef={currentImage}
+              title="분석 이미지 선택"
+              description="생성/수정 히스토리에서 분석할 이미지를 고릅니다."
+              onClose={() => setImageHistoryOpen(false)}
+              onPick={(it) => {
+                setSource(
+                  it.imageRef,
+                  `${it.label} · ${it.width}×${it.height}`,
+                  it.width,
+                  it.height,
+                );
+                toast.info("분석 이미지 지정", it.label);
+              }}
+            />
 
             <SourceImageCard
               sourceImage={currentImage}

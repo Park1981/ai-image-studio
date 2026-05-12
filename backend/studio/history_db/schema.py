@@ -17,6 +17,7 @@ Schema version (2026-04-27 · C2-P2-3 도입):
       v7 (2026-04-27) — reference_ref + reference_role (Edit multi-reference)
       v8 (2026-04-28) — reference_templates 테이블 + 인덱스 (라이브러리 plan)
       v9 (2026-05-11) — prompt_favorites 테이블 + 인덱스
+      v10 (2026-05-12) — auto_nsfw + nsfw_intensity 컬럼 (Video 자동 NSFW 시나리오)
 
     신규 버전 추가 정책:
       1) 컬럼 추가 (`ALTER TABLE ... ADD COLUMN ...`) — try/except 로 idempotent.
@@ -39,7 +40,7 @@ from ._config import log
 
 # Schema version — 2026-04-27 (C2-P2-3) 도입.
 # 신규 마이그레이션 추가 시 + 1 + init 함수에 idempotent 적용 함수 추가.
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 
 async def _get_schema_version(db: aiosqlite.Connection) -> int:
@@ -84,7 +85,9 @@ CREATE TABLE IF NOT EXISTS studio_history (
   frame_count INTEGER,
   refined_intent TEXT,
   reference_ref TEXT,
-  reference_role TEXT
+  reference_role TEXT,
+  auto_nsfw INTEGER DEFAULT 0,
+  nsfw_intensity INTEGER
 );
 """
 CREATE_IDX_CREATED = (
@@ -334,6 +337,22 @@ async def init_studio_history_db() -> None:
     async with aiosqlite.connect(_cfg._DB_PATH) as db:
         await _migrate_create_prompt_favorites(db)
         log.info("Migrated: prompt_favorites 테이블 + 인덱스 생성")
+    # v10 (2026-05-12): Video 자동 NSFW 시나리오 — auto_nsfw + nsfw_intensity 두 컬럼.
+    # spec 2026-05-12 v1.1 §9.2. video 모드만 의미. 기존 row 는 0/NULL.
+    async with aiosqlite.connect(_cfg._DB_PATH) as db:
+        v10_cols = (
+            ("auto_nsfw", "INTEGER DEFAULT 0"),
+            ("nsfw_intensity", "INTEGER"),
+        )
+        for col_name, col_type in v10_cols:
+            try:
+                await db.execute(
+                    f"ALTER TABLE studio_history ADD COLUMN {col_name} {col_type}"
+                )
+                log.info("Migrated studio_history: added %s column", col_name)
+            except Exception:
+                # 이미 존재하면 정상 (idempotent)
+                pass
         # 모든 마이그레이션 적용 후 schema version 마킹 (다음 부팅에서 skip).
         await _set_schema_version(db, SCHEMA_VERSION)
         await db.commit()

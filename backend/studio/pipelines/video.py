@@ -26,10 +26,7 @@ from ..comfy_api_builder import build_video_from_request
 from ..presets import (
     DEFAULT_OLLAMA_ROLES,
     DEFAULT_VIDEO_MODEL_ID,
-    LTX_VIDEO_PRESET,
-    VIDEO_MODEL,  # 호환 alias (== LTX_VIDEO_PRESET)
     VideoModelId,
-    WAN22_VIDEO_PRESET,
     Wan22ModelPreset,
     compute_video_resize,
     get_video_preset,
@@ -68,6 +65,8 @@ async def _run_video_pipeline_task(
     ollama_model_override: str | None = None,
     vision_model_override: str | None = None,
     adult: bool = False,
+    auto_nsfw: bool = False,        # spec 2026-05-12 v1.1
+    nsfw_intensity: int = 2,         # spec 2026-05-12 v1.1
     source_width: int = 0,
     source_height: int = 0,
     longer_edge: int | None = None,
@@ -141,9 +140,12 @@ async def _run_video_pipeline_task(
                 video_res = await run_video_pipeline(
                     image_bytes,
                     prompt,
+                    model_id=model_id,  # 3단 전파 (spec v1.1 Codex Finding 2)
                     vision_model=vision_model_override or DEFAULT_OLLAMA_ROLES.vision,
                     text_model=ollama_model_override or DEFAULT_OLLAMA_ROLES.text,
                     adult=adult,
+                    auto_nsfw=auto_nsfw,             # spec 2026-05-12 v1.1
+                    nsfw_intensity=nsfw_intensity,   # spec 2026-05-12 v1.1
                     prompt_mode=prompt_mode,
                 )
 
@@ -288,6 +290,9 @@ async def _run_video_pipeline_task(
             "comfyError": comfy_err,
             # video 전용 메타 — adult/fps/frameCount/durationSec
             "adult": adult,
+            # spec 2026-05-12 v1.1 — 자동 NSFW 시나리오 (video 만 의미)
+            "autoNsfw": auto_nsfw,
+            "nsfwIntensity": nsfw_intensity if auto_nsfw else None,
             "fps": fps_val,
             "frameCount": frame_count,
             "durationSec": duration_sec,

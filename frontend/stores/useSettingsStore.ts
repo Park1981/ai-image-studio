@@ -34,6 +34,12 @@ export interface PromptTemplate {
  */
 export type PromptEnhanceMode = "fast" | "precise";
 
+/**
+ * Auto NSFW 강도 (spec 2026-05-12 v1.1).
+ * 1: 은근 (옷 유지) · 2: 옷벗음 (탈의 reveal 까지) · 3: 옷벗음+애무 (L2 + intimate self-touch).
+ */
+export type NsfwIntensity = 1 | 2 | 3;
+
 export interface SettingsState {
   /* 모델 선택 (UI 용 표시값 — 실제 파일명은 model-presets 에서) */
   generateModel: string;
@@ -76,6 +82,20 @@ export interface SettingsState {
    */
   promptEnhanceMode: PromptEnhanceMode;
 
+  /**
+   * 자동 NSFW 시나리오 토글 (spec 2026-05-12 v1.1).
+   * Video 페이지의 adult 토글 위에 별도 단계. ON 이면 vision + gemma4-un 이
+   * 이미지 보고 explicit 시나리오 자율 작성 (사용자 지시 없어도 OK).
+   * 기본 false.
+   */
+  autoNsfwEnabled: boolean;
+  /**
+   * 자동 NSFW 강도 (spec 2026-05-12 v1.1).
+   * 1: 은근 (옷 유지) · 2: 옷벗음 (탈의 reveal) · 3: 옷벗음+애무 (intimate)
+   * 기본 2 — autoNsfwEnabled=true 일 때 의미 있음.
+   */
+  nsfwIntensity: NsfwIntensity;
+
   /* 프롬프트 템플릿 */
   templates: PromptTemplate[];
 
@@ -92,6 +112,8 @@ export interface SettingsState {
   setAutoStartComfy: (v: boolean) => void;
   setAutoCompareAnalysis: (v: boolean) => void;
   setPromptEnhanceMode: (v: PromptEnhanceMode) => void;
+  setAutoNsfwEnabled: (v: boolean) => void;
+  setNsfwIntensity: (v: NsfwIntensity) => void;
   addTemplate: (t: Omit<PromptTemplate, "id">) => void;
   removeTemplate: (id: string) => void;
 }
@@ -133,6 +155,9 @@ export const useSettingsStore = create<SettingsState>()(
       autoStartComfy: false,
       autoCompareAnalysis: false,
       promptEnhanceMode: "fast",
+      // spec 2026-05-12 v1.1 — 자동 NSFW 시나리오 (Video 페이지 전용 영향)
+      autoNsfwEnabled: false,
+      nsfwIntensity: 2 as NsfwIntensity,
 
       templates: DEFAULT_TEMPLATES,
 
@@ -148,6 +173,8 @@ export const useSettingsStore = create<SettingsState>()(
       setAutoStartComfy: (v) => set({ autoStartComfy: v }),
       setAutoCompareAnalysis: (v) => set({ autoCompareAnalysis: v }),
       setPromptEnhanceMode: (v) => set({ promptEnhanceMode: v }),
+      setAutoNsfwEnabled: (v) => set({ autoNsfwEnabled: v }),
+      setNsfwIntensity: (v) => set({ nsfwIntensity: v }),
 
       addTemplate: (t) =>
         set((s) => ({
@@ -162,7 +189,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "ais:settings",
       storage: createJSONStorage(() => localStorage),
-      version: 6,
+      version: 7,
       migrate: (persisted: unknown, fromVersion: number) => {
         const obj = (persisted as Record<string, unknown>) || {};
         // v1 → v2: autoCompareAnalysis 기본 false 추가
@@ -196,6 +223,12 @@ export const useSettingsStore = create<SettingsState>()(
         // 기본 "wan22" — 사용자 결정 #1 (spec §2).
         if (fromVersion < 6) {
           obj.videoModel = DEFAULT_VIDEO_MODEL_ID;
+        }
+        // v6 → v7: autoNsfwEnabled + nsfwIntensity 신설 (spec 2026-05-12 v1.1).
+        // 기본 false / 2 — 사용자 결정 (브레인스토밍 Q1 = 디폴트 강도 2).
+        if (fromVersion < 7) {
+          obj.autoNsfwEnabled = false;
+          obj.nsfwIntensity = 2;
         }
         return obj as unknown as SettingsState;
       },

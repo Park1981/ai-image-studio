@@ -327,6 +327,12 @@ export interface HistoryItem {
   referenceRef?: string | null;
   /** Edit multi-reference: reference role preset/custom text. */
   referenceRole?: string | null;
+
+  /* ── Auto NSFW 시나리오 메타 (spec 2026-05-12 v1.1 · mode === "video" 일 때만) ── */
+  /** 자동 NSFW 시나리오 토글 (true 면 nsfwIntensity 와 함께 복원). */
+  autoNsfw?: boolean;
+  /** 자동 시나리오 강도 (1: 은근 · 2: 옷벗음 · 3: 옷벗음+애무). */
+  nsfwIntensity?: 1 | 2 | 3;
 }
 
 /** Edit reference template — 라이브러리 plan v8 (2026-04-28).
@@ -600,6 +606,14 @@ export interface VideoRequest {
   promptMode?: "fast" | "precise";
   /** 영상 모델 (Phase 3 · 2026-05-03). 미전달 시 백엔드 default = "wan22". */
   modelId?: import("@/lib/model-presets").VideoModelId;
+  /**
+   * 자동 NSFW 시나리오 모드 (spec 2026-05-12 v1.1).
+   * adult=true 와 함께 사용 — vision + gemma4-un 이 이미지 보고 explicit 시나리오 자율 작성.
+   * undefined / false → 기존 흐름 (사용자 지시 + AI 보강).
+   */
+  autoNsfw?: boolean;
+  /** 자동 시나리오 강도 (1: 은근 · 2: 옷벗음 · 3: 옷벗음+애무 · default 2). */
+  nsfwIntensity?: 1 | 2 | 3;
 }
 
 export type VideoStage =

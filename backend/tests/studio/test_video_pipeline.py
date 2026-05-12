@@ -21,7 +21,6 @@ from studio.history_db import (
     _migrate_add_video_mode,
 )
 from studio.prompt_pipeline import (
-    SYSTEM_VIDEO,
     UpgradeResult,
     build_system_video,
     upgrade_video_prompt,
@@ -80,6 +79,7 @@ def test_run_video_pipeline_unloads_vision_before_text_spec19() -> None:
                 "panning shot",
                 vision_model="qwen2.5vl:7b",
                 text_model="gemma4-un:latest",
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
 
@@ -96,20 +96,21 @@ def _tiny_png_bytes() -> bytes:
 
 
 # ═════════════════════════════════════════════
-# SYSTEM_VIDEO 상수 검증
+# SYSTEM_VIDEO 상수 검증 (LTX 기준 · v1.1 이후 build_system_video(model_id="ltx") 경유)
 # ═════════════════════════════════════════════
 
 
 def test_system_video_has_required_cues() -> None:
     """LTX-2.3 영상 프롬프트 지시 키워드가 포함됐는지."""
-    assert "60-150 words" in SYSTEM_VIDEO
+    system_ltx = build_system_video(adult=False, model_id="ltx")
+    assert "60-150 words" in system_ltx
     for cue in ("motion", "camera", "lighting", "ambient"):
-        assert cue in SYSTEM_VIDEO.lower()
+        assert cue in system_ltx.lower()
     # 금지 지시
-    assert "cartoon" in SYSTEM_VIDEO.lower()
-    assert "game" in SYSTEM_VIDEO.lower()
+    assert "cartoon" in system_ltx.lower()
+    assert "game" in system_ltx.lower()
     # 출력 포맷 강제
-    assert "no bullets" in SYSTEM_VIDEO.lower()
+    assert "no bullets" in system_ltx.lower()
 
 
 # ═════════════════════════════════════════════
@@ -134,6 +135,7 @@ def test_upgrade_video_success() -> None:
             upgrade_video_prompt(
                 user_direction="피사체 클로즈업",
                 image_description="A woman in soft window light",
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
     assert result.fallback is False
@@ -154,6 +156,7 @@ def test_upgrade_video_fallback_on_ollama_fail() -> None:
             upgrade_video_prompt(
                 user_direction="카메라가 위로 팬",
                 image_description="A landscape",
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
     assert result.fallback is True
@@ -165,13 +168,13 @@ def test_upgrade_video_fallback_on_ollama_fail() -> None:
 def test_upgrade_video_empty_direction() -> None:
     """빈 direction 은 즉시 fallback."""
     result = asyncio.run(
-        upgrade_video_prompt(user_direction="  ", image_description="x")
+        upgrade_video_prompt(user_direction="  ", image_description="x", model_id="ltx")
     )
     assert result.fallback is True
 
 
 def test_upgrade_video_uses_system_video_prompt() -> None:
-    """adult=False (기본) 호출 시 SFW SYSTEM_VIDEO 전달."""
+    """adult=False (기본) 호출 시 SFW build_system_video(model_id="ltx") 전달."""
     chat_mock = AsyncMock(return_value="out")
     translate_mock = AsyncMock(return_value=None)
     with (
@@ -182,12 +185,34 @@ def test_upgrade_video_uses_system_video_prompt() -> None:
             upgrade_video_prompt(
                 user_direction="move",
                 image_description="desc",
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
     _, kwargs = chat_mock.call_args
-    assert kwargs["system"] == SYSTEM_VIDEO
+    assert kwargs["system"] == build_system_video(adult=False, model_id="ltx")
     # SFW 에선 ADULT_CLAUSE 미포함
     assert "ADULT MODE" not in kwargs["system"]
+
+
+def test_upgrade_video_uses_wan22_system_video_prompt() -> None:
+    """model_id='wan22' 호출 시 Wan 2.2 전용 system prompt 전달."""
+    chat_mock = AsyncMock(return_value="out")
+    translate_mock = AsyncMock(return_value=None)
+    with (
+        patch("studio.prompt_pipeline._ollama._call_ollama_chat", new=chat_mock),
+        patch("studio.prompt_pipeline.translate.translate_to_korean", new=translate_mock),
+    ):
+        asyncio.run(
+            upgrade_video_prompt(
+                user_direction="move",
+                image_description="desc",
+                model_id="wan22",
+            )
+        )
+    _, kwargs = chat_mock.call_args
+    assert kwargs["system"] == build_system_video(adult=False, model_id="wan22")
+    assert "Wan 2.2" in kwargs["system"]
+    assert "LTX-2.3" not in kwargs["system"]
 
 
 def test_upgrade_video_adult_injects_nsfw_clause() -> None:
@@ -203,6 +228,7 @@ def test_upgrade_video_adult_injects_nsfw_clause() -> None:
                 user_direction="move",
                 image_description="desc",
                 adult=True,
+                model_id="ltx",  # 기존 LTX 동작 보존 (v1.1)
             )
         )
     _, kwargs = chat_mock.call_args
@@ -217,8 +243,8 @@ def test_upgrade_video_adult_injects_nsfw_clause() -> None:
 
 def test_build_system_video_sfw_vs_adult_divergence() -> None:
     """SFW 버전은 ADULT 블록이 없고, 나머지는 동일 패턴 유지."""
-    sfw = build_system_video(adult=False)
-    nsfw = build_system_video(adult=True)
+    sfw = build_system_video(adult=False, model_id="ltx")
+    nsfw = build_system_video(adult=True, model_id="ltx")
     assert "ADULT MODE" not in sfw
     assert "ADULT MODE" in nsfw
     # 둘 다 RULES 섹션은 끝에 있어야 함
@@ -247,7 +273,7 @@ def test_run_video_pipeline_success() -> None:
         patch("studio.video_pipeline.upgrade_video_prompt", new=upgrade_mock),
     ):
         result: VideoPipelineResult = asyncio.run(
-            run_video_pipeline(_tiny_png_bytes(), "dusk mood")
+            run_video_pipeline(_tiny_png_bytes(), "dusk mood", model_id="ltx")
         )
     assert result.vision_ok is True
     assert "dusk" in result.image_description.lower()
@@ -271,7 +297,7 @@ def test_run_video_pipeline_vision_fail_still_upgrades() -> None:
         patch("studio.video_pipeline._describe_image", new=desc_mock),
         patch("studio.video_pipeline.upgrade_video_prompt", new=upgrade_mock),
     ):
-        result = asyncio.run(run_video_pipeline(_tiny_png_bytes(), "x"))
+        result = asyncio.run(run_video_pipeline(_tiny_png_bytes(), "x", model_id="ltx"))
     assert result.vision_ok is False
     assert "vision model unavailable" in result.image_description
     # upgrade 는 호출됐음 (실패한 설명 포함)
@@ -389,3 +415,87 @@ async def test_migration_rejects_invalid_mode(tmp_path: Path) -> None:
                 "VALUES ('bad', 'foobar', 'p', 'l', 300, '/x')"
             )
             await db.commit()
+
+
+from studio.prompt_pipeline.upgrade import (
+    build_auto_nsfw_clause,
+    _AUTO_NSFW_L2_POOL,
+    _AUTO_NSFW_L3_POOL_EXTRA,
+)
+
+
+class TestAutoNsfwClause:
+    """spec 2026-05-12 v1.1 §6.1 단위 테스트"""
+
+    def test_auto_nsfw_l1_clause_no_removal(self):
+        """L1 은 옷 안 벗음 — 명시 negative rule 포함"""
+        clause = build_auto_nsfw_clause(1)
+        assert "WITHOUT removing any garments" in clause
+        assert "NOT contain nudity, topless reveal, or garment removal" in clause
+        assert "L1 vocabulary:" in clause
+        # L2/L3 어휘는 없어야 함
+        assert "Undress motion:" not in clause
+        assert "Post-nude motion:" not in clause
+
+    def test_auto_nsfw_l2_no_caress_after_nudity(self):
+        """L2 는 옷벗음 reveal 까지만 — 자기 손길 금지"""
+        clause = build_auto_nsfw_clause(2)
+        assert "NO self-caress after nudity" in clause
+        assert "reveal IS the climax" in clause
+        assert "Undress motion:" in clause  # L2 pool 포함
+        assert "Post-nude motion:" not in clause  # L3 extra 미포함
+
+    def test_auto_nsfw_l3_combined_vocabulary(self):
+        """L3 는 L2 + L3 어휘 둘 다 코드 레벨로 concat"""
+        clause = build_auto_nsfw_clause(3)
+        # L2 pool substring (Codex Finding 7 fix)
+        assert "Undress motion:" in clause
+        assert "Reveal result:" in clause
+        # L3 extra substring
+        assert "Post-nude motion:" in clause
+        assert "intimate close-up of bare skin" in clause
+        # 타이밍 명시
+        assert "first ~half of the clip is undress" in clause
+
+    def test_auto_nsfw_grafting_and_fallback(self):
+        """grafting + 비-인물 fallback 섹션 포함"""
+        clause = build_auto_nsfw_clause(2)
+        assert "USER DIRECTION GRAFTING" in clause
+        assert "NON-HUMAN SUBJECT FALLBACK" in clause
+        assert "PRIMARY narrative" in clause
+
+    def test_auto_nsfw_invalid_intensity_raises(self):
+        """범위 밖 intensity → ValueError"""
+        import pytest
+        with pytest.raises(ValueError, match="intensity must be 1\\|2\\|3"):
+            build_auto_nsfw_clause(0)
+        with pytest.raises(ValueError, match="intensity must be 1\\|2\\|3"):
+            build_auto_nsfw_clause(4)
+
+
+class TestBuildSystemVideoAutoNsfw:
+    """spec 2026-05-12 v1.1 §4.2 — build_system_video 시그니처 확장"""
+
+    def test_auto_nsfw_replaces_adult_clause(self):
+        """auto_nsfw=True 면 SYSTEM_VIDEO_ADULT_CLAUSE 대신 auto clause"""
+        result = build_system_video(
+            adult=True, model_id="wan22", auto_nsfw=True, intensity=2,
+        )
+        assert "AUTO NSFW MODE" in result
+        assert "L2 vocabulary:" in result
+        # 기존 ADULT_CLAUSE 의 시그니처 키워드는 없어야
+        assert "Be direct and graphic" not in result
+
+    def test_auto_nsfw_requires_adult_value_error(self):
+        """adult=False 인데 auto_nsfw=True → ValueError"""
+        import pytest
+        with pytest.raises(ValueError, match="auto_nsfw requires adult"):
+            build_system_video(
+                adult=False, model_id="wan22", auto_nsfw=True, intensity=2,
+            )
+
+    def test_auto_nsfw_default_false_preserves_existing(self):
+        """auto_nsfw=False (default) 면 기존 ADULT_CLAUSE 유지 (회귀 0)"""
+        result = build_system_video(adult=True, model_id="wan22")
+        assert "ADULT MODE" in result
+        assert "AUTO NSFW MODE" not in result

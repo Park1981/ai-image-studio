@@ -51,6 +51,8 @@ export default function EditRightPanel({
   const { sourceImage } = useEditInputs();
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
+  const setPrompt = useEditStore((s) => s.setPrompt);
+  const setLightning = useEditStore((s) => s.setLightning);
   // Phase 2 후속 (Codex Phase 4 리뷰 Medium #1) — 수동 비교 분석도 Edit promptMode 전파.
   const editPromptMode = useEditStore((s) => s.promptMode);
 
@@ -141,8 +143,9 @@ export default function EditRightPanel({
         items={editResults}
         selectedId={afterId}
         onTileClick={(it) => {
-          // 히스토리 타일 클릭 = "이 수정 다시 보기"
-          // sourceRef 있으면 원본도 같이 복원해 진짜 한 쌍 슬라이더로 표시.
+          // 히스토리 타일 클릭 = "이 수정 다시 보기".
+          // sourceRef 있으면 원본도 같이 복원해 진짜 한 쌍 슬라이더로 표시하고,
+          // 좌측 수정 지시/Lightning 도 당시 설정으로 맞춰 재실행 동선을 짧게 만든다.
           // sourceRef 없는 옛 row 는 안내 + source 보존 (슬라이더 자동 빈 상태).
           // ⚠ 회귀 위험 #7 보존 — 이 toast 분기 제거하면 옛 row 사용자 혼란
           if (it.sourceRef) {
@@ -160,6 +163,8 @@ export default function EditRightPanel({
               "Before/After 슬라이더는 표시되지 않습니다.",
             );
           }
+          setPrompt(it.prompt);
+          setLightning(it.lightning);
           setAfterId(it.id);
           selectHistory(it.id);
         }}

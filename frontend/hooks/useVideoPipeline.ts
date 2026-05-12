@@ -54,6 +54,9 @@ export function useVideoPipeline(
   // 설정
   const ollamaModelSel = useSettingsStore((s) => s.ollamaModel);
   const visionModelSel = useSettingsStore((s) => s.visionModel);
+  // spec 2026-05-12 v1.1 — 자동 NSFW 시나리오
+  const autoNsfwEnabled = useSettingsStore((s) => s.autoNsfwEnabled);
+  const nsfwIntensity = useSettingsStore((s) => s.nsfwIntensity);
   // 프로세스 상태
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
 
@@ -63,7 +66,9 @@ export function useVideoPipeline(
       toast.warn("원본 이미지를 먼저 업로드해 주세요.");
       return;
     }
-    if (!prompt.trim()) {
+    // spec 2026-05-12 v1.1 §4.10 — autoNsfwEnabled 면 빈 prompt 허용
+    // (vision + gemma4-un 이 이미지 분석 후 자율 시나리오 작성)
+    if (!autoNsfwEnabled && !prompt.trim()) {
       toast.warn("영상 지시를 입력해 주세요.");
       return;
     }
@@ -77,18 +82,26 @@ export function useVideoPipeline(
     // 2026-04-30 (Phase 1 Task 0): prompt history 단일 source 에 등록.
     usePromptHistoryStore.getState().add("video", prompt);
 
+    // spec 2026-05-12 v1.1 §5.7 — skipUpgrade 3-layer 방어 Layer 1
+    // autoNsfw 면 vision + gemma4 가 자율 시나리오 작성해야 하므로 skipUpgrade 강제 OFF.
+    const effectiveSkipUpgrade = autoNsfwEnabled ? false : skipUpgrade;
+
     setRunning(true);
     await consumePipelineStream(
       videoImageStream({
         sourceImage,
         prompt,
         adult,
+        // spec 2026-05-12 v1.1 — adult && autoNsfwEnabled 단일 게이트 (race 차단)
+        autoNsfw: adult && autoNsfwEnabled ? true : undefined,
+        nsfwIntensity: adult && autoNsfwEnabled ? nsfwIntensity : undefined,
         longerEdge,
         lightning,
         ollamaModel: ollamaModelSel,
         visionModel: visionModelSel,
         // skipUpgrade ON: 사용자가 정제된 영문 프롬프트 직접 입력 — vision + gemma4 우회.
-        preUpgradedPrompt: skipUpgrade ? prompt : undefined,
+        // autoNsfwEnabled 일 때는 강제 OFF → preUpgradedPrompt 미전송 (vision/gemma4 진행).
+        preUpgradedPrompt: effectiveSkipUpgrade ? prompt : undefined,
         // Phase 2 (2026-05-01) — gemma4 보강 모드 (정밀 시 motion/camera/preserve 해석 깊어짐).
         promptMode,
         // Phase 4 (2026-05-03) — 영상 모델 선택 (Wan 2.2 / LTX 2.3)

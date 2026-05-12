@@ -14,8 +14,10 @@
 
 "use client";
 
+import { useState } from "react";
 import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { CompareImageSlot } from "@/components/studio/CompareImageSlot";
+import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import { StudioModeHeader } from "@/components/studio/StudioLayout";
@@ -23,8 +25,12 @@ import VisionModelSelector, {
   VISION_MODEL_OPTIONS,
 } from "@/components/studio/VisionModelSelector";
 import Icon from "@/components/ui/Icon";
+import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
+import { toast } from "@/stores/useToastStore";
 import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
+
+type CompareHistoryTarget = "A" | "B";
 
 interface Props {
   imageA: VisionCompareImage | null;
@@ -52,9 +58,19 @@ export default function CompareLeftPanel({
   onAnalyze,
 }: Props) {
   const hintTextareaRef = useAutoGrowTextarea(hint);
+  const [historyTarget, setHistoryTarget] = useState<CompareHistoryTarget | null>(null);
+  const imageHistoryItems = useHistoryStore((s) => s.items);
   // V4 Phase 8: 비전 모델 카드 — vision/compare 공용 (settings persist 공유)
   const visionModel = useSettingsStore((s) => s.visionModel);
   const setVisionModel = useSettingsStore((s) => s.setVisionModel);
+
+  const activeImage = historyTarget === "A" ? imageA : historyTarget === "B" ? imageB : null;
+  const drawerTitle =
+    historyTarget === "B" ? "이미지 B 선택" : "이미지 A 선택";
+
+  const pickHistoryImage = (target: CompareHistoryTarget) => {
+    setHistoryTarget(target);
+  };
 
   return (
     <>
@@ -91,13 +107,25 @@ export default function CompareLeftPanel({
       </div>
 
       {/* 이미지 A 슬롯 */}
-      <CompareImageSlot
-        label="이미지 A"
-        badge="A"
-        value={imageA}
-        onChange={setImageA}
-        onClear={() => setImageA(null)}
-      />
+      <div>
+        <div className="ais-field-header">
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="blue" />
+            이미지 A
+          </label>
+          <ImageHistoryButton onClick={() => pickHistoryImage("A")} />
+        </div>
+        <CompareImageSlot
+          label="이미지 A"
+          badge="A"
+          value={imageA}
+          onChange={setImageA}
+          onClear={() => setImageA(null)}
+        />
+      </div>
 
       {/* A↔B 스왑 버튼 — 두 슬롯 사이 */}
       <div style={{ display: "flex", justifyContent: "center" }}>
@@ -127,12 +155,44 @@ export default function CompareLeftPanel({
       </div>
 
       {/* 이미지 B 슬롯 */}
-      <CompareImageSlot
-        label="이미지 B"
-        badge="B"
-        value={imageB}
-        onChange={setImageB}
-        onClear={() => setImageB(null)}
+      <div>
+        <div className="ais-field-header">
+          <label
+            className="ais-field-label"
+            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
+          >
+            <SectionAccentBar accent="blue" />
+            이미지 B
+          </label>
+          <ImageHistoryButton onClick={() => pickHistoryImage("B")} />
+        </div>
+        <CompareImageSlot
+          label="이미지 B"
+          badge="B"
+          value={imageB}
+          onChange={setImageB}
+          onClear={() => setImageB(null)}
+        />
+      </div>
+
+      <ImageHistoryPickerDrawer
+        open={historyTarget !== null}
+        items={imageHistoryItems}
+        selectedImageRef={activeImage?.dataUrl ?? null}
+        title={drawerTitle}
+        description="생성/수정 히스토리에서 비교할 이미지를 고릅니다."
+        onClose={() => setHistoryTarget(null)}
+        onPick={(it) => {
+          const next: VisionCompareImage = {
+            dataUrl: it.imageRef,
+            label: `${it.label} · ${it.width}×${it.height}`,
+            width: it.width,
+            height: it.height,
+          };
+          if (historyTarget === "A") setImageA(next);
+          if (historyTarget === "B") setImageB(next);
+          toast.info(`${historyTarget ?? "이미지"} 지정`, it.label);
+        }}
       />
 
       {/* Vision 모델 카드 (V4 Phase 8 추가 · vision 페이지와 공용) */}
@@ -193,5 +253,26 @@ export default function CompareLeftPanel({
         </div>
       </div>
     </>
+  );
+}
+
+function ImageHistoryButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{
+        all: "unset",
+        cursor: "pointer",
+        fontSize: 11,
+        color: "var(--ink-3)",
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        whiteSpace: "nowrap",
+      }}
+    >
+      <Icon name="grid" size={11} /> 이미지 히스토리
+    </button>
   );
 }

@@ -45,6 +45,51 @@ VISION_SYSTEM = (
 )
 
 
+# Video i2v 전용 비전 system (spec 2026-05-11 v1.1).
+# 일반 캡션 VISION_SYSTEM 과 별개로, 영상 생성에 필요한 5 섹션을 라벨 형식으로 출력.
+# downstream gemma4 (SYSTEM_VIDEO_BASE / SYSTEM_VIDEO_WAN22_BASE) 가 그대로 흡수.
+VIDEO_VISION_SYSTEM = """You are an i2v (image-to-video) analyst.
+
+GOAL: Analyze this reference image so a downstream video model can
+(1) reproduce the first frame with high fidelity, and
+(2) generate natural motion for a 5-second clip.
+
+Output 5 LABELED sections in this exact order. English only.
+Describe ONLY what is visually present — do NOT speculate.
+
+[ANCHOR] — for first-frame identity match.
+  If person: gender, approximate age range, body type, face shape,
+  skin tone, hair (color/length/style), clothing (top/bottom/accessories),
+  pose, gaze direction. ONE sentence.
+  If object/landscape: subject identity, composition, materials, dominant
+  colors, viewpoint. ONE sentence.
+
+[MOTION CUES] — what could naturally move in a short clip.
+  Hands, arms, gaze, expression, hair strands, fabric/cloth, held objects.
+  Mention only cues actually visible in the image (e.g. loose strands,
+  parted lips, slightly raised hand). If nothing suggests motion:
+  "static subject — minimal motion cues". ONE sentence.
+
+[ENVIRONMENT DYNAMICS] — background elements that could animate naturally.
+  Wind, rain, dust, water ripples, flame flicker, light flicker, traffic,
+  crowd movement, falling leaves, mist. ONE sentence. If none: "still
+  environment".
+
+[CAMERA POTENTIAL] — spatial cues for camera work.
+  Depth of field (shallow/deep), spatial layers (foreground/midground/
+  background), leading lines, negative space direction. ONE sentence.
+
+[MOOD] — time of day, weather, lighting tone, overall atmosphere.
+  ONE sentence.
+
+RULES:
+- 5 sections, exactly one sentence each (total 5 sentences).
+- Use the labels verbatim, in this exact order.
+- NO preamble, NO closing remark, NO markdown.
+- Only what is visible — never invent details.
+"""
+
+
 async def _describe_image(
     image_path: Path | str | bytes,
     vision_model: str,

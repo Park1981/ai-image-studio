@@ -310,12 +310,29 @@ async def create_video_task(
     meta_obj = parse_meta_object(meta)
 
     prompt = meta_obj.get("prompt", "").strip()
-    if not prompt:
+    adult = bool(meta_obj.get("adult", False))
+
+    # spec 2026-05-12 v1.1 — 자동 NSFW 시나리오 (auto_nsfw + nsfw_intensity 파싱 + validation)
+    auto_nsfw = bool(meta_obj.get("autoNsfw") or meta_obj.get("auto_nsfw") or False)
+    nsfw_intensity_raw = meta_obj.get("nsfwIntensity")
+    if nsfw_intensity_raw is None:
+        nsfw_intensity_raw = meta_obj.get("nsfw_intensity", 2)
+    try:
+        nsfw_intensity = int(nsfw_intensity_raw)
+    except (TypeError, ValueError):
+        raise HTTPException(400, "nsfwIntensity must be an integer")
+
+    if auto_nsfw and not adult:
+        raise HTTPException(400, "autoNsfw requires adult=true")
+    if auto_nsfw and nsfw_intensity not in (1, 2, 3):
+        raise HTTPException(400, "nsfwIntensity must be 1|2|3")
+
+    # Codex Finding 2: prompt required 검증 우회 (auto_nsfw 일 때 빈 prompt 허용)
+    if not prompt and not auto_nsfw:
         raise HTTPException(400, "prompt required")
 
     ollama_override = meta_obj.get("ollamaModel") or meta_obj.get("ollama_model")
     vision_override = meta_obj.get("visionModel") or meta_obj.get("vision_model")
-    adult = bool(meta_obj.get("adult", False))
     # Lightning 토글 — 기본 True (4-step 초고속). False 면 full 30-step.
     lightning = bool(meta_obj.get("lightning", True))
     # AI 프롬프트 보정 우회 (2026-04-27) — 사용자가 정제된 영문 프롬프트 직접 입력한 케이스.
@@ -326,6 +343,10 @@ async def create_video_task(
     pre_upgraded_prompt: str | None = (
         pre_upgraded_raw.strip() if isinstance(pre_upgraded_raw, str) and pre_upgraded_raw.strip() else None
     )
+    # spec 2026-05-12 v1.1 §5.7 Layer 3 — auto_nsfw=True 면 preUpgradedPrompt silent ignore
+    # (frontend Layer 1/2 우회 시도 차단 — backend 가 최종 방어)
+    if auto_nsfw:
+        pre_upgraded_prompt = None
     # Phase 2 (2026-05-01): gemma4 보강 모드 ("fast" | "precise"). 미전달 / 미인식 → fast.
     video_prompt_mode_raw = meta_obj.get("promptMode") or meta_obj.get("prompt_mode")
     video_prompt_mode: str = (
@@ -379,6 +400,8 @@ async def create_video_task(
             ollama_override,
             vision_override,
             adult,
+            auto_nsfw,             # spec 2026-05-12 v1.1
+            nsfw_intensity,         # spec 2026-05-12 v1.1
             source_w,
             source_h,
             longer_edge,
