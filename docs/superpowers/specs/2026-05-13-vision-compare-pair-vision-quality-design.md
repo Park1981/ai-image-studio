@@ -141,6 +141,12 @@ compare-encoding
 
 MVP에서는 gemma4 `finalize` stage를 따로 두지 않아도 된다. pair vision이 기존 `VisionCompareAnalysisV4`에 가까운 JSON을 직접 출력하게 하고, 기존 `translate_v4_result()`로 한국어 필드만 채우는 편이 구현량이 작다.
 
+#### 4.1.1 책임 분리 박제 (2026-05-13 검증 보강)
+
+- **pair vision은 영문 only로 출력한다.** system prompt에 `Output English only — Korean translation is handled by translate_v4_result()`를 명시한다. 이유: gemma4 nested JSON 한국어 응답이 syntax error를 자주 일으켰던 V4 Phase 10 박제 — vision 모델은 한국어가 더 약하므로 영문 출력 → 평탄 k1/k2 번역 계약을 그대로 재사용해야 안전하다.
+- **`observation1`, `observation2` 보존은 `compare_pair_with_vision()` 함수 내부 책임.** 호출자가 또 채울 필요 없다. `vision_model` 필드도 같은 함수 내부에서 채워 책임을 일관시킨다 (현재 `analyze_pair_v4`의 line 110 외부 채움 패턴은 폐기). 이유: 함수 signature가 이미 observation/vision_model 모두 받으므로 호출자 코드 단순화.
+- **vision unload는 1회만 호출한다.** observe1/2/pair-compare 모두 같은 vision 모델을 재사용하므로 keep_alive를 유지하고, pair-compare 직후 (정상 path) 또는 synthesize_diff 직전 (fallback path)에 한 번만 unload한다.
+
 ### 4.2 개선형
 
 ```
@@ -412,6 +418,12 @@ frontend/components/studio/compare/CompareResultHeader.tsx
 - vision unload는 pair compare 이후에 호출된다.
 - `translation`은 fallback 결과에서는 skip된다.
 
+**🔴 mock.patch 사이트 (CLAUDE.md critical rule):**
+
+- pair_compare 함수 호출은 반드시 **호출 모듈 기준**으로 patch한다 — `studio.compare_pipeline_v4.pipeline.compare_pair_with_vision`.
+- `__init__.py` re-export에 patch하면 caller가 직접 import한 함수 객체와 다르므로 가로채지 못한다.
+- 같은 원칙으로 `synthesize_diff` fallback도 `studio.compare_pipeline_v4.pipeline.synthesize_diff` patch 위치 박제.
+
 ### 9.2 Frontend unit
 
 수정 테스트:
@@ -473,8 +485,8 @@ frontend/components/studio/compare/CompareResultHeader.tsx
    - 품질이 부족하면 finalize stage를 후속으로 추가.
 
 2. stage type 이름.
-   - 추천: `pair-compare`
-   - 대안: `pair-verify`
+   - **결정 (2026-05-13)**: `pair-compare`로 확정. `pair-verify`는 evidence 검증형 후속 옵션으로만 남긴다.
+   - 이유: 기존 stage 이름이 모두 행위 동사 + 명사 (observe, diff-synth, translation) — `compare`가 자연스럽다. `verify`는 retroactive 뉘앙스로 본 작업 (대조 + 차이 추출) 의미와 어긋난다.
 
 3. 슬라이더 비율 문제를 이번 구현에 포함할지.
    - 모델 품질 이슈는 아니지만 사용자가 체감하는 비교 품질에는 영향이 크다.

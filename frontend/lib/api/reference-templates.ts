@@ -6,7 +6,7 @@
  * 잘못 fetch 하는 사고 방지).
  */
 
-import { STUDIO_BASE, USE_MOCK } from "./client";
+import { STUDIO_BASE, USE_MOCK, fetchImageBlob } from "./client";
 import type { ReferenceTemplate } from "./types";
 
 /** ReferenceTemplate.imageRef 를 STUDIO_BASE 기준 절대 URL 로 정규화.
@@ -53,13 +53,7 @@ export async function createReferenceTemplate(req: {
   if (USE_MOCK) return null;
   const form = new FormData();
   if (typeof req.imageFile === "string") {
-    const fetched = await fetch(req.imageFile);
-    if (!fetched.ok) {
-      throw new Error(
-        `image fetch ${fetched.status}: ${req.imageFile.slice(0, 80)}`,
-      );
-    }
-    const blob = await fetched.blob();
+    const blob = await fetchImageBlob(req.imageFile);
     form.append("image", blob, "reference.png");
   } else {
     form.append("image", req.imageFile);

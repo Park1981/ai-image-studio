@@ -123,13 +123,14 @@ describe("PIPELINE_DEFS — 정적 일관성", () => {
     );
   });
 
-  it("compare 의 핵심 stage — V4 5 stage (encoding/observe1/observe2/diff-synth/translation)", () => {
+  it("compare 의 핵심 stage — V4 5 stage (encoding/observe1/observe2/pair-compare/translation)", () => {
+    // 2026-05-13 pair vision MVP: diff-synth → pair-compare.
     const types = PIPELINE_DEFS.compare.map((s) => s.type);
     expect(types).toEqual([
       "compare-encoding",
       "observe1",
       "observe2",
-      "diff-synth",
+      "pair-compare",
       "translation",
     ]);
   });

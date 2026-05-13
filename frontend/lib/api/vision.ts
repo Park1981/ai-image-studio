@@ -11,7 +11,7 @@
  * Real 모드: POST /api/studio/vision-analyze (multipart) + GET stream/{id} SSE.
  */
 
-import { STUDIO_BASE, USE_MOCK, parseSSE } from "./client";
+import { STUDIO_BASE, USE_MOCK, fetchImageBlob, parseSSE } from "./client";
 import type { TaskCreated } from "./generated-helpers";
 import { mockAnalyze } from "./mocks/vision";
 import type { VisionAnalysisResponse } from "./types";
@@ -62,11 +62,7 @@ export async function analyzeImage(
       );
     }
     try {
-      const res = await fetch(src);
-      if (!res.ok) {
-        throw new Error(`image fetch ${res.status}`);
-      }
-      const blob = await res.blob();
+      const blob = await fetchImageBlob(src);
       const guessedName = src.startsWith("data:")
         ? "upload.png"
         : src.split("/").pop()?.split("?")[0] || "source.png";

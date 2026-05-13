@@ -15,7 +15,7 @@ async function emitMockStages(
     { type: "compare-encoding", progress: 5, stageLabel: "이미지 A/B 인코딩" },
     { type: "observe1", progress: 20, stageLabel: "Image1 관찰 (qwen3-vl)" },
     { type: "observe2", progress: 40, stageLabel: "Image2 관찰 (qwen3-vl)" },
-    { type: "diff-synth", progress: 70, stageLabel: "차이 합성 (gemma4)" },
+    { type: "pair-compare", progress: 65, stageLabel: "동시 비교 (qwen3-vl)" },
     { type: "translation", progress: 90, stageLabel: "한국어 번역 (gemma4)" },
   ];
   for (const s of stages) {

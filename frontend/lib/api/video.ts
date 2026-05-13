@@ -9,6 +9,7 @@
 import {
   STUDIO_BASE,
   USE_MOCK,
+  fetchImageBlob,
   normalizeItem,
   parseSSE,
 } from "./client";
@@ -39,11 +40,7 @@ async function* realVideoStream(
       );
     }
     try {
-      const res = await fetch(src);
-      if (!res.ok) {
-        throw new Error(`image fetch ${res.status}: ${src.slice(0, 80)}`);
-      }
-      const blob = await res.blob();
+      const blob = await fetchImageBlob(src);
       const guessedName = src.startsWith("data:")
         ? "upload.png"
         : src.split("/").pop()?.split("?")[0] || "source.png";

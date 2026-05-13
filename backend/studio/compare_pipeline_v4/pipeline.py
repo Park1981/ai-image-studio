@@ -1,14 +1,20 @@
 """
-compare_pipeline_v4.pipeline — analyze_pair_v4 (4 stage orchestration).
+compare_pipeline_v4.pipeline — analyze_pair_v4 (5 stage orchestration · pair vision MVP).
 
-흐름:
-  1. observe1 — vision_observe(image1)
-  2. observe2 — vision_observe(image2)
-  3. unload(vision_model) + sleep 1.0   ← 명시적 호출 (spec §3.1)
-  4. diff_synth — synthesize_diff(obs1, obs2, hint)
-  5. translate — translate_v4_result(result)
+흐름 (2026-05-13 spec §4.1):
+  1. observe1     — vision_observe(image1)
+  2. observe2     — vision_observe(image2)
+  3. pair-compare — compare_pair_with_vision(A+B 동시 vision 호출)
+  4. unload(vision_model) + sleep 1.0   ← pair-compare 후 1회만
+  5. translate    — translate_v4_result(영문 → 한국어)
 
-실패 (observation 빈 dict / diff fallback) 시 fallback shape 보장 (HTTP 200).
+fallback 정책 (spec §7.3):
+  - observe1 또는 observe2 실패 → _fallback_result()
+  - pair-compare 실패 (fallback=True) → 기존 synthesize_diff(obs1, obs2, hint) 한 번 더 시도
+  - synthesize_diff 도 fallback 이면 translate 건너뜀
+
+실패 (observation 빈 dict / pair fallback / diff fallback) 시
+fallback shape 보장 (HTTP 200).
 """
 
 from __future__ import annotations
@@ -21,6 +27,7 @@ from ..ollama_unload import unload_model
 from ..vision_pipeline import observe_image
 from ._types import CompareAnalysisResultV4
 from .diff_synthesize import synthesize_diff
+from .pair_compare import compare_pair_with_vision
 from .translate import translate_v4_result
 
 log = logging.getLogger(__name__)
@@ -86,30 +93,53 @@ async def analyze_pair_v4(
         # 두 번째 관찰 실패 → fallback
         return _fallback_result(vision_model, text_model)
 
-    # ── 모델 전환: vision unload + sleep (16GB VRAM swap 방지) ──
-    # observe1/2 는 qwen3-vl vision 모델 점유 → diff_synth 는 gemma4 text 모델 필요
-    # 두 모델 동시 점유 시 VRAM swap 발생 → 명시적 unload 후 1.0초 대기
-    try:
-        await unload_model(vision_model, ollama_url=ollama_url)
-        await asyncio.sleep(1.0)
-    except Exception as unload_err:
-        # unload 실패는 non-fatal — diff_synth 계속 진행
-        log.info("compare-v4 vision unload failed (non-fatal): %s", unload_err)
-
-    # ── 3단계: diff_synth — 두 관찰 결과 차이 분석 ──
-    await _signal("diff-synth")
-    result = await synthesize_diff(
+    # ── 3단계: pair-compare — A+B 동시 vision 호출 (spec §4.1) ──
+    # observe1/2 와 같은 vision 모델 (qwen3-vl) 재사용 → keep_alive 유지 →
+    # vision 3 연속 호출 묶어서 모델 swap 없이 진행 (spec §4.1.1 박제).
+    # compare_pair_with_vision 이 observation1/2 + vision_model 을 함수 내부에서 채움.
+    await _signal("pair-compare")
+    result = await compare_pair_with_vision(
+        image1_bytes=image1_bytes,
+        image2_bytes=image2_bytes,
+        image1_w=image1_w,
+        image1_h=image1_h,
+        image2_w=image2_w,
+        image2_h=image2_h,
         observation1=obs1,
         observation2=obs2,
         compare_hint=compare_hint,
+        vision_model=vision_model,
         text_model=text_model,
         timeout=timeout,
         ollama_url=ollama_url,
     )
-    # diff_synthesize 는 vision_model 을 모름 → caller 인자로 채움
-    result.vision_model = vision_model
 
-    # diff fallback 이면 translate 건너뜀 (이미 *_ko 빈 문자열 — UI fallback)
+    # ── 모델 전환: vision unload + sleep (16GB VRAM swap 방지) ──
+    # pair-compare 후 1회만 unload — vision 3 호출 모두 끝났으므로 안전하게 반환.
+    # translation 은 gemma4 text 모델 필요 → 두 모델 동시 점유 방지.
+    try:
+        await unload_model(vision_model, ollama_url=ollama_url)
+        await asyncio.sleep(1.0)
+    except Exception as unload_err:
+        # unload 실패는 non-fatal
+        log.info("compare-v4 vision unload failed (non-fatal): %s", unload_err)
+
+    # ── pair fallback path: synthesize_diff (observation JSON 기반) 한 번 더 시도 ──
+    # spec §7.3 — pair vision 실패 시 기존 diff_synthesize 가 백업.
+    if result.fallback:
+        log.info("pair-compare returned fallback — trying synthesize_diff backup")
+        result = await synthesize_diff(
+            observation1=obs1,
+            observation2=obs2,
+            compare_hint=compare_hint,
+            text_model=text_model,
+            timeout=timeout,
+            ollama_url=ollama_url,
+        )
+        # synthesize_diff 는 vision_model 을 모름 → caller 인자로 채움
+        result.vision_model = vision_model
+
+    # 두 path 모두 fallback 이면 translate 건너뜀 (이미 *_ko 빈 문자열 — UI fallback)
     if result.fallback:
         return result
 

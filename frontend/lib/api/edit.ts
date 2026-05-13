@@ -6,6 +6,7 @@
 import {
   STUDIO_BASE,
   USE_MOCK,
+  fetchImageBlob,
   normalizeItem,
   parseSSE,
 } from "./client";
@@ -51,11 +52,7 @@ async function* realEditStream(
     // 히스토리 이미지(/images/studio/... 절대 URL)는 백엔드의 ensure_cors_for_static_images
     // 미들웨어가 Access-Control-Allow-Origin 을 주입해주므로 CORS 통과.
     try {
-      const res = await fetch(src);
-      if (!res.ok) {
-        throw new Error(`image fetch ${res.status}: ${src.slice(0, 80)}`);
-      }
-      const blob = await res.blob();
+      const blob = await fetchImageBlob(src);
       // 파일명 추출 (history URL 이면 basename, data URL 이면 "upload.png")
       const guessedName = src.startsWith("data:")
         ? "upload.png"
@@ -75,13 +72,7 @@ async function* realEditStream(
   if (req.useReferenceImage && req.referenceImage) {
     if (typeof req.referenceImage === "string") {
       try {
-        const res = await fetch(req.referenceImage);
-        if (!res.ok) {
-          throw new Error(
-            `image fetch ${res.status}: ${req.referenceImage.slice(0, 80)}`,
-          );
-        }
-        const blob = await res.blob();
+        const blob = await fetchImageBlob(req.referenceImage);
         form.append("reference_image", blob, "reference.png");
       } catch (err) {
         throw new Error(

@@ -111,8 +111,15 @@ async def compare_pair_with_vision(
   - image evidence overrides observation text
   - strict JSON only
   - identity/brand/celebrity 금지
-  - boilerplate 금지
-  - score hard caps
+  - boilerplate 금지 — `masterpiece`, `golden hour`, `85mm lens`, `cinematic editorial` 등은 visible 근거 없을 때 금지 (spec §6.1 exact 문구)
+  - **score hard caps (spec §6.3 exact 문구 그대로 시스템 프롬프트에 박제)**:
+    - 같은 인물/대상이어도 의상 카테고리가 크게 바뀌면 `fidelity_score <= 82`
+    - 프레이밍이 waist-up에서 close-up 또는 큰 crop 변화면 `composition <= 85`
+    - 시선/머리 각도/표정/포즈 중 2개 이상 바뀌면 `fidelity_score <= 82`
+    - 의상/포즈/구도 중 2개 이상 큰 변화면 `fidelity_score <= 78`
+    - 이미지가 본질적으로 다른 컨셉이면 `fidelity_score = null`
+    - 확신이 낮으면 낮게 준다 (과대평가보다 과소평가 우선)
+  - **`Output English only — Korean translation is handled by translate_v4_result()`** (spec §4.1.1 박제 — vision 모델 한국어 약함 + gemma4 nested JSON 한국어 응답 syntax error 회피)
 - [ ] 출력 schema는 MVP에서 기존 `diff_synthesize.py`와 같은 V4 JSON schema를 사용한다.
 
 ### Task 1.2: user payload 작성
@@ -132,7 +139,13 @@ async def compare_pair_with_vision(
 - [ ] payload는 `format: "json"`, `stream: False`를 사용한다.
 - [ ] `messages[-1]["images"]`에 `[A, B]` 순서로 base64를 넣는다.
 - [ ] base64 helper는 기존 helper를 재사용한다. 새 구현을 만들지 않는다.
+  - **권장 경로**: `from ..comparison_pipeline._common import _to_b64` (또는 절대 경로 `from studio.comparison_pipeline._common import _to_b64`).
+  - 단, 두 패키지(`compare_pipeline_v4` ↔ `comparison_pipeline`)간 cross-import 회피를 원하면 `compare_pipeline_v4/pair_compare.py` 안에 sibling helper로 4줄짜리 `_to_b64`를 직접 정의해도 된다 (선택 — 의존 그래프 깔끔).
 - [ ] `keep_alive` 기본값은 `resolve_ollama_keep_alive()`로 맞춘다.
+- [ ] 🔴 **Ollama keep_alive 형식 박제 (CLAUDE.md critical)**:
+  - `/api/chat` payload 에서는 **string** 형식 사용 (예: `"5m"` 또는 `"0"` — deferred 가능)
+  - 명시적 강제 unload 는 **반드시** `/api/generate` + **int `0`** 사용 (`ollama_unload.unload_model` 헬퍼) — chat 의 `"0"` 은 deferred 일 수 있어 강제 안 됨
+  - pair_compare 는 chat API 사용 → string 형식만 채움 (강제 unload 는 pipeline.py 가 별도 호출)
 - [ ] 권장 options:
 
 ```python
@@ -143,7 +156,8 @@ async def compare_pair_with_vision(
 
 - [ ] `parse_strict_json()`으로 응답을 파싱한다.
 - [ ] `_coerce` helper를 써서 `CompareAnalysisResultV4`를 만든다.
-- [ ] `observation1`, `observation2`는 최종 result에 그대로 보존한다.
+- [ ] `observation1`, `observation2`는 최종 result에 그대로 보존한다 — **`compare_pair_with_vision()` 함수 내부에서 채운다** (spec §4.1.1 박제 · caller 단순화).
+- [ ] `vision_model` 필드도 같은 함수 내부에서 채운다 — `analyze_pair_v4`의 `result.vision_model = vision_model` 외부 채움 패턴 (현재 `pipeline.py:110`)은 폐기. caller는 함수 호출만 하면 끝나야 한다.
 - [ ] `provider="ollama"`, `fallback=False`를 정상 결과에 설정한다.
 - [ ] 실패 시 `fallback=True`인 빈 result를 반환한다.
 - [ ] pair 실패와 mixed/null score는 구분한다. 호출 실패/parse 실패만 fallback이다.
@@ -155,6 +169,8 @@ async def compare_pair_with_vision(
 - [ ] prompt에 observation1/2와 compare hint가 포함되는지 검증한다.
 - [ ] 성공 JSON이 `CompareAnalysisResultV4`로 정규화되는지 검증한다.
 - [ ] call 실패/empty response/parse 실패가 fallback result를 반환하는지 검증한다.
+- [ ] **`observation1`/`observation2`/`vision_model`이 결과 dataclass에 채워져 있는지 검증한다** (Task 1.4 책임 분리 박제).
+- [ ] 🔴 **mock.patch 사이트**: `call_chat_payload` patch는 `studio.compare_pipeline_v4.pair_compare.call_chat_payload` (lookup 모듈 기준 · CLAUDE.md critical rule).
 
 **Phase 1 exit:** `compare_pair_with_vision()` 단위 테스트가 통과한다.
 
@@ -219,6 +235,12 @@ observe1
 - [ ] pair 정상 path에서는 `synthesize_diff`가 호출되지 않음을 검증한다.
 - [ ] pair fallback path에서는 `synthesize_diff`가 호출됨을 검증한다.
 - [ ] observation 실패 fallback은 기존대로 유지한다.
+- [ ] 🔴 **mock.patch 사이트** (CLAUDE.md critical rule · lookup 모듈 기준):
+  - `compare_pair_with_vision` patch: `studio.compare_pipeline_v4.pipeline.compare_pair_with_vision`
+  - `synthesize_diff` fallback patch: `studio.compare_pipeline_v4.pipeline.synthesize_diff`
+  - `observe_image` patch: `studio.compare_pipeline_v4.pipeline.observe_image`
+  - `unload_model` patch: `studio.compare_pipeline_v4.pipeline.unload_model`
+  - `__init__.py` re-export에 patch 금지 — caller가 직접 import한 함수 객체와 다름.
 
 **Phase 2 exit:** backend pipeline 단위 테스트가 새 stage 순서로 통과한다.
 
@@ -330,7 +352,7 @@ npx tsc --noEmit
 
 - 의상 변화가 상단 차이점에 나온다.
 - crop/framing 변화가 명확히 나온다.
-- `fidelityScore`가 80대 후반/90대로 과대평가되지 않는다.
+- `fidelityScore ≤ 82` (이상적으로 `≤ 78`) — spec §6.3 rubric: 의상·포즈·구도 중 2개 이상 큰 변화면 ≤ 78.
 - 한국어 결과에 영어 fallback이 섞이지 않는다.
 
 ### Case 2: 거의 동일한 이미지

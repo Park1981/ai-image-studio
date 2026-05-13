@@ -9,6 +9,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
+import { STUDIO_BASE } from "@/lib/api/client";
 
 // 12가지 따뜻한 팔레트 (sand, dusk, moss, clay, steel, honey, lilac, walnut, teal, terracotta, stone, ocean)
 const PH_PALETTES: [string, string][] = [
@@ -73,6 +74,33 @@ function isVideoRef(seed: string): boolean {
   );
 }
 
+function isStudioImageRef(seed: string): boolean {
+  if (seed.startsWith("/images/")) return true;
+  try {
+    const url = new URL(seed);
+    const studioBase = new URL(STUDIO_BASE);
+    return (
+      url.origin === studioBase.origin && url.pathname.startsWith("/images/")
+    );
+  } catch {
+    return false;
+  }
+}
+
+function mediaCrossOrigin(seed: string): "anonymous" | undefined {
+  if (isStudioImageRef(seed)) return "anonymous";
+  return undefined;
+}
+
+function withStudioCorsCacheKey(seed: string): string {
+  if (!isStudioImageRef(seed) || seed.includes("__ais_cors=")) return seed;
+  const hashIndex = seed.indexOf("#");
+  const base = hashIndex >= 0 ? seed.slice(0, hashIndex) : seed;
+  const hash = hashIndex >= 0 ? seed.slice(hashIndex) : "";
+  const join = base.includes("?") ? "&" : "?";
+  return `${base}${join}__ais_cors=1${hash}`;
+}
+
 export default function ImageTile({
   seed = "a",
   label,
@@ -84,6 +112,7 @@ export default function ImageTile({
 }: ImageTileProps) {
   // Video 면 <video muted preload="metadata"> 로 썸네일(+호버 시 autoPlay loop).
   if (isImageRef(seed) && isVideoRef(seed)) {
+    const src = withStudioCorsCacheKey(seed);
     return (
       <div
         onClick={onClick}
@@ -98,10 +127,11 @@ export default function ImageTile({
         }}
       >
         <video
-          src={seed}
+          src={src}
           muted
           loop
           playsInline
+          crossOrigin={mediaCrossOrigin(seed)}
           preload="metadata"
           // hover 시 자동 재생 (미리보기 느낌). 클릭 시 onClick 이 리프트.
           onMouseEnter={(e) => {
@@ -170,6 +200,7 @@ export default function ImageTile({
 
   // 실 이미지면 <img> 렌더 + object-fit:contain 으로 잘림 없이 letterbox.
   if (isImageRef(seed)) {
+    const src = withStudioCorsCacheKey(seed);
     return (
       <div
         onClick={onClick}
@@ -185,8 +216,11 @@ export default function ImageTile({
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src={seed}
+          src={src}
           alt={label || ""}
+          crossOrigin={mediaCrossOrigin(seed)}
+          loading="lazy"
+          decoding="async"
           style={{
             width: "100%",
             height: "100%",

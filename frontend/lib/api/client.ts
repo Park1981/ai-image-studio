@@ -61,6 +61,23 @@ export function normalizeItem(item: HistoryItem): HistoryItem {
   };
 }
 
+const IMAGE_REF_RELOAD_INIT: RequestInit = { cache: "reload" };
+
+/** 서버 이미지/data URL/blob URL 을 Blob 으로 변환.
+ *  히스토리의 /images/studio URL 은 dev 중 CORS 헤더 없는 옛 캐시가 남으면
+ *  간헐적으로 fetch 가 막힐 수 있어 강제 재검증한다. */
+export async function fetchImageBlob(ref: string): Promise<Blob> {
+  const needsReload =
+    ref.startsWith("http://") ||
+    ref.startsWith("https://") ||
+    ref.startsWith("/images/");
+  const res = await fetch(ref, needsReload ? IMAGE_REF_RELOAD_INIT : undefined);
+  if (!res.ok) {
+    throw new Error(`image fetch ${res.status}: ${ref.slice(0, 80)}`);
+  }
+  return res.blob();
+}
+
 /**
  * SSE 스트림 파서 — fetch 의 ReadableStream 을 `event: X\ndata: {...}\n\n` 단위로 끊어서 yield.
  *

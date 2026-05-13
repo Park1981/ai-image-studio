@@ -217,13 +217,14 @@ describe("compareAnalyze (Phase 6 SSE drain)", () => {
         task_id: "tsk-cmp-001",
         stream_url: "/api/studio/compare-analyze/stream/tsk-cmp-001",
       }),
-      // GET stream → V4 5 stage + done (compare-encoding/observe1/observe2/diff-synth/translation)
+      // GET stream → V4 5 stage + done (compare-encoding/observe1/observe2/pair-compare/translation)
+      // 2026-05-13 pair vision MVP: 옛 diff-synth (gemma4 텍스트 합성) → pair-compare (vision 동시 비교).
       makeStreamResponse(
         sseBody([
           { event: "stage", data: { type: "compare-encoding", progress: 5,  stageLabel: "이미지 A/B 인코딩" } },
           { event: "stage", data: { type: "observe1",         progress: 20, stageLabel: "Image1 관찰" } },
           { event: "stage", data: { type: "observe2",         progress: 40, stageLabel: "Image2 관찰" } },
-          { event: "stage", data: { type: "diff-synth",       progress: 70, stageLabel: "차이 합성" } },
+          { event: "stage", data: { type: "pair-compare",     progress: 65, stageLabel: "동시 비교" } },
           { event: "stage", data: { type: "translation",      progress: 90, stageLabel: "한국어 번역" } },
           {
             event: "done",
@@ -273,14 +274,16 @@ describe("compareAnalyze (Phase 6 SSE drain)", () => {
     });
 
     // onStage 호출 순서 — V4 5 stage (Vision Compare 메뉴는 intent-refine 안 거침)
+    // 2026-05-13 pair vision MVP: diff-synth → pair-compare.
     expect(stages).toEqual([
       "compare-encoding",
       "observe1",
       "observe2",
-      "diff-synth",
+      "pair-compare",
       "translation",
     ]);
     expect(stages).not.toContain("intent-refine");
+    expect(stages).not.toContain("diff-synth");
     // V4 analysis 반환 + saved=false (historyItemId 미전송 · compare context 휘발)
     expect(analysis).toBeDefined();
     expect(

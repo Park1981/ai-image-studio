@@ -7,14 +7,14 @@
  *   - POST → {task_id, stream_url} 받음 → SSE drain → done event payload 추출
  *   - opts.onStage 콜백으로 stage 이벤트 실시간 전달 (PipelineTimeline 연동)
  *
- * SSE 5 stage 시퀀스 (compare context):
- *   compare-encoding → observe1 → observe2 → diff-synth → translation
+ * SSE 5 stage 시퀀스 (compare context · 2026-05-13 pair vision MVP):
+ *   compare-encoding → observe1 → observe2 → pair-compare → translation
  * Edit context 는 옛 시퀀스 유지 (intent-refine + vision-pair + translation).
  *
  * USE_MOCK 모드에선 stage emit + sleep 후 가짜 결과 반환 (실 백엔드 패턴 모사).
  */
 
-import { STUDIO_BASE, USE_MOCK, parseSSE } from "./client";
+import { STUDIO_BASE, USE_MOCK, fetchImageBlob, parseSSE } from "./client";
 import type { AnalyzeStageEvent } from "./vision";
 import type { TaskCreated } from "./generated-helpers";
 import { mockCompareAnalyze } from "./mocks/compare";
@@ -83,11 +83,7 @@ async function toBlob(input: File | string): Promise<Blob> {
   // File 객체는 그대로 반환
   if (input instanceof File) return input;
   // 문자열(data URL / 절대 URL) 은 fetch 후 Blob 변환
-  const res = await fetch(input);
-  if (!res.ok) {
-    throw new Error(`image fetch ${res.status}: ${input.slice(0, 80)}`);
-  }
-  return res.blob();
+  return fetchImageBlob(input);
 }
 
 /**

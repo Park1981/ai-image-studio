@@ -199,13 +199,14 @@ describe("useVisionCompareStore — stageHistory (Phase 6)", () => {
     ]);
   });
 
-  it("Vision Compare V4 — 5 stage 시퀀스 누적 (compare-encoding/observe1/observe2/diff-synth/translation)", () => {
+  it("Vision Compare V4 — 5 stage 시퀀스 누적 (compare-encoding/observe1/observe2/pair-compare/translation)", () => {
+    // 2026-05-13 pair vision MVP: diff-synth → pair-compare.
     const { pushStage } = useVisionCompareStore.getState();
     const v4Sequence = [
       { type: "compare-encoding", label: "이미지 A/B 인코딩", progress: 5,  arrivedAt: 1000 },
       { type: "observe1",         label: "Image1 관찰",      progress: 20, arrivedAt: 1100 },
       { type: "observe2",         label: "Image2 관찰",      progress: 40, arrivedAt: 1200 },
-      { type: "diff-synth",       label: "차이 합성",        progress: 70, arrivedAt: 1300 },
+      { type: "pair-compare",     label: "동시 비교",        progress: 65, arrivedAt: 1300 },
       { type: "translation",      label: "한국어 번역",      progress: 90, arrivedAt: 1400 },
     ];
     for (const s of v4Sequence) {
@@ -214,14 +215,15 @@ describe("useVisionCompareStore — stageHistory (Phase 6)", () => {
 
     const { stageHistory } = useVisionCompareStore.getState();
     expect(stageHistory).toHaveLength(5);
-    // V4 는 옛 vision-pair / intent-refine 시퀀스 폐기
+    // V4 는 옛 vision-pair / intent-refine / diff-synth 폐기
     expect(stageHistory.map((s) => s.type)).not.toContain("vision-pair");
     expect(stageHistory.map((s) => s.type)).not.toContain("intent-refine");
+    expect(stageHistory.map((s) => s.type)).not.toContain("diff-synth");
     expect(stageHistory.map((s) => s.type)).toEqual([
       "compare-encoding",
       "observe1",
       "observe2",
-      "diff-synth",
+      "pair-compare",
       "translation",
     ]);
   });

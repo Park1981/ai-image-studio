@@ -33,7 +33,7 @@ describe("pipeline-defs · 모드 분기 (Phase 2)", () => {
     ["edit", "prompt-merge"],
     ["video", "prompt-merge"],
     // 2026-05-05 V4 재설계: compare.intent-refine 폐기 (compare_pipeline_v4 는
-    // promptMode 무관 · spec §6.2). compare 의 diff-synth/translation 은 정적 라벨.
+    // promptMode 무관 · spec §6.2). compare 의 pair-compare/translation 은 정적/비전 라벨.
   ] as const)(
     "%s.%s 의 subLabel 이 promptMode 에 따라 분기",
     (mode, type) => {
@@ -48,14 +48,16 @@ describe("pipeline-defs · 모드 분기 (Phase 2)", () => {
     },
   );
 
-  it("compare V4 의 diff-synth 는 promptMode 무관 (정적 'gemma4-un (think:false)')", () => {
-    const stage = findStage("compare", "diff-synth");
-    expect(getSubLabel(stage, { promptMode: "fast" })).toBe(
-      "gemma4-un (think:false)",
-    );
-    expect(getSubLabel(stage, { promptMode: "precise" })).toBe(
-      "gemma4-un (think:false)",
-    );
+  it("compare V4 의 pair-compare 는 promptMode 무관 (visionModel ctx 만 반영 · 2026-05-13 pair vision MVP)", () => {
+    // pair-compare 는 vision 호출 (qwen3-vl) — promptMode (gemma4 분기) 와 무관.
+    // visionSubLabel 콜백이 ctx.visionModel 만 봄 (default 'qwen3-vl:8b').
+    const stage = findStage("compare", "pair-compare");
+    expect(getSubLabel(stage, { promptMode: "fast" })).toBe("qwen3-vl:8b");
+    expect(getSubLabel(stage, { promptMode: "precise" })).toBe("qwen3-vl:8b");
+    // visionModel 명시 시 그 값 반영
+    expect(
+      getSubLabel(stage, { promptMode: "fast", visionModel: "qwen3-vl:thinking" }),
+    ).toBe("qwen3-vl:thinking");
   });
 
   it("vision.translation 은 promptMode 와 무관하게 항상 'gemma4-un' (정책 §4.4)", () => {

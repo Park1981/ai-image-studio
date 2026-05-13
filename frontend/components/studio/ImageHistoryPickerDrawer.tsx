@@ -7,7 +7,13 @@
 
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type UIEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import Icon from "@/components/ui/Icon";
 import ImageTile from "@/components/ui/ImageTile";
@@ -27,6 +33,9 @@ interface Props {
 }
 
 const IMAGE_HISTORY_MODES = new Set<HistoryMode>(["generate", "edit"]);
+const INITIAL_VISIBLE_ITEMS = 32;
+const LOAD_MORE_ITEMS = 32;
+const SCROLL_LOAD_THRESHOLD_PX = 520;
 
 export default function ImageHistoryPickerDrawer({
   open,
@@ -39,6 +48,10 @@ export default function ImageHistoryPickerDrawer({
 }: Props) {
   const [mounted, setMounted] = useState(false);
   const [filter, setFilter] = useState<ImageHistoryFilter>("all");
+  const [visibleWindow, setVisibleWindow] = useState({
+    key: "",
+    limit: INITIAL_VISIBLE_ITEMS,
+  });
   const [nowMs] = useState(() => Date.now());
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
@@ -103,6 +116,26 @@ export default function ImageHistoryPickerDrawer({
     onClose();
   };
 
+  const visibleWindowKey = `${filter}:${imageItems.length}`;
+  const effectiveVisibleLimit =
+    visibleWindow.key === visibleWindowKey
+      ? visibleWindow.limit
+      : INITIAL_VISIBLE_ITEMS;
+  const renderedItems = visibleItems.slice(0, effectiveVisibleLimit);
+
+  const handleDrawerScroll = (e: UIEvent<HTMLElement>) => {
+    const el = e.currentTarget;
+    const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+    if (remaining > SCROLL_LOAD_THRESHOLD_PX) return;
+    setVisibleWindow((prev) => {
+      const current =
+        prev.key === visibleWindowKey ? prev.limit : INITIAL_VISIBLE_ITEMS;
+      const next = Math.min(current + LOAD_MORE_ITEMS, visibleItems.length);
+      if (prev.key === visibleWindowKey && prev.limit === next) return prev;
+      return { key: visibleWindowKey, limit: next };
+    });
+  };
+
   return createPortal(
     <>
       <div
@@ -135,6 +168,7 @@ export default function ImageHistoryPickerDrawer({
           gap: 14,
           overflowY: "auto",
         }}
+        onScroll={handleDrawerScroll}
       >
         <div
           style={{
@@ -238,7 +272,7 @@ export default function ImageHistoryPickerDrawer({
               gap: 10,
             }}
           >
-            {visibleItems.map((item) => (
+            {renderedItems.map((item) => (
               <ImageHistoryCard
                 key={item.id}
                 item={item}

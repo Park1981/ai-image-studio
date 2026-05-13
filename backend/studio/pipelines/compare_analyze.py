@@ -7,9 +7,9 @@ context 분기:
   - "edit" (default): analyze_pair v3 — 도메인 분기 + 5 슬롯 매트릭스 + 의도 점수 + DB persist
   - "compare": analyze_pair_v4 — Vision Compare 재설계 (관찰자→편집자 듀얼 + 5 카테고리 · 휘발 정책)
 
-흐름 (compare context — Task 11 V4):
+흐름 (compare context — Task 11 V4 · 2026-05-13 pair vision MVP):
   1. emit "stage" type=compare-encoding
-  2. analyze_pair_v4 with progress_callback (observe1 → observe2 → diff-synth → translation)
+  2. analyze_pair_v4 with progress_callback (observe1 → observe2 → pair-compare → translation)
   3. emit "done" {analysis, saved=False} (휘발)
 
 흐름 (edit context — v3 무변경):
@@ -53,16 +53,17 @@ _LABEL = {
 
 # Task 11 (V4 — compare context 전용) — 5 stage 매핑.
 # compare-encoding 은 본 pipeline 이 직접 emit (기점), 나머지 4 는 analyze_pair_v4 의 progress_callback 으로 전달.
+# 2026-05-13 pair vision MVP — diff-synth (gemma4 텍스트 합성) 폐기 + pair-compare (vision 동시 비교) 추가.
 _V4_PROGRESS = {
     "observe1": 20,
     "observe2": 40,
-    "diff-synth": 70,
+    "pair-compare": 65,
     "translation": 90,
 }
 _V4_LABEL = {
     "observe1": "Image1 관찰 (qwen3-vl)",
     "observe2": "Image2 관찰 (qwen3-vl)",
-    "diff-synth": "차이 합성 (gemma4)",
+    "pair-compare": "동시 비교 (qwen3-vl)",
     "translation": "한국어 번역 (gemma4)",
 }
 

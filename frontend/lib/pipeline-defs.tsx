@@ -359,10 +359,11 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
     },
   ],
 
-  /* ── Compare (Vision Compare V4 · 5 stage · 2-stage observe + diff_synthesize) — Phase 6 V4 ──
+  /* ── Compare (Vision Compare V4 · 5 stage · pair vision MVP) — Phase 6 V4 ──
    * 2026-05-05 재설계: 옛 vision-pair (단일 호출) + intent-refine (Edit 공용) 폐기.
+   * 2026-05-13 pair vision MVP: 옛 diff-synth (gemma4 텍스트 합성) → pair-compare (vision 동시 비교) 전환.
    * V4 pipeline (compare_pipeline_v4) 의 5 stage 시퀀스를 그대로 미러:
-   *   compare-encoding → observe1 → observe2 → diff-synth → translation
+   *   compare-encoding → observe1 → observe2 → pair-compare → translation
    * Edit 자동 트리거는 PipelineTimeline 미사용 (toast + busy indicator).
    */
   compare: [
@@ -378,23 +379,11 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       subLabel: visionSubLabel,
     },
     {
-      type: "diff-synth",
-      label: "차이 합성",
-      subLabel: "gemma4-un (think:false)",
-      // diff_synthesize stage 가 summaryEn 을 emit (spec §6.3).
-      renderDetail: (p) => {
-        const summaryEn = p.summaryEn as string | undefined;
-        const provider = p.provider as string | undefined;
-        if (!summaryEn) return null;
-        return (
-          <DetailBox
-            kind={provider?.startsWith("fallback") ? "warn" : "info"}
-            title="차이 요약 (영문)"
-          >
-            {summaryEn}
-          </DetailBox>
-        );
-      },
+      type: "pair-compare",
+      label: "동시 비교",
+      subLabel: visionSubLabel,
+      // pair-compare 는 vision 호출 — summary detail emit 안 함 (final result 만).
+      // 실패 시 backend 가 synthesize_diff 로 fallback (UI 무변경).
     },
     {
       type: "translation",
