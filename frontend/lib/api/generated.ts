@@ -359,6 +359,50 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/studio/prompt-favorites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Prompt Favorites
+         * @description 프롬프트 즐겨찾기 목록 — updated_at 최신순.
+         */
+        get: operations["list_prompt_favorites_api_studio_prompt_favorites_get"];
+        put?: never;
+        /**
+         * Create Prompt Favorite
+         * @description 사용자 원문 prompt 를 즐겨찾기에 저장. 같은 mode+prompt 는 갱신.
+         */
+        post: operations["create_prompt_favorite_api_studio_prompt_favorites_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/studio/prompt-favorites/{favorite_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * Delete Prompt Favorite
+         * @description 프롬프트 즐겨찾기 해제.
+         */
+        delete: operations["delete_prompt_favorite_api_studio_prompt_favorites__favorite_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/studio/prompt/split": {
         parameters: {
             query?: never;
@@ -718,9 +762,9 @@ export interface components {
             /** Meta */
             meta: string;
             /** Result */
-            result: string;
+            result?: string | null;
             /** Source */
-            source: string;
+            source?: string | null;
         };
         /** Body_create_edit_task_api_studio_edit_post */
         Body_create_edit_task_api_studio_edit_post: {
@@ -854,6 +898,13 @@ export interface components {
             message?: string | null;
             /** Ok */
             ok: boolean;
+        };
+        /** PromptFavoriteBody */
+        PromptFavoriteBody: {
+            /** Mode */
+            mode: string;
+            /** Prompt */
+            prompt: string;
         };
         /** PromptSplitBody */
         PromptSplitBody: {
@@ -1454,6 +1505,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProcessAction"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_prompt_favorites_api_studio_prompt_favorites_get: {
+        parameters: {
+            query?: {
+                mode?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_prompt_favorite_api_studio_prompt_favorites_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PromptFavoriteBody"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_prompt_favorite_api_studio_prompt_favorites__favorite_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                favorite_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
             /** @description Validation Error */

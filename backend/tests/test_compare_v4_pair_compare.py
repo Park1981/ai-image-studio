@@ -243,6 +243,41 @@ async def test_success_returns_v4_with_observation_and_vision_model_filled():
 
 
 @pytest.mark.asyncio
+async def test_mixed_domain_forces_null_scores():
+    """mixed domain 은 모델이 점수를 줘도 score 불변식을 서버에서 강제."""
+    response = _full_v4_response()
+    response["domain_match"] = "mixed"
+    response["category_diffs"] = {}
+    response["category_scores"] = {
+        "composition": 99,
+        "subject": 88,
+        "clothing_or_materials": 77,
+        "environment": 66,
+        "lighting_camera_style": 55,
+    }
+    response["fidelity_score"] = 91
+
+    with patch(
+        "studio.compare_pipeline_v4.pair_compare.call_chat_payload",
+        new=AsyncMock(return_value=json.dumps(response)),
+    ):
+        result = await compare_pair_with_vision(
+            image1_bytes=b"x", image2_bytes=b"y",
+            image1_w=512, image1_h=512, image2_w=512, image2_h=512,
+            observation1={"type": "portrait"}, observation2={"type": "landscape"},
+            compare_hint="",
+            vision_model="qwen3-vl:8b",
+            text_model="gemma4-un:latest",
+            timeout=60.0, ollama_url="http://localhost:11434",
+        )
+
+    assert result.domain_match == "mixed"
+    assert result.category_diffs == {}
+    assert result.fidelity_score is None
+    assert all(v is None for v in result.category_scores.values())
+
+
+@pytest.mark.asyncio
 async def test_ollama_error_returns_fallback_preserving_observations():
     """Ollama 호출 예외 → fallback=True + observation 보존."""
     obs1 = _fake_observation("img1")

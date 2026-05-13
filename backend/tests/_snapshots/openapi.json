@@ -1399,19 +1399,31 @@
           "type": "string"
         },
         "result": {
-          "contentMediaType": "application/octet-stream",
-          "title": "Result",
-          "type": "string"
+          "anyOf": [
+            {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Result"
         },
         "source": {
-          "contentMediaType": "application/octet-stream",
-          "title": "Source",
-          "type": "string"
+          "anyOf": [
+            {
+              "contentMediaType": "application/octet-stream",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Source"
         }
       },
       "required": [
-        "source",
-        "result",
         "meta"
       ],
       "title": "Body_create_compare_analyze_task_api_studio_compare_analyze_post",

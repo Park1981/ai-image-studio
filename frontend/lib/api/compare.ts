@@ -43,9 +43,8 @@ export interface CompareAnalyzeRequest {
   /** Phase 6 — stage 이벤트 도착 시 호출 (PipelineTimeline 의 stageHistory 갱신). */
   onStage?: (e: AnalyzeStageEvent) => void;
   /**
-   * @deprecated spec §6.2 (2026-05-05) — V4 pipeline 은 promptMode 분기 없음.
-   * 필드는 caller 호환을 위해 유지하지만 compareAnalyze 가 더 이상 백엔드로 보내지 않음.
-   * 백엔드 v4 receiver 는 키 받아도 무시 (안전망).
+   * Edit context 의 intent-refine 정밀/빠른 모드.
+   * Vision Compare(context="compare") V4 는 promptMode 분기 없음.
    */
   promptMode?: "fast" | "precise";
 }
@@ -131,9 +130,9 @@ export async function compareAnalyze(
   if (isCompare) {
     metaPayload.context = "compare";
     metaPayload.compareHint = req.compareHint ?? "";
+  } else if (req.promptMode) {
+    metaPayload.promptMode = req.promptMode;
   }
-  // spec §6.2 (2026-05-05): promptMode 더 이상 백엔드로 보내지 않음.
-  // V4 pipeline 이 무관하고, Edit context 도 통일. caller 가 promptMode 넣어도 무시.
   form.append("meta", JSON.stringify(metaPayload));
 
   // Phase 6: POST 가 task_id + stream_url 반환 (옛처럼 직접 결과 X)

@@ -373,7 +373,7 @@ describe("compareAnalyze (Phase 6 SSE drain)", () => {
   it("Edit 컨텍스트 + 캐시 미스 — intent-refine stage 도착", async () => {
     const { compareAnalyze } = await import("@/lib/api/compare");
 
-    queueFetchResponses([
+    const fetchMock = queueFetchResponses([
       makeBlobResponse([1]),
       makeBlobResponse([2]),
       makeJsonResponse({
@@ -413,12 +413,18 @@ describe("compareAnalyze (Phase 6 SSE drain)", () => {
       result: "data:image/png;base64,b",
       editPrompt: "옷 색깔 바꿔줘",
       historyItemId: "tsk-aaaaaaaaaaaa",
+      promptMode: "precise",
       onStage: (e) => stages.push(e.type),
     });
 
     // intent-refine 포함 — Edit 컨텍스트 + 캐시 미스 시 도착
     expect(stages).toContain("intent-refine");
     expect(saved).toBe(true);
+
+    const [, postInit] = fetchMock.mock.calls[2];
+    const body = (postInit as RequestInit).body as FormData;
+    const meta = JSON.parse(String(body.get("meta"))) as { promptMode?: string };
+    expect(meta.promptMode).toBe("precise");
   });
 
   it("error event 도착 시 throw", async () => {

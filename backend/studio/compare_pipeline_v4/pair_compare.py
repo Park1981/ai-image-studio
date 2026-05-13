@@ -316,6 +316,10 @@ async def compare_pair_with_vision(
             cat_scores[axis] = coerce_fidelity_score(cat_scores_raw.get(axis))
     else:
         cat_scores = {k: None for k in COMPARE_V4_AXES}
+    fidelity_score = coerce_fidelity_score(parsed.get("fidelity_score"))
+    if domain == "mixed":
+        cat_scores = {k: None for k in COMPARE_V4_AXES}
+        fidelity_score = None
 
     # key_anchors: 최대 8개
     anchors_raw = parsed.get("key_anchors", [])
@@ -337,7 +341,7 @@ async def compare_pair_with_vision(
         category_diffs=cat_diffs,
         category_scores=cat_scores,
         key_anchors=anchors,
-        fidelity_score=coerce_fidelity_score(parsed.get("fidelity_score")),
+        fidelity_score=fidelity_score,
         transform_prompt_en=_coerce_safe_str(parsed.get("transform_prompt")),
         transform_prompt_ko="",
         uncertain_en=_coerce_safe_str(parsed.get("uncertain")),

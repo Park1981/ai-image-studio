@@ -120,6 +120,47 @@ async def test_synthesize_diff_mixed_domain_empty_category_diffs():
     assert len(result.key_anchors) == 2
 
 
+@pytest.mark.asyncio
+async def test_synthesize_diff_mixed_domain_forces_null_scores():
+    """mixed domain 은 모델이 점수를 줘도 서버 정규화에서 null 로 강제."""
+    fake_response = json.dumps({
+        "summary": "image1 is a portrait, image2 is a landscape.",
+        "common_points": ["both photographic"],
+        "key_differences": ["subject vs scene"],
+        "domain_match": "mixed",
+        "category_diffs": {},
+        "category_scores": {
+            "composition": 99,
+            "subject": 88,
+            "clothing_or_materials": 77,
+            "environment": 66,
+            "lighting_camera_style": 55,
+        },
+        "key_anchors": [],
+        "fidelity_score": 91,
+        "transform_prompt": "",
+        "uncertain": "",
+    })
+
+    with patch(
+        "studio.compare_pipeline_v4.diff_synthesize.call_chat_payload",
+        new=AsyncMock(return_value=fake_response),
+    ):
+        result = await synthesize_diff(
+            observation1={"type": "portrait"},
+            observation2={"type": "landscape"},
+            compare_hint="",
+            text_model="gemma4-un:latest",
+            timeout=120.0,
+            ollama_url="http://localhost:11434",
+        )
+
+    assert result.domain_match == "mixed"
+    assert result.category_diffs == {}
+    assert result.fidelity_score is None
+    assert all(v is None for v in result.category_scores.values())
+
+
 # ── parse 실패 fallback ──
 @pytest.mark.asyncio
 async def test_synthesize_diff_parse_failed_fallback():
