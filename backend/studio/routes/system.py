@@ -247,7 +247,7 @@ async def list_history(
     safe_mode = mode if mode in valid_modes else None
     items = await history_db.list_items(
         mode=safe_mode,
-        limit=max(1, min(limit, 200)),
+        limit=max(1, min(limit, 2000)),
         before_ts=before,
     )
     total = await history_db.count_items(safe_mode)

@@ -9,7 +9,10 @@ import { create } from "zustand";
 import { persist, createJSONStorage } from "zustand/middleware";
 import type { HistoryItem } from "@/lib/api/types";
 
-const MAX_HISTORY = 200;
+// 2026-05-13: 200 → 2000 (cap 풀기 · 사용자 DB 진실 그대로 갤러리에 표시).
+//  옛 200 cap 은 mode 합산 후 절단으로 mode 별 분포가 timing 따라 흔들렸음.
+//  localStorage 부담은 image URL string 만 저장 → 2000 row × ~500 byte ≈ 1MB 으로 안전.
+const MAX_HISTORY = 2000;
 
 export interface HistoryState {
   items: HistoryItem[];
