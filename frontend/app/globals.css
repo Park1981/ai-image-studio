@@ -437,6 +437,11 @@ button {
 .ais-prompt-mode-segmented[data-value="precise"] .ais-prompt-mode-thumb {
   transform: translateX(100%);
 }
+.ais-prompt-mode-segmented[data-disabled="true"] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
 .ais-prompt-mode-seg-btn {
   position: relative;
   z-index: 1;

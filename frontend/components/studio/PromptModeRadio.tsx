@@ -23,6 +23,7 @@ type Mode = "fast" | "precise";
 interface Props {
   value: Mode;
   onChange: (mode: Mode) => void;
+  disabled?: boolean;
 }
 
 const OPTIONS: ReadonlyArray<{
@@ -34,13 +35,14 @@ const OPTIONS: ReadonlyArray<{
   { id: "precise", label: "thinking", desc: "think:true · 30~60초+ · 사고모드" },
 ];
 
-function PromptModeRadioImpl({ value, onChange }: Props) {
+function PromptModeRadioImpl({ value, onChange, disabled = false }: Props) {
   return (
     <div
       className="ais-prompt-mode-segmented"
       role="radiogroup"
       aria-label="AI 보정 모드"
       data-value={value}
+      data-disabled={disabled ? "true" : undefined}
     >
       {/* 슬라이드 thumb — active 옵션 위로 부드럽게 transform 이동.
        *  버튼들은 transparent + thumb 가 흰 pill 배경 책임. iOS segmented 패턴. */}
@@ -55,9 +57,11 @@ function PromptModeRadioImpl({ value, onChange }: Props) {
             aria-checked={active}
             data-active={active}
             title={opt.desc}
+            disabled={disabled}
             onClick={(e) => {
               // V5MotionCard onClick (카드 자체 토글) 으로 bubble 차단 — segmented 는 카드 내부 독립 control.
               e.stopPropagation();
+              if (disabled) return;
               onChange(opt.id);
             }}
             className="ais-prompt-mode-seg-btn"

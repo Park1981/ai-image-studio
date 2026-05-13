@@ -37,6 +37,7 @@ import VideoModelSegment from "@/components/studio/video/VideoModelSegment";
 import VideoResolutionCard from "@/components/studio/video/VideoResolutionCard";
 import VideoAutoNsfwCard from "@/components/studio/video/VideoAutoNsfwCard";
 import { AnimatePresence, motion } from "framer-motion";
+import { USE_MOCK } from "@/lib/api/client";
 import { VIDEO_MODEL_PRESETS } from "@/lib/model-presets";
 import Icon from "@/components/ui/Icon";
 import { Spinner, Toggle } from "@/components/ui/primitives";
@@ -46,6 +47,7 @@ import {
   useVideoRunning,
 } from "@/stores/useVideoStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
+import { useProcessStore } from "@/stores/useProcessStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
 import VideoSizeWarnModal from "@/components/studio/video/VideoSizeWarnModal";
@@ -97,13 +99,29 @@ export default function VideoLeftPanel({
   const nsfwIntensity = useSettingsStore((s) => s.nsfwIntensity);
   const setAutoNsfwEnabled = useSettingsStore((s) => s.setAutoNsfwEnabled);
   const setNsfwIntensity = useSettingsStore((s) => s.setNsfwIntensity);
+  const ollamaStatus = useProcessStore((s) => s.ollama);
+
+  // spec 2026-05-13 v1.2 — adult OFF + persisted autoNsfwEnabled=true race 차단.
+  // ComfyUI 는 backend 가 자동 기동하므로 CTA 에서는 Ollama(자동 NSFW 전용)만 사전 차단.
+  const effectiveAutoNsfw = adult && autoNsfwEnabled;
+  const promptRequired = !effectiveAutoNsfw;
+  const externalDepsReady =
+    USE_MOCK || !effectiveAutoNsfw || ollamaStatus === "running";
+  const isInvalidSource =
+    typeof sourceImage === "string" && sourceImage.startsWith("mock-seed://");
+  const ctaDisabled =
+    running ||
+    !sourceImage ||
+    isInvalidSource ||
+    (promptRequired && !prompt.trim()) ||
+    !externalDepsReady;
 
   // Phase 5 후속 (2026-05-01) — 프롬프트 도구 (번역/분리) state + 핸들러 통합 hook.
   const promptTools = usePromptTools({
     prompt,
     onPromptChange: setPrompt,
     ollamaModel: ollamaModelForTools,
-    disabled: running,
+    disabled: running || effectiveAutoNsfw,
   });
 
   // Phase 2 (2026-05-01 · 2026-05-06 hook 추출) — session-only 정책 sync.
@@ -134,12 +152,6 @@ export default function VideoLeftPanel({
   // 큰 사이즈 경고 모달 노출 state.
   const [warnOpen, setWarnOpen] = useState(false);
   const [imageHistoryOpen, setImageHistoryOpen] = useState(false);
-
-  // spec 2026-05-12 v1.1 §4.9 — autoNsfwEnabled 면 prompt 검증 skip
-  // (vision + gemma4 가 이미지 보고 자율 시나리오 작성)
-  const promptRequired = !autoNsfwEnabled;
-  const ctaDisabled =
-    running || !sourceImage || (promptRequired && !prompt.trim());
 
   /**
    * Render CTA 클릭 — 사이즈 임계 충족 시 경고 모달, 미만이면 즉시 onGenerate.
@@ -276,7 +288,9 @@ export default function VideoLeftPanel({
           </label>
         </div>
         <div className="ais-prompt-shell">
-          <PromptHistoryPeek mode="video" onSelect={(p) => setPrompt(p)} />
+          {!effectiveAutoNsfw && (
+            <PromptHistoryPeek mode="video" onSelect={(p) => setPrompt(p)} />
+          )}
           <textarea
             ref={promptTextareaRef}
             value={prompt}
@@ -284,10 +298,11 @@ export default function VideoLeftPanel({
             placeholder="어떤 움직임/카메라/분위기의 영상? 예: 느린 달리 인, 창가 빛 변화..."
             rows={3}
             className="ais-prompt-textarea"
+            disabled={effectiveAutoNsfw}
           />
           {/* Phase 5 후속 (2026-05-01) — 도구 버튼 (번역/분리) textarea 안 우측. */}
-          <PromptToolsButtons tools={promptTools} />
-          {prompt.length > 0 && (
+          {!effectiveAutoNsfw && <PromptToolsButtons tools={promptTools} />}
+          {prompt.length > 0 && !effectiveAutoNsfw && (
             <button
               type="button"
               onClick={() => setPrompt("")}
@@ -300,7 +315,7 @@ export default function VideoLeftPanel({
           )}
         </div>
         {/* 번역/분리 결과 카드 — textarea 외부 아래에 펼침. */}
-        <PromptToolsResults tools={promptTools} />
+        {!effectiveAutoNsfw && <PromptToolsResults tools={promptTools} />}
       </div>
 
       {/* Phase 5 (2026-05-03 · spec §5.6) — 영상 모델 선택 세그먼트 (Wan 2.2 / LTX 2.3).
@@ -337,13 +352,13 @@ export default function VideoLeftPanel({
        *  Video 는 vision + gemma4 둘 다 우회 → ~15초 절약 (기본 OFF). */}
       <V5MotionCard
         className="ais-toggle-card ais-sig-ai"
-        data-active={!skipUpgrade || autoNsfwEnabled}
+        data-active={!skipUpgrade || effectiveAutoNsfw}
         onClick={
-          // spec 2026-05-12 v1.1 §5.7 Layer 2 — autoNsfwEnabled 면 클릭 차단
-          autoNsfwEnabled ? undefined : () => setSkipUpgrade(!skipUpgrade)
+          // spec 2026-05-13 v1.2 — effectiveAutoNsfw 면 클릭 차단
+          effectiveAutoNsfw ? undefined : () => setSkipUpgrade(!skipUpgrade)
         }
         tooltip={
-          autoNsfwEnabled
+          effectiveAutoNsfw
             ? "자동 NSFW 모드는 항상 AI 보강을 사용합니다"
             : skipUpgrade
               ? "OFF · 정제된 영문 프롬프트 그대로 (~15초 절약)"
@@ -353,14 +368,18 @@ export default function VideoLeftPanel({
         <Toggle
           flat
           icon="stars"
-          checked={!skipUpgrade || autoNsfwEnabled}
+          checked={!skipUpgrade || effectiveAutoNsfw}
           onChange={(v) => setSkipUpgrade(!v)}
           align="right"
           label="🪄 AI 프롬프트 보정"
-          disabled={autoNsfwEnabled}
+          disabled={effectiveAutoNsfw}
         />
-        {(!skipUpgrade || autoNsfwEnabled) && (
-          <PromptModeRadio value={promptMode} onChange={setPromptMode} />
+        {(!skipUpgrade || effectiveAutoNsfw) && (
+          <PromptModeRadio
+            value={promptMode}
+            onChange={setPromptMode}
+            disabled={effectiveAutoNsfw}
+          />
         )}
       </V5MotionCard>
 

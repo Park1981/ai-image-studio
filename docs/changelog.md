@@ -3,6 +3,10 @@
 > 누적 변경 로그 — 완료된 작업의 역사적 기록.
 > 최신 변경 + 활성 정책은 `CLAUDE.md` 참조. 자세한 작업 내역은 git log + memory.
 
+## 2026-05-13
+
+- Video CTA / 입력 게이트 정리 — 자동 NSFW 실제 게이트를 `adult && autoNsfwEnabled` 로 통일하고, 영상 지시 입력 경로·AI 보강 카드·PromptModeRadio·Ollama 의존성 가드를 같은 조건으로 동기화. 관련 spec: `docs/superpowers/specs/2026-05-13-video-cta-input-gating-design.md`.
+
 ## 2026-05-02 (저녁)
 
 ### 디자인 V5 시안 vs React 차이점 fix — 사용자 검증 라운드

@@ -9,6 +9,7 @@
 "use client";
 
 import { videoImageStream } from "@/lib/api/video";
+import { USE_MOCK } from "@/lib/api/client";
 import { consumePipelineStream } from "@/hooks/usePipelineStream";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useProcessStore } from "@/stores/useProcessStore";
@@ -59,6 +60,7 @@ export function useVideoPipeline(
   const nsfwIntensity = useSettingsStore((s) => s.nsfwIntensity);
   // 프로세스 상태
   const comfyuiStatus = useProcessStore((s) => s.comfyui);
+  const ollamaStatus = useProcessStore((s) => s.ollama);
 
   const generate = async () => {
     if (running) return;
@@ -66,10 +68,21 @@ export function useVideoPipeline(
       toast.warn("원본 이미지를 먼저 업로드해 주세요.");
       return;
     }
-    // spec 2026-05-12 v1.1 §4.10 — autoNsfwEnabled 면 빈 prompt 허용
+    // spec 2026-05-12 v1.1 — adult && autoNsfwEnabled 단일 게이트 (race 차단)
+    // adult OFF 면 VideoAutoNsfwCard 가 안 렌더되지만 settings store persist 로
+    // autoNsfwEnabled=true 가 유령처럼 살아있을 수 있음 → effective 게이트 단일 진실원으로 일원화.
+    const effectiveAutoNsfw = adult && autoNsfwEnabled;
+    // spec 2026-05-12 v1.1 §4.10 — effectiveAutoNsfw 면 빈 prompt 허용
     // (vision + gemma4-un 이 이미지 분석 후 자율 시나리오 작성)
-    if (!autoNsfwEnabled && !prompt.trim()) {
+    if (!effectiveAutoNsfw && !prompt.trim()) {
       toast.warn("영상 지시를 입력해 주세요.");
+      return;
+    }
+    if (effectiveAutoNsfw && !USE_MOCK && ollamaStatus === "stopped") {
+      toast.warn(
+        "Ollama가 정지 상태입니다.",
+        "자동 NSFW는 vision + gemma4 (Ollama)가 필요합니다. 설정에서 시작해 주세요.",
+      );
       return;
     }
     if (comfyuiStatus === "stopped") {
@@ -83,8 +96,8 @@ export function useVideoPipeline(
     usePromptHistoryStore.getState().add("video", prompt);
 
     // spec 2026-05-12 v1.1 §5.7 — skipUpgrade 3-layer 방어 Layer 1
-    // autoNsfw 면 vision + gemma4 가 자율 시나리오 작성해야 하므로 skipUpgrade 강제 OFF.
-    const effectiveSkipUpgrade = autoNsfwEnabled ? false : skipUpgrade;
+    // effectiveAutoNsfw 면 vision + gemma4 가 자율 시나리오 작성해야 하므로 skipUpgrade 강제 OFF.
+    const effectiveSkipUpgrade = effectiveAutoNsfw ? false : skipUpgrade;
 
     setRunning(true);
     await consumePipelineStream(
@@ -92,9 +105,8 @@ export function useVideoPipeline(
         sourceImage,
         prompt,
         adult,
-        // spec 2026-05-12 v1.1 — adult && autoNsfwEnabled 단일 게이트 (race 차단)
-        autoNsfw: adult && autoNsfwEnabled ? true : undefined,
-        nsfwIntensity: adult && autoNsfwEnabled ? nsfwIntensity : undefined,
+        autoNsfw: effectiveAutoNsfw ? true : undefined,
+        nsfwIntensity: effectiveAutoNsfw ? nsfwIntensity : undefined,
         longerEdge,
         lightning,
         ollamaModel: ollamaModelSel,
