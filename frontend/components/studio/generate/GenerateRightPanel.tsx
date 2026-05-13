@@ -22,6 +22,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
+import { ResultBox } from "@/components/studio/ResultBox";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
@@ -30,11 +31,12 @@ import { copyText, urlToDataUrl } from "@/lib/image-actions";
 import { useEditStore } from "@/stores/useEditStore";
 import {
   useGenerateInputs,
+  useGenerateRunning,
   useGenerateStore,
 } from "@/stores/useGenerateStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
-import GenerateResultViewer from "./GenerateResultViewer";
+import GenerateContent from "./GenerateContent";
 
 interface Props {
   /** Lightbox open 콜백 (page-level state) */
@@ -44,6 +46,7 @@ interface Props {
 export default function GenerateRightPanel({ onLightboxOpen }: Props) {
   const router = useRouter();
   const { setPrompt, applyLightning, lightning } = useGenerateInputs();
+  const { generating } = useGenerateRunning();
   // setDimensions 는 useGenerateInputs 가 묶고 있지만 재선택 보일러 줄이려고 직접 호출.
   const setDimensions = useGenerateStore((s) => s.setDimensions);
 
@@ -56,6 +59,11 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
     [items],
   );
   const selectedItem = genItems.find((i) => i.id === selectedId);
+  const resultState = generating ? "loading" : selectedItem ? "done" : "idle";
+  const selectedAspectRatio =
+    selectedItem && selectedItem.width > 0 && selectedItem.height > 0
+      ? `${selectedItem.width} / ${selectedItem.height}`
+      : undefined;
 
   const [viewerHovered, setViewerHovered] = useState(false);
 
@@ -86,7 +94,7 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
 
   // V5 result-meta-pills — 첫 violet pill = 해상도, 추가 pill = 모델/Lightning
   // 2026-05-02: 이미지 미선택 시 pill 자체 숨김 (옛 PNG fallback 제거 — 의미 없음).
-  const metaPills = selectedItem ? (
+  const metaPills = resultState === "done" && selectedItem ? (
     <>
       <span className="ais-result-pill ais-pill-violet mono">
         {selectedItem.width} × {selectedItem.height}
@@ -102,37 +110,60 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
     <StudioRightPanel>
       <StudioResultHeader title="결과" titleEn="Latest" meta={metaPills} />
 
-      {selectedItem ? (
-        <GenerateResultViewer
-          item={selectedItem}
-          hovered={viewerHovered}
-          onEnter={() => setViewerHovered(true)}
-          onLeave={() => setViewerHovered(false)}
-          onExpand={() => onLightboxOpen(selectedItem.imageRef)}
-          onCopyPrompt={() =>
-            void copyText(selectedItem.prompt || "", "프롬프트")
-          }
-          onSendToEdit={() => sendToEdit(selectedItem)}
-          onReuse={() => {
-            // 재생성 = 프롬프트 + 사이즈 + Lightning 복원.
-            // Seed/Step/CFG 는 UI 제거 + 매번 랜덤 정책이라 복원 안 함.
-            setPrompt(selectedItem.prompt);
-            setDimensions(selectedItem.width, selectedItem.height);
-            if (selectedItem.lightning !== lightning) {
-              applyLightning(selectedItem.lightning);
+      <ResultBox
+        state={resultState}
+        emptyState={
+          <StudioEmptyState size="normal">
+            아직 생성된 이미지가 없습니다. 프롬프트 입력 후 <b>생성</b> 버튼을
+            눌러 주세요.
+          </StudioEmptyState>
+        }
+        style={
+          selectedAspectRatio
+            ? { aspectRatio: selectedAspectRatio, maxHeight: "65vh" }
+            : undefined
+        }
+      >
+        {selectedItem && (
+          <GenerateContent
+            item={selectedItem}
+            hovered={viewerHovered}
+            onEnter={() => setViewerHovered(true)}
+            onLeave={() => setViewerHovered(false)}
+            onExpand={() => onLightboxOpen(selectedItem.imageRef)}
+            onCopyPrompt={() =>
+              void copyText(selectedItem.prompt || "", "프롬프트")
             }
-            toast.info(
-              "재생성 준비",
-              `${selectedItem.width}×${selectedItem.height} · [생성] 눌러`,
-            );
-          }}
-        />
-      ) : (
-        <StudioEmptyState size="normal">
-          아직 생성된 이미지가 없습니다. 프롬프트 입력 후 <b>생성</b> 버튼을
-          눌러 주세요.
-        </StudioEmptyState>
-      )}
+            onSendToEdit={() => sendToEdit(selectedItem)}
+            onReuse={() => {
+              // 재생성 = 프롬프트 + 사이즈 + Lightning 복원.
+              // Seed/Step/CFG 는 UI 제거 + 매번 랜덤 정책이라 복원 안 함.
+              setPrompt(selectedItem.prompt);
+              setDimensions(selectedItem.width, selectedItem.height);
+              if (selectedItem.lightning !== lightning) {
+                applyLightning(selectedItem.lightning);
+              }
+              toast.info(
+                "재생성 준비",
+                `${selectedItem.width}×${selectedItem.height} · [생성] 눌러`,
+              );
+            }}
+          />
+        )}
+      </ResultBox>
+
+      {resultState === "done" &&
+        selectedItem &&
+        (selectedItem.upgradedPrompt || selectedItem.prompt) && (
+          <div className="ais-result-caption">
+            <p
+              className="ais-result-caption-prompt"
+              title={selectedItem.upgradedPrompt || selectedItem.prompt}
+            >
+              {selectedItem.upgradedPrompt || selectedItem.prompt}
+            </p>
+          </div>
+        )}
 
       <HistorySectionHeader
         title="보관"

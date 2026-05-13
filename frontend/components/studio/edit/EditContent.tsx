@@ -1,5 +1,5 @@
 /**
- * EditResultViewer — Edit 페이지 결과 뷰어 (Before/After 슬라이더 + 호버 액션바).
+ * EditContent — Edit 페이지 결과 본문 (Before/After 슬라이더 + 호버 액션바).
  *
  * 2026-04-26: edit/page.tsx 분해 step 2.
  *  - Generate 의 GenerateResultViewer 패턴과 통일 (호버 props + 콜백)
@@ -7,11 +7,11 @@
  *  - 외부 영향 액션 (Lightbox open / Comparison detail) 만 콜백
  *
  * 2026-05-02 디자인 V5 Phase 5 격상:
- *  - 매트지 wrapper inline → className `.ais-result-hero .ais-result-hero-edit` (V5 토큰)
+ *  - 매트지 wrapper 는 ResultBox 로 이관
  *  - SegControl wrapper → className `.ais-hero-seg-row`
  *  - **Action Bar 4 버튼** — download 제거 + copy 신규 (자세히 / 수정 지시 복사 / 다음 수정 원본 / 리프레시)
  *  - **canPromote=true 시 5번째 액션 "라이브러리 저장"** 유지 필수 (회귀 위험 #5)
- *  - **Caption 슬롯 NEW** — italic afterItem.prompt 1줄 truncate (Hero 아래 · 결정 ⓒ)
+ *  - Caption 은 ResultBox 밖에서 page 가 done 상태일 때만 렌더
  *  - **회귀 위험 #4 보존**: BeforeAfterSlider 자체 드래그 핸들 (별도 컴포넌트 — 변경 0)
  *  - inner box (BeforeAfter wrapper) inline 제거 — BeforeAfterSlider 자체 box-shadow 가 처리
  *
@@ -55,7 +55,7 @@ interface Props {
   onAfterIdReset: () => void;
 }
 
-export default function EditResultViewer({
+export default function EditContent({
   afterItem,
   sourceImage,
   compareX,
@@ -99,6 +99,7 @@ export default function EditResultViewer({
     : afterItem.width && afterItem.height
       ? `${afterItem.width} / ${afterItem.height}`
       : "16 / 10";
+  const maxViewerWidth = "min(100%, 1040px)";
 
   // 2026-05-02: 둘 다 contain 으로. ComfyUI 결과 미세 비율 차이 (~4%) 는 transform 보정 시도했으나
   // 사용자 시각 인지 영역 밑이라 fix 빼고 그대로 contain 처리. (autoMatchAspect 시도 → 인물 약간 어색)
@@ -161,26 +162,33 @@ export default function EditResultViewer({
   );
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div
-        className="ais-result-hero ais-result-hero-edit"
-        onMouseEnter={onEnter}
-        onMouseLeave={onLeave}
-      >
-        {/* 모드 토글 — 우측 상단. CompareViewer 와 통일 (2026-04-27 오빠 피드백). */}
-        <div className="ais-hero-seg-row">
-          <SegControl
-            value={viewerMode}
-            onChange={(v) => setViewerMode(v as EditViewerMode)}
-            options={[
-              { value: "slider", label: "슬라이더" },
-              { value: "sidebyside", label: "나란히" },
-            ]}
-          />
-        </div>
+    <div
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      style={{
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        width: "100%",
+        maxWidth: maxViewerWidth,
+        marginInline: "auto",
+      }}
+    >
+      {/* 모드 토글 — 우측 상단. CompareViewer 와 통일 (2026-04-27 오빠 피드백). */}
+      <div className="ais-hero-seg-row">
+        <SegControl
+          value={viewerMode}
+          onChange={(v) => setViewerMode(v as EditViewerMode)}
+          options={[
+            { value: "slider", label: "슬라이더" },
+            { value: "sidebyside", label: "나란히" },
+          ]}
+        />
+      </div>
 
-        {viewerMode === "slider" ? (
-          <div style={{ position: "relative" }}>
+      {viewerMode === "slider" ? (
+        <div style={{ display: "grid", justifyItems: "center", width: "100%" }}>
+          <div style={{ position: "relative", width: "100%" }}>
             <BeforeAfterSlider
               beforeSrc={sourceImage}
               afterSeed={afterItem.imageRef || afterItem.id}
@@ -197,30 +205,17 @@ export default function EditResultViewer({
               </ResultHoverActionBar>
             </div>
           </div>
-        ) : (
-          <SideBySidePanel
-            beforeSrc={sourceImage}
-            afterItem={afterItem}
-            aspectRatio={aspectRatio}
-            hovered={hovered}
-            actionBarChildren={actionBarChildren}
-            beforeFit="cover"
-          />
-        )}
-      </div>
-
-      {/* V5 Caption 슬롯 — italic 1줄 truncate (Hero 매트지 아래 · 결정 ⓒ).
-       *  2026-05-03 통일: upgradedPrompt 우선 → 없으면 사용자 지시 fallback.
-       *  Generate 와 동일 정책 (영어 업그레이드 결과로 풍성한 캡션). */}
-      {(afterItem.upgradedPrompt || afterItem.prompt) && (
-        <div className="ais-result-caption">
-          <p
-            className="ais-result-caption-prompt"
-            title={afterItem.upgradedPrompt || afterItem.prompt}
-          >
-            {afterItem.upgradedPrompt || afterItem.prompt}
-          </p>
         </div>
+      ) : (
+        <SideBySidePanel
+          beforeSrc={sourceImage}
+          afterItem={afterItem}
+          aspectRatio={aspectRatio}
+          hovered={hovered}
+          actionBarChildren={actionBarChildren}
+          maxWidth={maxViewerWidth}
+          beforeFit="cover"
+        />
       )}
 
       {/* v9 (2026-04-29 · Phase C.2): 사후 라이브러리 저장 모달 */}
@@ -249,6 +244,7 @@ function SideBySidePanel({
   aspectRatio,
   hovered,
   actionBarChildren,
+  maxWidth,
   beforeFit = "contain",
 }: {
   beforeSrc: string;
@@ -256,6 +252,7 @@ function SideBySidePanel({
   aspectRatio: string;
   hovered: boolean;
   actionBarChildren: React.ReactNode;
+  maxWidth: string;
   beforeFit?: "contain" | "cover";
 }) {
   return (
@@ -264,7 +261,10 @@ function SideBySidePanel({
         display: "grid",
         gridTemplateColumns: "1fr 1fr",
         gap: 12,
+        width: "100%",
+        maxWidth,
         maxHeight: "70vh",
+        marginInline: "auto",
       }}
     >
       <SideThumb

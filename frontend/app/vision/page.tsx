@@ -13,7 +13,9 @@ import AppHeader from "@/components/chrome/AppHeader";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import ProgressModal from "@/components/studio/ProgressModal";
+import { ResultBox } from "@/components/studio/ResultBox";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import StudioEmptyState from "@/components/studio/StudioEmptyState";
 import StudioResultHeader, {
   SectionAccentBar,
 } from "@/components/studio/StudioResultHeader";
@@ -28,7 +30,7 @@ import VisionHistoryList from "@/components/studio/VisionHistoryList";
 import VisionModelSelector, {
   VISION_MODEL_OPTIONS,
 } from "@/components/studio/VisionModelSelector";
-import VisionResultCard from "@/components/studio/VisionResultCard";
+import VisionContent from "@/components/studio/VisionContent";
 import Icon from "@/components/ui/Icon";
 import { Spinner } from "@/components/ui/primitives";
 import { useVisionPipeline } from "@/hooks/useVisionPipeline";
@@ -113,6 +115,7 @@ export default function VisionPage() {
 
   /* ── 파이프라인 훅 ── */
   const { analyze, analyzing } = useVisionPipeline();
+  const resultState = analyzing ? "loading" : lastResult ? "done" : "idle";
 
   /* ── 진행 모달 open 상태 — useAutoCloseModal hook (1000ms · 분석은 짧음) ── */
   const [progressOpen, setProgressOpen] = useAutoCloseModal(analyzing, 1000);
@@ -296,7 +299,17 @@ export default function VisionPage() {
             meta={renderVisionMeta(currentImage, currentLabel, currentWidth, currentHeight)}
           />
 
-          <VisionResultCard result={lastResult} running={analyzing} />
+          <ResultBox
+            state={resultState}
+            variant="plain"
+            emptyState={
+              <StudioEmptyState size="normal">
+                이미지를 업로드하고 <b>분석</b> 버튼을 눌러 주세요.
+              </StudioEmptyState>
+            }
+          >
+            {lastResult && <VisionContent result={lastResult} />}
+          </ResultBox>
 
           {/* ── V5 Archive Header (Edit/Generate 와 통일 · 2026-05-03) ──
            *  "모두 지우기" 액션은 actions 슬롯으로. countLabel "/ 100" 으로

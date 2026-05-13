@@ -11,8 +11,8 @@
 4 모드 (Generate / Edit / Video / Vision) 의 결과 박스가 **4 개 분리 컴포넌트** 로 구현되어 있다:
 
 - `frontend/components/studio/generate/GenerateResultViewer.tsx` (238 라인)
-- `frontend/components/studio/edit/EditResultViewer.tsx` (240 라인)
-- `frontend/components/studio/VideoPlayerCard.tsx` (151 라인)
+- `frontend/components/studio/edit/EditResultViewer.tsx` (354 라인 · 2026-05-14 구현 전 재검증 기준)
+- `frontend/components/studio/VideoPlayerCard.tsx` (152 라인 · 2026-05-14 구현 전 재검증 기준)
 - `frontend/components/studio/VisionResultCard.tsx` (74 라인)
 
 진행 중 결과 박스 동작이 **두 갈래로 갈림**:
@@ -91,15 +91,15 @@ interface ResultBoxProps {
 **책임**:
 - 외곽 `.ais-result-hero{-plain}{-edit}` 클래스 + dot-grid 매트 유지
 - state 분기 (idle → emptyState · loading → loadingPlaceholder + effectOverlay · done → children)
-- `done ↔ loading` 전환 시 framer-motion `AnimatePresence` 로 0.4s cross-fade
+- `loading` 이 낀 전환 시 framer-motion `AnimatePresence` 로 0.4s cross-fade
 
 ### 5.2 4 본문 컴포넌트 (Rename only)
 
 | Rename 후 | 기존 라인 | 책임 |
 |---------|---------|------|
 | `GenerateContent` | 238 → ~190 (외곽 분리 후) | `<img>` + zoom/pan + hover action bar |
-| `EditContent` | 240 → ~200 | BeforeAfter slider / SideBy + viewer mode 토글 + sourceRef 매칭 |
-| `VideoContent` | 151 → ~120 | `<video>` player + 메타 + action bar |
+| `EditContent` | 354 → ~300 | BeforeAfter slider / SideBy + viewer mode 토글 + sourceRef 매칭 |
+| `VideoContent` | 152 → ~120 | `<video>` player + 메타 + action bar |
 | `VisionContent` | 74 → ~50 | `RecipeV2View` / `LegacyV1View` 분기 |
 
 본문은 *done 상태 일 때만 렌더* — 외곽 / empty / loading 책임은 ResultBox 로 이관.
@@ -157,7 +157,7 @@ interface ResultBoxProps {
 </AnimatePresence>
 ```
 
-`mode="sync"` 가 cross-fade (둘 다 동시 0.4s). done ↔ loading / idle ↔ done 모두 자연 페이드.
+`mode="sync"` 가 cross-fade (둘 다 동시 0.4s). 단, fade 는 `loading` 이 낀 전환만 적용한다. 원본 이미지 변경처럼 결과 짝이 무효화되어 `done → idle` 로 가는 경우는 즉시 empty 상태로 전환해 불필요한 UX 연출을 피한다.
 
 ### 6.3 Caption / Pill / Loading 텍스트 처리
 
@@ -197,9 +197,9 @@ ProgressModal: 모드별 delay (1000~1400ms · Vision 1000 · Generate 기본값
 |-------|------|---------|------|
 | **0** | `<ResultBox>` base + AnimatePresence 패턴 신설 | `studio/ResultBox.tsx` (신규) | vitest 단위 5 |
 | **1** | Vision 마이그레이션 (가장 단순 · 74줄) | `VisionResultCard` → `VisionContent` + `vision/page.tsx` | vitest +3 ~ +5 |
-| **2** | Video 마이그레이션 (151줄) | `VideoPlayerCard` → `VideoContent` + `video/page.tsx` | vitest +3 ~ +5 |
+| **2** | Video 마이그레이션 (152줄) | `VideoPlayerCard` → `VideoContent` + `video/page.tsx` | vitest +3 ~ +5 |
 | **3** | Generate 마이그레이션 (238줄 · zoom/pan 보존) | `GenerateResultViewer` → `GenerateContent` + `generate/page.tsx` | vitest +3 ~ +5 |
-| **4** | Edit 마이그레이션 (240줄 · BeforeAfter + sourceRef · 가장 복잡) | `EditResultViewer` → `EditContent` + `edit/page.tsx` | vitest +3 ~ +5 |
+| **4** | Edit 마이그레이션 (354줄 · BeforeAfter + sourceRef · 가장 복잡) | `EditResultViewer` → `EditContent` + `edit/page.tsx` | vitest +3 ~ +5 |
 | **5** | ProgressModal X 비활성화 (5 모드 공용 단일 변경) | `studio/ProgressModal.tsx` | vitest +2 |
 | **6** | 시각 회귀 검증 (chrome MCP 12 컷) | — | 4 페이지 × 3 상태 스크린샷 |
 | **7** | Codex 교차 리뷰 (종료 조건: finding < 10 = 패스) | (없거나 미세) | — |

@@ -1,13 +1,14 @@
 /**
- * Phase 3 검증 — VisionResultCard 의 V2/V1 분기에 .ais-result-hero-plain wrapper.
- * Loading / Empty 분기는 wrapper 없음 (StudioLoadingState/StudioEmptyState 그대로).
+ * ResultBox 통일 검증 — VisionContent 를 .ais-result-hero-plain 외곽에 주입.
  */
 
 import { afterEach, expect, it } from "vitest";
-import { cleanup, render } from "@testing-library/react";
-import VisionResultCard, {
+import { cleanup, render, screen } from "@testing-library/react";
+import { ResultBox } from "@/components/studio/ResultBox";
+import StudioEmptyState from "@/components/studio/StudioEmptyState";
+import VisionContent, {
   type VisionCardResult,
-} from "@/components/studio/VisionResultCard";
+} from "@/components/studio/VisionContent";
 
 afterEach(() => cleanup());
 
@@ -18,9 +19,11 @@ const v2Result: VisionCardResult = {
   positivePrompt: "young woman, red dress, sunset",
 };
 
-it("V2 분기 — outermost element 가 .ais-result-hero-plain wrapper", () => {
+it("V2 done 상태 — outermost element 가 .ais-result-hero-plain wrapper", () => {
   const { container } = render(
-    <VisionResultCard result={v2Result} running={false} />,
+    <ResultBox state="done" variant="plain">
+      <VisionContent result={v2Result} />
+    </ResultBox>,
   );
   const root = container.firstChild as HTMLElement | null;
   expect(root).not.toBeNull();
@@ -30,25 +33,38 @@ it("V2 분기 — outermost element 가 .ais-result-hero-plain wrapper", () => {
 it("V1 분기 (positivePrompt 빈값) — 동일하게 .ais-result-hero-plain wrapper", () => {
   const v1Result: VisionCardResult = { ...v2Result, positivePrompt: "" };
   const { container } = render(
-    <VisionResultCard result={v1Result} running={false} />,
+    <ResultBox state="done" variant="plain">
+      <VisionContent result={v1Result} />
+    </ResultBox>,
   );
   const root = container.firstChild as HTMLElement | null;
   expect(root).not.toBeNull();
   expect(root!.className).toContain("ais-result-hero-plain");
 });
 
-it("Empty 분기 (result null) — wrapper 없음 (StudioEmptyState 그대로)", () => {
-  const { container } = render(<VisionResultCard result={null} running={false} />);
+it("idle 상태 — emptyState 도 plain wrapper 안에 렌더한다", () => {
+  const { container } = render(
+    <ResultBox
+      state="idle"
+      variant="plain"
+      emptyState={<StudioEmptyState size="normal">비어있음</StudioEmptyState>}
+    />,
+  );
   const root = container.firstChild as HTMLElement | null;
-  // StudioEmptyState 는 항상 DOM 노드를 마운트하므로 non-null 명시 검증
   expect(root).not.toBeNull();
-  expect(root!.className).not.toContain("ais-result-hero-plain");
+  expect(root!.className).toContain("ais-result-hero-plain");
+  expect(screen.getByText("비어있음")).toBeInTheDocument();
 });
 
-it("Loading 분기 (running true) — wrapper 없음 (StudioLoadingState 그대로)", () => {
-  const { container } = render(<VisionResultCard result={null} running={true} />);
+it("loading 상태 — 텍스트 없는 빈 placeholder 로 전환한다", () => {
+  const { container } = render(
+    <ResultBox state="loading" variant="plain">
+      <VisionContent result={v2Result} />
+    </ResultBox>,
+  );
   const root = container.firstChild as HTMLElement | null;
-  // StudioLoadingState 는 항상 DOM 노드를 마운트하므로 non-null 명시 검증
   expect(root).not.toBeNull();
-  expect(root!.className).not.toContain("ais-result-hero-plain");
+  expect(root!.className).toContain("ais-result-hero-plain");
+  expect(screen.getByTestId("result-box-loading-placeholder")).toBeInTheDocument();
+  expect(screen.queryByText(/분석 중/)).not.toBeInTheDocument();
 });

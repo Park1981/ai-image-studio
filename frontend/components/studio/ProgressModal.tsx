@@ -48,6 +48,7 @@ export default function ProgressModal({
   onClose: () => void;
 }) {
   const canInterruptComfy = useComfyInterruptAvailability(mode);
+  const running = usePipelineRunning(mode);
   const headerTitle = MODE_TITLES[mode];
   const handleCancel = async () => {
     if (!canInterruptComfy) return;
@@ -94,6 +95,7 @@ export default function ProgressModal({
           onClose={onClose}
           onCancel={handleCancel}
           canInterruptComfy={canInterruptComfy}
+          running={running}
         />
         <StatusBar mode={mode} />
         <div
@@ -138,6 +140,20 @@ function useComfyInterruptAvailability(mode: PipelineMode): boolean {
   }
   // Phase 6: vision/compare 는 ComfyUI 미사용 → interrupt 버튼 안 노출
   return false;
+}
+
+function usePipelineRunning(mode: PipelineMode): boolean {
+  const genRunning = useGenerateStore((s) => s.generating);
+  const editRunning = useEditStore((s) => s.running);
+  const videoRunning = useVideoStore((s) => s.running);
+  const visionRunning = useVisionStore((s) => s.running);
+  const compareRunning = useVisionCompareStore((s) => s.running);
+
+  if (mode === "generate") return genRunning;
+  if (mode === "edit") return editRunning;
+  if (mode === "video") return videoRunning;
+  if (mode === "vision") return visionRunning;
+  return compareRunning;
 }
 
 /**
@@ -326,11 +342,13 @@ function Header({
   onClose,
   onCancel,
   canInterruptComfy,
+  running,
 }: {
   title: string;
   onClose: () => void;
   onCancel: () => void;
   canInterruptComfy: boolean;
+  running: boolean;
 }) {
   return (
     <header
@@ -381,18 +399,20 @@ function Header({
         <button
           type="button"
           onClick={onClose}
+          disabled={running}
           style={{
             all: "unset",
-            cursor: "pointer",
+            cursor: running ? "not-allowed" : "pointer",
             width: 28,
             height: 28,
             borderRadius: "var(--radius-sm)",
             display: "grid",
             placeItems: "center",
-            color: "var(--ink-3)",
+            color: running ? "var(--ink-4)" : "var(--ink-3)",
+            opacity: running ? 0.45 : 1,
           }}
-          title="모달 닫기 (생성은 계속됨)"
-          aria-label="닫기"
+          title={running ? "진행 중에는 닫을 수 없습니다" : "모달 닫기"}
+          aria-label={running ? "진행 중에는 닫을 수 없습니다" : "모달 닫기"}
         >
           <Icon name="x" size={16} />
         </button>

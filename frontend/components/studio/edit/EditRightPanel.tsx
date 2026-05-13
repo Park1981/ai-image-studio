@@ -22,6 +22,7 @@ import { useState } from "react";
 import ComparisonAnalysisCard from "@/components/studio/ComparisonAnalysisCard";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
+import { ResultBox } from "@/components/studio/ResultBox";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
@@ -31,7 +32,7 @@ import type { HistoryItem } from "@/lib/api/types";
 import { useEditStore, useEditInputs } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
-import EditResultViewer from "./EditResultViewer";
+import EditContent from "./EditContent";
 
 interface Props {
   afterId: string | null;
@@ -49,6 +50,7 @@ export default function EditRightPanel({
   onComparisonModalOpen,
 }: Props) {
   const { sourceImage } = useEditInputs();
+  const running = useEditStore((s) => s.running);
   const compareX = useEditStore((s) => s.compareX);
   const setCompareX = useEditStore((s) => s.setCompareX);
   const setPrompt = useEditStore((s) => s.setPrompt);
@@ -80,9 +82,10 @@ export default function EditRightPanel({
     !!afterItem &&
     !!afterItem.sourceRef &&
     afterItem.sourceRef === sourceImage;
+  const resultState = running ? "loading" : pairMatched ? "done" : "idle";
 
   // V5 result-meta-pills — 첫 violet pill = 해상도 (afterItem) · BEFORE·AFTER · Lightning
-  const metaPills = afterItem ? (
+  const metaPills = resultState === "done" && afterItem ? (
     <>
       <span className="ais-result-pill ais-pill-violet mono">
         {afterItem.width} × {afterItem.height}
@@ -92,43 +95,60 @@ export default function EditRightPanel({
         <span className="ais-result-pill ais-pill-amber mono">Lightning</span>
       )}
     </>
-  ) : (
-    <span className="ais-result-pill mono">BEFORE · AFTER</span>
-  );
+  ) : null;
 
   return (
     <StudioRightPanel>
       <StudioResultHeader title="수정 결과" titleEn="Edited" meta={metaPills} />
 
-      {pairMatched ? (
-        <>
-          <EditResultViewer
-            afterItem={afterItem!}
-            sourceImage={sourceImage!}
+      <ResultBox
+        state={resultState}
+        modifier="edit"
+        emptyState={
+          <StudioEmptyState size="normal">
+            {!sourceImage
+              ? "왼쪽에서 원본 이미지를 업로드해 주세요."
+              : "이 원본의 수정 결과가 아직 없습니다. [수정 생성] 또는 아래 히스토리에서 선택하면 표시됩니다."}
+          </StudioEmptyState>
+        }
+      >
+        {pairMatched && afterItem && sourceImage && (
+          <EditContent
+            afterItem={afterItem}
+            sourceImage={sourceImage}
             compareX={compareX}
             setCompareX={setCompareX}
             hovered={viewerHovered}
             onEnter={() => setViewerHovered(true)}
             onLeave={() => setViewerHovered(false)}
-            onExpand={() => onLightboxOpen(afterItem!.imageRef)}
+            onExpand={() => onLightboxOpen(afterItem.imageRef)}
             onAfterIdReset={() => setAfterId(null)}
           />
+        )}
+      </ResultBox>
+
+      {resultState === "done" && pairMatched && afterItem && (
+        <>
+          {(afterItem.upgradedPrompt || afterItem.prompt) && (
+            <div className="ais-result-caption">
+              <p
+                className="ais-result-caption-prompt"
+                title={afterItem.upgradedPrompt || afterItem.prompt}
+              >
+                {afterItem.upgradedPrompt || afterItem.prompt}
+              </p>
+            </div>
+          )}
 
           {/* 비교 분석 카드 — 수정 결과 대 원본 5축 평가 (V5 amber filled) */}
           <ComparisonAnalysisCard
-            item={afterItem!}
-            busy={isBusy(afterItem!.id)}
-            onAnalyze={() => analyze(afterItem!, { promptMode: editPromptMode })}
+            item={afterItem}
+            busy={isBusy(afterItem.id)}
+            onAnalyze={() => analyze(afterItem, { promptMode: editPromptMode })}
             onOpenDetail={onComparisonModalOpen}
-            onReanalyze={() => analyze(afterItem!, { promptMode: editPromptMode })}
+            onReanalyze={() => analyze(afterItem, { promptMode: editPromptMode })}
           />
         </>
-      ) : (
-        <StudioEmptyState size="normal">
-          {!sourceImage
-            ? "왼쪽에서 원본 이미지를 업로드해 주세요."
-            : "이 원본의 수정 결과가 아직 없습니다. [수정 생성] 또는 아래 히스토리에서 선택하면 표시됩니다."}
-        </StudioEmptyState>
       )}
 
       {/* ── V5 Archive Header — bilingual + count + size chip ── */}

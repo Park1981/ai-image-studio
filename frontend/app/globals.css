@@ -1430,6 +1430,53 @@ button {
   overflow: hidden;
 }
 
+/* ResultBox state canvas — effect spec 전까지는 정적인 빈 매트만 사용 */
+.ais-result-state-shell {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  place-items: center;
+  min-height: clamp(116px, 14vh, 150px);
+}
+.ais-result-hero:not(.ais-result-hero-edit) .ais-result-state-shell {
+  height: 100%;
+  min-height: 100%;
+}
+.ais-result-hero-plain .ais-result-state-shell {
+  min-height: clamp(120px, 18vh, 180px);
+}
+.ais-result-empty-content {
+  justify-self: center;
+  align-self: center;
+  width: 100%;
+  max-width: 760px;
+  box-sizing: border-box;
+  min-height: inherit;
+  display: grid;
+  place-items: center;
+}
+.ais-result-empty-content > * {
+  width: 100% !important;
+  min-height: inherit;
+  display: grid !important;
+  place-items: center;
+}
+.ais-result-loading-canvas {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: inherit;
+  overflow: hidden;
+  border-radius: calc(var(--radius-card) - 6px);
+  background:
+    radial-gradient(circle, rgba(0,0,0,.055) 1px, transparent 1px) 0 0 / 16px 16px,
+    linear-gradient(135deg, rgba(255,255,255,.92), rgba(250,249,246,.78));
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.56),
+    inset 0 -28px 70px rgba(23,20,14,.05);
+}
+
 /* SegControl row (Edit Hero 우상단 — 슬라이더/나란히 토글) */
 .ais-hero-seg-row {
   display: flex;

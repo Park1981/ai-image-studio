@@ -1,5 +1,5 @@
 /**
- * GenerateResultViewer — Generate 페이지 결과 이미지 뷰어 + 호버 액션바.
+ * GenerateContent — Generate 페이지 결과 이미지 본문 + 호버 액션바.
  *
  * 2026-04-26 (task #5): generate/page.tsx 에서 별도 파일로 분리.
  * 2026-04-27 (UX 폴리시):
@@ -11,10 +11,9 @@
  *
  * 2026-05-02 디자인 V5 Phase 4 격상:
  *  - **Action Bar 4 버튼** — download 제거 (자세히 / 복사 / 수정 / 리프레시)
- *  - **Caption 슬롯 NEW** (결정 ⓒ · α 적용) — italic prompt 1줄 truncate (Hero 아래)
- *  - className `.ais-result-caption` (V5 토큰 cascade)
+ *  - Caption 은 ResultBox 밖에서 page 가 done 상태일 때만 렌더
  *  - **회귀 위험 #2 보존**: Hero wheel zoom + drag pan + dbl-click reset (line 81~143 그대로)
- *  - Hero 자체 inline style 은 동적 aspectRatio (item.width/height) 라 유지 (plan v4 변경 #4 — 동적 계산 허용)
+ *  - Hero 외곽/비율은 ResultBox 가 담당
  */
 
 "use client";
@@ -43,7 +42,7 @@ const SCALE_MAX = 4;
 const clamp = (v: number, min: number, max: number) =>
   Math.min(max, Math.max(min, v));
 
-export default function GenerateResultViewer({
+export default function GenerateContent({
   item,
   hovered,
   onEnter,
@@ -53,12 +52,6 @@ export default function GenerateResultViewer({
   onSendToEdit,
   onReuse,
 }: Props) {
-  // 원본 비율 — width/height 없으면 1/1 폴백
-  const aspectRatio =
-    item.width > 0 && item.height > 0
-      ? `${item.width} / ${item.height}`
-      : "1 / 1";
-
   /* ── zoom / pan state ── */
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -154,85 +147,69 @@ export default function GenerateResultViewer({
       : "default";
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div
-        ref={containerRef}
-        className="ais-result-hero"
-        onMouseEnter={onEnter}
-        onMouseLeave={onLeave}
-        onMouseDown={onMouseDown}
-        onDoubleClick={onDoubleClick}
+    <div
+      ref={containerRef}
+      onMouseEnter={onEnter}
+      onMouseLeave={onLeave}
+      onMouseDown={onMouseDown}
+      onDoubleClick={onDoubleClick}
+      style={{
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        display: "grid",
+        placeItems: "center",
+        cursor,
+        touchAction: "none",
+      }}
+      title={
+        scale > SCALE_MIN
+          ? "드래그로 이동 · 더블클릭으로 100% 복원"
+          : "휠로 확대/축소"
+      }
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        className="ais-result-hero-img"
+        src={item.imageRef}
+        alt={item.label}
+        draggable={false}
         style={{
-          // 동적 — 원본 비율 유지 + 65vh cap (CSS 의 고정 1672/941 override)
-          aspectRatio,
-          maxHeight: "65vh",
-          // 동적 — zoom 시 cursor 분기 + native 제스처 차단
-          cursor,
-          touchAction: "none",
+          // 동적 — zoom + pan transform · drag 중엔 transition off
+          transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
+          transformOrigin: "center center",
+          transition: isDragging ? "none" : "transform .18s ease-out",
+          // 비표준 Webkit user-drag 만 inline (표준 user-select / pointer-events 는 CSS 가 처리)
+          // @ts-expect-error — 비표준 Webkit
+          WebkitUserDrag: "none",
         }}
-        title={
-          scale > SCALE_MIN
-            ? "드래그로 이동 · 더블클릭으로 100% 복원"
-            : "휠로 확대/축소"
-        }
-      >
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className="ais-result-hero-img"
-          src={item.imageRef}
-          alt={item.label}
-          draggable={false}
-          style={{
-            // 동적 — zoom + pan transform · drag 중엔 transition off
-            transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
-            transformOrigin: "center center",
-            transition: isDragging ? "none" : "transform .18s ease-out",
-            // 비표준 Webkit user-drag 만 inline (표준 user-select / pointer-events 는 CSS 가 처리)
-            // @ts-expect-error — 비표준 Webkit
-            WebkitUserDrag: "none",
-          }}
-        />
+      />
 
-        {/* 하단 호버 액션바 — V5 4 버튼 (download 제거 · 자세히/복사/수정/리프레시) */}
-        <div onClick={(e) => e.stopPropagation()}>
-          <ResultHoverActionBar hovered={hovered} variant="hero">
-            <ActionBarButton
-              icon="zoom-in"
-              title="크게 보기"
-              onClick={onExpand}
-            />
-            <ActionBarButton
-              icon="copy"
-              title="프롬프트 복사"
-              onClick={onCopyPrompt}
-            />
-            <ActionBarButton
-              icon="edit"
-              title="수정으로"
-              onClick={onSendToEdit}
-            />
-            <ActionBarButton
-              icon="refresh"
-              title="재생성 (파라미터 복원)"
-              onClick={onReuse}
-            />
-          </ResultHoverActionBar>
-        </div>
+      {/* 하단 호버 액션바 — V5 4 버튼 (download 제거 · 자세히/복사/수정/리프레시) */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <ResultHoverActionBar hovered={hovered} variant="hero">
+          <ActionBarButton
+            icon="zoom-in"
+            title="크게 보기"
+            onClick={onExpand}
+          />
+          <ActionBarButton
+            icon="copy"
+            title="프롬프트 복사"
+            onClick={onCopyPrompt}
+          />
+          <ActionBarButton
+            icon="edit"
+            title="수정으로"
+            onClick={onSendToEdit}
+          />
+          <ActionBarButton
+            icon="refresh"
+            title="재생성 (파라미터 복원)"
+            onClick={onReuse}
+          />
+        </ResultHoverActionBar>
       </div>
-
-      {/* V5 Caption 슬롯 — italic prompt 1줄 truncate (Hero 바로 아래).
-       *  2026-05-03 통일: upgradedPrompt 우선 → 없으면 사용자 입력 fallback.
-       *  Edit/Generate 양쪽 동일 정책 (영어 업그레이드 결과로 풍성한 캡션). */}
-      {(item.upgradedPrompt || item.prompt) && (
-        <div className="ais-result-caption">
-          <p
-            className="ais-result-caption-prompt"
-            title={item.upgradedPrompt || item.prompt}
-          >
-            {item.upgradedPrompt || item.prompt}
-          </p>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,7 +4,7 @@
 
 **Goal:** 4 모드 (Generate / Edit / Video / Vision) 결과 박스를 단일 `<ResultBox>` base 로 통일 + 진행 중 박스 안 정보 제거 + Generate/Edit 0.4s 페이드 전환 + ProgressModal X 비활성화 + 효과 slot 박제 (다음 spec).
 
-**Architecture:** 얇은 `<ResultBox>` base (외곽 + 상태 분기 + AnimatePresence cross-fade + effectOverlay slot) + 모드별 본문 (`<{Generate,Edit,Video,Vision}Content>`) 을 children 으로 주입. 4 페이지가 store flag 를 `state="idle"|"loading"|"done"` 으로 매핑.
+**Architecture:** 얇은 `<ResultBox>` base (외곽 + 상태 분기 + loading 전환 한정 AnimatePresence cross-fade + effectOverlay slot) + 모드별 본문 (`<{Generate,Edit,Video,Vision}Content>`) 을 children 으로 주입. 4 페이지가 store flag 를 `state="idle"|"loading"|"done"` 으로 매핑.
 
 **Tech Stack:** Next.js 16 App Router · React 19 · TypeScript strict · Zustand 5 · framer-motion (이미 deps) · vitest + jsdom · chrome MCP
 
@@ -93,7 +93,7 @@ Expected: 5 FAIL ("Cannot find module @/components/studio/ResultBox")
  * ResultBox — 4 모드 결과 박스 통일 base.
  *
  * 외곽 .ais-result-hero{,-plain,-edit} 클래스 + 상태 분기 (idle/loading/done) +
- * framer-motion AnimatePresence cross-fade (0.4s) + effectOverlay slot (다음 spec).
+ * framer-motion AnimatePresence cross-fade (0.4s · loading 전환 한정) + effectOverlay slot (다음 spec).
  *
  * 모드별 본문 (Generate/Edit/Video/Vision) 은 children 으로 주입.
  */
@@ -346,7 +346,7 @@ git mv frontend/components/studio/VideoPlayerCard.tsx frontend/components/studio
 
 - [ ] **Step 2: VideoContent.tsx 본문만 남김**
 
-기존 (151 라인) 에서:
+기존 (152 라인 · 2026-05-14 구현 전 재검증 기준) 에서:
 - `running` 분기 + `StudioLoadingState` 호출 + `StudioEmptyState` 호출 삭제
 - 본문 (`<video>` player + 메타 + action bar) 만 남김
 - props 변경: `src` `prompt` `lastVideoMeta` 등 — done 상태 일 때 필요한 데이터만 받음
@@ -384,7 +384,7 @@ export function VideoContent({ src, prompt, onCopyPrompt, onReuse }: VideoConten
 }
 ```
 
-(실제 본문 코드는 기존 line 32-151 에서 추출 — `running` 분기와 외곽 div 만 제거)
+(실제 본문 코드는 기존 line 32-152 에서 추출 — `running` 분기와 외곽 div 만 제거)
 
 - [ ] **Step 3: video/page.tsx 에서 ResultBox 사용**
 
@@ -629,8 +629,8 @@ git commit -m "refactor(generate): GenerateResultViewer → GenerateContent + pa
 
 - [ ] **Step 1: 기존 Edit 테스트 모두 회귀 0 인지 사전 확인**
 
-Run: `cd frontend && npx vitest run __tests__/edit-*.test.tsx`
-Expected: 모두 PASS (이번 task 의 baseline)
+Run: `cd frontend && npx vitest run __tests__/edit-library-store.test.ts __tests__/edit-multi-ref-crop.test.ts __tests__/edit-multi-ref.test.ts`
+Expected: 3 files / 22 tests PASS (이번 task 의 baseline)
 
 - [ ] **Step 2: 파일 rename**
 
@@ -641,7 +641,7 @@ git mv frontend/components/studio/edit/EditResultViewer.tsx frontend/components/
 
 - [ ] **Step 3: EditContent.tsx 본문만 남김**
 
-기존 (240 라인) 에서:
+기존 (354 라인 · 2026-05-14 구현 전 재검증 기준) 에서:
 - 외곽 `.ais-result-hero .ais-result-hero-edit` div 제거 (ResultBox 책임)
 - 본문 (BeforeAfter slider + SideBy + viewer mode 토글 + sourceRef 매칭 로직) 만 남김
 - **`compareX 50 자동 리셋` 미세 동작 보존** (afterId 변경 시 setCompareX(50) 호출 — 본문 컴포넌트 안에 유지)
@@ -785,7 +785,7 @@ describe("Edit page ResultBox 통합", () => {
 
 Run:
 ```bash
-cd frontend && npx vitest run __tests__/edit-result-box.test.tsx __tests__/edit-*.test.tsx
+cd frontend && npx vitest run __tests__/edit-result-box.test.tsx __tests__/edit-library-store.test.ts __tests__/edit-multi-ref-crop.test.ts __tests__/edit-multi-ref.test.ts
 ```
 Expected: 신규 5 PASS + 기존 모두 PASS
 
@@ -1043,7 +1043,7 @@ git checkout master
 git merge --no-ff feature/result-box-unification -m "Merge branch 'feature/result-box-unification' — 4 모드 결과 박스 ResultBox base 통일
 
 - ResultBox base 신설 (frontend/components/studio/ResultBox.tsx · ~80 라인)
-- AnimatePresence mode='sync' 0.4s cross-fade (done ↔ loading ↔ idle)
+- AnimatePresence mode='sync' 0.4s cross-fade (loading 전환 한정)
 - 4 모드 마이그레이션: Vision → Video → Generate → Edit (복잡도 ↑ 순)
 - 4 viewer rename only (위치 그대로 · git history 보존)
 - 진행 중 결과 박스 안 caption/pill/loading 텍스트 0

@@ -16,9 +16,11 @@
 
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
+import { ResultBox } from "@/components/studio/ResultBox";
+import StudioEmptyState from "@/components/studio/StudioEmptyState";
 import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import { StudioRightPanel } from "@/components/studio/StudioLayout";
-import VideoPlayerCard from "@/components/studio/VideoPlayerCard";
+import VideoContent from "@/components/studio/VideoContent";
 import { useHistoryStats } from "@/hooks/useHistoryStats";
 import type { HistoryItem } from "@/lib/api/types";
 import { filenameFromRef } from "@/lib/image-actions";
@@ -32,7 +34,7 @@ interface Props {
 
 export default function VideoRightPanel({ onLightboxOpen }: Props) {
   const lastVideoRef = useVideoStore((s) => s.lastVideoRef);
-  const { running, pipelineLabel } = useVideoRunning();
+  const { running } = useVideoRunning();
   const items = useHistoryStore((s) => s.items);
   const videoResults = items.filter((x) => x.mode === "video");
   // 2026-05-03: 카운트는 그리드와 1:1 매칭되는 store length 사용 (보이는 수 = 표시 수).
@@ -46,6 +48,7 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
   const playingItem = playingRef
     ? videoResults.find((v) => v.imageRef === playingRef)
     : undefined;
+  const resultState = running ? "loading" : playingRef ? "done" : "idle";
 
   // V5 result-meta-pills (Generate/Edit 와 통일 · 2026-05-03):
   //   해상도 (violet) · 실제 영상 메타 (확장자 / duration / fps · HistoryItem video 필드)
@@ -74,7 +77,7 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
           border: "1px solid rgba(34, 211, 238, 0.35)",
         };
 
-  const metaPills = playingItem ? (
+  const metaPills = resultState === "done" && playingItem ? (
     <>
       <span className="ais-result-pill ais-pill-violet mono">
         {playingItem.width} × {playingItem.height}
@@ -96,9 +99,7 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
         <span className="ais-result-pill mono">NSFW</span>
       )}
     </>
-  ) : (
-    <span className="ais-result-pill mono">MP4</span>
-  );
+  ) : null;
 
   return (
     <StudioRightPanel>
@@ -108,30 +109,35 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
         meta={metaPills}
       />
 
-      <VideoPlayerCard
-        src={playingRef}
-        running={running}
-        label={pipelineLabel}
-        filename={
-          playingRef ? filenameFromRef(playingRef, "ais-video.mp4") : undefined
+      <ResultBox
+        state={resultState}
+        modifier="edit"
+        emptyState={
+          <StudioEmptyState size="normal">
+            원본 이미지와 영상 지시를 입력하고
+            <br />
+            <b>영상 생성</b> 버튼을 눌러 주세요.
+          </StudioEmptyState>
         }
-        onExpand={
-          // 현재 재생 중 ref 에 해당하는 history item 을 라이트박스로
-          playingRef
-            ? () => {
-                const hit = videoResults.find(
-                  (v) => v.imageRef === playingRef,
-                );
-                if (hit) onLightboxOpen(hit);
-              }
-            : undefined
-        }
-      />
+      >
+        {playingRef && (
+          <VideoContent
+            src={playingRef}
+            filename={filenameFromRef(playingRef, "ais-video.mp4")}
+            onExpand={() => {
+              const hit = videoResults.find((v) => v.imageRef === playingRef);
+              if (hit) onLightboxOpen(hit);
+            }}
+          />
+        )}
+      </ResultBox>
 
       {/* V5 Caption 슬롯 — Generate/Edit 와 통일 (2026-05-03).
        *  upgradedPrompt 우선 → 없으면 사용자 영상 지시 fallback.
        *  running/empty 상태엔 playingItem 자체가 없어 자연스럽게 미노출. */}
-      {playingItem && (playingItem.upgradedPrompt || playingItem.prompt) && (
+      {resultState === "done" &&
+        playingItem &&
+        (playingItem.upgradedPrompt || playingItem.prompt) && (
         <div className="ais-result-caption">
           <p
             className="ais-result-caption-prompt"
@@ -140,7 +146,7 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
             {playingItem.upgradedPrompt || playingItem.prompt}
           </p>
         </div>
-      )}
+        )}
 
       <HistorySectionHeader
         title="보관"

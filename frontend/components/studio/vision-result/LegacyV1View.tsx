@@ -11,7 +11,7 @@ import { useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { SmallBtn } from "@/components/ui/primitives";
 import { toast } from "@/stores/useToastStore";
-import type { VisionCardResult } from "@/components/studio/VisionResultCard";
+import type { VisionCardResult } from "@/components/studio/VisionContent";
 
 export default function LegacyV1View({ result }: { result: VisionCardResult }) {
   const [lang, setLang] = useState<"en" | "ko">("en");

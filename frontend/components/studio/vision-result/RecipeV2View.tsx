@@ -17,7 +17,7 @@
 import DetailCard from "./DetailCard";
 import PromptToggleCard from "./PromptToggle";
 import SummaryCard from "./SummaryCard";
-import type { VisionCardResult } from "@/components/studio/VisionResultCard";
+import type { VisionCardResult } from "@/components/studio/VisionContent";
 
 export default function RecipeV2View({ result }: { result: VisionCardResult }) {
   const summary = result.summary || "";
