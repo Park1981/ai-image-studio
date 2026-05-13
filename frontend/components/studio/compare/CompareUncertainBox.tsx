@@ -8,6 +8,8 @@
 
 import Icon from "@/components/ui/Icon";
 
+import { hasUsableKorean } from "./compareLanguage";
+
 interface Props {
   uncertainEn: string;
   uncertainKo: string;
@@ -19,6 +21,8 @@ export default function CompareUncertainBox({
 }: Props) {
   const en = uncertainEn.trim();
   const ko = uncertainKo.trim();
+  const canShowKo = hasUsableKorean(ko);
+  const fallbackText = !en && !canShowKo ? ko : "";
   if (!en && !ko) return null;
 
   return (
@@ -50,11 +54,14 @@ export default function CompareUncertainBox({
         <Icon name="search" size={11} />
         UNCERTAIN · 비교 못한 영역
       </div>
-      {ko && (
-        <div style={{ color: "var(--ink-2)", lineHeight: 1.55 }}>{ko}</div>
+      {canShowKo && (
+        <div lang="ko" style={{ color: "var(--ink-2)", lineHeight: 1.55 }}>
+          {ko}
+        </div>
       )}
-      {en && (
+      {(en || fallbackText) && (
         <div
+          lang="en"
           style={{
             color: "var(--ink-3, #94a3b8)",
             lineHeight: 1.55,
@@ -62,7 +69,7 @@ export default function CompareUncertainBox({
             fontSize: 11,
           }}
         >
-          {en}
+          {en || fallbackText}
         </div>
       )}
     </div>

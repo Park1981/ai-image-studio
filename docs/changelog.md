@@ -5,6 +5,8 @@
 
 ## 2026-05-13
 
+- Vision Compare 번역 fallback 정리 — `*_ko` 슬롯에 영어가 복사된 경우를 프론트에서 감지해 영문 원문으로 표시하고, 한국어 토글/영문 펼침 중복 표시를 숨김. 백엔드는 영어 echo 슬롯을 한 번 더 번역 재시도하도록 보강.
+- Vision Compare 서버 이미지 CORS 회피 — 히스토리/서버 이미지 URL 비교 시 프론트가 정적 이미지를 직접 `fetch()`하지 않고 `sourceRef/resultRef` 를 보내며, 백엔드가 로컬 studio 이미지 파일을 안전하게 읽도록 보강.
 - Video CTA / 입력 게이트 정리 — 자동 NSFW 실제 게이트를 `adult && autoNsfwEnabled` 로 통일하고, 영상 지시 입력 경로·AI 보강 카드·PromptModeRadio·Ollama 의존성 가드를 같은 조건으로 동기화. 관련 spec: `docs/superpowers/specs/2026-05-13-video-cta-input-gating-design.md`.
 
 ## 2026-05-02 (저녁)

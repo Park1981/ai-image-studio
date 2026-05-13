@@ -38,6 +38,17 @@ describe("CompareTransformBox", () => {
     expect(screen.getByText("날개 추가")).toBeTruthy();
   });
 
+  it("transformPromptKo 가 영어 fallback 이면 한국어 토글을 숨김", () => {
+    render(
+      <CompareTransformBox
+        transformPromptEn="add wings"
+        transformPromptKo="add wings"
+      />,
+    );
+    expect(screen.queryByRole("button", { name: /한국어/ })).toBeNull();
+    expect(screen.getByText("add wings").getAttribute("lang")).toBe("en");
+  });
+
   it("복사 버튼 클릭 → navigator.clipboard.writeText(en) 호출", () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {

@@ -292,6 +292,81 @@ describe("compareAnalyze (Phase 6 SSE drain)", () => {
     expect(saved).toBe(false);
   });
 
+  it("서버 이미지 URL은 브라우저 fetch 없이 sourceRef/resultRef 로 전송", async () => {
+    const { compareAnalyze } = await import("@/lib/api/compare");
+
+    const fetchMock = queueFetchResponses([
+      makeJsonResponse({
+        task_id: "tsk-cmp-ref",
+        stream_url: "/api/studio/compare-analyze/stream/tsk-cmp-ref",
+      }),
+      makeStreamResponse(
+        sseBody([
+          {
+            event: "done",
+            data: {
+              analysis: {
+                summaryEn: "ok",
+                summaryKo: "좋음",
+                commonPointsEn: [],
+                commonPointsKo: [],
+                keyDifferencesEn: [],
+                keyDifferencesKo: [],
+                domainMatch: "person",
+                categoryDiffs: {},
+                categoryScores: {},
+                keyAnchors: [],
+                fidelityScore: 90,
+                transformPromptEn: "",
+                transformPromptKo: "",
+                uncertainEn: "",
+                uncertainKo: "",
+                observation1: {},
+                observation2: {},
+                provider: "ollama",
+                fallback: false,
+                analyzedAt: 1700000000000,
+                visionModel: "qwen3-vl:8b",
+                textModel: "gemma4-un:latest",
+              },
+              saved: false,
+            },
+          },
+        ]),
+      ),
+    ]);
+
+    await compareAnalyze({
+      source: "http://localhost:8001/images/studio/edit/2026-05-13/edit-1017-005.png",
+      result: "/images/studio/generate/2026-05-13/gen-1018-001.png",
+      editPrompt: "",
+      context: "compare",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(String(url)).toContain("/api/studio/compare-analyze");
+    const body = (init as RequestInit).body as FormData;
+    expect(body.get("source")).toBeNull();
+    expect(body.get("result")).toBeNull();
+    expect(body.get("source_ref")).toBe(
+      "/images/studio/edit/2026-05-13/edit-1017-005.png",
+    );
+    expect(body.get("result_ref")).toBe(
+      "/images/studio/generate/2026-05-13/gen-1018-001.png",
+    );
+    const meta = JSON.parse(String(body.get("meta"))) as {
+      sourceRef: string;
+      resultRef: string;
+    };
+    expect(meta.sourceRef).toBe(
+      "/images/studio/edit/2026-05-13/edit-1017-005.png",
+    );
+    expect(meta.resultRef).toBe(
+      "/images/studio/generate/2026-05-13/gen-1018-001.png",
+    );
+  });
+
   it("Edit 컨텍스트 + 캐시 미스 — intent-refine stage 도착", async () => {
     const { compareAnalyze } = await import("@/lib/api/compare");
 

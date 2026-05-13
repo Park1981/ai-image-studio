@@ -52,6 +52,14 @@ EXAMPLE output (WRONG — English echo):
 """
 
 
+TRANSLATE_V4_RETRY_SYSTEM = """You are a strict English-to-Korean JSON translator.
+
+Return ONLY JSON with the same k1/k2/k3 keys from the input.
+Translate every value into natural Korean.
+Every output value MUST contain at least one Hangul character.
+Do not echo English. Do not add explanations."""
+
+
 async def translate_v4_result(
     result: CompareAnalysisResultV4,
     *,
@@ -69,53 +77,109 @@ async def translate_v4_result(
     if not flat_input:
         return result
 
-    payload = {
-        "model": text_model,
-        "messages": [
-            {"role": "system", "content": TRANSLATE_V4_SYSTEM},
-            {
-                "role": "user",
-                "content": (
-                    "다음 평탄한 JSON 의 모든 영어 value 를 한국어로 번역해주세요. "
-                    "키 (k1, k2, ...) 는 그대로 보존, value 만 한국어로. 영어 echo 금지.\n\n"
-                    f"```json\n{json.dumps(flat_input, ensure_ascii=False, indent=2)}\n```\n\n"
-                    "같은 키 + 한국어 value 의 JSON 을 출력하세요."
-                ),
-            },
-        ],
-        "stream": False,
-        "format": "json",
-        "think": False,
-        "keep_alive": "5m",
-        "options": {"temperature": 0.4, "num_ctx": 8192},
-    }
+    flat_ko = {key: en for key, en in flat_input.items()}
+    failed_keys = set(flat_input.keys())
 
     try:
         raw = await call_chat_payload(
             ollama_url=ollama_url,
-            payload=payload,
+            payload=_build_translate_payload(text_model, flat_input),
             timeout=timeout,
             allow_thinking_fallback=False,
         )
     except Exception as e:
         log.warning("translate_v4 call failed: %s", e)
-        _apply_en_fallback_to_ko(result)
-        return result
+        raw = ""
 
-    if not raw:
+    if raw:
+        parsed = _parse_strict_json(raw)
+        if isinstance(parsed, dict):
+            flat_ko, failed_keys = _validated_flat_translations(parsed, flat_input)
+        else:
+            log.warning("translate_v4 parse failed (raw len=%d)", len(raw))
+    else:
         log.warning("translate_v4 empty response")
-        _apply_en_fallback_to_ko(result)
-        return result
 
-    parsed = _parse_strict_json(raw)
-    if not isinstance(parsed, dict):
-        log.warning("translate_v4 parse failed (raw len=%d)", len(raw))
-        _apply_en_fallback_to_ko(result)
-        return result
+    # gemma4 가 value 를 영어로 echo 하는 케이스가 있어 실패 슬롯만 한 번 더 짧게 재시도한다.
+    if failed_keys:
+        retry_input = {key: flat_input[key] for key in failed_keys}
+        try:
+            retry_raw = await call_chat_payload(
+                ollama_url=ollama_url,
+                payload=_build_translate_payload(text_model, retry_input, retry=True),
+                timeout=timeout,
+                allow_thinking_fallback=False,
+            )
+        except Exception as e:
+            log.warning("translate_v4 retry failed: %s", e)
+            retry_raw = ""
 
-    # 평탄 응답 → en 슬롯 별 한국어 매핑 (한글 검증)
+        if retry_raw:
+            retry_parsed = _parse_strict_json(retry_raw)
+            if isinstance(retry_parsed, dict):
+                retry_ko, retry_failed = _validated_flat_translations(
+                    retry_parsed,
+                    retry_input,
+                )
+                for key in retry_input:
+                    flat_ko[key] = retry_ko[key]
+                failed_keys = retry_failed
+            else:
+                log.warning("translate_v4 retry parse failed (raw len=%d)", len(retry_raw))
+
+    if failed_keys:
+        log.warning(
+            "translate_v4 partial echo (%d/%d slots fell back to en)",
+            len(failed_keys),
+            len(flat_input),
+        )
+
+    _unflatten_to_result(result, flat_keys, flat_ko)
+    return result
+
+
+def _build_translate_payload(
+    text_model: str,
+    flat_input: dict[str, str],
+    *,
+    retry: bool = False,
+) -> dict[str, object]:
+    """Ollama chat payload for flat JSON translation."""
+    system = TRANSLATE_V4_RETRY_SYSTEM if retry else TRANSLATE_V4_SYSTEM
+    user = (
+        "Translate every English JSON value into Korean. "
+        "Preserve the exact keys. Return JSON only.\n\n"
+        f"{json.dumps(flat_input, ensure_ascii=False, indent=2)}"
+    )
+    if not retry:
+        user = (
+            "다음 평탄한 JSON 의 모든 영어 value 를 한국어로 번역해주세요. "
+            "키 (k1, k2, ...) 는 그대로 보존, value 만 한국어로. 영어 echo 금지.\n\n"
+            f"{json.dumps(flat_input, ensure_ascii=False, indent=2)}\n\n"
+            "같은 키 + 한국어 value 의 JSON 을 출력하세요."
+        )
+
+    return {
+        "model": text_model,
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ],
+        "stream": False,
+        "format": "json",
+        "think": False,
+        "keep_alive": "5m",
+        "options": {"temperature": 0.1 if retry else 0.3, "num_ctx": 8192},
+    }
+
+
+def _validated_flat_translations(
+    parsed: dict[str, object],
+    flat_input: dict[str, str],
+) -> tuple[dict[str, str], set[str]]:
+    """Validate translated flat JSON values and keep en fallback per failed slot."""
     flat_ko: dict[str, str] = {}
-    echo_count = 0
+    failed_keys: set[str] = set()
     for key, en in flat_input.items():
         ko_val = parsed.get(key)
         if (
@@ -127,17 +191,8 @@ async def translate_v4_result(
             flat_ko[key] = ko_val.strip()
         else:
             flat_ko[key] = en  # echo / 누락 / 한글 없음 → en fallback
-            echo_count += 1
-
-    if echo_count > 0:
-        log.warning(
-            "translate_v4 partial echo (%d/%d slots fell back to en)",
-            echo_count,
-            len(flat_input),
-        )
-
-    _unflatten_to_result(result, flat_keys, flat_ko)
-    return result
+            failed_keys.add(key)
+    return flat_ko, failed_keys
 
 
 def _flatten_strings(r: CompareAnalysisResultV4) -> tuple[list[tuple[str, str]], dict[str, str]]:

@@ -18,6 +18,8 @@ GPU lock + ComfyUI 충돌 방지 정책은 백그라운드 파이프라인이 �
 from __future__ import annotations
 
 import io
+from pathlib import Path
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
@@ -29,7 +31,11 @@ from ..comparison_pipeline import analyze_pair  # noqa: F401 — 옛 테스트 �
 from ..pipelines import _run_compare_analyze_pipeline
 from ..prompt_pipeline import clarify_edit_intent  # noqa: F401 — 옛 테스트 호환 (mock.patch 위치)
 from ..schemas import PerImagePromptRequest, PerImagePromptResponse, TaskCreated
-from ..storage import STUDIO_MAX_IMAGE_BYTES
+from ..storage import (
+    STUDIO_MAX_IMAGE_BYTES,
+    _edit_source_path_from_url,
+    _result_path_from_url,
+)
 from ..tasks import TASKS, _new_task
 # Task 12 (V4): per-image t2i prompt endpoint — vision 정공법의 prompt_synthesize 재사용.
 from ..vision_pipeline.prompt_synthesize import synthesize_prompt
@@ -40,8 +46,8 @@ router = APIRouter()
 
 @router.post("/compare-analyze", response_model=TaskCreated)
 async def create_compare_analyze_task(
-    source: UploadFile = File(...),
-    result: UploadFile = File(...),
+    source: UploadFile | None = File(default=None),
+    result: UploadFile | None = File(default=None),
     meta: str = Form(...),
 ):
     """비교 분석 요청 (multipart). Phase 6 — task 생성 + SSE.
@@ -68,8 +74,16 @@ async def create_compare_analyze_task(
         "precise" if isinstance(compare_prompt_mode_raw, str) and compare_prompt_mode_raw == "precise" else "fast"
     )
 
-    source_bytes = await source.read()
-    result_bytes = await result.read()
+    source_bytes = await _read_image_input(
+        upload=source,
+        ref=meta_obj.get("sourceRef") or meta_obj.get("source_ref"),
+        label="source",
+    )
+    result_bytes = await _read_image_input(
+        upload=result,
+        ref=meta_obj.get("resultRef") or meta_obj.get("result_ref"),
+        label="result",
+    )
     if not source_bytes or not result_bytes:
         raise HTTPException(400, "empty image (source or result)")
     if (
@@ -125,6 +139,44 @@ async def create_compare_analyze_task(
         task_id=task.task_id,
         stream_url=f"/api/studio/compare-analyze/stream/{task.task_id}",
     )
+
+
+async def _read_image_input(
+    *,
+    upload: UploadFile | None,
+    ref: object,
+    label: str,
+) -> bytes:
+    """Read compare image bytes from multipart file or safe local studio ref."""
+    if upload is not None:
+        return await upload.read()
+
+    if not isinstance(ref, str) or not ref.strip():
+        raise HTTPException(400, f"missing image ({label})")
+
+    path = _resolve_studio_image_ref(ref.strip())
+    if path is None:
+        raise HTTPException(400, f"invalid image ref ({label})")
+    try:
+        return path.read_bytes()
+    except OSError as exc:
+        raise HTTPException(404, f"image ref not found ({label})") from exc
+
+
+def _resolve_studio_image_ref(ref: str) -> Path | None:
+    """Resolve /images/studio URLs to local paths using storage guards."""
+    path_ref = ref
+    if ref.startswith("http://") or ref.startswith("https://"):
+        parsed = urlparse(ref)
+        path_ref = parsed.path
+
+    if not path_ref.startswith("/images/studio/"):
+        return None
+
+    path = _edit_source_path_from_url(path_ref)
+    if path is None:
+        path = _result_path_from_url(path_ref)
+    return path
 
 
 @router.get("/compare-analyze/stream/{task_id}")

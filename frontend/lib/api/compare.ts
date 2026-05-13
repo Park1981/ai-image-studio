@@ -61,6 +61,23 @@ export interface CompareAnalyzeResponse {
   saved: boolean;
 }
 
+function getStudioImageRef(input: File | string): string | null {
+  if (input instanceof File) return null;
+  if (input.startsWith("/images/")) return input;
+
+  try {
+    const url = new URL(input);
+    const studioBase = new URL(STUDIO_BASE);
+    if (url.origin === studioBase.origin && url.pathname.startsWith("/images/")) {
+      return url.pathname;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
+
 /** File / data URL / 절대 URL → Blob 변환 (Edit 의 패턴 동일). */
 async function toBlob(input: File | string): Promise<Blob> {
   // File 객체는 그대로 반환
@@ -92,16 +109,28 @@ export async function compareAnalyze(
 
   // Real 분기: multipart/form-data 빌드
   const form = new FormData();
-  const sourceBlob = await toBlob(req.source);
-  const resultBlob = await toBlob(req.result);
-  form.append("source", sourceBlob, "source.png");
-  form.append("result", resultBlob, "result.png");
+  const sourceRef = getStudioImageRef(req.source);
+  const resultRef = getStudioImageRef(req.result);
+  if (sourceRef) {
+    form.append("source_ref", sourceRef);
+  } else {
+    const sourceBlob = await toBlob(req.source);
+    form.append("source", sourceBlob, "source.png");
+  }
+  if (resultRef) {
+    form.append("result_ref", resultRef);
+  } else {
+    const resultBlob = await toBlob(req.result);
+    form.append("result", resultBlob, "result.png");
+  }
   // meta 빌드 — context 없으면 백엔드 기본 "edit" 으로 동작 (기존 호출자 100% 무영향)
   const metaPayload: Record<string, unknown> = {
     editPrompt: req.editPrompt,
     historyItemId: req.historyItemId,
     visionModel: req.visionModel,
     ollamaModel: req.ollamaModel,
+    sourceRef,
+    resultRef,
   };
   if (isCompare) {
     metaPayload.context = "compare";

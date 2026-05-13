@@ -14,6 +14,8 @@ import { useState } from "react";
 
 import type { CompareKeyAnchorJSON } from "@/lib/api/types";
 
+import { pickCompareText } from "./compareLanguage";
+
 interface Props {
   anchors: CompareKeyAnchorJSON[];
   domainMatch: "person" | "object_scene" | "mixed";
@@ -64,6 +66,9 @@ export default function CompareKeyAnchors({ anchors, domainMatch }: Props) {
 }
 
 function AnchorRow({ anchor }: { anchor: CompareKeyAnchorJSON }) {
+  const image1 = pickCompareText(anchor.image1Ko, anchor.image1);
+  const image2 = pickCompareText(anchor.image2Ko, anchor.image2);
+
   return (
     <div
       style={{
@@ -88,11 +93,15 @@ function AnchorRow({ anchor }: { anchor: CompareKeyAnchorJSON }) {
       >
         {anchor.label}
       </span>
-      <span style={{ color: "var(--ink-1)" }}>{anchor.image1Ko}</span>
+      <span lang={image1.lang} style={{ color: "var(--ink-1)" }}>
+        {image1.text}
+      </span>
       <span style={{ color: "var(--ink-3, #94a3b8)", fontWeight: 600 }}>
         →
       </span>
-      <span style={{ color: "var(--ink-1)" }}>{anchor.image2Ko}</span>
+      <span lang={image2.lang} style={{ color: "var(--ink-1)" }}>
+        {image2.text}
+      </span>
     </div>
   );
 }

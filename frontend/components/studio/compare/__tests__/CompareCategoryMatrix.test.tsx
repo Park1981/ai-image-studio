@@ -63,6 +63,25 @@ describe("CompareCategoryMatrix", () => {
     expect(screen.getByText("c diff en")).toBeTruthy();
   });
 
+  it("ko 슬롯이 영어 fallback 이면 영어 본문만 표시하고 en 토글은 숨김", () => {
+    render(
+      <CompareCategoryMatrix
+        categoryDiffs={{
+          composition: {
+            image1: "front portrait",
+            image2: "side portrait",
+            diff: "head angle differs",
+            image1Ko: "front portrait",
+            image2Ko: "side portrait",
+            diffKo: "head angle differs",
+          },
+        }}
+      />,
+    );
+    expect(screen.getByText("front portrait").getAttribute("lang")).toBe("en");
+    expect(screen.queryByRole("button", { name: /영문|en/i })).toBeNull();
+  });
+
   it("categoryDiffs 빈 dict 면 컴포넌트 미렌더", () => {
     const { container } = render(<CompareCategoryMatrix categoryDiffs={{}} />);
     expect(container.querySelector(".ais-compare-matrix")).toBeNull();

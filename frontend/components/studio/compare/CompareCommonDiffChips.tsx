@@ -7,6 +7,8 @@
 
 "use client";
 
+import { pickCompareTextList, type CompareDisplayText } from "./compareLanguage";
+
 interface Props {
   commonPointsKo: string[];
   commonPointsEn: string[];
@@ -20,7 +22,10 @@ export default function CompareCommonDiffChips({
   keyDifferencesKo,
   keyDifferencesEn,
 }: Props) {
-  if (commonPointsKo.length === 0 && keyDifferencesKo.length === 0) {
+  const commonPoints = pickCompareTextList(commonPointsKo, commonPointsEn);
+  const keyDifferences = pickCompareTextList(keyDifferencesKo, keyDifferencesEn);
+
+  if (commonPoints.length === 0 && keyDifferences.length === 0) {
     return null;
   }
   return (
@@ -35,14 +40,12 @@ export default function CompareCommonDiffChips({
       <ChipColumn
         label="공통점"
         tone="cyan"
-        ko={commonPointsKo}
-        en={commonPointsEn}
+        items={commonPoints}
       />
       <ChipColumn
         label="차이점"
         tone="amber"
-        ko={keyDifferencesKo}
-        en={keyDifferencesEn}
+        items={keyDifferences}
       />
     </div>
   );
@@ -51,13 +54,11 @@ export default function CompareCommonDiffChips({
 function ChipColumn({
   label,
   tone,
-  ko,
-  en,
+  items,
 }: {
   label: string;
   tone: "cyan" | "amber";
-  ko: string[];
-  en: string[];
+  items: CompareDisplayText[];
 }) {
   const palette = tone === "cyan"
     ? { bg: "rgba(34, 211, 238, 0.12)", color: "rgb(8, 145, 178)", border: "rgba(34, 211, 238, 0.3)" }
@@ -81,13 +82,14 @@ function ChipColumn({
         {label}
       </div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-        {ko.map((text, i) => {
-          const tooltip = i < en.length ? en[i] : undefined;
+        {items.map((item, i) => {
+          const tooltip = item.lang === "ko" && item.en ? item.en : undefined;
           return (
             <span
               key={`${tone}-${i}`}
               className="ais-compare-chip"
               title={tooltip}
+              lang={item.lang}
               style={{
                 padding: "4px 10px",
                 borderRadius: 999,
@@ -98,7 +100,7 @@ function ChipColumn({
                 whiteSpace: "nowrap",
               }}
             >
-              {text}
+              {item.text}
             </span>
           );
         })}

@@ -28,6 +28,17 @@ describe("CompareUncertainBox", () => {
     expect(screen.getByText(/조명 불확실/)).toBeTruthy();
   });
 
+  it("ko 슬롯이 영어 fallback 이면 영어 블록으로 한 번만 노출", () => {
+    render(
+      <CompareUncertainBox
+        uncertainEn="lighting unknown"
+        uncertainKo="lighting unknown"
+      />,
+    );
+    expect(screen.getAllByText(/lighting unknown/)).toHaveLength(1);
+    expect(screen.getByText(/lighting unknown/).getAttribute("lang")).toBe("en");
+  });
+
   it("en 만 있으면 en 만 노출", () => {
     render(
       <CompareUncertainBox uncertainEn="lighting unknown" uncertainKo="" />,

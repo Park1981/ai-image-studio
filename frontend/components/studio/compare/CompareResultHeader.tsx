@@ -8,7 +8,10 @@
 
 "use client";
 
+import { pickCompareText } from "./compareLanguage";
+
 interface Props {
+  summaryEn: string;
   summaryKo: string;
   fidelityScore: number | null;
   domainMatch: "person" | "object_scene" | "mixed";
@@ -21,12 +24,14 @@ function fidelityTone(score: number): "cyan" | "amber" | "muted" {
 }
 
 export default function CompareResultHeader({
+  summaryEn,
   summaryKo,
   fidelityScore,
   domainMatch,
 }: Props) {
   const showChip = domainMatch !== "mixed" && fidelityScore !== null;
   const tone = fidelityScore !== null ? fidelityTone(fidelityScore) : "muted";
+  const summary = pickCompareText(summaryKo, summaryEn);
 
   return (
     <div
@@ -46,8 +51,9 @@ export default function CompareResultHeader({
           lineHeight: 1.5,
           flex: 1,
         }}
+        lang={summary.lang}
       >
-        {summaryKo}
+        {summary.text}
       </div>
       {showChip && (
         <div

@@ -145,6 +145,7 @@ function AnalysisFilled({
     <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
       {/* 1. 결과 헤더 (summary + fidelity chip) */}
       <CompareResultHeader
+        summaryEn={analysis.summaryEn}
         summaryKo={analysis.summaryKo}
         fidelityScore={analysis.fidelityScore}
         domainMatch={analysis.domainMatch}

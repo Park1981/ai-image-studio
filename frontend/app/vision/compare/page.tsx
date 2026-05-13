@@ -41,6 +41,7 @@ import {
   compareAnalyze,
   compareAnalyzePerImagePrompt,
 } from "@/lib/api/compare";
+import { analysisHasUsableKorean } from "@/components/studio/compare/compareLanguage";
 import { useImagePasteTarget } from "@/hooks/useImagePasteTarget";
 import { loadImageFile } from "@/lib/image-actions";
 import { toast } from "@/stores/useToastStore";
@@ -175,6 +176,12 @@ export default function VisionComparePage() {
       if (a.fallback) {
         toast.warn("비교 분석 fallback", a.summaryKo || "비전 응답 부족");
       } else {
+        if (!analysisHasUsableKorean(a)) {
+          toast.warn(
+            "한국어 번역 실패",
+            "영문 원문으로 표시합니다. Ollama 번역 응답이 비어 있거나 영어로 돌아왔습니다.",
+          );
+        }
         const meta = a.fidelityScore !== null ? `유사도 ${a.fidelityScore}%` : a.domainMatch;
         toast.success("비교 분석 완료", meta);
       }

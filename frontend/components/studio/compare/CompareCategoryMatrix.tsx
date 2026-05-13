@@ -20,6 +20,8 @@ import { useState } from "react";
 
 import type { CompareCategoryDiffJSON } from "@/lib/api/types";
 
+import { pickCompareText, rowHasUsableKorean } from "./compareLanguage";
+
 interface Props {
   categoryDiffs: Record<string, CompareCategoryDiffJSON>;
 }
@@ -71,6 +73,7 @@ function CategoryRow({
   row: CompareCategoryDiffJSON;
 }) {
   const [showEn, setShowEn] = useState(false);
+  const canShowEn = rowHasUsableKorean(row);
   return (
     <div
       className="ais-compare-matrix-row"
@@ -94,23 +97,25 @@ function CategoryRow({
         <div style={{ fontWeight: 700, fontSize: 13, color: "var(--ink-1)" }}>
           {labelKo}
         </div>
-        <button
-          type="button"
-          onClick={() => setShowEn((v) => !v)}
-          aria-label={showEn ? "영문 닫기" : "영문 펼치기 (en)"}
-          aria-expanded={showEn}
-          style={{
-            padding: "2px 8px",
-            borderRadius: 6,
-            border: "1px solid var(--line-1)",
-            background: "transparent",
-            fontSize: 11,
-            color: "var(--ink-2)",
-            cursor: "pointer",
-          }}
-        >
-          {showEn ? "▴ en" : "▾ en"}
-        </button>
+        {canShowEn && (
+          <button
+            type="button"
+            onClick={() => setShowEn((v) => !v)}
+            aria-label={showEn ? "영문 닫기" : "영문 펼치기 (en)"}
+            aria-expanded={showEn}
+            style={{
+              padding: "2px 8px",
+              borderRadius: 6,
+              border: "1px solid var(--line-1)",
+              background: "transparent",
+              fontSize: 11,
+              color: "var(--ink-2)",
+              cursor: "pointer",
+            }}
+          >
+            {showEn ? "▴ en" : "▾ en"}
+          </button>
+        )}
       </div>
       <div
         style={{
@@ -141,6 +146,8 @@ function Cell({
   showEn: boolean;
   eyebrow: string;
 }) {
+  const display = pickCompareText(ko, en);
+  const showEnglishOriginal = showEn && display.lang === "ko" && !!en.trim();
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
       <div
@@ -153,8 +160,8 @@ function Cell({
       >
         {eyebrow}
       </div>
-      <div>{ko}</div>
-      {showEn && (
+      <div lang={display.lang}>{display.text}</div>
+      {showEnglishOriginal && (
         <div
           style={{
             fontSize: 11,

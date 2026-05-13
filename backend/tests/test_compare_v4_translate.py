@@ -195,6 +195,52 @@ async def test_translate_v4_english_echo_falls_back():
 
 
 @pytest.mark.asyncio
+async def test_translate_v4_retry_recovers_english_echo():
+    """1차 응답이 영어 echo 여도 retry 가 한국어 슬롯을 복구."""
+    first_echo = json.dumps({
+        "k1": "Both images show the same person.",
+        "k2": "same person",
+        "k3": "same outfit",
+        "k4": "one eye closed",
+        "k5": "head-on",
+        "k6": "3/4 view",
+        "k7": "head turned",
+        "k8": "open",
+        "k9": "closed",
+        "k10": "close left eye",
+    })
+    retry_ko = json.dumps({
+        "k1": "두 이미지는 같은 사람을 보여줍니다.",
+        "k2": "같은 사람",
+        "k3": "같은 의상",
+        "k4": "한쪽 눈을 감음",
+        "k5": "정면",
+        "k6": "3/4 측면",
+        "k7": "고개가 돌아감",
+        "k8": "뜬 상태",
+        "k9": "감은 상태",
+        "k10": "왼쪽 눈을 감기",
+    })
+    chat = AsyncMock(side_effect=[first_echo, retry_ko])
+
+    with patch(
+        "studio.compare_pipeline_v4.translate.call_chat_payload",
+        new=chat,
+    ):
+        result = await translate_v4_result(
+            _sample_result(),
+            text_model="gemma4-un:latest",
+            timeout=60.0,
+            ollama_url="http://localhost:11434",
+        )
+
+    assert chat.await_count == 2
+    assert result.summary_ko == "두 이미지는 같은 사람을 보여줍니다."
+    assert result.common_points_ko == ["같은 사람", "같은 의상"]
+    assert result.transform_prompt_ko == "왼쪽 눈을 감기"
+
+
+@pytest.mark.asyncio
 async def test_translate_v4_partial_korean_partial_echo():
     """일부 슬롯만 번역 / 일부는 echo — 슬롯별로 한글 검증 적용."""
     fake_ko = json.dumps({

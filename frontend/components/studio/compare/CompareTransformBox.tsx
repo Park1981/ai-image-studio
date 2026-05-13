@@ -13,6 +13,8 @@ import { useState } from "react";
 import Icon from "@/components/ui/Icon";
 import { toast } from "@/stores/useToastStore";
 
+import { hasUsableKorean } from "./compareLanguage";
+
 interface Props {
   transformPromptEn: string;
   transformPromptKo: string;
@@ -25,6 +27,7 @@ export default function CompareTransformBox({
   const [showKo, setShowKo] = useState(false);
   const en = transformPromptEn.trim();
   const ko = transformPromptKo.trim();
+  const canShowKo = hasUsableKorean(ko);
 
   if (!en && !ko) return null;
 
@@ -71,7 +74,7 @@ export default function CompareTransformBox({
           TRANSFORM · A → B 변형 가이드
         </span>
         <div style={{ display: "flex", gap: 6 }}>
-          {ko && (
+          {canShowKo && (
             <button
               type="button"
               onClick={() => setShowKo((v) => !v)}
@@ -121,11 +124,13 @@ export default function CompareTransformBox({
           whiteSpace: "pre-wrap",
           wordBreak: "break-word",
         }}
+        lang={en ? "en" : canShowKo ? "ko" : "en"}
       >
         {en || ko}
       </div>
-      {showKo && ko && (
+      {showKo && canShowKo && (
         <div
+          lang="ko"
           style={{
             fontSize: 12,
             lineHeight: 1.55,

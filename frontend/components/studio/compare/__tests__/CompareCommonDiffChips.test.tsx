@@ -43,14 +43,28 @@ describe("CompareCommonDiffChips", () => {
   it("ko 배열보다 en 배열이 짧으면 title 미설정 (안전한 인덱스 매칭)", () => {
     render(
       <CompareCommonDiffChips
-        commonPointsKo={["A", "B"]}
+        commonPointsKo={["항목 A", "항목 B"]}
         commonPointsEn={["only A"]}
         keyDifferencesKo={[]}
         keyDifferencesEn={[]}
       />,
     );
-    expect(screen.getByText("A").getAttribute("title")).toBe("only A");
-    expect(screen.getByText("B").getAttribute("title")).toBeNull();
+    expect(screen.getByText("항목 A").getAttribute("title")).toBe("only A");
+    expect(screen.getByText("항목 B").getAttribute("title")).toBeNull();
+  });
+
+  it("ko 슬롯이 영어 fallback 이면 영어로 표시하고 hover 원문은 중복하지 않음", () => {
+    render(
+      <CompareCommonDiffChips
+        commonPointsKo={["same person"]}
+        commonPointsEn={["same person"]}
+        keyDifferencesKo={[]}
+        keyDifferencesEn={[]}
+      />,
+    );
+    const chip = screen.getByText("same person");
+    expect(chip.getAttribute("lang")).toBe("en");
+    expect(chip.getAttribute("title")).toBeNull();
   });
 
   it("commonPointsKo + keyDifferencesKo 둘 다 빈 배열이면 컴포넌트 자체 미렌더 (또는 빈 결과)", () => {
