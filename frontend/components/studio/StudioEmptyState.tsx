@@ -6,11 +6,11 @@
  *
  * Size:
  *   - normal: 기본 dashed 카드 (28px 20px padding · radius-card)
- *     → Generate/Edit/Video/Vision 의 우측 empty 용
+ *     → Generate/Edit/Video/Vision/Compare 의 우측 empty 용
  *   - compact: 얇은 한 줄 안내 (12px 16px padding · radius)
  *     → 좌측 작은 보조 영역 용
- *   - panel: 큰 flex-center 영역 (아이콘 + 타이틀 + 설명 + 보조설명)
- *     → Compare ViewerPanel/AnalysisPanel 내부 empty 용
+ *   - panel: normal 과 같은 문구 톤 + flex:1
+ *     → Compare ViewerPanel 내부 empty 용
  *
  * props:
  *   - title: 메인 메시지 (panel 기준 큰 볼드)
@@ -39,42 +39,25 @@ export default function StudioEmptyState({
   icon?: IconName;
   children?: ReactNode;
 }) {
+  const body = children ?? (
+    <>
+      {title && <div className="ais-empty-state-title">{title}</div>}
+      {description && (
+        <div className="ais-empty-state-desc">{description}</div>
+      )}
+    </>
+  );
+
   if (size === "panel") {
     return (
       <div
+        className="ais-empty-state ais-empty-state-panel"
         style={{
           flex: 1,
-          background: "var(--bg-2)",
-          border: "1.5px dashed var(--line-2)",
-          borderRadius: "var(--radius)",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: 8,
-          color: "var(--ink-3)",
-          padding: 20,
         }}
       >
-        {icon && <Icon name={icon} size={26} />}
-        {title && (
-          <div
-            style={{
-              fontSize: 13,
-              fontWeight: 600,
-              color: "var(--ink-2)",
-              textAlign: "center",
-            }}
-          >
-            {title}
-          </div>
-        )}
-        {description && (
-          <div style={{ fontSize: 11.5, textAlign: "center" }}>
-            {description}
-          </div>
-        )}
-        {children}
+        {icon && <Icon name={icon} size={20} />}
+        {body}
       </div>
     );
   }
@@ -105,30 +88,9 @@ export default function StudioEmptyState({
 
   // normal
   return (
-    <div
-      style={{
-        padding: "28px 20px",
-        background: "var(--surface)",
-        border: "1px dashed var(--line-2)",
-        borderRadius: "var(--radius-card)",
-        textAlign: "center",
-        color: "var(--ink-4)",
-        fontSize: 12.5,
-        lineHeight: 1.6,
-      }}
-    >
-      {children ?? (
-        <>
-          {title && (
-            <div style={{ fontWeight: 500, color: "var(--ink-3)" }}>
-              {title}
-            </div>
-          )}
-          {description && (
-            <div style={{ marginTop: 4, fontSize: 11.5 }}>{description}</div>
-          )}
-        </>
-      )}
+    <div className="ais-empty-state">
+      {icon && <Icon name={icon} size={20} />}
+      {body}
     </div>
   );
 }

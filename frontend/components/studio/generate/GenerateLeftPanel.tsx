@@ -24,6 +24,7 @@ import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
 import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
+import ProcessingCTA from "@/components/studio/ProcessingCTA";
 import { usePromptModeInit } from "@/hooks/usePromptModeInit";
 import { usePromptTools } from "@/hooks/usePromptTools";
 import ResearchBanner from "@/components/studio/ResearchBanner";
@@ -35,7 +36,7 @@ import {
 } from "@/components/studio/StudioLayout";
 import V5MotionCard from "@/components/studio/V5MotionCard";
 import Icon from "@/components/ui/Icon";
-import { Spinner, Toggle } from "@/components/ui/primitives";
+import { Toggle } from "@/components/ui/primitives";
 import {
   hasMarker,
   stripAllLibBlocks,
@@ -167,30 +168,16 @@ export default function GenerateLeftPanel({
        *  Phase 1.5.2 (결정 K) — shortcut (⇧↵) 표시 제거. 기능 미구현 유지.
        *  CSS .ais-cta-shortcut 자체는 보존 (향후 단축키 기능 살릴 때 재사용). */}
       <div className="ais-cta-sticky-top">
-        <button
-          type="button"
+        <ProcessingCTA
           onClick={onGenerate}
           disabled={generating || !prompt.trim()}
-          className="ais-cta-primary"
-        >
-          {generating ? (
-            <>
-              <div
-                className="ais-cta-progress"
-                style={{ width: `${progress}%` }}
-              />
-              <span className="ais-cta-content">
-                <Spinner />
-                {stage} · {Math.round(progress)}%
-              </span>
-            </>
-          ) : (
-            <>
-              <Icon name="sparkle" size={15} />
-              Generate
-            </>
-          )}
-        </button>
+          running={generating}
+          progress={progress}
+          idleLabel="Generate"
+          runningLabel="이미지 생성 중"
+          subLabel={stage || "DIFFUSION"}
+          icon="sparkle"
+        />
       </div>
 
       {/* ── 프롬프트 카드 ── */}

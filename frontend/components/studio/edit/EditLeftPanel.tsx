@@ -24,6 +24,7 @@ import { useState } from "react";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
+import ProcessingCTA from "@/components/studio/ProcessingCTA";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
 import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
 import { usePromptModeInit } from "@/hooks/usePromptModeInit";
@@ -46,7 +47,7 @@ import {
 } from "@/components/studio/StudioLayout";
 import V5MotionCard from "@/components/studio/V5MotionCard";
 import Icon from "@/components/ui/Icon";
-import { Spinner, Toggle } from "@/components/ui/primitives";
+import { Toggle } from "@/components/ui/primitives";
 import { useEditInputs, useEditRunning } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
@@ -78,7 +79,7 @@ export default function EditLeftPanel({
     setPickedTemplateId, setPickedTemplateRef,
     promptMode, setPromptMode,
   } = useEditInputs();
-  const { running } = useEditRunning();
+  const { running, pipelineProgress, pipelineLabel } = useEditRunning();
   const items = useHistoryStore((s) => s.items);
   // 수정 후 자동 비교 분석 토글 — 설정 → Edit 좌측 패널 이동 (오빠 피드백 2026-04-27).
   const autoCompareAnalysis = useSettingsStore((s) => s.autoCompareAnalysis);
@@ -140,23 +141,16 @@ export default function EditLeftPanel({
       {/* Primary CTA — sticky 상단 (Generate 와 통일 · 폼 길어져도 시야 안).
        *  Phase 1.5.3 (결정 K) — shortcut 표시 X (Edit 은 이미 표시 X 였음). 텍스트 영문 통일 (Edit). */}
       <div className="ais-cta-sticky-top">
-        <button
-          type="button"
+        <ProcessingCTA
           onClick={onGenerate}
           disabled={ctaDisabled}
-          className="ais-cta-primary"
-        >
-          {running ? (
-            <>
-              <Spinner /> 처리 중…
-            </>
-          ) : (
-            <>
-              <Icon name="wand" size={16} />
-              Edit
-            </>
-          )}
-        </button>
+          running={running}
+          progress={pipelineProgress}
+          idleLabel="Edit"
+          runningLabel="이미지 수정 중"
+          subLabel={pipelineLabel || "EDIT PIPELINE"}
+          icon="wand"
+        />
       </div>
 
       {/* ── 원본 이미지 ── */}

@@ -112,11 +112,13 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
 
       <ResultBox
         state={resultState}
+        loadingLabel="이미지 생성 중…"
         emptyState={
-          <StudioEmptyState size="normal">
-            아직 생성된 이미지가 없습니다. 프롬프트 입력 후 <b>생성</b> 버튼을
-            눌러 주세요.
-          </StudioEmptyState>
+          <StudioEmptyState
+            size="normal"
+            title="생성 대기 중"
+            description="프롬프트 입력 후 생성 버튼을 눌러 주세요."
+          />
         }
         style={
           selectedAspectRatio

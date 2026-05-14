@@ -20,11 +20,13 @@ it("loading 상태는 빈 placeholder 와 effectOverlay slot 을 렌더한다", 
   render(
     <ResultBox
       state="loading"
+      loadingLabel="이미지 생성 중…"
       effectOverlay={<div data-testid="effect">효과</div>}
     />,
   );
 
   expect(screen.getByTestId("result-box-loading-placeholder")).toBeInTheDocument();
+  expect(screen.getByText("이미지 생성 중…")).toBeInTheDocument();
   expect(screen.getByTestId("effect")).toBeInTheDocument();
 });
 

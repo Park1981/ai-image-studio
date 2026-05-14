@@ -22,6 +22,7 @@ import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
+import ProcessingCTA from "@/components/studio/ProcessingCTA";
 import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
 import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
 import { usePromptModeInit } from "@/hooks/usePromptModeInit";
@@ -40,7 +41,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { USE_MOCK } from "@/lib/api/client";
 import { VIDEO_MODEL_PRESETS } from "@/lib/model-presets";
 import Icon from "@/components/ui/Icon";
-import { Spinner, Toggle } from "@/components/ui/primitives";
+import { Toggle } from "@/components/ui/primitives";
 import {
   computeVideoResize,
   useVideoInputs,
@@ -75,7 +76,7 @@ export default function VideoLeftPanel({
     // Phase 5 (2026-05-03) — 영상 모델 선택 (Wan 2.2 / LTX 2.3)
     selectedVideoModel, setSelectedVideoModel,
   } = useVideoInputs();
-  const { running } = useVideoRunning();
+  const { running, pipelineProgress, pipelineLabel } = useVideoRunning();
   const items = useHistoryStore((s) => s.items);
 
   // Phase 5 (2026-05-03) — 페이지 마운트 시 1회 settings.videoModel 로 sync.
@@ -202,23 +203,16 @@ export default function VideoLeftPanel({
        *  Phase 1.5.4 (결정 K) — 텍스트 영문 통일 (Render). shortcut 표시 X.
        *  Phase 5 follow-up 4 (2026-05-03 fix) — ETA description 제거 (Generate/Edit 와 통일). */}
       <div className="ais-cta-sticky-top">
-        <button
-          type="button"
+        <ProcessingCTA
           onClick={handleCtaClick}
           disabled={ctaDisabled}
-          className="ais-cta-primary"
-        >
-          {running ? (
-            <>
-              <Spinner /> 처리 중…
-            </>
-          ) : (
-            <>
-              <Icon name="sparkle" size={15} />
-              Render
-            </>
-          )}
-        </button>
+          running={running}
+          progress={pipelineProgress}
+          idleLabel="Render"
+          runningLabel="영상 생성 중"
+          subLabel={pipelineLabel || "VIDEO PIPELINE"}
+          icon="sparkle"
+        />
       </div>
 
       {/* ── 원본 이미지 ── */}

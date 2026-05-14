@@ -112,12 +112,13 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
       <ResultBox
         state={resultState}
         modifier="edit"
+        loadingLabel="영상 생성 중…"
         emptyState={
-          <StudioEmptyState size="normal">
-            원본 이미지와 영상 지시를 입력하고
-            <br />
-            <b>영상 생성</b> 버튼을 눌러 주세요.
-          </StudioEmptyState>
+          <StudioEmptyState
+            size="normal"
+            title="영상 대기 중"
+            description="원본 이미지와 영상 지시를 입력하고 영상 생성 버튼을 눌러 주세요."
+          />
         }
       >
         {playingRef && (

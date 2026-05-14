@@ -11,7 +11,7 @@
  *  - CompareTransformBox (transform_prompt + 복사)
  *  - CompareUncertainBox (페이지 끝 회색 박스)
  *
- * 외곽: .ais-result-hero-plain (5 페이지 통일 · plain base).
+ * 외곽: ResultBox (5 페이지 공통 결과 박스).
  *  - running: 로딩
  *  - !analysis: 빈 상태
  *  - analysis.fallback: amber 폴백 카드
@@ -20,8 +20,8 @@
 
 "use client";
 
+import { ResultBox } from "@/components/studio/ResultBox";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
-import StudioLoadingState from "@/components/studio/StudioLoadingState";
 import type { VisionCompareAnalysisV4 } from "@/lib/api/types";
 import type {
   PerImagePromptResult,
@@ -60,23 +60,18 @@ export default function CompareAnalysisPanel({
   onPerImagePromptRequest,
   onPerImagePromptReset,
 }: Props) {
+  const resultState = running ? "loading" : analysis ? "done" : "idle";
+
   return (
-    <div
-      className="ais-result-hero-plain"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 20,
-        minHeight: 262,
-      }}
+    <ResultBox
+      state={resultState}
+      variant="plain"
+      loadingLabel="비교 분석 중…"
+      emptyState={<AnalysisEmpty />}
     >
-      {running ? (
-        <AnalysisLoading />
-      ) : !analysis ? (
-        <AnalysisEmpty />
-      ) : analysis.fallback ? (
+      {analysis?.fallback ? (
         <AnalysisFallback summary={analysis.summaryKo} />
-      ) : (
+      ) : analysis ? (
         <AnalysisFilled
           analysis={analysis}
           image1Url={image1Url}
@@ -87,28 +82,17 @@ export default function CompareAnalysisPanel({
           onPerImagePromptRequest={onPerImagePromptRequest}
           onPerImagePromptReset={onPerImagePromptReset}
         />
-      )}
-    </div>
-  );
-}
-
-function AnalysisLoading() {
-  return (
-    <StudioLoadingState
-      size="panel"
-      title="비교 분석 중…"
-      description="2-stage 관찰자 + 차이 합성 진행 중 · 약 30~60초 소요"
-    />
+      ) : null}
+    </ResultBox>
   );
 }
 
 function AnalysisEmpty() {
   return (
     <StudioEmptyState
-      size="panel"
-      icon="sparkle"
-      title="분석 대기 중"
-      description="두 이미지 업로드 후 좌측의 비교 분석 시작 을 눌러 주세요"
+      size="normal"
+      title="비교 대기 중"
+      description="두 이미지를 업로드하고 비교 분석을 시작해 주세요."
     />
   );
 }

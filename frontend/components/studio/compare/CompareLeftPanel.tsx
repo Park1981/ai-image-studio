@@ -19,6 +19,7 @@ import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { CompareImageSlot } from "@/components/studio/CompareImageSlot";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
+import ProcessingCTA from "@/components/studio/ProcessingCTA";
 import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import { StudioModeHeader } from "@/components/studio/StudioLayout";
 import VisionModelSelector, {
@@ -28,7 +29,10 @@ import Icon from "@/components/ui/Icon";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { toast } from "@/stores/useToastStore";
-import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
+import {
+  useVisionCompareStore,
+  type VisionCompareImage,
+} from "@/stores/useVisionCompareStore";
 
 type CompareHistoryTarget = "A" | "B";
 
@@ -60,6 +64,16 @@ export default function CompareLeftPanel({
   const hintTextareaRef = useAutoGrowTextarea(hint);
   const [historyTarget, setHistoryTarget] = useState<CompareHistoryTarget | null>(null);
   const imageHistoryItems = useHistoryStore((s) => s.items);
+  const latestStageProgress = useVisionCompareStore((s) =>
+    s.stageHistory.length > 0
+      ? s.stageHistory[s.stageHistory.length - 1].progress
+      : 0,
+  );
+  const latestStageLabel = useVisionCompareStore((s) =>
+    s.stageHistory.length > 0
+      ? s.stageHistory[s.stageHistory.length - 1].label
+      : "",
+  );
   // V4 Phase 8: 비전 모델 카드 — vision/compare 공용 (settings persist 공유)
   const visionModel = useSettingsStore((s) => s.visionModel);
   const setVisionModel = useSettingsStore((s) => s.setVisionModel);
@@ -81,29 +95,20 @@ export default function CompareLeftPanel({
         description="두 이미지의 차이를 관찰자 듀얼 + 차이 합성으로 자세히 분석합니다."
       />
 
-      {/* Phase 1.5.5 (결정 F · 2026-05-02) — CTA 상단 sticky 로 변경.
-       *  옛: 패널 하단 sticky + flex:1 spacer 로 밀어내림.
-       *  신: StudioModeHeader 직후 .ais-cta-sticky-top (Generate/Edit/Video 와 통일).
-       *  inline style 잔여 0 (V5 시각 대상) — Aurora Glass CTA 자동 적용. */}
+      {/* Phase 1.5.5 (결정 F · 2026-05-02) — CTA 상단 sticky.
+       *  StudioModeHeader 직후 공통 ProcessingCTA 사용.
+       *  inline style 잔여 0 (V5 시각 대상). */}
       <div className="ais-cta-sticky-top">
-        <button
-          type="button"
+        <ProcessingCTA
           onClick={onAnalyze}
           disabled={!canRun}
-          className="ais-cta-primary"
-        >
-          {running ? (
-            <>
-              <Icon name="refresh" size={14} className="spin" />
-              분석 중…
-            </>
-          ) : (
-            <>
-              <Icon name="sparkle" size={14} />
-              Compare
-            </>
-          )}
-        </button>
+          running={running}
+          progress={latestStageProgress}
+          idleLabel="Compare"
+          runningLabel="비교 분석 중"
+          subLabel={latestStageLabel || "COMPARE ANALYSIS"}
+          icon="compare"
+        />
       </div>
 
       {/* 이미지 A 슬롯 */}

@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Image Studio · Progress Demo 2 · Loading & CTA Ideas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+ * Demo 2 — 로딩 캔버스 + 진행 버튼 아이디어 컬렉션
+ * 토큰 / 폰트 / 일반 톤은 progress-animation-demo.html 과 동일하게 맞춤
+ * 핵심: ::before / ::after + transform translate 루프만으로 끊김 없는 무한 재생
+ * ═══════════════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+:root {
+  --bg: #FAF9F7;
+  --bg-2: #F4F2EE;
+  --surface: #FFFFFF;
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --accent: #4A9EFF;
+  --accent-ink: #1E7BE0;
+  --violet: #7C3AED;
+  --violet-ink: #5B21B6;
+  --cyan: #13C6E8;
+  --green: #52C41A;
+  --amber: #FAAD14;
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-card: 14px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(23,20,14,.04), 0 2px 8px rgba(23,20,14,.04);
+  --shadow-lg: 0 4px 10px rgba(23,20,14,.05), 0 20px 48px rgba(23,20,14,.08);
+  --canvas-h: 188px;
+}
+body {
+  background:
+    radial-gradient(circle at 14% 4%, rgba(74,158,255,.05), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(124,58,237,.05), transparent 30%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; }
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+.display {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+}
+.page {
+  width: min(1240px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 34px 0 60px;
+}
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.eyebrow {
+  margin-bottom: 5px;
+  color: var(--ink-4);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+h1, h2, h3, p { margin: 0; }
+h1 {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+h1 strong { color: var(--violet); font-style: normal; }
+.lead {
+  margin-top: 9px;
+  max-width: 720px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.topbar-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--ink-4);
+}
+.topbar-meta a {
+  color: var(--accent-ink);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--line-2);
+}
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 22px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: rgba(255,255,255,.72);
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+}
+.controls-left { display: flex; align-items: center; gap: 12px; }
+.controls-left strong { color: var(--ink-2); font-weight: 700; font-size: 12px; }
+.controls-left .mono { color: var(--ink-4); font-size: 11px; }
+.controls-right { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 7px 12px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.btn.primary {
+  border-color: rgba(74,158,255,.28);
+  background: linear-gradient(135deg, rgba(74,158,255,.14), rgba(124,58,237,.08));
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.btn[aria-pressed="true"] {
+  border-color: rgba(124,58,237,.3);
+  background: linear-gradient(135deg, rgba(124,58,237,.18), rgba(74,158,255,.10));
+  color: var(--violet-ink);
+  font-weight: 700;
+}
+
+.section { margin-top: 32px; }
+.section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.section-title h2 {
+  font-size: 23px;
+  font-weight: 500;
+}
+.section-title strong { color: var(--violet); font-style: normal; }
+.note { color: var(--ink-4); font-size: 11px; }
+
+.canvas-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.cta-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px;
+}
+.card {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255,255,255,.78);
+  box-shadow: var(--shadow-sm);
+}
+.card h3 {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink-2);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.card h3 .idx {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: .12em;
+  font-weight: 500;
+}
+.card p {
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.72);
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-family: "JetBrains Mono", monospace;
+}
+.chip.pro {
+  border-color: rgba(82,196,26,.32);
+  background: rgba(82,196,26,.08);
+  color: #2e7d10;
+}
+.chip.con {
+  border-color: rgba(250,173,20,.34);
+  background: rgba(250,173,20,.10);
+  color: #8a5a00;
+}
+
+/* ───────────── 통일 픽 강조 라벨 ───────────── */
+/* 5 모드 통일 추천 카드만 violet glow + 우상단 PICK 배지 */
+.card.pick {
+  position: relative;
+  border-color: rgba(124,58,237,.42);
+  background:
+    linear-gradient(180deg, rgba(124,58,237,.06), rgba(74,158,255,.04)),
+    rgba(255,255,255,.86);
+  box-shadow:
+    0 0 0 1px rgba(124,58,237,.18) inset,
+    0 10px 32px rgba(124,58,237,.18),
+    var(--shadow-sm);
+}
+.pick-badge {
+  position: absolute;
+  top: -10px;
+  right: 14px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #7C3AED, #4A9EFF);
+  color: #fff;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  box-shadow: 0 6px 18px rgba(124,58,237,.34);
+}
+.pick-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.28);
+  animation: pick-pulse 1.8s ease-in-out infinite;
+}
+.pick-badge.alt {
+  background: rgba(255,255,255,.92);
+  color: var(--ink-3);
+  box-shadow: 0 4px 12px rgba(23,20,14,.08);
+  font-weight: 600;
+}
+.pick-badge.alt::before {
+  background: var(--ink-4);
+  box-shadow: none;
+  animation: none;
+}
+.card.alt {
+  opacity: .68;
+  filter: saturate(.82);
+}
+.card.alt:hover {
+  opacity: 1;
+  filter: none;
+}
+@keyframes pick-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.4); opacity: .5; }
+}
+
+/* ───────────── 로딩 캔버스 공용 ───────────── */
+.result-box {
+  position: relative;
+  width: 100%;
+  height: var(--canvas-h);
+  background-color: var(--surface);
+  background-image: radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 36px rgba(23,20,14,.08);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.loading-canvas {
+  position: absolute;
+  inset: 18px;
+  border-radius: calc(var(--radius-card) - 6px);
+  overflow: hidden;
+  isolation: isolate;
+}
+.canvas-caption {
+  position: relative;
+  z-index: 2;
+  padding: 5px 10px;
+  border: 1px solid rgba(255,255,255,.62);
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.62);
+  box-shadow: 0 8px 24px rgba(23,20,14,.07);
+  color: var(--ink-3);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  font-family: "JetBrains Mono", monospace;
+}
+
+/* ───────────── 시안 1: Aurora Drift ───────────── */
+/* organic 오로라 띠 — 사선 흐름인데 wave 보다 부드럽고 색 굴곡 더 큼 */
+.canvas-aurora {
+  background:
+    radial-gradient(circle, rgba(0,0,0,.04) 1px, transparent 1px) 0 0 / 14px 14px,
+    linear-gradient(135deg, rgba(246,241,255,.96), rgba(234,245,255,.92) 48%, rgba(250,249,246,.88));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+}
+.canvas-aurora::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  background:
+    radial-gradient(ellipse 60% 38% at 20% 30%, rgba(124,58,237,.42), transparent 60%),
+    radial-gradient(ellipse 50% 30% at 78% 64%, rgba(19,198,232,.46), transparent 64%),
+    radial-gradient(ellipse 44% 28% at 52% 86%, rgba(74,158,255,.38), transparent 62%);
+  filter: blur(28px) saturate(1.18);
+  animation: aurora-drift 7.4s ease-in-out infinite alternate;
+}
+.canvas-aurora::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(115deg, transparent 0%, rgba(255,255,255,.42) 50%, transparent 100%);
+  mix-blend-mode: overlay;
+  opacity: .6;
+  animation: aurora-sheen 4.8s linear infinite;
+}
+@keyframes aurora-drift {
+  0%   { transform: translate3d(-3%, -2%, 0) scale(1); }
+  50%  { transform: translate3d(2%, 1%, 0) scale(1.08); }
+  100% { transform: translate3d(3%, 2%, 0) scale(1); }
+}
+@keyframes aurora-sheen {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+/* ───────────── 시안 2: Mesh Bloom ───────────── */
+/* 가운데서 mesh blob 이 부풀고 줄어드는 호흡 — pulse 메타포가 강함 */
+.canvas-mesh {
+  background:
+    radial-gradient(circle, rgba(0,0,0,.04) 1px, transparent 1px) 0 0 / 14px 14px,
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.84), rgba(244,242,238,.7));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+}
+.canvas-mesh::before {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 32%, rgba(124,58,237,.66), transparent 58%),
+    radial-gradient(circle at 72% 68%, rgba(74,158,255,.7), transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(19,198,232,.42), transparent 70%);
+  filter: blur(22px);
+  animation: mesh-bloom 3.4s ease-in-out infinite;
+}
+.canvas-mesh::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(circle at 50% 50%, transparent 30%, rgba(255,255,255,.34) 80%);
+  pointer-events: none;
+}
+@keyframes mesh-bloom {
+  0%, 100% { transform: scale(.86) rotate(0deg); opacity: .82; }
+  50%      { transform: scale(1.12) rotate(8deg); opacity: 1; }
+}
+
+/* ───────────── 시안 3: Dot Field Sweep ───────────── */
+/* 점 그리드 + 빛이 좌→우로 쓸고 지나가며 점들 색 잠깐 강조 (AI/constellation) */
+.canvas-dot {
+  background:
+    radial-gradient(circle, rgba(124,58,237,.34) 1.4px, transparent 1.9px) 0 0 / 18px 18px,
+    linear-gradient(180deg, #fbfaf7, #f1eef5);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+}
+.canvas-dot::before {
+  content: "";
+  position: absolute;
+  inset: -18px;
+  background-image: radial-gradient(circle, rgba(74,158,255,.92) 1.6px, transparent 2.2px);
+  background-size: 18px 18px;
+  -webkit-mask-image: linear-gradient(115deg, transparent 30%, #000 45%, #000 55%, transparent 70%);
+  mask-image: linear-gradient(115deg, transparent 30%, #000 45%, #000 55%, transparent 70%);
+  -webkit-mask-size: 220% 100%;
+  mask-size: 220% 100%;
+  animation: dot-sweep 3.6s ease-in-out infinite;
+}
+.canvas-dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 60% 40% at 50% 50%, rgba(255,255,255,.28), transparent 70%);
+  pointer-events: none;
+}
+@keyframes dot-sweep {
+  0% { -webkit-mask-position: -120% 0; mask-position: -120% 0; }
+  100% { -webkit-mask-position: 120% 0; mask-position: 120% 0; }
+}
+
+/* ───────────── 시안 4: Iso Stripe ───────────── */
+/* 격자 + 단일 사선 빛띠 sweep — 현 diagonal wave 의 절제판, 거슬리지 않음 */
+.canvas-iso {
+  background:
+    linear-gradient(135deg, rgba(124,58,237,.06) 0 1px, transparent 1px 24px),
+    linear-gradient(45deg, rgba(74,158,255,.06) 0 1px, transparent 1px 24px),
+    linear-gradient(180deg, #fbfaf7, #f3eef7);
+  background-size: 24px 24px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.5);
+}
+.canvas-iso::before {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  background: linear-gradient(115deg,
+    transparent 0 40%,
+    rgba(124,58,237,.28) 46%,
+    rgba(255,255,255,.65) 50%,
+    rgba(74,158,255,.32) 54%,
+    transparent 60% 100%);
+  filter: blur(6px);
+  animation: iso-sweep 4.4s ease-in-out infinite;
+}
+.canvas-iso::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% 100%, rgba(124,58,237,.10), transparent 70%);
+  pointer-events: none;
+}
+@keyframes iso-sweep {
+  0%   { transform: translateX(-50%); opacity: 0; }
+  20%  { opacity: 1; }
+  80%  { opacity: 1; }
+  100% { transform: translateX(50%); opacity: 0; }
+}
+
+/* ───────────── 진행 버튼 공용 ───────────── */
+.cta-stage {
+  display: grid;
+  gap: 10px;
+  padding: 18px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(180deg, #f7f4ef, #efece5);
+  border: 1px solid var(--line);
+}
+.cta-stage .row-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  font-family: "JetBrains Mono", monospace;
+}
+.cta-base {
+  position: relative;
+  width: 100%;
+  min-height: 56px;
+  border: 0;
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  isolation: isolate;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 650;
+  letter-spacing: .01em;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,.30),
+    inset 0 1px 0 rgba(255,255,255,.25);
+  text-align: left;
+  padding: 0 22px;
+  display: grid;
+  place-items: center;
+}
+.cta-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.cta-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.cta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.cta-title {
+  font-size: 13.5px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.cta-sub {
+  color: rgba(255,255,255,.7);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  font-family: "JetBrains Mono", monospace;
+}
+.cta-pct {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 750;
+  color: rgba(255,255,255,.92);
+  letter-spacing: .04em;
+}
+
+/* ───────────── CTA 시안 A: Liquid Wave Fill ───────────── */
+/* fill 의 윗변이 sine wave 처럼 출렁이는 물높이. 가공 느낌, 살아있는 호흡 */
+.cta-liquid {
+  background: linear-gradient(135deg, #6E2AE0, #2A6DEB);
+}
+.cta-liquid::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,.12));
+  transition: width .25s ease;
+  z-index: 1;
+}
+.cta-liquid::after {
+  /* sine wave 곡선을 SVG noise 대신 conic blob 으로 흉내 — 윗변 출렁임 */
+  content: "";
+  position: absolute;
+  left: calc(var(--p, 0%) - 24px);
+  top: -50%;
+  width: 48px;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,.34) 0 14px, transparent 30%);
+  filter: blur(3px);
+  animation: liquid-bob 1.6s ease-in-out infinite;
+  z-index: 1;
+}
+@keyframes liquid-bob {
+  0%, 100% { transform: translateY(-6px); }
+  50% { transform: translateY(6px); }
+}
+
+/* ───────────── CTA 시안 B: Stage Tooth Bar ───────────── */
+/* 단계 tick 표시 + bar 가 tick 을 넘어갈 때마다 발광. 진행 명확성 최강 */
+.cta-tooth {
+  background: linear-gradient(135deg, #1B2638, #2A3854);
+  border: 1px solid rgba(151,176,220,.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(0,0,0,.24),
+    0 8px 22px rgba(20,30,60,.32);
+}
+.cta-tooth::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  background: linear-gradient(90deg, #7C3AED 0%, #4A9EFF 60%, #13C6E8 100%);
+  box-shadow: 0 0 18px rgba(74,158,255,.6), 0 0 32px rgba(124,58,237,.4);
+  transition: width .25s ease;
+  z-index: 1;
+}
+.cta-tooth .teeth {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  z-index: 2;
+  pointer-events: none;
+}
+.cta-tooth .teeth span {
+  border-left: 1px dashed rgba(255,255,255,.18);
+}
+.cta-tooth .teeth span:first-child { border-left: 0; }
+
+/* ───────────── CTA 시안 C: Orbit + Percent ───────────── */
+/* 좌측 conic orbit + 우측 큰 퍼센트 — compact, 단계 라벨은 작게 */
+.cta-orbit {
+  background: linear-gradient(135deg, #4F46E5, #06B6D4);
+  padding: 0 22px 0 18px;
+}
+.cta-orbit .orbit {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, #fff var(--p, 0%), rgba(255,255,255,.22) 0);
+  flex: 0 0 auto;
+  animation: orbit-spin 2.4s linear infinite;
+}
+.cta-orbit .orbit::after {
+  content: "";
+  position: absolute;
+  inset: 6px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #4F46E5, #06B6D4);
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.22);
+}
+.cta-orbit .orbit-mark {
+  position: absolute;
+  inset: 6px;
+  display: grid;
+  place-items: center;
+  z-index: 1;
+  color: #fff;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+}
+.cta-orbit::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  background: rgba(255,255,255,.14);
+  transition: width .25s ease;
+  z-index: 0;
+}
+@keyframes orbit-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* ───────────── CTA 시안 D: Shimmer Pill ───────────── */
+/* fill + metallic sheen 좌→우 sweep — premium / understated */
+.cta-shimmer {
+  background: linear-gradient(135deg, #0F172A, #1E293B);
+  border: 1px solid rgba(255,255,255,.08);
+}
+.cta-shimmer::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  background: linear-gradient(90deg, rgba(124,58,237,.65), rgba(74,158,255,.65) 60%, rgba(19,198,232,.6));
+  transition: width .25s ease;
+  z-index: 1;
+}
+.cta-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg,
+    transparent 0 35%,
+    rgba(255,255,255,.42) 50%,
+    transparent 65% 100%);
+  background-size: 220% 100%;
+  animation: shimmer-sweep 2.6s linear infinite;
+  z-index: 2;
+  pointer-events: none;
+}
+@keyframes shimmer-sweep {
+  from { background-position: -120% 0; }
+  to   { background-position: 220% 0; }
+}
+
+/* ───────────── 사용 권장표 ───────────── */
+.summary {
+  margin-top: 32px;
+  padding: 20px;
+  border: 1px solid rgba(124,58,237,.18);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(124,58,237,.06), rgba(74,158,255,.04));
+}
+.summary h3 {
+  font-size: 15px;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+.summary p {
+  color: var(--ink-3);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+table.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.matrix th, table.matrix td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  text-align: left;
+}
+table.matrix th {
+  color: var(--ink-4);
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+}
+table.matrix td:first-child {
+  font-weight: 650;
+  color: var(--ink-2);
+}
+table.matrix td .mono { font-size: 11px; color: var(--ink-3); }
+
+@media (max-width: 980px) {
+  .page { width: min(100% - 28px, 760px); padding-top: 22px; }
+  .topbar { flex-direction: column; }
+  .canvas-grid, .cta-grid { grid-template-columns: 1fr; }
+  .topbar-meta { align-items: flex-start; text-align: left; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <div>
+      <div class="eyebrow mono">IMAGE STUDIO · DESIGN TEST · DEMO 2</div>
+      <h1 class="display"><strong>로딩 캔버스 + 진행 버튼</strong> · Ideas Gallery</h1>
+      <p class="lead"><strong style="color: var(--violet-ink); font-weight: 700;">5 모드 통일 1픽</strong> = <span class="mono" style="color: var(--violet-ink); font-weight: 700;">CV·03 Dot Field Sweep</span> + <span class="mono" style="color: var(--violet-ink); font-weight: 700;">CTA·A Liquid Wave</span>. 캔버스는 "AI 처리·스캔" 메타포가 5 모드 공통 본질에 가장 부합, 버튼은 단계 수 차이와 무관하게 호흡+퍼센트만으로 작동. 나머지 6 시안은 대안 (alt) 으로 dim 처리.</p>
+    </div>
+    <div class="topbar-meta mono">
+      <span>← <a href="./progress-animation-demo.html">progress-animation-demo.html</a></span>
+      <span>demo height: 188px</span>
+      <span>색 토큰: violet · blue · cyan</span>
+    </div>
+  </header>
+
+  <div class="controls">
+    <div class="controls-left">
+      <strong>Progress 시뮬레이션</strong>
+      <span class="mono" id="progress-readout">0% · running</span>
+    </div>
+    <div class="controls-right">
+      <button class="btn primary" id="btn-restart" type="button">다시 재생</button>
+      <button class="btn" id="btn-pause" type="button" aria-pressed="false">일시정지</button>
+      <button class="btn" id="btn-snap" type="button" aria-pressed="false">75% 고정</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ 로딩 캔버스 4종 ═══════════════ -->
+  <section class="section" aria-labelledby="canvas-title">
+    <div class="section-title">
+      <h2 id="canvas-title" class="display"><strong>로딩 캔버스</strong> · Result Box 안에서 보이는 상태</h2>
+      <span class="note mono">현재: diagonal-wave + wave-breathe</span>
+    </div>
+    <div class="canvas-grid">
+
+      <article class="card alt">
+        <span class="pick-badge alt">ALT</span>
+        <h3><span class="idx">CV·01</span> Aurora Drift</h3>
+        <div class="result-box">
+          <div class="loading-canvas canvas-aurora"></div>
+          <span class="canvas-caption">AURORA · DRIFTING</span>
+        </div>
+        <p>3개의 mesh blob 이 천천히 미끄러지고, 위에 얇은 sheen 이 사선으로 sweep. 현 diagonal-wave 가 "기계적인 줄무늬" 라면 이건 "공기 위에 흐르는 안개" 톤. 색이 살짝씩 섞이고 굴절해서 시선이 한 점에 박히지 않음.</p>
+        <div class="chip-row">
+          <span class="chip">violet · cyan · blue</span>
+          <span class="chip">blur 28px + sheen</span>
+          <span class="chip pro">시선 부담 적음</span>
+          <span class="chip con">생동감 약함 (조용한 톤)</span>
+        </div>
+      </article>
+
+      <article class="card alt">
+        <span class="pick-badge alt">ALT</span>
+        <h3><span class="idx">CV·02</span> Mesh Bloom</h3>
+        <div class="result-box">
+          <div class="loading-canvas canvas-mesh"></div>
+          <span class="canvas-caption">BLOOM · BREATHING</span>
+        </div>
+        <p>가운데서 mesh blob 이 부풀었다 줄어드는 호흡. AI 가 "안에서 무언가 만들어내는" 메타포가 강함. Vision/Analyze 모드처럼 1장 결과가 나오는 경우 적합 (중심성 강조).</p>
+        <div class="chip-row">
+          <span class="chip">radial · breath 3.4s</span>
+          <span class="chip">scale .86 ↔ 1.12</span>
+          <span class="chip pro">의미 명확 (생성/분석)</span>
+          <span class="chip con">시선이 중앙에 묶임</span>
+        </div>
+      </article>
+
+      <article class="card pick">
+        <span class="pick-badge">5-MODE PICK</span>
+        <h3><span class="idx">CV·03</span> Dot Field Sweep</h3>
+        <div class="result-box">
+          <div class="loading-canvas canvas-dot"></div>
+          <span class="canvas-caption">DOT FIELD · SCAN</span>
+        </div>
+        <p>점 그리드가 깔려 있고 좌→우 빛띠가 지나갈 때만 점들이 파랗게 강조됨. AI / constellation / 데이터 스캔 컨셉. 결과 박스가 "처리 중인 캔버스" 라는 시각 언어로 가장 명확.</p>
+        <div class="chip-row">
+          <span class="chip">grid 18px</span>
+          <span class="chip">mask sweep 3.6s</span>
+          <span class="chip pro">컨셉 명확 (스캔/처리)</span>
+          <span class="chip con">텍스처 잔상 약간 보임</span>
+        </div>
+      </article>
+
+      <article class="card alt">
+        <span class="pick-badge alt">ALT</span>
+        <h3><span class="idx">CV·04</span> Iso Stripe</h3>
+        <div class="result-box">
+          <div class="loading-canvas canvas-iso"></div>
+          <span class="canvas-caption">ISO GRID · SINGLE PASS</span>
+        </div>
+        <p>대각 격자 + 단일 빛띠가 fade-in→pass→fade-out. 현 diagonal-wave 대비 한 번에 한 줄기만 지나가서 훨씬 절제됨. 영상/대용량 작업처럼 "오래 보고 있어야 하는" 시나리오에 부담 적음.</p>
+        <div class="chip-row">
+          <span class="chip">single sweep 4.4s</span>
+          <span class="chip">iso grid 24px</span>
+          <span class="chip pro">장시간 시선 부담 낮음</span>
+          <span class="chip con">활기 약함 (의도적)</span>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════ 진행 버튼 4종 ═══════════════ -->
+  <section class="section" aria-labelledby="cta-title">
+    <div class="section-title">
+      <h2 id="cta-title" class="display"><strong>진행 버튼</strong> · CTA Progress Variants</h2>
+      <span class="note mono">현재: linear fill + spinner</span>
+    </div>
+    <div class="cta-grid">
+
+      <article class="card pick">
+        <span class="pick-badge">5-MODE PICK</span>
+        <h3><span class="idx">CTA·A</span> Liquid Wave Fill</h3>
+        <div class="cta-stage">
+          <div class="row-label"><span>liquid · 출렁이는 물</span><span class="mono" id="ra">0%</span></div>
+          <button class="cta-base cta-liquid" type="button" data-cta="liquid">
+            <span class="cta-content">
+              <span class="cta-main">
+                <span class="cta-text">
+                  <span class="cta-title">이미지 생성 중</span>
+                  <span class="cta-sub">DIFFUSION · 14/40</span>
+                </span>
+              </span>
+              <span class="cta-pct" data-pct="liquid">0%</span>
+            </span>
+          </button>
+        </div>
+        <p>fill 의 진행선 위에 작은 발광 blob 이 위아래로 출렁임 — "물높이가 차오르는" 메타포. 단조로운 linear fill 에 살아있는 호흡을 더해 진행이 멈춘 것처럼 느껴지지 않음.</p>
+        <div class="chip-row">
+          <span class="chip">blob bob 1.6s</span>
+          <span class="chip pro">살아있는 호흡</span>
+          <span class="chip con">5초 미만 작업엔 과함</span>
+        </div>
+      </article>
+
+      <article class="card alt">
+        <span class="pick-badge alt">ALT</span>
+        <h3><span class="idx">CTA·B</span> Stage Tooth Bar</h3>
+        <div class="cta-stage">
+          <div class="row-label"><span>tooth · 단계 명시</span><span class="mono" id="rb">0%</span></div>
+          <button class="cta-base cta-tooth" type="button" data-cta="tooth">
+            <span class="teeth"><span></span><span></span><span></span><span></span><span></span></span>
+            <span class="cta-content">
+              <span class="cta-main">
+                <span class="cta-text">
+                  <span class="cta-title">영상 렌더링</span>
+                  <span class="cta-sub">STAGE 3/5 · MOTION</span>
+                </span>
+              </span>
+              <span class="cta-pct" data-pct="tooth">0%</span>
+            </span>
+          </button>
+        </div>
+        <p>fill 위에 5개 점선 tick 이 깔려 있어 "지금 몇 단계인지" 가 시각만으로 즉시 읽힘. 단계가 명확한 Edit/Video/Compare 에 적합. fill 자체도 violet→blue→cyan 그라데이션 + glow 라 진행이 화려함.</p>
+        <div class="chip-row">
+          <span class="chip">5 ticks · dashed</span>
+          <span class="chip">glow 18+32px</span>
+          <span class="chip pro">단계 직관성 최강</span>
+          <span class="chip con">단계 수 변하면 재조정 필요</span>
+        </div>
+      </article>
+
+      <article class="card alt">
+        <span class="pick-badge alt">ALT</span>
+        <h3><span class="idx">CTA·C</span> Orbit + Percent</h3>
+        <div class="cta-stage">
+          <div class="row-label"><span>orbit · 회전 + 진행률</span><span class="mono" id="rc">0%</span></div>
+          <button class="cta-base cta-orbit" type="button" data-cta="orbit">
+            <span class="cta-content">
+              <span class="cta-main">
+                <span class="orbit"><span class="orbit-mark"><span data-orbit-mark>0</span></span></span>
+                <span class="cta-text">
+                  <span class="cta-title">분석 중</span>
+                  <span class="cta-sub">VISION · QWEN2.5VL</span>
+                </span>
+              </span>
+              <span class="cta-pct" data-pct="orbit">0%</span>
+            </span>
+          </button>
+        </div>
+        <p>좌측 conic ring 이 회전하면서 진행률을 채움. 작업이 끝나지 않은 동안엔 항상 돌고 있어 "멈춘 듯한" 인상이 없음. compact 라서 좁은 우패널에도 무리 없이 들어감.</p>
+        <div class="chip-row">
+          <span class="chip">conic + spin 2.4s</span>
+          <span class="chip pro">컴팩트 / 항상 움직임</span>
+          <span class="chip con">단계 정보는 약함</span>
+        </div>
+      </article>
+
+      <article class="card alt">
+        <span class="pick-badge alt">ALT</span>
+        <h3><span class="idx">CTA·D</span> Shimmer Pill</h3>
+        <div class="cta-stage">
+          <div class="row-label"><span>shimmer · 광택 sweep</span><span class="mono" id="rd">0%</span></div>
+          <button class="cta-base cta-shimmer" type="button" data-cta="shimmer">
+            <span class="cta-content">
+              <span class="cta-main">
+                <span class="cta-text">
+                  <span class="cta-title">비교 분석</span>
+                  <span class="cta-sub">COMPARE · DIFF SYNTH</span>
+                </span>
+              </span>
+              <span class="cta-pct" data-pct="shimmer">0%</span>
+            </span>
+          </button>
+        </div>
+        <p>다크 베이스 + 진행 fill 위에 metallic sheen 이 좌→우로 sweep. iOS 14 슬롯머신·Apple 스타일 톤. fill 색은 한 톤 죽이고 sheen 으로 살아있음을 표현 — 5 모드 중 가장 절제된 느낌.</p>
+        <div class="chip-row">
+          <span class="chip">sheen 2.6s linear</span>
+          <span class="chip pro">premium / 절제됨</span>
+          <span class="chip con">진행률 정보는 percent 의존</span>
+        </div>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ═══════════════ 사용 권장 매트릭스 ═══════════════ -->
+  <section class="section">
+    <div class="summary">
+      <h3>5 모드 통일 적용 — <span style="font-family:'JetBrains Mono',monospace; color: var(--violet-ink);">CV·03 + CTA·A</span></h3>
+      <p>한 짝으로 5 모드 전체 덮음. 모드별 차이는 <strong>라벨/sub 텍스트</strong>로만 표현하고, 캔버스/버튼 시각은 동일하게 유지. 통일성 ↑ · 컴포넌트 1개로 5 곳 재사용.</p>
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>모드</th>
+            <th>로딩 캔버스</th>
+            <th>진행 버튼</th>
+            <th>모드별 라벨 (예)</th>
+            <th>이 픽이 어울리는 이유</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Generate</td>
+            <td><span class="mono">CV·03</span></td>
+            <td><span class="mono">CTA·A</span></td>
+            <td><span class="mono">"이미지 생성 중 · DIFFUSION 14/40"</span></td>
+            <td>30~60s 작업, 호흡 blob 이 살아있음 시그널</td>
+          </tr>
+          <tr>
+            <td>Edit</td>
+            <td><span class="mono">CV·03</span></td>
+            <td><span class="mono">CTA·A</span></td>
+            <td><span class="mono">"수정 적용 · EDIT 22/40"</span></td>
+            <td>점 그리드 스캔이 "원본 위에 변경 가하는" 메타포</td>
+          </tr>
+          <tr>
+            <td>Video</td>
+            <td><span class="mono">CV·03</span></td>
+            <td><span class="mono">CTA·A</span></td>
+            <td><span class="mono">"영상 렌더링 · 81 FRAMES · STAGE 3/5"</span></td>
+            <td>5분 동안 봐도 점은 정적 / sweep 만 흐름 → 부담 적음</td>
+          </tr>
+          <tr>
+            <td>Vision</td>
+            <td><span class="mono">CV·03</span></td>
+            <td><span class="mono">CTA·A</span></td>
+            <td><span class="mono">"분석 중 · 9 SLOTS"</span></td>
+            <td>"스캔" 메타포가 vision 본질과 정확히 일치</td>
+          </tr>
+          <tr>
+            <td>Compare</td>
+            <td><span class="mono">CV·03</span></td>
+            <td><span class="mono">CTA·A</span></td>
+            <td><span class="mono">"비교 분석 · 5축 평가"</span></td>
+            <td>좌→우 sweep = 두 이미지 비교 흐름과 시각적으로 매칭</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════
+ * 진행률 시뮬레이션
+ * 0~100% 를 7.5초 주기로 자동 순환
+ * --p CSS var 를 4개 CTA + 모든 percent 텍스트에 동시 반영
+ * pause / snap75 / restart 3 컨트롤
+ * ═══════════════════════════════════════════════════════════════ */
+(function () {
+  const ctaSet = ['liquid', 'tooth', 'orbit', 'shimmer'];
+  const ctas = ctaSet.map(k => document.querySelector(`[data-cta="${k}"]`));
+  const pctEls = ctaSet.map(k => document.querySelector(`[data-pct="${k}"]`));
+  const rowReads = {
+    liquid: document.getElementById('ra'),
+    tooth: document.getElementById('rb'),
+    orbit: document.getElementById('rc'),
+    shimmer: document.getElementById('rd'),
+  };
+  const orbitMark = document.querySelector('[data-orbit-mark]');
+  const readout = document.getElementById('progress-readout');
+
+  const DURATION_MS = 7500;     // 한 사이클 7.5초
+  let startedAt = performance.now();
+  let paused = false;
+  let snap = false;             // 75% 고정 모드
+
+  function update(now) {
+    let p;
+    if (snap) {
+      p = 75;
+    } else if (paused) {
+      p = lastP;
+    } else {
+      const t = ((now - startedAt) % DURATION_MS) / DURATION_MS;
+      // 0~95% 까지 ease-out 곡선으로 차오르고 95~100% 살짝 천천히
+      p = Math.min(100, Math.round(easeOutCubic(t) * 100));
+    }
+    lastP = p;
+
+    const pStr = p + '%';
+    ctas.forEach(el => el && (el.style.setProperty('--p', pStr)));
+    pctEls.forEach(el => el && (el.textContent = pStr));
+    Object.values(rowReads).forEach(el => el && (el.textContent = pStr));
+    if (orbitMark) orbitMark.textContent = String(p);
+    if (readout) readout.textContent = `${pStr} · ${paused ? 'paused' : (snap ? 'snap 75%' : 'running')}`;
+
+    requestAnimationFrame(update);
+  }
+  let lastP = 0;
+
+  function easeOutCubic(t) {
+    return 1 - Math.pow(1 - t, 3);
+  }
+
+  // 컨트롤 wiring
+  document.getElementById('btn-restart').addEventListener('click', () => {
+    startedAt = performance.now();
+    paused = false;
+    snap = false;
+    setPressed('btn-pause', false);
+    setPressed('btn-snap', false);
+  });
+  document.getElementById('btn-pause').addEventListener('click', (e) => {
+    paused = !paused;
+    if (paused) snap = false;
+    setPressed('btn-pause', paused);
+    if (paused) setPressed('btn-snap', false);
+  });
+  document.getElementById('btn-snap').addEventListener('click', () => {
+    snap = !snap;
+    if (snap) paused = false;
+    setPressed('btn-snap', snap);
+    if (snap) setPressed('btn-pause', false);
+  });
+  function setPressed(id, on) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.setAttribute('aria-pressed', on ? 'true' : 'false');
+  }
+
+  requestAnimationFrame(update);
+})();
+</script>
+</body>
+</html>

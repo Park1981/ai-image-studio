@@ -104,12 +104,17 @@ export default function EditRightPanel({
       <ResultBox
         state={resultState}
         modifier="edit"
+        loadingLabel="이미지 수정 중…"
         emptyState={
-          <StudioEmptyState size="normal">
-            {!sourceImage
-              ? "왼쪽에서 원본 이미지를 업로드해 주세요."
-              : "이 원본의 수정 결과가 아직 없습니다. [수정 생성] 또는 아래 히스토리에서 선택하면 표시됩니다."}
-          </StudioEmptyState>
+          <StudioEmptyState
+            size="normal"
+            title={!sourceImage ? "원본 이미지 필요" : "수정 결과 대기 중"}
+            description={
+              !sourceImage
+                ? "왼쪽에서 원본 이미지를 업로드해 주세요."
+                : "수정 생성 또는 아래 히스토리 선택 후 결과가 표시됩니다."
+            }
+          />
         }
       >
         {pairMatched && afterItem && sourceImage && (

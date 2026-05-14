@@ -1,0 +1,1595 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Image Studio · Progress Animation Demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+:root {
+  --bg: #FAF9F7;
+  --bg-2: #F4F2EE;
+  --surface: #FFFFFF;
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --accent: #4A9EFF;
+  --accent-ink: #1E7BE0;
+  --accent-soft: #EAF3FF;
+  --green: #52C41A;
+  --amber: #FAAD14;
+  --amber-ink: #B47600;
+  --output-violet: #7C3AED;
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-card: 14px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(23,20,14,.04), 0 2px 8px rgba(23,20,14,.04);
+  --shadow-lg: 0 4px 10px rgba(23,20,14,.05), 0 20px 48px rgba(23,20,14,.08);
+  --demo-result-height: 188px;
+}
+body {
+  background:
+    radial-gradient(circle at 14% 4%, rgba(74,158,255,.05), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(124,58,237,.05), transparent 30%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; }
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+.display {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+}
+.page {
+  width: min(1180px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 34px 0 52px;
+}
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+  padding-bottom: 18px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.eyebrow {
+  margin-bottom: 5px;
+  color: var(--ink-4);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+h1, h2, h3, p { margin: 0; }
+h1 {
+  font-size: 32px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+h1 strong { color: var(--output-violet); font-style: normal; }
+.lead {
+  margin-top: 9px;
+  max-width: 680px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.mode-tabs {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid rgba(0,0,0,.05);
+  border-radius: var(--radius-full);
+  background: rgba(0,0,0,.04);
+}
+.tab {
+  all: unset;
+  cursor: pointer;
+  padding: 7px 13px;
+  border-radius: var(--radius-full);
+  color: var(--ink-3);
+  font-family: "Fraunces", Georgia, serif;
+  font-style: italic;
+  font-size: 13px;
+  transition: background .18s ease, color .18s ease, box-shadow .18s ease;
+}
+.tab[aria-selected="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+  font-weight: 700;
+}
+.grid {
+  display: grid;
+  grid-template-columns: minmax(0, .95fr) minmax(420px, 1.05fr);
+  gap: 22px;
+  align-items: start;
+}
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.section-title h2 {
+  font-size: 23px;
+  font-weight: 500;
+}
+.section-title strong { color: var(--output-violet); font-style: normal; }
+.note {
+  color: var(--ink-4);
+  font-size: 11px;
+}
+.result-stack {
+  display: grid;
+  gap: 14px;
+}
+.result-preview {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.preview-label {
+  padding-top: 10px;
+}
+.preview-label h3 {
+  font-size: 12.5px;
+  color: var(--ink-2);
+}
+.preview-label p {
+  margin-top: 3px;
+  color: var(--ink-4);
+  font-size: 10.5px;
+}
+.result-box {
+  position: relative;
+  width: 100%;
+  height: var(--demo-result-height);
+  min-height: var(--demo-result-height);
+  aspect-ratio: auto;
+  background-color: var(--surface);
+  background-image: radial-gradient(circle, rgba(0,0,0,.06) 1px, transparent 1px);
+  background-size: 16px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 2px 4px rgba(23,20,14,.04), 0 14px 36px rgba(23,20,14,.08);
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  overflow: hidden;
+}
+.result-empty {
+  width: 100%;
+  min-height: calc(var(--demo-result-height) - 52px);
+  display: grid;
+  place-items: center;
+  padding: 22px 18px;
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-card);
+  background: rgba(255,255,255,.88);
+  color: var(--ink-4);
+  text-align: center;
+  font-size: 12px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.46);
+}
+.result-empty-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  max-width: 520px;
+}
+.result-empty-title {
+  color: var(--ink-3);
+  font-weight: 650;
+}
+.result-empty-desc {
+  color: var(--ink-4);
+  font-size: 11.5px;
+}
+.loading-canvas {
+  position: absolute;
+  inset: 18px;
+  border-radius: calc(var(--radius-card) - 6px);
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle, rgba(0,0,0,.04) 1px, transparent 1px) 0 0 / 14px 14px,
+    linear-gradient(135deg, rgba(246,241,255,.98), rgba(234,245,255,.92) 48%, rgba(250,249,246,.88));
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.56), inset 0 -28px 70px rgba(23,20,14,.05);
+}
+.loading-canvas::before {
+  content: "";
+  position: absolute;
+  left: -144px;
+  top: -144px;
+  width: calc(100% + 144px);
+  height: calc(100% + 144px);
+  background:
+    repeating-linear-gradient(135deg,
+      transparent 0 30px,
+      rgba(124,58,237,.14) 40px,
+      rgba(74,158,255,.34) 52px,
+      rgba(255,255,255,.72) 64px,
+      rgba(74,158,255,.30) 76px,
+      rgba(124,58,237,.12) 88px,
+      transparent 108px,
+      transparent 144px),
+    repeating-linear-gradient(135deg,
+      transparent 0 42px,
+      rgba(255,255,255,.22) 52px,
+      rgba(74,158,255,.16) 64px,
+      transparent 82px,
+      transparent 144px);
+  filter: blur(.1px) saturate(1.18);
+  opacity: 1;
+  mix-blend-mode: normal;
+  animation: seamless-diagonal-wave 5.4s linear infinite;
+}
+.loading-canvas::after {
+  content: "";
+  position: absolute;
+  inset: -26%;
+  background:
+    radial-gradient(ellipse at 22% 18%, rgba(124,58,237,.34), transparent 35%),
+    radial-gradient(ellipse at 78% 82%, rgba(74,158,255,.38), transparent 38%),
+    linear-gradient(135deg, rgba(124,58,237,.12), rgba(255,255,255,.42), rgba(74,158,255,.16));
+  opacity: .86;
+  mix-blend-mode: normal;
+  animation: wave-breathe 4.6s ease-in-out infinite;
+}
+.loading-caption {
+  position: relative;
+  z-index: 1;
+  padding: 6px 10px;
+  border: 1px solid rgba(255,255,255,.62);
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.62);
+  box-shadow: 0 8px 24px rgba(23,20,14,.07);
+  color: var(--ink-3);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+.policy-card {
+  display: grid;
+  gap: 8px;
+  padding: 13px 14px;
+  border: 1px solid rgba(124,58,237,.16);
+  border-radius: var(--radius-card);
+  background: linear-gradient(135deg, rgba(124,58,237,.07), rgba(74,158,255,.04));
+  color: var(--ink-3);
+  font-size: 12px;
+}
+.policy-card b {
+  color: var(--ink-2);
+  font-weight: 650;
+}
+.policy-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.policy-chip {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.72);
+  color: var(--ink-3);
+  font-size: 10.5px;
+}
+.modal-stage {
+  position: relative;
+  min-height: 612px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(rgba(23,20,14,.40), rgba(23,20,14,.40)),
+    radial-gradient(circle at 10% 0%, rgba(74,158,255,.18), transparent 30%),
+    var(--bg);
+  display: grid;
+  place-items: center;
+  padding: 26px;
+  overflow: hidden;
+}
+.modal {
+  width: min(620px, 100%);
+  max-height: 85vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  box-shadow: var(--shadow-lg);
+  animation: scale-in .22s cubic-bezier(.22,1,.36,1);
+}
+.modal-stage::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(23, 20, 14, .08);
+  animation: fade-in .18s ease;
+}
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(255,255,255,.35);
+}
+.modal-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.modal-title h3 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+.icon-button {
+  all: unset;
+  width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+  color: var(--ink-4);
+  cursor: not-allowed;
+}
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 22px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg-2);
+  font-size: 12px;
+}
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--ink-2);
+}
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+}
+.percent {
+  color: var(--accent);
+  font-weight: 600;
+  letter-spacing: .04em;
+}
+.timeline-wrap {
+  padding: 16px 22px 22px;
+  background: var(--bg);
+}
+.timeline {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+}
+.timeline-item {
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 0;
+}
+.bullet {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1.5px solid var(--line-2);
+  background: #fff;
+  color: var(--ink-4);
+  font-size: 10px;
+  font-weight: 600;
+}
+.timeline-item.done .bullet {
+  border-color: var(--green);
+  background: var(--green);
+  color: #fff;
+}
+.timeline-item.running .bullet {
+  border-color: var(--accent);
+  background: #fff;
+}
+.label {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  color: var(--ink-4);
+  font-size: 13px;
+  font-weight: 500;
+}
+.timeline-item.done .label,
+.timeline-item.running .label { color: var(--ink); }
+.sub {
+  color: var(--ink-4);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  font-weight: 400;
+}
+.elapsed {
+  color: var(--ink-3);
+  font-size: 10.5px;
+  letter-spacing: .04em;
+}
+.running-label {
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: .04em;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+.detail {
+  margin-left: 34px;
+  margin-top: 4px;
+  padding: 9px 10px;
+  border: 1px solid rgba(74,158,255,.18);
+  border-radius: var(--radius-sm);
+  background: rgba(74,158,255,.06);
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+.demo-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 13px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: rgba(255,255,255,.72);
+  box-shadow: var(--shadow-sm);
+}
+.button-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.btn {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  padding: 8px 12px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 12px;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+}
+.btn:hover { transform: translateY(-1px); box-shadow: var(--shadow-sm); }
+.btn.primary {
+  border-color: rgba(74,158,255,.28);
+  background: linear-gradient(135deg, rgba(74,158,255,.14), rgba(124,58,237,.08));
+  color: var(--accent-ink);
+  font-weight: 600;
+}
+.cta-demo {
+  position: relative;
+  min-width: 220px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #7C3AED, #4A9EFF);
+  color: #fff;
+  box-shadow: 0 10px 26px rgba(74,158,255,.20);
+}
+.cta-progress {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  background: rgba(255,255,255,.18);
+  transition: width .2s ease;
+}
+.cta-content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.button-lab {
+  margin-top: 24px;
+}
+.reference-lab {
+  margin-top: 24px;
+}
+.reference-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  align-items: stretch;
+}
+.reference-card {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255,255,255,.72);
+  box-shadow: var(--shadow-sm);
+}
+.reference-card h3 {
+  color: var(--ink-2);
+  font-size: 14px;
+}
+.reference-card p {
+  color: var(--ink-4);
+  font-size: 11.5px;
+}
+.ref-dark-panel {
+  display: grid;
+  gap: 16px;
+  padding: 22px;
+  border-radius: var(--radius);
+  background: #091121;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(122,164,255,.12);
+}
+.ref-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  color: #7f9acc;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+}
+.ref-head strong {
+  color: #4aa3ff;
+  font-weight: 800;
+}
+.ref-progress-btn {
+  position: relative;
+  min-height: 86px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 0 38px 0 42px;
+  border: 1px solid rgba(151,176,220,.20);
+  border-radius: 22px;
+  overflow: hidden;
+  isolation: isolate;
+  background: #1b2638;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(0,0,0,.24);
+}
+.ref-progress-btn::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 31%);
+  background: linear-gradient(90deg, #6557ff 0%, #13c6e8 100%);
+  box-shadow: 14px 0 26px rgba(19,198,232,.34);
+}
+.ref-progress-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, transparent 0 31%, rgba(255,255,255,.65) 31.4%, transparent 32.2%),
+    linear-gradient(180deg, rgba(255,255,255,.04), transparent);
+  pointer-events: none;
+}
+.ref-progress-main,
+.ref-progress-percent {
+  position: relative;
+  z-index: 1;
+}
+.ref-progress-main {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  min-width: 0;
+}
+.ref-orbit {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  border: 3px solid rgba(255,255,255,.92);
+  flex: 0 0 auto;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.18);
+  animation: ref-orbit-pulse 1.8s ease-in-out infinite;
+}
+.ref-progress-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.ref-progress-title {
+  font-size: 25px;
+  font-weight: 850;
+  letter-spacing: -.01em;
+  white-space: nowrap;
+}
+.ref-progress-sub {
+  color: rgba(255,255,255,.58);
+  font-size: 15px;
+  font-weight: 700;
+}
+.ref-progress-percent {
+  color: #fff;
+  font-size: 32px;
+  font-weight: 900;
+  letter-spacing: -.04em;
+}
+.ref-dot-stage {
+  min-height: 304px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border-radius: var(--radius);
+  background: #050505;
+}
+.gpt-dot-canvas {
+  position: relative;
+  width: min(100%, 430px);
+  aspect-ratio: 1;
+  border-radius: 42px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    radial-gradient(circle, rgba(255,255,255,.09) 1.1px, transparent 1.8px) 0 0 / 27px 27px,
+    #303030;
+}
+.gpt-dot-canvas::before,
+.gpt-dot-canvas::after {
+  content: "";
+  position: absolute;
+  inset: -27px;
+  background-image: radial-gradient(circle, rgba(255,255,255,.34) 1.9px, transparent 2.5px);
+  background-size: 27px 27px;
+  animation: gpt-dot-slide 5.4s linear infinite;
+}
+.gpt-dot-canvas::before {
+  opacity: .72;
+  -webkit-mask-image: radial-gradient(ellipse at 23% 70%, #000 0 12%, rgba(0,0,0,.86) 20%, transparent 39%);
+  mask-image: radial-gradient(ellipse at 23% 70%, #000 0 12%, rgba(0,0,0,.86) 20%, transparent 39%);
+}
+.gpt-dot-canvas::after {
+  opacity: .58;
+  background-position: 13px 0;
+  -webkit-mask-image: radial-gradient(ellipse at 72% 20%, #000 0 13%, rgba(0,0,0,.78) 22%, transparent 42%);
+  mask-image: radial-gradient(ellipse at 72% 20%, #000 0 13%, rgba(0,0,0,.78) 22%, transparent 42%);
+  animation-direction: reverse;
+}
+.gpt-dot-label {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.08);
+  color: rgba(255,255,255,.58);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+.app-dot-stage {
+  min-height: 304px;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    radial-gradient(circle, rgba(0,0,0,.035) 1px, transparent 1px) 0 0 / 16px 16px,
+    var(--surface);
+}
+.app-dot-canvas {
+  position: relative;
+  width: min(100%, 430px);
+  aspect-ratio: 1;
+  border-radius: 42px;
+  overflow: hidden;
+  isolation: isolate;
+  background:
+    linear-gradient(135deg, rgba(250,249,247,.98), rgba(244,242,238,.95));
+  box-shadow:
+    inset 0 0 0 1px rgba(23,20,14,.05),
+    inset 0 -28px 70px rgba(23,20,14,.04);
+}
+.app-dot-canvas::before,
+.app-dot-canvas::after {
+  content: "";
+  position: absolute;
+  inset: -27px;
+  background-image: radial-gradient(circle, rgba(0,0,0,.30) 1.9px, transparent 2.6px);
+  background-size: 27px 27px;
+  animation: gpt-dot-slide 5.4s linear infinite;
+}
+.app-dot-canvas::before {
+  opacity: .58;
+  -webkit-mask-image: radial-gradient(ellipse at 23% 70%, #000 0 12%, rgba(0,0,0,.86) 20%, transparent 39%);
+  mask-image: radial-gradient(ellipse at 23% 70%, #000 0 12%, rgba(0,0,0,.86) 20%, transparent 39%);
+}
+.app-dot-canvas::after {
+  opacity: .42;
+  background-position: 13px 0;
+  -webkit-mask-image: radial-gradient(ellipse at 72% 20%, #000 0 13%, rgba(0,0,0,.78) 22%, transparent 42%);
+  mask-image: radial-gradient(ellipse at 72% 20%, #000 0 13%, rgba(0,0,0,.78) 22%, transparent 42%);
+  animation-direction: reverse;
+}
+.app-dot-label {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  padding: 6px 10px;
+  border: 1px solid rgba(23,20,14,.06);
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.66);
+  color: var(--ink-3);
+  box-shadow: 0 8px 24px rgba(23,20,14,.06);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  backdrop-filter: blur(10px);
+}
+.cta-compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.cta-panel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255,255,255,.72);
+  box-shadow: var(--shadow-sm);
+}
+.cta-panel h3 {
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.cta-panel p {
+  color: var(--ink-4);
+  font-size: 11.5px;
+}
+.cta-list {
+  display: grid;
+  gap: 10px;
+}
+.cta-row-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--ink-4);
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+.cta-state {
+  min-height: 48px;
+  width: 100%;
+  border: 0;
+  border-radius: var(--radius-full);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  position: relative;
+  overflow: hidden;
+  font-weight: 650;
+  letter-spacing: .01em;
+  box-shadow:
+    0 4px 18px rgba(99,102,241,.34),
+    inset 0 1px 0 rgba(255,255,255,.25);
+}
+.cta-state-current {
+  background: linear-gradient(135deg, #8B5CF6 0%, #3B82F6 100%);
+}
+.cta-state-current.is-muted {
+  background: #9AA5B5;
+  box-shadow: none;
+  color: rgba(255,255,255,.82);
+}
+.cta-state-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  background: rgba(255,255,255,.18);
+}
+.cta-state-content {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.cta-next {
+  min-height: 58px;
+  padding: 0 18px;
+  background:
+    linear-gradient(135deg, rgba(124,58,237,.98), rgba(74,158,255,.98));
+  isolation: isolate;
+}
+.cta-next::before {
+  content: "";
+  position: absolute;
+  left: -128px;
+  top: -128px;
+  width: calc(100% + 128px);
+  height: calc(100% + 128px);
+  background:
+    repeating-linear-gradient(135deg,
+      transparent 0 28px,
+      rgba(255,255,255,.15) 38px,
+      rgba(255,255,255,.46) 50px,
+      rgba(255,255,255,.16) 62px,
+      transparent 86px,
+      transparent 128px),
+    repeating-linear-gradient(135deg,
+      transparent 0 44px,
+      rgba(255,255,255,.13) 52px,
+      transparent 68px,
+      transparent 128px);
+  opacity: .9;
+  animation: cta-seamless-diagonal-wave 4.2s linear infinite;
+}
+.cta-next::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.28),
+    inset 0 -18px 34px rgba(23,20,14,.12);
+  pointer-events: none;
+}
+.cta-next .cta-state-fill {
+  background:
+    linear-gradient(90deg, rgba(255,255,255,.20), rgba(255,255,255,.08));
+  border-right: 1px solid rgba(255,255,255,.30);
+}
+.cta-next-content {
+  width: 100%;
+  justify-content: space-between;
+  text-align: left;
+}
+.cta-next-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.cta-next-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.cta-next-title {
+  font-size: 13.5px;
+  white-space: nowrap;
+}
+.cta-next-sub {
+  color: rgba(255,255,255,.66);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .04em;
+}
+.cta-next-percent {
+  color: rgba(255,255,255,.92);
+  font-size: 12px;
+  font-weight: 750;
+  letter-spacing: .04em;
+}
+.cta-ring {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background:
+    conic-gradient(from 0deg, #fff var(--p, 54%), rgba(255,255,255,.24) 0);
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  animation: spin 1.2s linear infinite;
+}
+.cta-ring::after {
+  content: "";
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(79,120,245,.95);
+}
+.cta-next.is-compact {
+  min-height: 48px;
+}
+.spinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: currentColor;
+  display: inline-block;
+  animation: spin 1s linear infinite;
+}
+.modal-title .spinner,
+.timeline-item.running .spinner {
+  color: var(--accent);
+  border-color: rgba(74,158,255,.22);
+  border-top-color: var(--accent);
+}
+.timeline-item.running .spinner {
+  width: 10px;
+  height: 10px;
+  border-width: 2px;
+}
+.check {
+  font-size: 12px;
+  line-height: 1;
+  transform: translateY(-.5px);
+}
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .4; }
+}
+@keyframes seamless-diagonal-wave {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(144px, 144px, 0);
+  }
+}
+@keyframes wave-breathe {
+  0%, 100% {
+    transform: translate3d(-2%, -2%, 0) scale(1);
+    opacity: .58;
+  }
+  50% {
+    transform: translate3d(2%, 2%, 0) scale(1.04);
+    opacity: .82;
+  }
+}
+@keyframes cta-seamless-diagonal-wave {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(128px, 128px, 0);
+  }
+}
+@keyframes ref-orbit-pulse {
+  0%, 100% {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 0 0 0 rgba(255,255,255,.22);
+  }
+  50% {
+    box-shadow: inset 0 0 0 1px rgba(255,255,255,.18), 0 0 0 8px rgba(255,255,255,0);
+  }
+}
+@keyframes gpt-dot-slide {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(27px, 27px, 0);
+  }
+}
+@media (max-width: 980px) {
+  .page { width: min(100% - 28px, 760px); padding-top: 22px; }
+  .topbar { flex-direction: column; }
+  .grid { grid-template-columns: 1fr; }
+  .reference-grid { grid-template-columns: 1fr; }
+  .cta-compare-grid { grid-template-columns: 1fr; }
+  .result-preview { grid-template-columns: 1fr; }
+  .preview-label { padding-top: 0; }
+  .modal-stage { min-height: 560px; padding: 14px; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <div>
+      <div class="eyebrow mono">IMAGE STUDIO · DESIGN TEST</div>
+      <h1 class="display"><strong>진행 애니메이션</strong> · Result / Progress Mock</h1>
+      <p class="lead">실제 생성이나 분석 API 호출 없이, 현재 결과 박스 변형과 ProgressModal의 단계 진행 애니메이션을 눈으로 확인하는 독립 HTML 샘플.</p>
+    </div>
+    <nav class="mode-tabs" aria-label="mode selector">
+      <button class="tab" data-mode="generate" aria-selected="true">Generate</button>
+      <button class="tab" data-mode="edit" aria-selected="false">Edit</button>
+      <button class="tab" data-mode="video" aria-selected="false">Video</button>
+      <button class="tab" data-mode="vision" aria-selected="false">Analyze</button>
+      <button class="tab" data-mode="compare" aria-selected="false">Compare</button>
+    </nav>
+  </header>
+
+  <div class="grid">
+    <section class="section" aria-labelledby="result-title">
+      <div class="section-title">
+        <h2 id="result-title" class="display"><strong>결과 박스</strong> · Current</h2>
+        <span class="note mono">현재 구현 차이 미리보기</span>
+      </div>
+      <div class="policy-card">
+        <b>제안: 초기 상태는 ResultBox 하나로 통일, 완료 상태만 콘텐츠 비율 반영</b>
+        <span>현재 Generate는 1672/941 비율 때문에 약 380px로 보이고, Edit/Video/Analyze/Compare는 idle/loading clamp 기준이라 약 304px로 보입니다. 의도된 UX라기보다 기준이 둘로 갈라진 상태라, 빈 상태와 로딩 상태는 같은 높이로 맞추는 쪽이 안정적입니다.</span>
+        <div class="policy-chips mono">
+          <span class="policy-chip">ResultBox single source</span>
+          <span class="policy-chip">no plain/panel exception</span>
+          <span class="policy-chip">demo height 188px</span>
+          <span class="policy-chip">production 후보 clamp(320px, 34vh, 380px)</span>
+          <span class="policy-chip">done 상태는 이미지/영상 비율 허용</span>
+        </div>
+      </div>
+      <div class="result-stack">
+        <article class="result-preview">
+          <div class="preview-label">
+            <h3>Generate</h3>
+            <p class="mono">ResultBox · idle</p>
+          </div>
+          <div class="result-box">
+            <div class="result-empty">
+              <div class="result-empty-inner">
+                <span class="result-empty-title">생성 대기 중</span>
+                <span class="result-empty-desc">프롬프트 입력 후 생성 버튼을 눌러 주세요.</span>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="result-preview">
+          <div class="preview-label">
+            <h3>Edit / Video</h3>
+            <p class="mono">ResultBox · idle</p>
+          </div>
+          <div class="result-box">
+            <div class="result-empty">
+              <div class="result-empty-inner">
+                <span class="result-empty-title">입력 대기 중</span>
+                <span class="result-empty-desc">원본 이미지와 지시를 입력하고 버튼을 눌러 주세요.</span>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="result-preview">
+          <div class="preview-label">
+            <h3>Analyze</h3>
+            <p class="mono">ResultBox · idle</p>
+          </div>
+          <div class="result-box">
+            <div class="result-empty">
+              <div class="result-empty-inner">
+                <span class="result-empty-title">분석 대기 중</span>
+                <span class="result-empty-desc">이미지를 업로드하고 분석 버튼을 눌러 주세요.</span>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="result-preview">
+          <div class="preview-label">
+            <h3>Compare</h3>
+            <p class="mono">ResultBox · idle</p>
+          </div>
+          <div class="result-box">
+            <div class="result-empty">
+              <div class="result-empty-inner">
+                <span class="result-empty-title">비교 대기 중</span>
+                <span class="result-empty-desc">두 이미지를 넣고 비교 분석을 시작해 주세요.</span>
+              </div>
+            </div>
+          </div>
+        </article>
+        <article class="result-preview">
+          <div class="preview-label">
+            <h3>Loading Canvas</h3>
+            <p class="mono">ResultBox loading</p>
+          </div>
+          <div class="result-box">
+            <div class="loading-canvas"></div>
+            <div class="loading-caption mono">DIAGONAL WAVE · LOADING</div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section" aria-labelledby="progress-title">
+      <div class="section-title">
+        <h2 id="progress-title" class="display"><strong>진행 모달</strong> · Demo</h2>
+        <span id="current-mode-label" class="note mono">generate</span>
+      </div>
+      <div class="demo-controls">
+        <div class="button-row">
+          <button class="btn primary" id="play-btn" type="button">다시 재생</button>
+          <button class="btn" id="pause-btn" type="button">일시정지</button>
+          <button class="btn" id="reset-btn" type="button">초기화</button>
+        </div>
+        <div class="cta-demo" id="cta-demo" style="--p: 0%">
+          <div class="cta-progress"></div>
+          <span class="cta-content"><span class="spinner"></span><span id="cta-label">프롬프트 해석 · 0%</span></span>
+        </div>
+      </div>
+
+      <div class="modal-stage">
+        <section class="modal" role="dialog" aria-label="진행 상황 데모">
+          <header class="modal-header">
+            <div class="modal-title">
+              <span class="spinner" aria-hidden="true"></span>
+              <h3 id="modal-title">이미지 생성 중</h3>
+            </div>
+            <button class="icon-button" type="button" aria-label="진행 중에는 닫을 수 없습니다">x</button>
+          </header>
+          <div class="status-bar">
+            <div class="status-left">
+              <span class="status-chip mono">clock <span id="elapsed-total">00:00</span></span>
+              <span class="status-chip mono" id="sampling-chip" hidden>cpu <span id="sampling-step">스텝 0/40</span></span>
+            </div>
+            <div class="percent mono" id="percent">0%</div>
+          </div>
+          <div class="timeline-wrap">
+            <ol class="timeline" id="timeline"></ol>
+          </div>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <section class="section button-lab" aria-labelledby="button-title">
+    <div class="section-title">
+      <h2 id="button-title" class="display"><strong>진행 버튼</strong> · Current / Proposal</h2>
+      <span class="note mono">left = current · right = 하루 추천</span>
+    </div>
+      <div class="policy-card">
+        <b>하루 의견: 버튼도 ResultBox 로딩과 같은 언어를 쓰는 게 좋아요</b>
+        <span>현재는 Generate만 stage와 퍼센트가 보이고, Edit/Video/Analyze/Compare는 대부분 고정 문구라 처리 중인지 어느 정도 진행됐는지 체감이 약합니다. 추천안은 모든 모드가 같은 구조를 쓰고, 모드별 라벨만 바꾸는 방식입니다. 끊김 방지는 첫 프레임과 마지막 프레임이 같은 타일형 background-position 루프를 사용합니다.</span>
+      <div class="policy-chips mono">
+        <span class="policy-chip">same component</span>
+        <span class="policy-chip">same height</span>
+          <span class="policy-chip">wave + progress fill</span>
+          <span class="policy-chip">seamless tile loop</span>
+          <span class="policy-chip">mode label only</span>
+          <span class="policy-chip">disabled tone separate</span>
+      </div>
+    </div>
+
+    <div class="cta-compare-grid">
+      <article class="cta-panel">
+        <div>
+          <h3>현재 버튼 상태</h3>
+          <p>Generate는 진행률이 있고, 나머지 모드는 정적 처리 문구 중심입니다.</p>
+        </div>
+        <div class="cta-list">
+          <div>
+            <div class="cta-row-label mono"><span>Generate running</span><span>progress</span></div>
+            <button class="cta-state cta-state-current" type="button" style="--p: 54%">
+              <span class="cta-state-fill"></span>
+              <span class="cta-state-content"><span class="spinner"></span>이미지 생성 · 54%</span>
+            </button>
+          </div>
+          <div>
+            <div class="cta-row-label mono"><span>Edit / Video running</span><span>static</span></div>
+            <button class="cta-state cta-state-current is-muted" type="button">
+              <span class="cta-state-content"><span class="spinner"></span>처리 중…</span>
+            </button>
+          </div>
+          <div>
+            <div class="cta-row-label mono"><span>Analyze / Compare running</span><span>static</span></div>
+            <button class="cta-state cta-state-current is-muted" type="button">
+              <span class="cta-state-content"><span class="spinner"></span>분석 중…</span>
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <article class="cta-panel">
+        <div>
+          <h3>변경 아이디어 · 공통 Wave CTA</h3>
+          <p>로딩 캔버스와 같은 사선 흐름을 버튼 안에 넣고, 모든 모드가 퍼센트/단계 정보를 같은 위치에 표시합니다.</p>
+        </div>
+        <div class="cta-list">
+          <div>
+            <div class="cta-row-label mono"><span>Image generate</span><span>recommended</span></div>
+            <button class="cta-state cta-next" type="button" style="--p: 54%">
+              <span class="cta-state-fill"></span>
+              <span class="cta-state-content cta-next-content">
+                <span class="cta-next-main">
+                  <span class="cta-ring"></span>
+                  <span class="cta-next-text">
+                    <span class="cta-next-title">이미지 생성 중</span>
+                    <span class="cta-next-sub mono">qwen-image · sampling</span>
+                  </span>
+                </span>
+                <span class="cta-next-percent mono">54%</span>
+              </span>
+            </button>
+          </div>
+          <div>
+            <div class="cta-row-label mono"><span>Video render</span><span>same component</span></div>
+            <button class="cta-state cta-next" type="button" style="--p: 18%">
+              <span class="cta-state-fill"></span>
+              <span class="cta-state-content cta-next-content">
+                <span class="cta-next-main">
+                  <span class="cta-ring"></span>
+                  <span class="cta-next-text">
+                    <span class="cta-next-title">영상 생성 중</span>
+                    <span class="cta-next-sub mono">wan2.2 · workflow</span>
+                  </span>
+                </span>
+                <span class="cta-next-percent mono">18%</span>
+              </span>
+            </button>
+          </div>
+          <div>
+            <div class="cta-row-label mono"><span>Analyze / Compare</span><span>compact option</span></div>
+            <button class="cta-state cta-next is-compact" type="button" style="--p: 72%">
+              <span class="cta-state-fill"></span>
+              <span class="cta-state-content cta-next-content">
+                <span class="cta-next-main">
+                  <span class="cta-ring"></span>
+                  <span class="cta-next-text">
+                    <span class="cta-next-title">비교 분석 중</span>
+                    <span class="cta-next-sub mono">qwen3-vl · translation</span>
+                  </span>
+                </span>
+                <span class="cta-next-percent mono">72%</span>
+              </span>
+            </button>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="section reference-lab" aria-labelledby="reference-title">
+    <div class="section-title">
+      <h2 id="reference-title" class="display"><strong>레퍼런스 반영</strong> · Recommended Direction</h2>
+      <span class="note mono">dark progress · dot generation field</span>
+    </div>
+    <div class="policy-card">
+      <b>하루 의견: 진행 버튼은 이 방향이 더 강하고, 생성 캔버스는 도트 필드가 더 오래 보기 좋아요</b>
+      <span>버튼은 진행률이 정보라서 레퍼런스처럼 채워지는 면적과 큰 숫자를 분리하는 게 읽기 좋습니다. 결과 박스 로딩은 웨이브보다 도트 필드가 이미지 생성의 “조용히 만들어지는 중” 느낌에 가깝고, 반복 루프도 27px 타일 이동이라 끊김이 덜합니다.</span>
+      <div class="policy-chips mono">
+        <span class="policy-chip">recommended for CTA</span>
+        <span class="policy-chip">ChatGPT-like generation field</span>
+        <span class="policy-chip">27px seamless dot loop</span>
+        <span class="policy-chip">actual app: light shell + dark inner canvas</span>
+      </div>
+    </div>
+    <div class="reference-grid">
+      <article class="reference-card">
+        <div>
+          <h3>Progress CTA · Reference Style</h3>
+          <p>생성/영상처럼 오래 걸리는 액션에 우선 적용하기 좋은 타입입니다. 단계명은 왼쪽, 퍼센트는 오른쪽에 고정합니다.</p>
+        </div>
+        <div class="ref-dark-panel">
+          <div class="ref-head mono">
+            <span>Image Generate</span>
+            <strong>Recommended</strong>
+          </div>
+          <div class="ref-progress-btn" style="--p: 31%">
+            <div class="ref-progress-main">
+              <span class="ref-orbit"></span>
+              <span class="ref-progress-copy">
+                <span class="ref-progress-title">이미지 생성 중</span>
+                <span class="ref-progress-sub mono">qwen-image · sampling</span>
+              </span>
+            </div>
+            <span class="ref-progress-percent mono">31%</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="reference-card">
+        <div>
+          <h3>Result Loading · ChatGPT Dot Field</h3>
+          <p>이미지 생성 결과 박스에는 어두운 내부 캔버스를 넣고, 주변 ResultBox 외곽은 현재 앱 톤을 유지하는 안입니다.</p>
+        </div>
+        <div class="ref-dot-stage">
+          <div class="gpt-dot-canvas" aria-label="이미지 생성 중 도트 캔버스">
+            <span class="gpt-dot-label mono">Image Generation</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="reference-card">
+        <div>
+          <h3>Result Loading · App Tone Dots</h3>
+          <p>오빠 의견 반영안입니다. 배경은 현재 앱의 밝은 종이톤을 유지하고, 검은 도트를 낮은 투명도로 겹쳐 생성 중 흐름만 만듭니다.</p>
+        </div>
+        <div class="app-dot-stage">
+          <div class="app-dot-canvas" aria-label="앱 톤 이미지 생성 중 도트 캔버스">
+            <span class="app-dot-label mono">Image Generation</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+</main>
+
+<script>
+const modes = {
+  generate: {
+    title: "이미지 생성 중",
+    cta: "progress",
+    stages: [
+      ["prompt-parse", "프롬프트 해석", "", 10],
+      ["gemma4-upgrade", "프롬프트 강화", "gemma4-un", 25],
+      ["workflow-dispatch", "워크플로우 설정", "", 40],
+      ["comfyui-sampling", "이미지 생성", "qwen-image-2512", 82],
+      ["save-output", "결과 저장", "", 100],
+    ],
+  },
+  edit: {
+    title: "이미지 수정 중",
+    cta: "처리 중…",
+    stages: [
+      ["vision-analyze", "이미지 분석", "qwen3-vl:8b", 18],
+      ["prompt-merge", "프롬프트 통합", "gemma4-un", 35],
+      ["param-extract", "사이즈/스타일 추출", "auto", 48],
+      ["comfyui-sampling", "이미지 수정", "qwen-image-edit-2511", 86],
+      ["save-output", "결과 저장", "", 100],
+    ],
+  },
+  video: {
+    title: "영상 생성 중",
+    cta: "처리 중…",
+    stages: [
+      ["vision-analyze", "이미지 분석", "qwen3-vl:8b", 16],
+      ["prompt-merge", "프롬프트 통합", "gemma4-un", 32],
+      ["workflow-dispatch", "워크플로우 설정", "Wan 2.2 i2v builder", 46],
+      ["comfyui-sampling", "영상 생성", "wan2.2-14b-q6_k", 88],
+      ["save-output", "MP4 저장", "h264 인코딩", 100],
+    ],
+  },
+  vision: {
+    title: "비전 분석 중",
+    cta: "분석 중…",
+    stages: [
+      ["vision-encoding", "이미지 인코딩", "browser", 8],
+      ["vision-analyze", "이미지 분석", "qwen3-vl:8b", 42],
+      ["prompt-synthesize", "프롬프트 합성", "gemma4-un", 72],
+      ["translation", "한국어 번역", "gemma4-un", 100],
+    ],
+  },
+  compare: {
+    title: "비교 분석 중",
+    cta: "비교 분석 중…",
+    stages: [
+      ["compare-encoding", "이미지 A/B 인코딩", "browser", 8],
+      ["observe1", "Image1 관찰", "qwen3-vl:8b", 28],
+      ["observe2", "Image2 관찰", "qwen3-vl:8b", 48],
+      ["pair-compare", "동시 비교", "qwen3-vl:8b", 78],
+      ["translation", "한국어 번역", "gemma4-un", 100],
+    ],
+  },
+};
+
+let mode = "generate";
+let activeIndex = 0;
+let startedAt = Date.now();
+let stageStartedAt = Date.now();
+let paused = false;
+let timer = null;
+const stepMs = 1450;
+
+const timeline = document.getElementById("timeline");
+const percent = document.getElementById("percent");
+const modalTitle = document.getElementById("modal-title");
+const totalElapsed = document.getElementById("elapsed-total");
+const samplingChip = document.getElementById("sampling-chip");
+const samplingStep = document.getElementById("sampling-step");
+const cta = document.getElementById("cta-demo");
+const ctaLabel = document.getElementById("cta-label");
+const modeLabel = document.getElementById("current-mode-label");
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+function formatClock(ms) {
+  const sec = Math.floor(ms / 1000);
+  return `${pad2(Math.floor(sec / 60))}:${pad2(sec % 60)}`;
+}
+
+function render() {
+  const data = modes[mode];
+  const now = Date.now();
+  modalTitle.textContent = data.title;
+  modeLabel.textContent = mode;
+  totalElapsed.textContent = formatClock(now - startedAt);
+
+  timeline.innerHTML = "";
+  data.stages.forEach((stage, i) => {
+    const [type, label, sub] = stage;
+    const li = document.createElement("li");
+    li.className = "timeline-item " + (i < activeIndex ? "done" : i === activeIndex ? "running" : "pending");
+
+    const row = document.createElement("div");
+    row.className = "row";
+
+    const bullet = document.createElement("span");
+    bullet.className = "bullet";
+    if (i < activeIndex) {
+      bullet.innerHTML = '<span class="check">✓</span>';
+    } else if (i === activeIndex) {
+      bullet.innerHTML = '<span class="spinner" aria-hidden="true"></span>';
+    } else {
+      bullet.textContent = String(i + 1);
+    }
+
+    const labelWrap = document.createElement("div");
+    labelWrap.className = "label";
+    labelWrap.append(document.createTextNode(label));
+    if (sub) {
+      const subEl = document.createElement("span");
+      subEl.className = "sub mono";
+      subEl.textContent = sub;
+      labelWrap.append(subEl);
+    }
+
+    row.append(bullet, labelWrap);
+    if (i < activeIndex || i === activeIndex) {
+      const elapsed = document.createElement("span");
+      elapsed.className = "elapsed mono";
+      const elapsedSec = i < activeIndex ? (stepMs / 1000).toFixed(1) : ((now - stageStartedAt) / 1000).toFixed(1);
+      elapsed.textContent = `${elapsedSec}s`;
+      row.append(elapsed);
+    }
+    if (i === activeIndex) {
+      const running = document.createElement("span");
+      running.className = "running-label mono";
+      running.textContent = "RUNNING";
+      row.append(running);
+    }
+    li.append(row);
+    if (i < activeIndex && (type === "vision-analyze" || type === "prompt-merge" || type === "translation")) {
+      const detail = document.createElement("div");
+      detail.className = "detail";
+      detail.textContent = type === "prompt-merge"
+        ? "완료 payload가 있으면 최종 프롬프트 DetailBox가 이 위치에 표시됩니다."
+        : "완료된 stage의 요약/번역 payload가 있으면 보조 박스가 표시됩니다.";
+      li.append(detail);
+    }
+    timeline.append(li);
+  });
+
+  const current = data.stages[Math.min(activeIndex, data.stages.length - 1)];
+  const prevProgress = activeIndex === 0 ? 0 : data.stages[activeIndex - 1][3];
+  const targetProgress = current[3];
+  const stageRatio = Math.min(1, Math.max(0, (now - stageStartedAt) / stepMs));
+  const progress = activeIndex >= data.stages.length
+    ? 100
+    : Math.round(prevProgress + (targetProgress - prevProgress) * stageRatio);
+
+  percent.textContent = `${progress}%`;
+  cta.style.setProperty("--p", `${progress}%`);
+  ctaLabel.textContent = data.cta === "progress"
+    ? `${current[1]} · ${progress}%`
+    : data.cta;
+
+  if (current[0] === "comfyui-sampling") {
+    samplingChip.hidden = false;
+    const step = Math.max(1, Math.min(40, Math.round(progress / 100 * 40)));
+    samplingStep.textContent = `스텝 ${step}/40`;
+  } else {
+    samplingChip.hidden = true;
+  }
+}
+
+function tick() {
+  if (paused) {
+    render();
+    return;
+  }
+  const data = modes[mode];
+  const now = Date.now();
+  if (now - stageStartedAt >= stepMs) {
+    activeIndex += 1;
+    stageStartedAt = now;
+    if (activeIndex >= data.stages.length) {
+      activeIndex = 0;
+      startedAt = now;
+      stageStartedAt = now;
+    }
+  }
+  render();
+}
+
+function start(nextMode = mode) {
+  mode = nextMode;
+  activeIndex = 0;
+  startedAt = Date.now();
+  stageStartedAt = Date.now();
+  paused = false;
+  document.querySelectorAll(".tab").forEach((tab) => {
+    tab.setAttribute("aria-selected", tab.dataset.mode === mode ? "true" : "false");
+  });
+  render();
+}
+
+document.querySelectorAll(".tab").forEach((tab) => {
+  tab.addEventListener("click", () => start(tab.dataset.mode));
+});
+document.getElementById("play-btn").addEventListener("click", () => start(mode));
+document.getElementById("pause-btn").addEventListener("click", (event) => {
+  paused = !paused;
+  event.currentTarget.textContent = paused ? "계속" : "일시정지";
+});
+document.getElementById("reset-btn").addEventListener("click", () => {
+  activeIndex = 0;
+  startedAt = Date.now();
+  stageStartedAt = Date.now();
+  paused = true;
+  document.getElementById("pause-btn").textContent = "계속";
+  render();
+});
+
+timer = setInterval(tick, 120);
+start("generate");
+</script>
+</body>
+</html>

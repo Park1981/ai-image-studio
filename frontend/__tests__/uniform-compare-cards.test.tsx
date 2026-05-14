@@ -8,7 +8,7 @@
  */
 
 import { afterEach, expect, it, vi } from "vitest";
-import { cleanup, render } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import CompareViewer from "@/components/studio/compare/CompareViewer";
 import CompareAnalysisPanel from "@/components/studio/compare/CompareAnalysisPanel";
 import type { VisionCompareImage } from "@/stores/useVisionCompareStore";
@@ -97,6 +97,7 @@ it("CompareAnalysisPanel — analysis 있을 때 .ais-result-hero-plain 적용",
   const root = container.firstChild as HTMLElement | null;
   expect(root).not.toBeNull();
   expect(root!.className).toContain("ais-result-hero-plain");
+  expect(root).toHaveAttribute("data-result-state", "done");
   expect(root!.className).not.toContain("ais-compare-analysis-card");
 });
 
@@ -117,5 +118,8 @@ it("CompareAnalysisPanel — running 시에도 outer wrapper 에 .ais-result-her
   const root = container.firstChild as HTMLElement | null;
   expect(root).not.toBeNull();
   expect(root!.className).toContain("ais-result-hero-plain");
+  expect(root).toHaveAttribute("data-result-state", "loading");
+  expect(screen.getByTestId("result-box-loading-placeholder")).toBeInTheDocument();
+  expect(screen.getByText("비교 분석 중…")).toBeInTheDocument();
   expect(root!.className).not.toContain("ais-compare-analysis-card");
 });

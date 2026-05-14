@@ -949,6 +949,171 @@ button {
   z-index: 1;
 }
 
+/* ProcessingCTA — 공통 진행 버튼 (CTA·D Shimmer Pill 변형).
+   Generate/Edit/Video/Analyze/Compare 는 이 컴포넌트를 통해 같은 구조를 공유한다. */
+.ais-processing-cta {
+  all: unset;
+  cursor: pointer;
+  width: 100%;
+  min-height: 56px;
+  padding: 0 18px;
+  box-sizing: border-box;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255,255,255,.09);
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  color: #fff;
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  display: grid;
+  place-items: center;
+  box-shadow:
+    0 5px 18px rgba(15,23,42,.26),
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(0,0,0,.26);
+  transition:
+    transform .22s cubic-bezier(.4, 0, .2, 1),
+    box-shadow .22s cubic-bezier(.4, 0, .2, 1),
+    background .22s cubic-bezier(.4, 0, .2, 1);
+}
+.ais-processing-cta::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--p, 0%);
+  min-width: 0;
+  background: linear-gradient(90deg,
+    rgba(124,58,237,.72),
+    rgba(74,158,255,.74) 60%,
+    rgba(19,198,232,.68));
+  opacity: 0;
+  z-index: 0;
+  transition: width .24s ease, opacity .18s ease;
+}
+.ais-processing-cta::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg,
+    transparent 0 35%,
+    rgba(255,255,255,.42) 50%,
+    transparent 65% 100%);
+  background-size: 220% 100%;
+  opacity: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.ais-processing-cta[data-running="true"] {
+  cursor: wait;
+}
+.ais-processing-cta[data-running="true"]::before {
+  opacity: 1;
+}
+.ais-processing-cta[data-running="true"]::after {
+  opacity: .86;
+  animation: ais-processing-cta-shimmer 2.6s linear infinite;
+}
+.ais-processing-cta:hover:not(:disabled),
+.ais-processing-cta[data-running="true"]:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    0 8px 26px rgba(15,23,42,.34),
+    inset 0 1px 0 rgba(255,255,255,.12),
+    inset 0 -1px 0 rgba(0,0,0,.22);
+}
+.ais-processing-cta:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ais-processing-cta:disabled:not([data-running="true"]) {
+  cursor: not-allowed;
+  background: var(--accent-disabled);
+  color: rgba(31,31,31,.46);
+  border-color: var(--line);
+  box-shadow: none;
+}
+.ais-processing-cta:disabled:not([data-running="true"])::before,
+.ais-processing-cta:disabled:not([data-running="true"])::after {
+  display: none;
+}
+.ais-processing-cta-content {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+.ais-processing-cta-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+.ais-processing-cta-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+.ais-processing-cta-title {
+  color: currentColor;
+  font-size: 13.5px;
+  font-weight: 750;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.ais-processing-cta-sub {
+  color: rgba(255,255,255,.68);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .04em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ais-processing-cta:disabled:not([data-running="true"]) .ais-processing-cta-sub {
+  color: rgba(31,31,31,.34);
+}
+.ais-processing-cta-percent {
+  flex: 0 0 auto;
+  color: rgba(255,255,255,.95);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .03em;
+}
+.ais-processing-cta-pulse {
+  width: 17px;
+  height: 17px;
+  border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.54);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.12),
+    0 0 0 0 rgba(255,255,255,.22);
+  animation: ais-processing-cta-pulse 1.8s ease-in-out infinite;
+  flex: 0 0 auto;
+}
+@keyframes ais-processing-cta-shimmer {
+  from { background-position: -120% 0; }
+  to { background-position: 220% 0; }
+}
+@keyframes ais-processing-cta-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.12),
+      0 0 0 0 rgba(255,255,255,.24);
+  }
+  50% {
+    transform: scale(1.04);
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,.12),
+      0 0 0 8px rgba(255,255,255,0);
+  }
+}
+
 /* ── Section 5: 카드 패턴 (.ais-* · Phase 1.3)
    8 카드 모두 같은 base + signature var override 만 다름.
    base = backdrop blur + 인물 webp 우측 fade + active 시 padding/mask 변화 */
@@ -1419,10 +1584,14 @@ button {
  *  텍스트 결과 (Vision / Compare-analysis) 용. dot-grid X · 약한 shadow.
  *  매트 (.ais-result-hero base) 와 분기 — 이미지/영상 = 매트 / 텍스트 = plain. */
 .ais-result-hero-plain {
-  background: var(--surface);
+  background-color: var(--surface);
+  background-image: radial-gradient(circle, rgba(0,0,0,.05) 1px, transparent 1px);
+  background-size: 16px 16px;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
-  box-shadow: var(--shadow-sm);
+  box-shadow:
+    0 2px 4px rgba(23,20,14,.04),
+    0 14px 36px rgba(23,20,14,.08);
   padding: 24px;
   display: flex;
   flex-direction: column;
@@ -1430,21 +1599,21 @@ button {
   overflow: hidden;
 }
 
-/* ResultBox state canvas — effect spec 전까지는 정적인 빈 매트만 사용 */
+/* ResultBox state canvas — idle/loading 공통 높이와 정렬 */
 .ais-result-state-shell {
   width: 100%;
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
   place-items: center;
-  min-height: clamp(116px, 14vh, 150px);
+  min-height: clamp(220px, 30vh, 360px);
 }
 .ais-result-hero:not(.ais-result-hero-edit) .ais-result-state-shell {
   height: 100%;
   min-height: 100%;
 }
 .ais-result-hero-plain .ais-result-state-shell {
-  min-height: clamp(120px, 18vh, 180px);
+  min-height: clamp(220px, 30vh, 360px);
 }
 .ais-result-empty-content {
   justify-self: center;
@@ -1462,19 +1631,105 @@ button {
   display: grid !important;
   place-items: center;
 }
+.ais-result-empty-content > .ais-empty-state {
+  display: flex !important;
+  flex-direction: column;
+}
+.ais-empty-state {
+  padding: 28px 20px;
+  background: rgba(255,255,255,.88);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--radius-card);
+  text-align: center;
+  color: var(--ink-4);
+  font-size: 12.5px;
+  line-height: 1.6;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.46);
+}
+.ais-empty-state-panel {
+  min-height: clamp(180px, 26vh, 320px);
+}
+.ais-empty-state-title {
+  color: var(--ink-3);
+  font-size: 12.5px;
+  font-weight: 650;
+}
+.ais-empty-state-desc {
+  color: var(--ink-4);
+  font-size: 11.5px;
+}
 .ais-result-loading-canvas {
   position: relative;
   width: 100%;
   height: 100%;
   min-height: inherit;
   overflow: hidden;
+  isolation: isolate;
   border-radius: calc(var(--radius-card) - 6px);
   background:
-    radial-gradient(circle, rgba(0,0,0,.055) 1px, transparent 1px) 0 0 / 16px 16px,
-    linear-gradient(135deg, rgba(255,255,255,.92), rgba(250,249,246,.78));
+    radial-gradient(circle, rgba(0,0,0,.032) 1px, transparent 1px) 0 0 / 16px 16px,
+    radial-gradient(circle at 50% 50%, rgba(255,255,255,.86), rgba(244,242,238,.72));
   box-shadow:
     inset 0 0 0 1px rgba(255,255,255,.56),
-    inset 0 -28px 70px rgba(23,20,14,.05);
+    inset 0 -30px 72px rgba(23,20,14,.045);
+}
+.ais-result-loading-canvas::before {
+  content: "";
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 28% 32%, rgba(124,58,237,.58), transparent 58%),
+    radial-gradient(circle at 72% 68%, rgba(74,158,255,.62), transparent 60%),
+    radial-gradient(circle at 50% 50%, rgba(19,198,232,.36), transparent 70%);
+  filter: blur(22px) saturate(1.12);
+  opacity: .92;
+  mix-blend-mode: normal;
+  animation: ais-result-mesh-bloom 4.2s ease-in-out infinite;
+}
+.ais-result-loading-canvas::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(circle at 50% 50%, transparent 30%, rgba(255,255,255,.34) 80%),
+    linear-gradient(115deg, transparent 0 36%, rgba(255,255,255,.26) 50%, transparent 64% 100%);
+  background-size: 100% 100%, 220% 100%;
+  opacity: .84;
+  pointer-events: none;
+  animation: ais-result-mesh-sheen 5.6s linear infinite;
+}
+.ais-result-loading-caption {
+  position: relative;
+  z-index: 1;
+  padding: 6px 10px;
+  border: 1px solid rgba(255,255,255,.62);
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.62);
+  box-shadow: 0 8px 24px rgba(23,20,14,.07);
+  color: var(--ink-3);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+@keyframes ais-result-mesh-bloom {
+  0%, 100% {
+    transform: scale(.86) rotate(0deg);
+    opacity: .78;
+  }
+  50% {
+    transform: scale(1.12) rotate(8deg);
+    opacity: 1;
+  }
+}
+@keyframes ais-result-mesh-sheen {
+  from { background-position: 0 0, -120% 0; }
+  to { background-position: 0 0, 220% 0; }
 }
 
 /* SegControl row (Edit Hero 우상단 — 슬라이더/나란히 토글) */

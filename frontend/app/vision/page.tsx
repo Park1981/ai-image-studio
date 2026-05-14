@@ -12,6 +12,7 @@ import { useState } from "react";
 import AppHeader from "@/components/chrome/AppHeader";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
+import ProcessingCTA from "@/components/studio/ProcessingCTA";
 import ProgressModal from "@/components/studio/ProgressModal";
 import { ResultBox } from "@/components/studio/ResultBox";
 import SourceImageCard from "@/components/studio/SourceImageCard";
@@ -32,7 +33,6 @@ import VisionModelSelector, {
 } from "@/components/studio/VisionModelSelector";
 import VisionContent from "@/components/studio/VisionContent";
 import Icon from "@/components/ui/Icon";
-import { Spinner } from "@/components/ui/primitives";
 import { useVisionPipeline } from "@/hooks/useVisionPipeline";
 import { useAutoCloseModal } from "@/hooks/useAutoCloseModal";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -106,6 +106,16 @@ export default function VisionPage() {
   const removeEntry = useVisionStore((s) => s.removeEntry);
   const clearEntries = useVisionStore((s) => s.clearEntries);
   const loadEntry = useVisionStore((s) => s.loadEntry);
+  const latestStageProgress = useVisionStore((s) =>
+    s.stageHistory.length > 0
+      ? s.stageHistory[s.stageHistory.length - 1].progress
+      : 0,
+  );
+  const latestStageLabel = useVisionStore((s) =>
+    s.stageHistory.length > 0
+      ? s.stageHistory[s.stageHistory.length - 1].label
+      : "",
+  );
   const imageHistoryItems = useHistoryStore((s) => s.items);
 
   /* ── 임시 모델 토글 (2026-05-04 비교 검증용) ── */
@@ -155,28 +165,20 @@ export default function VisionPage() {
             description="이미지 한 장의 구도, 분위기, 품질을 분석하고 번역합니다."
           />
 
-          {/* Phase 1.5.6 (결정 H · 2026-05-02) — CTA 상단 sticky 로 변경.
-           *  옛: 패널 하단 sticky + flex:1 spacer + onMouseEnter inline style swap.
-           *  신: StudioModeHeader 직후 .ais-cta-sticky-top + .ais-cta-primary (Aurora Glass).
+          {/* Phase 1.5.6 (결정 H · 2026-05-02) — CTA 상단 sticky.
+           *  StudioModeHeader 직후 공통 ProcessingCTA 사용.
            *  inline style 잔여 0 (V5 시각 대상). */}
           <div className="ais-cta-sticky-top">
-            <button
-              type="button"
+            <ProcessingCTA
               onClick={analyze}
               disabled={analyzeDisabled}
-              className="ais-cta-primary"
-            >
-              {analyzing ? (
-                <>
-                  <Spinner /> 분석 중…
-                </>
-              ) : (
-                <>
-                  <Icon name="search" size={15} />
-                  Analyze
-                </>
-              )}
-            </button>
+              running={analyzing}
+              progress={latestStageProgress}
+              idleLabel="Analyze"
+              runningLabel="분석 중"
+              subLabel={latestStageLabel || "VISION ANALYSIS"}
+              icon="search"
+            />
           </div>
 
           {/* ── 원본 이미지 (Edit/Video 와 통일 — .ais-field-header + SectionAccentBar) ── */}
@@ -302,10 +304,13 @@ export default function VisionPage() {
           <ResultBox
             state={resultState}
             variant="plain"
+            loadingLabel="분석 중…"
             emptyState={
-              <StudioEmptyState size="normal">
-                이미지를 업로드하고 <b>분석</b> 버튼을 눌러 주세요.
-              </StudioEmptyState>
+              <StudioEmptyState
+                size="normal"
+                title="분석 대기 중"
+                description="이미지를 업로드하고 분석 버튼을 눌러 주세요."
+              />
             }
           >
             {lastResult && <VisionContent result={lastResult} />}

@@ -1,5 +1,5 @@
 /**
- * ResultBox — 4 모드 결과 박스 통일 base.
+ * ResultBox — 5 모드 결과 박스 통일 base.
  *
  * 외곽 className / 상태 분기 / 0.4s cross-fade / effectOverlay slot 만 담당한다.
  * 모드별 본문은 children 으로 주입한다.
@@ -19,6 +19,7 @@ import {
   type ReactNode,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import ResultLoadingCanvas from "@/components/studio/ResultLoadingCanvas";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
 
 export type ResultBoxState = "idle" | "loading" | "done";
@@ -31,6 +32,7 @@ interface ResultBoxProps
   effectOverlay?: ReactNode;
   emptyState?: ReactNode;
   loadingPlaceholder?: ReactNode;
+  loadingLabel?: string;
   children?: ReactNode;
 }
 
@@ -46,14 +48,16 @@ function assignRef(ref: ForwardedRef<HTMLDivElement>, value: HTMLDivElement | nu
   }
 }
 
-function defaultLoadingPlaceholder(variant: "hero" | "plain", modifier?: "edit") {
+function defaultLoadingPlaceholder(
+  variant: "hero" | "plain",
+  modifier?: "edit",
+  label?: string,
+) {
   return (
-    <div
-      className="ais-result-state-shell ais-result-loading-canvas"
-      data-testid="result-box-loading-placeholder"
-      data-result-loading-variant={variant}
-      data-result-loading-modifier={modifier ?? "none"}
-      aria-hidden="true"
+    <ResultLoadingCanvas
+      variant={variant}
+      modifier={modifier}
+      label={label}
     />
   );
 }
@@ -71,6 +75,7 @@ export const ResultBox = forwardRef<HTMLDivElement, ResultBoxProps>(
       effectOverlay,
       emptyState,
       loadingPlaceholder,
+      loadingLabel,
       children,
       className,
       style,
@@ -123,7 +128,7 @@ export const ResultBox = forwardRef<HTMLDivElement, ResultBoxProps>(
 
     const loadingMinHeight =
       state === "loading"
-        ? lastStableHeight ?? (modifier === "edit" ? 320 : null)
+        ? lastStableHeight ?? (modifier === "edit" || variant === "plain" ? 320 : null)
         : null;
 
     const rootStyle: CSSProperties = {
@@ -142,7 +147,8 @@ export const ResultBox = forwardRef<HTMLDivElement, ResultBoxProps>(
         children
       ) : state === "loading" ? (
         <>
-          {loadingPlaceholder ?? defaultLoadingPlaceholder(variant, modifier)}
+          {loadingPlaceholder ??
+            defaultLoadingPlaceholder(variant, modifier, loadingLabel)}
           {effectOverlay}
         </>
       ) : (
