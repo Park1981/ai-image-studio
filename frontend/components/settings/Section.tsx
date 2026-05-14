@@ -45,6 +45,9 @@ export default function Section({
         display: "flex",
         flexDirection: "column",
         gap: 10,
+        // marginTop 으로 이전 섹션 끝과 separator 사이 호흡 확보
+        // (separator 는 paddingTop 영역의 top:0 에 위치 → marginTop 만큼 위 여백).
+        marginTop: first ? 0 : 14,
         paddingTop: first ? 0 : 22,
       }}
     >

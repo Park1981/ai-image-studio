@@ -3463,7 +3463,7 @@ button {
 }
 .ais-ctl-switch.is-on { background: var(--accent); }
 .ais-ctl-switch.is-on::after { left: 16px; }
-.ais-ctl-switch.is-on.tone-violet { background: var(--output-violet); }
+.ais-ctl-switch.is-on.tone-violet { background: var(--ais-output-violet); }
 
 /* segmented control — 2/3 choice 모두 */
 .ais-ctl-seg {
@@ -3536,7 +3536,7 @@ button {
   top: 0; left: 0; right: 0;
   height: 3px;
   background: linear-gradient(90deg,
-    var(--output-violet) 0%,
+    var(--ais-output-violet) 0%,
     var(--accent) 50%,
     #06B6D4 100%);
 }
@@ -3569,7 +3569,7 @@ button {
   font-style: normal;
   font-weight: 700;
   font-size: 20px;
-  color: var(--output-violet);
+  color: var(--ais-output-violet);
   margin-right: 8px;
   vertical-align: 2px;
   font-variation-settings: normal;
@@ -3612,7 +3612,7 @@ button {
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 9px;
   letter-spacing: .14em;
-  color: var(--output-violet);
+  color: var(--ais-output-violet);
   font-weight: 700;
   padding: 2px 6px;
   border: 1px solid currentColor;
@@ -3808,10 +3808,13 @@ button {
 .ais-svc-btn {
   all: unset;
   cursor: pointer;
-  padding: 6px 10px;
-  font-family: "JetBrains Mono", ui-monospace, monospace;
-  font-size: 10.5px;
-  letter-spacing: .04em;
+  padding: 6px 12px;
+  /* 한글 라벨 (모델 · 정지 · 시작) 친화 — JetBrains Mono 는 한글 글리프
+     없어 fallback 으로 떨어져 글자가 작아 보이던 회귀. Pretendard 로 강제. */
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -.002em;
   color: var(--ink-3);
   background: var(--bg-2);
   border: 1px solid var(--line);
@@ -3905,7 +3908,7 @@ button {
 }
 .ais-res-bar-fill[data-tone="cyan"]   { background: linear-gradient(90deg, #06B6D4, #67E8F9); }
 .ais-res-bar-fill[data-tone="green"]  { background: linear-gradient(90deg, #15803D, #86EFAC); }
-.ais-res-bar-fill[data-tone="violet"] { background: linear-gradient(90deg, var(--output-violet), #C4B5FD); }
+.ais-res-bar-fill[data-tone="violet"] { background: linear-gradient(90deg, var(--ais-output-violet), #C4B5FD); }
 .ais-res-bar-fill[data-tone="amber"]  { background: linear-gradient(90deg, #B45309, #FCD34D); }
 
 .ais-res-break {
