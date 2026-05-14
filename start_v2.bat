@@ -7,5 +7,5 @@ REM =========================================================
 chcp 65001 >nul
 cd /d "%~dp0"
 
-start "" powershell.exe -NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File "%~dp0start_v2.ps1"
+wscript.exe //B "%~dp0start_v2_hidden.vbs"
 exit /b
