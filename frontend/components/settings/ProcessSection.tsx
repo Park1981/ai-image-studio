@@ -62,8 +62,15 @@ export default function ProcessSection() {
     );
   };
 
+  const runningCount = (ollama === "running" ? 1 : 0) + (comfyui === "running" ? 1 : 0);
   return (
-    <Section title="로컬 서비스" desc="AI 런타임 상태 + 등록 모델">
+    <Section
+      num="01"
+      title="로컬 서비스"
+      titleEn="Local Services"
+      meta={`${runningCount}/2 ${runningCount > 0 ? "ONLINE" : "OFFLINE"}`}
+      desc="AI 런타임 상태 + 등록 모델"
+    >
       <ServiceCard
         name="Ollama"
         port={11434}

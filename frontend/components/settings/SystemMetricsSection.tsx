@@ -21,7 +21,12 @@ export default function SystemMetricsSection() {
   const ramBreakdown = useProcessStore((s) => s.ramBreakdown);
 
   return (
-    <Section title="리소스 모니터">
+    <Section
+      num="02"
+      title="리소스 모니터"
+      titleEn="Resources"
+      meta="SYS · LIVE"
+    >
       <div
         style={{
           display: "flex",

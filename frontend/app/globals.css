@@ -3506,3 +3506,208 @@ button {
     0 1px 2px rgba(0,0,0,.06),
     0 0 0 1px rgba(124,58,237,.14);
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Settings Drawer · Editorial Anatomy (2026-05-14 Phase 2)
+ *
+ * 7 섹션 (헤더 + 5 섹션 + 푸터) 공통 anatomy:
+ *  - eyebrow (mono micro · 9.5px · letter-spaced uppercase)
+ *  - bilingual title (Pretendard 한글 + Fraunces italic 영문)
+ *  - meta (mono micro · 우측 정렬)
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* ── Drawer top header ── */
+.ais-drawer-head {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 22px 20px 18px;
+  border-bottom: 1px dashed var(--line-2);
+  background:
+    radial-gradient(ellipse 100% 100% at 50% 0%, rgba(124,58,237,.04), transparent 60%),
+    transparent;
+}
+.ais-drawer-head::before {
+  /* 상단 4px 다색 띠 (violet → blue → cyan) */
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: linear-gradient(90deg,
+    var(--output-violet) 0%,
+    var(--accent) 50%,
+    #06B6D4 100%);
+}
+.ais-drawer-head-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.ais-drawer-eyebrow {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+.ais-drawer-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "ital" 1;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 28px;
+  line-height: 1;
+  letter-spacing: -.01em;
+  color: var(--ink);
+  margin: 0;
+}
+.ais-drawer-title .ais-ko {
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 20px;
+  color: var(--output-violet);
+  margin-right: 8px;
+  vertical-align: 2px;
+  font-variation-settings: normal;
+}
+.ais-drawer-close {
+  all: unset;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  color: var(--ink-3);
+  cursor: pointer;
+  transition: border-color .15s ease, background .15s ease, color .15s ease;
+  flex-shrink: 0;
+}
+.ais-drawer-close:hover {
+  border-color: var(--ink-3);
+  color: var(--ink);
+  background: var(--surface);
+}
+
+/* ── Section header (s-head) ── */
+.ais-section-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+.ais-section-head-main {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+}
+.ais-section-num {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: var(--output-violet);
+  font-weight: 700;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  align-self: center;
+  margin-bottom: 1px;
+}
+.ais-section-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "ital" 1;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 19px;
+  line-height: 1;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -.005em;
+}
+.ais-section-title .ais-ko {
+  font-family: "Pretendard Variable", Pretendard, sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink-2);
+  margin-right: 7px;
+  vertical-align: 1px;
+  font-variation-settings: normal;
+}
+.ais-section-meta {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+.ais-section-desc {
+  font-size: 11px;
+  color: var(--ink-3);
+  margin: 2px 0 6px;
+  line-height: 1.5;
+}
+
+/* ── Section separator (점선 가로 띠 — section 사이) ── */
+.ais-section-sep {
+  height: 1px;
+  background: repeating-linear-gradient(90deg,
+    var(--line-2) 0 4px,
+    transparent 4px 8px);
+  margin: 2px 0;
+}
+
+/* ── Drawer footer ── */
+.ais-drawer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  margin-top: 10px;
+  border-top: 1px dashed var(--line-2);
+  background: linear-gradient(180deg, transparent 0%, var(--bg-2) 100%);
+}
+.ais-drawer-foot-mark {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ais-drawer-foot-mark .ais-app {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 96, "ital" 1;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.ais-drawer-foot-mark .ais-ver {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9.5px;
+  letter-spacing: .08em;
+  color: var(--ink-4);
+}
+.ais-drawer-foot-ports {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.ais-port-tag {
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+  color: var(--ink-4);
+}
+.ais-port-tag b {
+  color: var(--ink-2);
+  font-weight: 700;
+}

@@ -66,7 +66,7 @@ export default function SettingsDrawer() {
           top: 0,
           right: 0,
           bottom: 0,
-          width: 400,
+          width: 440,
           maxWidth: "100vw",
           background: "var(--bg)",
           borderLeft: "1px solid var(--line)",
@@ -106,50 +106,27 @@ export default function SettingsDrawer() {
 }
 
 /* ─────────────────────────────────
-   Drawer header
+   Drawer header — Editorial Anatomy (2026-05-14 Phase 2)
+   eyebrow + Fraunces italic bilingual + 상단 4px 다색 띠 + close 박스
    ───────────────────────────────── */
 function DrawerHeader({ onClose }: { onClose: () => void }) {
   return (
-    <header
-      style={{
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "space-between",
-        padding: "16px 20px 12px",
-        borderBottom: "1px solid var(--line)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-        <Icon name="gear" size={16} />
-        <h2
-          style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: "var(--ink)",
-            letterSpacing: "-.005em",
-            margin: 0,
-          }}
-        >
-          설정
+    <header className="ais-drawer-head">
+      <div className="ais-drawer-head-meta">
+        <div className="ais-drawer-eyebrow">IMAGE STUDIO · CONFIG · v1.3.0</div>
+        <h2 className="ais-drawer-title">
+          <span className="ais-ko">설정</span>
+          <em>Settings</em>
         </h2>
       </div>
       <button
         type="button"
         onClick={onClose}
-        aria-label="설정 닫기"
-        style={{
-          all: "unset",
-          cursor: "pointer",
-          padding: 6,
-          borderRadius: "var(--radius-sm)",
-          color: "var(--ink-3)",
-          display: "inline-flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "background .15s",
-        }}
+        aria-label="설정 닫기 (ESC)"
+        title="설정 닫기 (ESC)"
+        className="ais-drawer-close"
       >
-        <Icon name="x" size={16} />
+        <Icon name="x" size={14} />
       </button>
     </header>
   );
@@ -185,7 +162,13 @@ function PreferencesSection() {
   };
 
   return (
-    <Section title="기본 설정" desc="기본 동작 토글 · 모든 변경 즉시 저장">
+    <Section
+      num="03"
+      title="기본 설정"
+      titleEn="Defaults"
+      meta="AUTO-SAVE"
+      desc="기본 동작 토글 · 모든 변경 즉시 저장"
+    >
       {/* 통일 ToggleRow (2026-05-14):
        *  - 프롬프트 숨기기 (switch) 와 AI 보정 모드 (segmented) 가 같은 카드 wrapper 공유.
        *  - 옛 raw div 인라인 ad-hoc 카드의 토큰 어긋남 + "빠른" 한글 자모 줄바꿈 회귀 해소.
@@ -223,26 +206,21 @@ function PreferencesSection() {
 }
 
 /* ─────────────────────────────────
-   Footer info (인라인 — 작아서 분리 안 함)
+   Footer info — Editorial Anatomy (2026-05-14 Phase 2)
+   좌측 mark (Fraunces italic + version) · 우측 ports tag 행
    ───────────────────────────────── */
 function FooterInfo() {
   return (
-    <div
-      className="mono"
-      style={{
-        marginTop: 8,
-        paddingTop: 14,
-        borderTop: "1px solid var(--line)",
-        fontSize: 10.5,
-        color: "var(--ink-4)",
-        letterSpacing: ".04em",
-        display: "flex",
-        flexDirection: "column",
-        gap: 4,
-      }}
-    >
-      <div>AI Image Studio · v1.3.0 · LOCAL</div>
-      <div>ComfyUI :8000 · Ollama :11434 · Backend :8001</div>
-    </div>
+    <footer className="ais-drawer-foot">
+      <div className="ais-drawer-foot-mark">
+        <span className="ais-app"><em>AI Image Studio</em></span>
+        <span className="ais-ver">LOCAL · v1.3.0</span>
+      </div>
+      <div className="ais-drawer-foot-ports">
+        <span className="ais-port-tag">ComfyUI <b>8000</b></span>
+        <span className="ais-port-tag">Ollama <b>11434</b></span>
+        <span className="ais-port-tag">Backend <b>8001</b></span>
+      </div>
+    </footer>
   );
 }

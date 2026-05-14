@@ -79,7 +79,13 @@ export default function HistorySection() {
   const dbSize = stats?.dbSizeBytes ?? 0;
 
   return (
-    <Section title="히스토리" desc="생성/수정/영상 기록 + 디스크 사용량">
+    <Section
+      num="04"
+      title="히스토리"
+      titleEn="Archive"
+      meta="SQLITE · v8"
+      desc="생성/수정/영상 기록 + 디스크 사용량"
+    >
       <div
         style={{
           display: "flex",

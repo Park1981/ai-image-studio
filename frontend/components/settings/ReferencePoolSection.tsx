@@ -58,7 +58,13 @@ export default function ReferencePoolSection() {
   const mb = stats ? (stats.totalBytes / 1024 / 1024).toFixed(1) : "—";
 
   return (
-    <Section title="참조 임시 캐시" desc="Edit 사용자 직접 업로드 reference 의 임시 풀">
+    <Section
+      num="05"
+      title="참조 임시 캐시"
+      titleEn="Refs · Cache"
+      meta="EDIT · POOL"
+      desc="Edit 사용자 직접 업로드 reference 의 임시 풀"
+    >
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
         <div
           className="mono"
