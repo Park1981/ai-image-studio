@@ -3,7 +3,9 @@
  *
  * 2026-05-14 Phase 2 — Editorial Anatomy 채택:
  *   - num · bilingual title · meta · desc 4 슬롯 헤더
- *   - 점선 separator 가 section 사이 가르며 hierarchy 표현
+ *   - 첫 섹션 (first=true) 위쪽 padding 0 / 나머지 padding-top 22
+ *   - 첫 섹션 외 위쪽에 점선 separator (Turbopack hot reload 안정성 위해
+ *     CSS pseudo 대신 인라인 absolute span 사용)
  *
  * Phase 3.2 추출 (refactor doc 2026-04-30 §I2) — 옛 SettingsDrawer.tsx (1466줄) 분할.
  */
@@ -21,6 +23,8 @@ interface Props {
   meta?: ReactNode;
   /** 설명 — 한 줄 desc. 옵션. */
   desc?: string;
+  /** 첫 섹션 — 위쪽 separator + padding 제거. 기본 false. */
+  first?: boolean;
   children: ReactNode;
 }
 
@@ -30,10 +34,34 @@ export default function Section({
   num,
   meta,
   desc,
+  first = false,
   children,
 }: Props) {
   return (
-    <section style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <section
+      className="ais-settings-section"
+      style={{
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        gap: 10,
+        paddingTop: first ? 0 : 22,
+      }}
+    >
+      {!first && (
+        <span
+          aria-hidden
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: 1,
+            backgroundImage:
+              "repeating-linear-gradient(90deg, var(--line-2) 0 4px, transparent 4px 8px)",
+          }}
+        />
+      )}
       <header className="ais-section-head">
         <div className="ais-section-head-main">
           {num && <span className="ais-section-num">{num}</span>}

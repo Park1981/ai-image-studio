@@ -86,10 +86,13 @@ export default function SettingsDrawer() {
             // flex 자식의 min-height 기본값이 auto — 콘텐츠가 길면 축소되는 이슈 방지
             minHeight: 0,
             overflowY: "auto",
-            padding: "6px 20px 32px",
+            // 2026-05-14 Phase 3 fix: 헤더와 §01 사이 패딩 (6 → 22) 늘림.
+            // gap 은 0 — 섹션 사이 간격은 `.ais-settings-section + .ais-settings-section`
+            // 의 padding-top 22 (+ 점선 separator) 가 책임 (중복 방지).
+            padding: "22px 20px 32px",
             display: "flex",
             flexDirection: "column",
-            gap: 20,
+            gap: 0,
           }}
         >
           <ProcessSection />

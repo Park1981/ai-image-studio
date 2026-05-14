@@ -3656,7 +3656,28 @@ button {
   line-height: 1.5;
 }
 
-/* ── Section separator (점선 가로 띠 — section 사이) ── */
+/* ── Section separator (점선 가로 띠 — section 사이) ──
+   첫 섹션 제외 · sibling 자동 적용. demo .s + .s 패턴. */
+.ais-settings-section {
+  position: relative;
+}
+.ais-settings-section + .ais-settings-section {
+  padding-top: 22px;
+}
+.ais-settings-section + .ais-settings-section::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--line-2) 0 4px,
+    transparent 4px 8px
+  );
+}
+/* 옛 inline-use 호환 (현재 미사용) */
 .ais-section-sep {
   height: 1px;
   background: repeating-linear-gradient(90deg,

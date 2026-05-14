@@ -65,6 +65,7 @@ export default function ProcessSection() {
   const runningCount = (ollama === "running" ? 1 : 0) + (comfyui === "running" ? 1 : 0);
   return (
     <Section
+      first
       num="01"
       title="로컬 서비스"
       titleEn="Local Services"
