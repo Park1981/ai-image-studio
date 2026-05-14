@@ -3805,27 +3805,31 @@ button {
   gap: 6px;
   flex-shrink: 0;
 }
+/* Service tile 버튼 (▾ 모델 · 정지 · 시작) — 3 variant.
+   2026-05-14 dogfooding fix: 비호버 base 가 회색조라 비활성화처럼 보이던
+   회귀. 기본 ink-3 → ink-2 (글자 진하게) + .danger 도 비호버 rose tint
+   부여 (실행 영향 있는 버튼은 항상 시각적 강조). */
 .ais-svc-btn {
   all: unset;
   cursor: pointer;
   padding: 6px 12px;
-  /* 한글 라벨 (모델 · 정지 · 시작) 친화 — JetBrains Mono 는 한글 글리프
-     없어 fallback 으로 떨어져 글자가 작아 보이던 회귀. Pretendard 로 강제. */
+  /* 한글 라벨 친화 — JetBrains Mono 한글 글리프 부재 회귀 fix. */
   font-family: "Pretendard Variable", Pretendard, sans-serif;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: -.002em;
-  color: var(--ink-3);
+  color: var(--ink-2);
   background: var(--bg-2);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   border-radius: var(--radius-sm);
   transition: border-color .15s ease, background .15s ease, color .15s ease;
 }
 .ais-svc-btn:hover {
-  border-color: var(--ink-4);
+  border-color: var(--ink-3);
   color: var(--ink);
   background: var(--surface);
 }
+/* .is-on (시작 — running=false) — primary accent CTA */
 .ais-svc-btn.is-on {
   border-color: var(--accent);
   background: var(--accent);
@@ -3835,9 +3839,17 @@ button {
   background: var(--accent-ink);
   border-color: var(--accent-ink);
 }
-.ais-svc-btn:hover.danger {
-  color: var(--rose, #DC2626);
-  border-color: var(--rose, #DC2626);
+/* .danger (정지 — running=true) — 비호버 시도 rose tint 명확.
+   기존 :hover.danger 만 정의 → 비호버 base 회색조 회귀 fix. */
+.ais-svc-btn.danger {
+  color: #B91C1C;
+  background: rgba(220, 38, 38, .06);
+  border-color: rgba(220, 38, 38, .28);
+}
+.ais-svc-btn.danger:hover {
+  color: #DC2626;
+  background: rgba(220, 38, 38, .12);
+  border-color: #DC2626;
 }
 
 /* Service card 펼침 (모델 목록) */
@@ -4153,3 +4165,5 @@ button {
   content: "※ ";
   color: var(--ink-5);
 }
+
+/* svc-btn dogfooding fix 2026-05-14 — turbopack cache trigger */
