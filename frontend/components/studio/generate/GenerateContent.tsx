@@ -154,10 +154,19 @@ export default function GenerateContent({
       onMouseDown={onMouseDown}
       onDoubleClick={onDoubleClick}
       style={{
-        position: "relative",
-        width: "100%",
-        height: "100%",
+        // (1) absolute inset 0 — 부모 motion.div (relative) sizing 그대로 차지.
+        // (2) gridTemplate {rows,cols} = minmax(0, 1fr) — 핵심. 명시 안 두면
+        //     default `grid-template-rows: auto` 가 자식 img 의 intrinsic
+        //     (768×1200) 따라 row 를 1200 으로 grow 시키면서 img 의
+        //     max-height: 100% 가 "row 1200 의 100%" 로 풀려 자기 본래 비율로
+        //     그려짐 → 박스 외곽 (clamp 530) 밖으로 흘러내림 + overflow:hidden
+        //     으로 하단 잘림 + absolute 호버바 위치도 같이 박스 밖으로 밀려나
+        //     서 안 보이던 회귀를 풂.
+        position: "absolute",
+        inset: 0,
         display: "grid",
+        gridTemplateRows: "minmax(0, 1fr)",
+        gridTemplateColumns: "minmax(0, 1fr)",
         placeItems: "center",
         cursor,
         touchAction: "none",
