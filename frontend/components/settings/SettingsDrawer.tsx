@@ -176,6 +176,7 @@ function PreferencesSection() {
        *    사용자가 페이지에서 토글한 값은 session-only — 여기서 변경해도 즉시 안 덮음.
        *    다음 페이지 재진입 (또는 새로고침) 시점부터 반영. */}
       <ToggleRow
+        marker="⊙"
         label="프롬프트 숨기기 (생성 · 수정 · 영상)"
         desc="ON: 진행 모달 프롬프트 접힘 + 생성 전 검수 모달 미노출 / OFF: 펼침 + 검수 모달 노출"
         control={{

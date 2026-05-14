@@ -1,8 +1,9 @@
 /**
- * SystemMetricsSection — CPU/GPU/VRAM/RAM 막대 + VRAM/RAM 들여쓰기 분해.
+ * SystemMetricsSection — CPU/GPU/VRAM/RAM 막대 + 분해 라인.
  *
- * Phase 3.2 추출 (refactor doc 2026-04-30 §I2) — 옛 SettingsDrawer.tsx 의
- * SystemMetricsSection / MetricBar / BreakdownLines 3 함수.
+ * 2026-05-14 Phase 3 (Editorial Resource): 얇은 5px bar + tone 별
+ *   그라데이션 + mono micro 라벨 + 우측 mono percent. breakdown 은
+ *   `↳ name` prefix + 우측 GB.
  *
  * 데이터 = useProcessStore (5초 폴링 결과 재사용 — 추가 fetch 없음).
  */
@@ -11,6 +12,8 @@
 
 import { useProcessStore } from "@/stores/useProcessStore";
 import Section from "./Section";
+
+type Tone = "cyan" | "green" | "violet" | "amber";
 
 export default function SystemMetricsSection() {
   const cpuPercent = useProcessStore((s) => s.cpuPercent);
@@ -23,228 +26,127 @@ export default function SystemMetricsSection() {
   return (
     <Section
       num="02"
-      title="리소스 모니터"
+      title="리소스"
       titleEn="Resources"
       meta="SYS · LIVE"
     >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 14,
-          padding: "12px 14px",
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
-          borderRadius: "var(--radius)",
-        }}
-      >
+      <div className="ais-res-list">
         <MetricBar
-          label="CPU"
-          accent="#06b6d4"
+          name="CPU"
+          tone="cyan"
           percent={cpuPercent}
-          rightText={cpuPercent != null ? `${cpuPercent.toFixed(1)}%` : "—"}
+          valueText={cpuPercent != null ? cpuPercent.toFixed(1) : "—"}
+          unit="%"
         />
         <MetricBar
-          label="GPU"
-          accent="#22c55e"
+          name="GPU"
+          tone="green"
           percent={gpuPercent}
-          rightText={gpuPercent != null ? `${gpuPercent.toFixed(1)}%` : "—"}
+          valueText={gpuPercent != null ? gpuPercent.toFixed(1) : "—"}
+          unit="%"
         />
-        <div>
-          <MetricBar
-            label="VRAM"
-            accent="#8b5cf6"
-            percent={
-              vram && vram.totalGb > 0
-                ? (vram.usedGb / vram.totalGb) * 100
-                : null
-            }
-            rightText={
-              vram ? `${vram.usedGb.toFixed(1)} / ${vram.totalGb.toFixed(0)} GB` : "—"
-            }
-          />
-          {vramBreakdown && (
-            <BreakdownLines
-              lines={[
-                {
-                  label: "Ollama",
-                  value: vramBreakdown.ollama.vramGb,
-                  detail: vramBreakdown.ollama.models.length
-                    ? vramBreakdown.ollama.models[0].name
-                    : undefined,
-                },
-                {
-                  label: "ComfyUI",
-                  value: vramBreakdown.comfyui.vramGb,
-                  detail: vramBreakdown.comfyui.models.length
-                    ? vramBreakdown.comfyui.models[0]
-                    : undefined,
-                },
-                { label: "기타", value: vramBreakdown.otherGb },
-              ]}
-              unit="GB"
-            />
-          )}
-        </div>
-        <div>
-          <MetricBar
-            label="RAM"
-            accent="#f59e0b"
-            percent={
-              ram && ram.totalGb > 0
-                ? (ram.usedGb / ram.totalGb) * 100
-                : null
-            }
-            rightText={
-              ram ? `${ram.usedGb.toFixed(1)} / ${ram.totalGb.toFixed(0)} GB` : "—"
-            }
-          />
-          {ramBreakdown && (
-            <BreakdownLines
-              lines={[
-                { label: "Backend", value: ramBreakdown.backendGb },
-                { label: "ComfyUI", value: ramBreakdown.comfyuiGb },
-                { label: "Ollama", value: ramBreakdown.ollamaGb },
-                { label: "기타", value: ramBreakdown.otherGb },
-              ]}
-              unit="GB"
-            />
-          )}
-        </div>
+        <MetricBar
+          name="VRAM"
+          tone="violet"
+          percent={
+            vram && vram.totalGb > 0 ? (vram.usedGb / vram.totalGb) * 100 : null
+          }
+          valueText={vram ? vram.usedGb.toFixed(1) : "—"}
+          unit={vram ? `/ ${vram.totalGb.toFixed(0)} GB` : ""}
+          breakdown={
+            vramBreakdown
+              ? [
+                  {
+                    label: "Ollama",
+                    value: vramBreakdown.ollama.vramGb,
+                    detail: vramBreakdown.ollama.models[0]?.name,
+                  },
+                  {
+                    label: "ComfyUI",
+                    value: vramBreakdown.comfyui.vramGb,
+                    detail: vramBreakdown.comfyui.models[0],
+                  },
+                  { label: "기타", value: vramBreakdown.otherGb },
+                ]
+              : undefined
+          }
+        />
+        <MetricBar
+          name="RAM"
+          tone="amber"
+          percent={
+            ram && ram.totalGb > 0 ? (ram.usedGb / ram.totalGb) * 100 : null
+          }
+          valueText={ram ? ram.usedGb.toFixed(1) : "—"}
+          unit={ram ? `/ ${ram.totalGb.toFixed(0)} GB` : ""}
+          breakdown={
+            ramBreakdown
+              ? [
+                  { label: "Backend", value: ramBreakdown.backendGb },
+                  { label: "ComfyUI", value: ramBreakdown.comfyuiGb },
+                  { label: "Ollama", value: ramBreakdown.ollamaGb },
+                  { label: "기타", value: ramBreakdown.otherGb },
+                ]
+              : undefined
+          }
+        />
       </div>
     </Section>
   );
 }
 
-/** 막대 한 줄 — label + bar + 우측 수치. percent null = 측정 불가 (회색 빈 막대). */
+type BreakdownLine = { label: string; value: number; detail?: string };
+
+/** 한 줄 메트릭 — 라벨 + 얇은 5px bar + tone 별 그라데이션 + breakdown 옵션.
+ *  값이 < 0.05 GB (≈ 50MB) 인 breakdown 항목은 숨김 (오빠 피드백 2026-04-27). */
 function MetricBar({
-  label,
-  accent,
+  name,
+  tone,
   percent,
-  rightText,
+  valueText,
+  unit,
+  breakdown,
 }: {
-  label: string;
-  accent: string;
+  name: string;
+  tone: Tone;
   percent: number | null;
-  rightText: string;
+  valueText: string;
+  unit: string;
+  breakdown?: BreakdownLine[];
 }) {
   const clamped = percent == null ? 0 : Math.max(0, Math.min(100, percent));
+  const visible = breakdown?.filter((l) => l.value >= 0.05);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "baseline",
-          justifyContent: "space-between",
-          gap: 8,
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11.5,
-            fontWeight: 600,
-            color: "var(--ink-2)",
-            letterSpacing: ".02em",
-          }}
-        >
-          {label}
-        </span>
-        <span
-          className="mono"
-          style={{
-            fontSize: 11,
-            color: "var(--ink-3)",
-            fontWeight: 500,
-          }}
-        >
-          {rightText}
+    <div className="ais-res-row">
+      <div className="ais-res-line">
+        <span className="ais-res-name">{name}</span>
+        <span className="ais-res-val">
+          {valueText}
+          {unit && <span className="unit">{unit}</span>}
         </span>
       </div>
-      <div
-        style={{
-          height: 6,
-          width: "100%",
-          background: "var(--bg-2)",
-          borderRadius: "var(--radius-full)",
-          overflow: "hidden",
-        }}
-      >
+      <div className="ais-res-bar">
         <div
-          style={{
-            height: "100%",
-            width: `${clamped}%`,
-            background: accent,
-            transition: "width .3s ease, background .2s",
-          }}
+          className="ais-res-bar-fill"
+          data-tone={tone}
+          style={{ width: `${clamped}%` }}
         />
       </div>
-    </div>
-  );
-}
-
-/** 들여쓰기 분해 라인 — VRAM/RAM 아래 ↳ 형태.
- *  값이 < 0.05 GB (≈ 50MB) 인 항목은 숨김 (오빠 피드백 2026-04-27 — 0GB 노이즈 제거).
- *  모든 값이 임계 미만이면 컴포넌트 자체 안 그림. */
-function BreakdownLines({
-  lines,
-  unit,
-  threshold = 0.05,
-}: {
-  lines: Array<{ label: string; value: number; detail?: string }>;
-  unit: string;
-  threshold?: number;
-}) {
-  const visible = lines.filter((l) => l.value >= threshold);
-  if (visible.length === 0) return null;
-  return (
-    <div
-      style={{
-        marginTop: 6,
-        paddingLeft: 10,
-        display: "flex",
-        flexDirection: "column",
-        gap: 2,
-      }}
-    >
-      {visible.map((l) => (
-        <div
-          key={l.label}
-          style={{
-            display: "flex",
-            alignItems: "baseline",
-            justifyContent: "space-between",
-            gap: 8,
-            fontSize: 10.5,
-          }}
-        >
-          <span style={{ color: "var(--ink-4)" }}>
-            <span style={{ marginRight: 4 }}>↳</span>
-            {l.label}
-            {l.detail && (
-              <span
-                className="mono"
-                style={{
-                  marginLeft: 6,
-                  fontSize: 9.5,
-                  color: "var(--ink-4)",
-                  opacity: 0.7,
-                }}
-              >
-                {l.detail}
+      {visible && visible.length > 0 && (
+        <div className="ais-res-break">
+          {visible.map((l) => (
+            <div key={l.label} className="ais-res-break-row">
+              <span>
+                {l.label}
+                {l.detail && (
+                  <span style={{ opacity: 0.7, marginLeft: 6 }}>{l.detail}</span>
+                )}
               </span>
-            )}
-          </span>
-          <span
-            className="mono"
-            style={{
-              color: "var(--ink-3)",
-              fontWeight: 500,
-            }}
-          >
-            {l.value.toFixed(2)} {unit}
-          </span>
+              <span>{l.value.toFixed(2)} GB</span>
+            </div>
+          ))}
         </div>
-      ))}
+      )}
     </div>
   );
 }

@@ -107,7 +107,8 @@ export default function ProcessSection() {
   );
 }
 
-/** 서비스 카드 — StatusLine + 펼침 토글 + 펼침 컨텐츠. */
+/** 서비스 카드 — Editorial svc tile (2026-05-14 Phase 3):
+ *  LED + Fraunces "Ollama/ComfyUI" + mono port + 모델/정지 액션 + 펼침. */
 function ServiceCard({
   name,
   port,
@@ -125,34 +126,41 @@ function ServiceCard({
   onToggle: () => void;
   children: ReactNode;
 }) {
+  const running = status === "running";
   return (
-    <div
-      style={{
-        background: "var(--surface)",
-        border: "1px solid var(--line)",
-        borderRadius: "var(--radius)",
-        overflow: "hidden",
-      }}
-    >
-      <StatusLine
-        name={name}
-        port={port}
-        status={status}
-        open={open}
-        onExpand={onExpand}
-        onToggle={onToggle}
-      />
-      {open && (
-        <div
-          style={{
-            borderTop: "1px solid var(--line)",
-            background: "var(--bg-2)",
-            padding: "8px 12px",
-          }}
-        >
-          {children}
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div className="ais-svc">
+        <span
+          className={`ais-svc-led${running ? "" : " is-down"}`}
+          aria-hidden="true"
+        />
+        <div className="ais-svc-id">
+          <span className="ais-svc-name">{name}</span>
+          <span className="ais-svc-port">{port}</span>
         </div>
-      )}
+        <div className="ais-svc-actions">
+          <button
+            type="button"
+            onClick={onExpand}
+            title={open ? "접기" : "모델 보기"}
+            aria-label={open ? "접기" : "모델 보기"}
+            aria-expanded={open}
+            className="ais-svc-btn"
+          >
+            {open ? "▴ 접기" : "▾ 모델"}
+          </button>
+          <button
+            type="button"
+            onClick={onToggle}
+            title={running ? `${name} 정지` : `${name} 시작`}
+            aria-label={running ? `${name} 정지` : `${name} 시작`}
+            className={`ais-svc-btn${running ? " danger" : " is-on"}`}
+          >
+            {running ? "정지" : "시작"}
+          </button>
+        </div>
+      </div>
+      {open && <div className="ais-svc-expand">{children}</div>}
     </div>
   );
 }
@@ -262,103 +270,3 @@ function ComfyuiModelList() {
   );
 }
 
-/** 프로세스 한 줄 — dot + name + 포트 + 펼침 버튼 + 시작/정지. */
-function StatusLine({
-  name,
-  port,
-  status,
-  open,
-  onExpand,
-  onToggle,
-}: {
-  name: string;
-  port: number;
-  status: ProcStatus;
-  open: boolean;
-  onExpand: () => void;
-  onToggle: () => void;
-}) {
-  const running = status === "running";
-  return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        padding: "10px 12px",
-      }}
-    >
-      <span
-        style={{
-          width: 8,
-          height: 8,
-          borderRadius: "50%",
-          background: running ? "var(--green)" : "var(--ink-4)",
-          boxShadow: running ? "0 0 0 3px rgba(82,196,26,.18)" : "none",
-          flexShrink: 0,
-        }}
-      />
-      <div style={{ flex: 1, display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
-          {name}
-        </span>
-        <span
-          className="mono"
-          style={{
-            fontSize: 10,
-            color: "var(--ink-4)",
-            letterSpacing: ".04em",
-          }}
-        >
-          :{port}
-        </span>
-      </div>
-      <button
-        type="button"
-        onClick={onExpand}
-        title={open ? "접기" : "모델 보기"}
-        aria-label={open ? "접기" : "모델 보기"}
-        aria-expanded={open}
-        style={{
-          all: "unset",
-          cursor: "pointer",
-          fontSize: 10.5,
-          fontWeight: 500,
-          padding: "4px 8px",
-          borderRadius: "var(--radius-sm)",
-          border: "1px solid var(--line)",
-          background: "var(--bg)",
-          color: "var(--ink-3)",
-          transition: "all .15s",
-          flexShrink: 0,
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 3,
-        }}
-      >
-        {open ? "▴ 접기" : "▾ 모델"}
-      </button>
-      <button
-        type="button"
-        onClick={onToggle}
-        title={running ? `${name} 정지` : `${name} 시작`}
-        aria-label={running ? `${name} 정지` : `${name} 시작`}
-        style={{
-          all: "unset",
-          cursor: "pointer",
-          fontSize: 11,
-          fontWeight: 600,
-          padding: "4px 10px",
-          borderRadius: "var(--radius-sm)",
-          border: `1px solid ${running ? "var(--line)" : "var(--accent)"}`,
-          background: running ? "var(--bg)" : "var(--accent)",
-          color: running ? "var(--ink-2)" : "#fff",
-          transition: "all .15s",
-          flexShrink: 0,
-        }}
-      >
-        {running ? "정지" : "시작"}
-      </button>
-    </div>
-  );
-}

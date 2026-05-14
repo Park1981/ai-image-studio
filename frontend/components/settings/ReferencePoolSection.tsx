@@ -65,51 +65,40 @@ export default function ReferencePoolSection() {
       meta="EDIT · POOL"
       desc="Edit 사용자 직접 업로드 reference 의 임시 풀"
     >
-      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        <div
-          className="mono"
-          style={{ fontSize: 12, color: "var(--ink-2)" }}
-        >
-          {loading
-            ? "로딩 중…"
-            : stats
-              ? `총 ${stats.count}개 · ${mb} MB`
-              : "—"}
+      {/* Editorial cache card (2026-05-14 Phase 3):
+       *   상단 head — 총 갯수/용량 + 우측 orphan chip
+       *   center — 일괄 삭제 CTA (orphan 0 또는 busy 시 disabled)
+       *   하단 notes — 안전성 안내 ※ 2 줄 */}
+      <div className="ais-cache-card">
+        <div className="ais-cache-head">
+          <span className="ais-cache-total">
+            {loading
+              ? "로딩 중…"
+              : stats
+                ? <>총 <span className="num">{stats.count}</span>개 · <span className="num">{mb}</span> MB</>
+                : "—"}
+          </span>
+          {orphanCount > 0 && (
+            <span className="ais-cache-orphan">orphan {orphanCount}</span>
+          )}
         </div>
-        <div
-          style={{ fontSize: 11.5, color: "var(--ink-3)" }}
-        >
-          history 에서 참조 끊긴 고아 참조:{" "}
-          <strong style={{ color: orphanCount > 0 ? "var(--warn, #c08400)" : "var(--ink-3)" }}>
-            {orphanCount}개
-          </strong>
+        <div className="ais-cache-action">
+          <button
+            type="button"
+            onClick={() => void handleDeleteOrphans()}
+            disabled={busy || orphanCount === 0}
+            className="ais-cache-cta"
+          >
+            {busy
+              ? "삭제 중…"
+              : orphanCount === 0
+                ? "고아 참조 없음"
+                : `⌫ 고아 참조 ${orphanCount}개 일괄 삭제`}
+          </button>
         </div>
-        <button
-          type="button"
-          onClick={() => void handleDeleteOrphans()}
-          disabled={busy || orphanCount === 0}
-          style={{
-            all: "unset",
-            cursor: busy || orphanCount === 0 ? "not-allowed" : "pointer",
-            padding: "8px 12px",
-            borderRadius: "var(--radius-md)",
-            fontSize: 12,
-            fontWeight: 500,
-            border: "1px solid var(--line)",
-            background: "var(--surface)",
-            color:
-              orphanCount > 0
-                ? "var(--danger, #c44)"
-                : "var(--ink-4, #999)",
-            opacity: busy || orphanCount === 0 ? 0.5 : 1,
-            textAlign: "center",
-          }}
-        >
-          {busy ? "삭제 중…" : `고아 참조 ${orphanCount}개 일괄 삭제`}
-        </button>
-        <div style={{ fontSize: 10.5, color: "var(--ink-4)" }}>
-          ※ history row 에 연결된 ref 는 절대 삭제하지 않습니다 (안전).
-          <br />※ history 단건/전체 삭제 시 임시 풀도 자동 cascade unlink.
+        <div className="ais-cache-notes">
+          <p>history row 에 연결된 ref 는 절대 삭제하지 않습니다 (안전).</p>
+          <p>history 단건/전체 삭제 시 임시 풀도 자동 cascade unlink.</p>
         </div>
       </div>
     </Section>

@@ -1,6 +1,9 @@
 /**
  * HistorySection — 저장된 기록 통계 + 모드별 분해 + 모두 삭제.
  *
+ * 2026-05-14 Phase 3 (Editorial Archive): hero number (Fraunces italic
+ *   큰 숫자) + 우측 mono 총 용량 + 모드별 grid 4-col + 하단 danger CTA.
+ *
  * Phase 3.2 추출 (refactor doc 2026-04-30 §I2) — 옛 SettingsDrawer.tsx 의
  * HistorySection / HistoryModeRow + fmtBytes helper.
  */
@@ -8,7 +11,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Icon, { type IconName } from "@/components/ui/Icon";
 import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
 import { clearHistory as apiClearHistory, getHistoryStats } from "@/lib/api/history";
@@ -86,117 +88,57 @@ export default function HistorySection() {
       meta="SQLITE · v8"
       desc="생성/수정/영상 기록 + 디스크 사용량"
     >
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
-          borderRadius: "var(--radius)",
-          overflow: "hidden",
-        }}
-      >
-        {/* 상단 — 총 갯수 + 총 용량 */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            padding: "10px 12px",
-            borderBottom: "1px solid var(--line)",
-          }}
-        >
-          <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
-              저장된 기록
-            </span>
-            <span
-              className="mono"
-              style={{ fontSize: 10.5, color: "var(--ink-4)" }}
-            >
-              DB {fmtBytes(dbSize)}
-            </span>
+      <div className="ais-hist-frame">
+        {/* Hero — 큰 숫자 + 총 용량 + DB 크기 */}
+        <div className="ais-hist-hero">
+          <div className="ais-hist-hero-num">
+            <span className="big">{displayCount}</span>
+            <span className="sub">total · saved</span>
           </div>
-          <div style={{ display: "flex", alignItems: "baseline", gap: 12 }}>
-            <span
-              className="mono"
-              style={{
-                fontSize: 13,
-                fontWeight: 700,
-                color: "var(--ink)",
-              }}
-            >
-              {displayCount}
-            </span>
-            <span
-              className="mono"
-              style={{
-                fontSize: 11,
-                color: "var(--ink-3)",
-                fontWeight: 500,
-              }}
-            >
-              {fmtBytes(totalSize)}
-            </span>
+          <div className="ais-hist-hero-size">
+            <span className="size">{fmtBytes(totalSize)}</span>
+            <span className="db">DB · {fmtBytes(dbSize)}</span>
           </div>
         </div>
 
         {/* 모드별 분해 */}
         {stats && (
-          <>
+          <div className="ais-hist-modes">
             <HistoryModeRow
-              icon="image"
-              accent="#3b82f6"
+              glyph="🖼"
               label="이미지 생성"
               count={stats.byMode.generate.count}
               sizeBytes={stats.byMode.generate.sizeBytes}
             />
             <HistoryModeRow
-              icon="wand"
-              accent="#8b5cf6"
+              glyph="✦"
               label="이미지 수정"
               count={stats.byMode.edit.count}
               sizeBytes={stats.byMode.edit.sizeBytes}
             />
             <HistoryModeRow
-              icon="play"
-              accent="#f43f5e"
+              glyph="▷"
               label="영상 생성"
               count={stats.byMode.video.count}
               sizeBytes={stats.byMode.video.sizeBytes}
-              divider={false}
             />
-          </>
+          </div>
         )}
 
         {/* 하단 액션 */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            padding: "8px 12px",
-            background: "var(--bg-2)",
-            borderTop: "1px solid var(--line)",
-          }}
-        >
+        <div className="ais-hist-foot">
           <button
             type="button"
             onClick={handleClear}
             disabled={displayCount === 0}
-            style={{
-              all: "unset",
-              cursor: displayCount === 0 ? "not-allowed" : "pointer",
-              padding: "5px 10px",
-              fontSize: 11.5,
-              fontWeight: 500,
-              borderRadius: "var(--radius-sm)",
-              border: "1px solid var(--line)",
-              background: "var(--bg)",
-              color: displayCount === 0 ? "var(--ink-4)" : "#C0392B",
-              opacity: displayCount === 0 ? 0.5 : 1,
-            }}
+            className="ais-btn-danger"
+            style={
+              displayCount === 0
+                ? { opacity: 0.45, cursor: "not-allowed" }
+                : undefined
+            }
           >
-            모두 삭제
+            ⌫ 모두 삭제
           </button>
         </div>
       </div>
@@ -205,70 +147,25 @@ export default function HistorySection() {
 }
 
 function HistoryModeRow({
-  icon,
-  accent,
+  glyph,
   label,
   count,
   sizeBytes,
-  divider = true,
 }: {
-  icon: IconName;
-  accent: string;
+  glyph: string;
   label: string;
   count: number;
   sizeBytes: number;
-  divider?: boolean;
 }) {
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "8px 12px",
-        borderBottom: divider ? "1px solid var(--line)" : "none",
-        opacity: count === 0 ? 0.55 : 1,
-      }}
+      className="ais-hist-mode"
+      style={count === 0 ? { opacity: 0.5 } : undefined}
     >
-      <span
-        aria-hidden
-        style={{ color: accent, display: "inline-flex", flexShrink: 0 }}
-      >
-        <Icon name={icon} size={14} stroke={1.7} />
-      </span>
-      <span
-        style={{
-          fontSize: 12,
-          color: "var(--ink-3)",
-          fontWeight: 500,
-          flex: 1,
-        }}
-      >
-        {label}
-      </span>
-      <span
-        className="mono"
-        style={{
-          fontSize: 11.5,
-          color: "var(--ink)",
-          fontWeight: 600,
-          minWidth: 30,
-          textAlign: "right",
-        }}
-      >
-        {count}
-      </span>
-      <span
-        className="mono"
-        style={{
-          fontSize: 10.5,
-          color: "var(--ink-4)",
-          minWidth: 60,
-          textAlign: "right",
-        }}
-      >
-        {fmtBytes(sizeBytes)}
-      </span>
+      <span className="glyph" aria-hidden="true">{glyph}</span>
+      <span className="lbl">{label}</span>
+      <span className="count">{count}</span>
+      <span className="sz">{fmtBytes(sizeBytes)}</span>
     </div>
   );
 }
