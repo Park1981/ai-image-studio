@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Image Studio · Settings ToggleRow 통일 데모</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+ * 설정 드로어 ToggleRow 통일 시안
+ * 목표: 모든 토글 row 가 같은 카드 wrapper · 우측 control 만 variant 분기
+ *  - switch        : boolean (프롬프트 숨기기)
+ *  - segmented     : 2-choice (AI 보정 모드)
+ *  - segmented-3   : 3-choice 향후 확장
+ * ═══════════════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+:root {
+  --bg: #FAF9F7;
+  --bg-2: #F4F2EE;
+  --surface: #FFFFFF;
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --accent: #4A9EFF;
+  --accent-ink: #1E7BE0;
+  --accent-soft: #EAF3FF;
+  --amber: #FAAD14;
+  --amber-soft: #FFF7E6;
+  --amber-ink: #B47600;
+  --violet: #7C3AED;
+  --violet-ink: #5B21B6;
+  --radius-sm: 8px;
+  --radius: 10px;
+  --radius-card: 14px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+  --shadow-sm: 0 1px 2px rgba(23,20,14,.04), 0 2px 8px rgba(23,20,14,.04);
+}
+body {
+  background:
+    radial-gradient(circle at 14% 4%, rgba(74,158,255,.05), transparent 34%),
+    radial-gradient(circle at 82% 18%, rgba(124,58,237,.05), transparent 30%),
+    var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+button { font: inherit; }
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+.display {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+}
+.page {
+  width: min(1180px, calc(100vw - 48px));
+  margin: 0 auto;
+  padding: 34px 0 60px;
+}
+.topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 28px;
+  padding-bottom: 18px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.eyebrow {
+  margin-bottom: 5px;
+  color: var(--ink-4);
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+}
+h1, h2, h3, p { margin: 0; }
+h1 { font-size: 32px; font-weight: 500; letter-spacing: 0; }
+h1 strong { color: var(--violet); font-style: normal; }
+.lead {
+  margin-top: 9px;
+  max-width: 720px;
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.topbar-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--ink-4);
+}
+.topbar-meta a {
+  color: var(--accent-ink);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--line-2);
+}
+
+.section { margin-top: 36px; }
+.section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed var(--line-2);
+}
+.section-title h2 {
+  font-size: 23px;
+  font-weight: 500;
+}
+.section-title strong { color: var(--violet); font-style: normal; }
+.note { color: var(--ink-4); font-size: 11px; }
+
+/* ═══════════════ 설정 드로어 미니 미리보기 ═══════════════ */
+.drawer-frame {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+.drawer-section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding-left: 8px;
+  border-left: 3px solid var(--accent);
+}
+.drawer-section-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.drawer-section-desc {
+  margin: 2px 0 12px 11px;
+  color: var(--ink-3);
+  font-size: 11.5px;
+}
+
+.compare-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  align-items: start;
+}
+.compare-grid > .card { display: grid; gap: 12px; }
+.card {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: rgba(255,255,255,.78);
+  box-shadow: var(--shadow-sm);
+}
+.card h3 {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--ink-2);
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.card h3 .idx {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+  letter-spacing: .12em;
+  font-weight: 500;
+}
+.card p {
+  color: var(--ink-3);
+  font-size: 12px;
+  line-height: 1.55;
+}
+.chip-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-full);
+  background: rgba(255,255,255,.72);
+  color: var(--ink-3);
+  font-size: 10.5px;
+  font-family: "JetBrains Mono", monospace;
+}
+.chip.pro {
+  border-color: rgba(82,196,26,.32);
+  background: rgba(82,196,26,.08);
+  color: #2e7d10;
+}
+.chip.con {
+  border-color: rgba(250,173,20,.34);
+  background: rgba(250,173,20,.10);
+  color: #8a5a00;
+}
+.pick-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #7C3AED, #4A9EFF);
+  color: #fff;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  box-shadow: 0 6px 18px rgba(124,58,237,.34);
+}
+.card.pick {
+  position: relative;
+  border-color: rgba(124,58,237,.42);
+  background:
+    linear-gradient(180deg, rgba(124,58,237,.06), rgba(74,158,255,.04)),
+    rgba(255,255,255,.86);
+  box-shadow:
+    0 0 0 1px rgba(124,58,237,.18) inset,
+    0 10px 32px rgba(124,58,237,.18),
+    var(--shadow-sm);
+}
+.card.pick > .pick-badge {
+  position: absolute;
+  top: -10px;
+  right: 14px;
+  z-index: 3;
+}
+
+/* ═══════════════ Toggle (현재 · 프롬프트 숨기기 패턴) ═══════════════ */
+/* primitives.tsx Toggle 컴포넌트의 default (non-flat) 스타일을 1:1 복제. */
+.cur-toggle {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--accent-soft);
+  border: 1px solid rgba(74,158,255,.35);
+  transition: all .15s;
+}
+.cur-toggle .label-area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.cur-toggle .label-area .label {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+.cur-toggle .label-area .desc {
+  font-size: 10.5px;
+  color: var(--ink-4);
+}
+.cur-toggle .ios-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  flex-shrink: 0;
+}
+.cur-toggle .ios-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 14px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  transition: left .15s;
+}
+.cur-toggle.is-off {
+  background: var(--bg-2);
+  border-color: var(--line);
+}
+.cur-toggle.is-off .ios-switch { background: var(--line-2); }
+.cur-toggle.is-off .ios-switch::after { left: 2px; }
+
+/* ═══════════════ AI 보정 모드 (현재 · ad-hoc 인라인) ═══════════════ */
+/* SettingsDrawer.tsx:200~ 의 raw div 그대로. 의도적으로 회귀 재현. */
+.cur-segrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+.cur-segrow .label-area { min-width: 0; }
+.cur-segrow .label-area .label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.cur-segrow .label-area .desc {
+  margin-top: 2px;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+.cur-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: var(--line);
+  /* 현재 코드: 명시적 min-width / nowrap 없음 → 줄바꿈 회귀 재현용 */
+}
+.cur-seg .btn {
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-3);
+  background: transparent;
+  /* 의도적 누락 — 회귀: white-space: normal 가 한글 자모 break 가능 폭에서 줄바꿈 발생 */
+  max-width: 28px;          /* 회귀 재현용 강제 좁힘 */
+  overflow-wrap: break-word;
+  word-break: break-all;
+}
+.cur-seg .btn.active {
+  color: var(--accent-ink);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+
+/* ═══════════════ ToggleRow — 통일 시안 (PROPOSAL) ═══════════════ */
+/* 모든 row 가 이 단일 wrapper 사용. 우측 control 만 variant 분기. */
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  transition: background .15s ease, border-color .15s ease;
+}
+/* 활성 시 (switch=ON 또는 segmented value selected always) 톤 변화 */
+.row.is-active {
+  background: var(--accent-soft);
+  border-color: rgba(74,158,255,.35);
+}
+.row[data-tone="violet"].is-active {
+  background: rgba(124,58,237,.08);
+  border-color: rgba(124,58,237,.32);
+}
+.row .row-label-area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.row .row-label {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.row .row-desc {
+  font-size: 10.5px;
+  color: var(--ink-4);
+  line-height: 1.5;
+}
+.row .row-control {
+  flex-shrink: 0;     /* 핵심: 우측 control 영역이 라벨/desc 에 의해 안 좁아짐 */
+}
+
+/* control: switch (iOS toggle) */
+.ctl-switch {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--line-2);
+  cursor: pointer;
+  transition: background .15s;
+}
+.ctl-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0,0,0,.2);
+  transition: left .15s;
+}
+.ctl-switch.is-on {
+  background: var(--accent);
+}
+.ctl-switch.is-on::after { left: 14px; }
+.ctl-switch.tone-violet.is-on { background: var(--violet); }
+
+/* control: segmented (2/3-choice) */
+.ctl-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 6px;
+  background: rgba(0,0,0,.06);
+  /* 핵심 fix: container 가 음수 폭 방지 + 자식 nowrap */
+}
+.ctl-seg .seg-btn {
+  padding: 4px 12px;
+  min-width: 42px;             /* 한글 2자 (빠른) 안전 폭 */
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-3);
+  background: transparent;
+  white-space: nowrap;          /* 핵심: 한글 글자 break 차단 */
+  text-align: center;
+  transition: background .12s, color .12s;
+}
+.ctl-seg .seg-btn:hover { color: var(--ink-2); }
+.ctl-seg .seg-btn.is-active {
+  color: var(--accent-ink);
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0,0,0,.08);
+}
+.ctl-seg.tone-violet .seg-btn.is-active { color: var(--violet-ink); }
+
+/* ═══════════════ 변수 매트릭스 표 ═══════════════ */
+.summary {
+  margin-top: 22px;
+  padding: 20px;
+  border: 1px solid rgba(124,58,237,.18);
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(124,58,237,.06), rgba(74,158,255,.04));
+}
+.summary h3 {
+  font-size: 15px;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+.summary p {
+  color: var(--ink-3);
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+table.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.matrix th, table.matrix td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  text-align: left;
+}
+table.matrix th {
+  color: var(--ink-4);
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  font-family: "JetBrains Mono", monospace;
+  font-weight: 600;
+}
+table.matrix td:first-child {
+  font-weight: 650;
+  color: var(--ink-2);
+}
+table.matrix .mono { font-size: 11px; color: var(--ink-3); }
+table.matrix td.same { color: #2e7d10; font-weight: 600; }
+table.matrix td.diff { color: #b53e08; font-weight: 600; }
+
+/* ═══════════════ 코드 블록 ═══════════════ */
+pre.code {
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: var(--radius-sm);
+  background: #0F172A;
+  color: #E2E8F0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  line-height: 1.55;
+  overflow-x: auto;
+}
+pre.code .k { color: #C792EA; }      /* keyword */
+pre.code .s { color: #C3E88D; }      /* string */
+pre.code .c { color: #546E7A; }      /* comment */
+pre.code .p { color: #FFCB6B; }      /* prop */
+
+@media (max-width: 980px) {
+  .page { width: min(100% - 28px, 760px); padding-top: 22px; }
+  .topbar { flex-direction: column; }
+  .compare-grid { grid-template-columns: 1fr; }
+  .topbar-meta { align-items: flex-start; text-align: left; }
+}
+</style>
+</head>
+<body>
+<main class="page">
+  <header class="topbar">
+    <div>
+      <div class="eyebrow mono">SETTINGS · DESIGN TEST · TOGGLEROW</div>
+      <h1 class="display"><strong>설정 드로어 ToggleRow</strong> · 통일 시안</h1>
+      <p class="lead">현재 <strong>프롬프트 숨기기 (Toggle 컴포넌트)</strong> 와 <strong>AI 보정 모드 (ad-hoc raw div)</strong> 가 카드 wrapper 토큰이 어긋남. 둘 다 같은 <span class="mono">ToggleRow</span> 카드를 쓰고 우측 control 만 <span class="mono">variant="switch" | "segmented"</span> 로 분기. "빠른" 줄바꿈도 같이 fix.</p>
+    </div>
+    <div class="topbar-meta mono">
+      <span>← <a href="./progress-animation-demo2.html">progress-animation-demo2.html</a></span>
+      <span>SettingsDrawer.tsx:188~</span>
+      <span>primitives.tsx Toggle 1:1 호환</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════ Section 1: 현재 회귀 재현 ═══════════════ -->
+  <section class="section">
+    <div class="section-title">
+      <h2 class="display"><strong>현재 상태</strong> · 회귀 재현</h2>
+      <span class="note mono">두 카드의 wrapper 가 다름 + 빠른/정밀 줄바꿈</span>
+    </div>
+
+    <div class="compare-grid">
+      <article class="card">
+        <h3><span class="idx">CUR·A</span> 프롬프트 숨기기 (<span class="mono" style="font-size:11px;">&lt;Toggle&gt;</span>)</h3>
+        <div class="drawer-frame">
+          <div class="drawer-section-header"><h3>기본 설정</h3></div>
+          <div class="drawer-section-desc">기본 동작 토글 · 모든 변경 즉시 저장</div>
+
+          <label class="cur-toggle" title="primitives.tsx Toggle 컴포넌트 default 스타일">
+            <span class="label-area">
+              <span class="label">프롬프트 숨기기 (생성 · 수정 · 영상)</span>
+              <span class="desc">ON: 진행 모달 프롬프트 접힘 + 생성 전 검수 모달 미노출 / OFF: 펼침 + 검수 모달 노출</span>
+            </span>
+            <span class="ios-switch"></span>
+          </label>
+        </div>
+        <div class="chip-row">
+          <span class="chip">padding 8px 10px</span>
+          <span class="chip">background accent-soft (ON)</span>
+          <span class="chip">label 12.5 · 500 · ink-2</span>
+          <span class="chip">desc 10.5 · ink-4</span>
+        </div>
+      </article>
+
+      <article class="card">
+        <h3><span class="idx">CUR·B</span> AI 보정 모드 (ad-hoc div)</h3>
+        <div class="drawer-frame">
+          <div class="drawer-section-header"><h3>기본 설정</h3></div>
+          <div class="drawer-section-desc">기본 동작 토글 · 모든 변경 즉시 저장</div>
+
+          <div class="cur-segrow" role="radiogroup" aria-label="AI 보정 모드 기본값">
+            <div class="label-area">
+              <div class="label">🧠 AI 보정 모드 기본값</div>
+              <div class="desc">페이지 마운트 시점의 기본 모드 (페이지 토글은 session-only · 다음 진입부터 반영)</div>
+            </div>
+            <div class="cur-seg" aria-hidden="true">
+              <button type="button" class="btn active">빠른</button>
+              <button type="button" class="btn">정밀</button>
+            </div>
+          </div>
+        </div>
+        <div class="chip-row">
+          <span class="chip con">padding 8px 12px ≠ Toggle</span>
+          <span class="chip con">background surface (흰색)</span>
+          <span class="chip con">label 13 · 600 · ink</span>
+          <span class="chip con">desc 11 · ink-3</span>
+          <span class="chip con">"빠른" 줄바꿈</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Section 2: 통일 시안 ═══════════════ -->
+  <section class="section">
+    <div class="section-title">
+      <h2 class="display"><strong>통일 시안</strong> · ToggleRow 공통 카드</h2>
+      <span class="note mono">단일 wrapper · 우측 control 만 variant 분기</span>
+    </div>
+
+    <div class="compare-grid">
+      <article class="card pick">
+        <span class="pick-badge">PROPOSAL</span>
+        <h3><span class="idx">NEW·1</span> ToggleRow variant="switch"</h3>
+        <div class="drawer-frame">
+          <div class="drawer-section-header"><h3>기본 설정</h3></div>
+          <div class="drawer-section-desc">기본 동작 토글 · 모든 변경 즉시 저장</div>
+
+          <!-- ON 상태 (active 톤) -->
+          <div class="row is-active" style="margin-bottom: 10px;">
+            <div class="row-label-area">
+              <div class="row-label">프롬프트 숨기기 (생성 · 수정 · 영상)</div>
+              <div class="row-desc">ON: 진행 모달 프롬프트 접힘 + 생성 전 검수 모달 미노출 / OFF: 펼침 + 검수 모달 노출</div>
+            </div>
+            <div class="row-control">
+              <div class="ctl-switch is-on" role="switch" aria-checked="true"></div>
+            </div>
+          </div>
+
+          <!-- OFF 비교용 (실 데모용) -->
+          <div class="row" style="opacity:.85;">
+            <div class="row-label-area">
+              <div class="row-label">(예시) OFF 상태 비교</div>
+              <div class="row-desc">background bg-2 · border line · switch line-2</div>
+            </div>
+            <div class="row-control">
+              <div class="ctl-switch" role="switch" aria-checked="false"></div>
+            </div>
+          </div>
+        </div>
+        <div class="chip-row">
+          <span class="chip pro">primitives.tsx Toggle 토큰 1:1 보존</span>
+          <span class="chip">label 12.5 · 600 · ink-2</span>
+          <span class="chip">desc 10.5 · ink-4</span>
+          <span class="chip">padding 10 12</span>
+        </div>
+      </article>
+
+      <article class="card pick">
+        <span class="pick-badge">PROPOSAL</span>
+        <h3><span class="idx">NEW·2</span> ToggleRow variant="segmented"</h3>
+        <div class="drawer-frame">
+          <div class="drawer-section-header"><h3>기본 설정</h3></div>
+          <div class="drawer-section-desc">기본 동작 토글 · 모든 변경 즉시 저장</div>
+
+          <div class="row is-active" data-tone="violet">
+            <div class="row-label-area">
+              <div class="row-label">🧠 AI 보정 모드 기본값</div>
+              <div class="row-desc">페이지 마운트 시점의 기본 모드 (페이지 토글은 session-only · 다음 진입부터 반영)</div>
+            </div>
+            <div class="row-control">
+              <div class="ctl-seg tone-violet" role="radiogroup" aria-label="AI 보정 모드 기본값">
+                <button type="button" class="seg-btn is-active" role="radio" aria-checked="true">빠른</button>
+                <button type="button" class="seg-btn" role="radio" aria-checked="false">정밀</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="chip-row">
+          <span class="chip pro">동일 wrapper · 우측만 다름</span>
+          <span class="chip pro">white-space: nowrap (줄바꿈 fix)</span>
+          <span class="chip pro">min-width 42 (한글 2자 안전)</span>
+          <span class="chip">tone="violet" (🧠 톤 매칭)</span>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Section 3: 향후 확장 ═══════════════ -->
+  <section class="section">
+    <div class="section-title">
+      <h2 class="display"><strong>향후 확장</strong> · 3-choice + tone 변종</h2>
+      <span class="note mono">같은 카드 · 우측 control 만 늘림</span>
+    </div>
+    <article class="card">
+      <h3><span class="idx">NEW·3</span> 미래 확장 — segmented-3 + tone 변종</h3>
+      <div class="drawer-frame">
+        <div class="row is-active" data-tone="violet">
+          <div class="row-label-area">
+            <div class="row-label">(예시) 영상 모델 기본값</div>
+            <div class="row-desc">3-choice 케이스 시연용 · 같은 wrapper · button 만 늘림</div>
+          </div>
+          <div class="row-control">
+            <div class="ctl-seg tone-violet" role="radiogroup">
+              <button type="button" class="seg-btn">Wan22</button>
+              <button type="button" class="seg-btn is-active">LTX</button>
+              <button type="button" class="seg-btn">Auto</button>
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 10px;" class="row is-active">
+          <div class="row-label-area">
+            <div class="row-label">(예시) 자동 NSFW 분석 사용</div>
+            <div class="row-desc">switch + tone=accent 변종 시연</div>
+          </div>
+          <div class="row-control">
+            <div class="ctl-switch is-on" role="switch" aria-checked="true"></div>
+          </div>
+        </div>
+      </div>
+      <p>같은 <span class="mono">.row</span> 카드 wrapper 가 <strong>switch / segmented-2 / segmented-3</strong> 모두 받음. 향후 segmented-4+ 도 동일 패턴.</p>
+    </article>
+  </section>
+
+  <!-- ═══════════════ Section 4: 토큰 매트릭스 ═══════════════ -->
+  <section class="section">
+    <div class="section-title">
+      <h2 class="display"><strong>디자인 토큰</strong> · 통일 명세표</h2>
+      <span class="note mono">primitives.tsx Toggle 기준 · ad-hoc 카드 토큰을 여기에 맞춤</span>
+    </div>
+    <div class="summary">
+      <table class="matrix">
+        <thead>
+          <tr>
+            <th>속성</th>
+            <th>현재 Toggle (A)</th>
+            <th>현재 ad-hoc (B)</th>
+            <th>통일 ToggleRow</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>padding</td>
+            <td class="diff"><span class="mono">8px 10px</span></td>
+            <td class="diff"><span class="mono">8px 12px</span></td>
+            <td class="same"><span class="mono">10px 12px</span></td>
+          </tr>
+          <tr>
+            <td>border-radius</td>
+            <td class="same"><span class="mono">var(--radius-sm) = 8</span></td>
+            <td class="same"><span class="mono">8</span></td>
+            <td class="same"><span class="mono">var(--radius-sm)</span></td>
+          </tr>
+          <tr>
+            <td>background (OFF)</td>
+            <td><span class="mono">var(--bg-2)</span></td>
+            <td class="diff"><span class="mono">var(--surface)</span></td>
+            <td class="same"><span class="mono">var(--bg-2)</span></td>
+          </tr>
+          <tr>
+            <td>background (ON / active)</td>
+            <td><span class="mono">var(--accent-soft)</span></td>
+            <td class="diff"><span class="mono">var(--surface) — 변화 없음</span></td>
+            <td class="same"><span class="mono">accent-soft · violet 변종</span></td>
+          </tr>
+          <tr>
+            <td>border</td>
+            <td><span class="mono">line / accent(.35)</span></td>
+            <td class="diff"><span class="mono">line 고정</span></td>
+            <td class="same"><span class="mono">line / accent · violet</span></td>
+          </tr>
+          <tr>
+            <td>label font</td>
+            <td><span class="mono">12.5 / 500 / ink-2</span></td>
+            <td class="diff"><span class="mono">13 / 600 / ink</span></td>
+            <td class="same"><span class="mono">12.5 / 600 / ink-2</span> ★</td>
+          </tr>
+          <tr>
+            <td>desc font</td>
+            <td><span class="mono">10.5 / ink-4</span></td>
+            <td class="diff"><span class="mono">11 / ink-3</span></td>
+            <td class="same"><span class="mono">10.5 / ink-4</span></td>
+          </tr>
+          <tr>
+            <td>control flex-shrink</td>
+            <td><span class="mono">— (없음)</span></td>
+            <td><span class="mono">— (없음)</span></td>
+            <td class="same"><span class="mono">0 (필수)</span></td>
+          </tr>
+          <tr>
+            <td>segmented btn nowrap</td>
+            <td><span class="mono">N/A</span></td>
+            <td class="diff"><span class="mono">미지정 → 줄바꿈</span></td>
+            <td class="same"><span class="mono">white-space: nowrap</span></td>
+          </tr>
+          <tr>
+            <td>segmented btn min-width</td>
+            <td><span class="mono">N/A</span></td>
+            <td class="diff"><span class="mono">미지정 → 좁아짐</span></td>
+            <td class="same"><span class="mono">42 (한글 2자 안전)</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <p style="margin-top: 12px;">★ <strong>label font-weight 만 600 으로 변경</strong> — Toggle 의 500 보다 살짝 진하게. 두 row 통일 후 "기본 설정" 섹션의 가독성을 살리기 위함. 다른 토큰은 모두 Toggle 컴포넌트 기준 그대로 (회귀 위험 최소).</p>
+    </div>
+  </section>
+
+  <!-- ═══════════════ Section 5: 컴포넌트 API 시안 ═══════════════ -->
+  <section class="section">
+    <div class="section-title">
+      <h2 class="display"><strong>컴포넌트 API</strong> · 시안</h2>
+      <span class="note mono">신설 위치: primitives.tsx 또는 components/settings/ToggleRow.tsx</span>
+    </div>
+    <article class="card">
+      <h3><span class="idx">API</span> ToggleRow — 단일 wrapper + control variant</h3>
+<pre class="code"><span class="c">// 신설 — components/settings/ToggleRow.tsx (또는 ui/primitives.tsx 확장)</span>
+
+<span class="k">type</span> <span class="p">ToggleRowProps</span> = {
+  <span class="p">label</span>: string;
+  <span class="p">desc</span>?: string;
+  <span class="p">tone</span>?: <span class="s">"accent"</span> | <span class="s">"violet"</span>;          <span class="c">// active 시 카드 톤</span>
+  <span class="p">control</span>:
+    | { <span class="p">variant</span>: <span class="s">"switch"</span>;  <span class="p">checked</span>: boolean; <span class="p">onChange</span>: (v: boolean) => <span class="k">void</span>; }
+    | { <span class="p">variant</span>: <span class="s">"segmented"</span>;
+        <span class="p">value</span>: string;
+        <span class="p">options</span>: Array&lt;{ value: string; label: string }&gt;;
+        <span class="p">onChange</span>: (v: string) => <span class="k">void</span>; };
+};
+
+<span class="c">// 사용 예 — SettingsDrawer.tsx</span>
+&lt;<span class="p">ToggleRow</span>
+  <span class="p">label</span>=<span class="s">"프롬프트 숨기기 (생성 · 수정 · 영상)"</span>
+  <span class="p">desc</span>=<span class="s">"ON: 진행 모달 프롬프트 접힘 + ..."</span>
+  <span class="p">control</span>={{ variant: <span class="s">"switch"</span>, checked: hideAll, onChange: onToggleHideAll }}
+/&gt;
+
+&lt;<span class="p">ToggleRow</span>
+  <span class="p">label</span>=<span class="s">"🧠 AI 보정 모드 기본값"</span>
+  <span class="p">desc</span>=<span class="s">"페이지 마운트 시점의 기본 모드 (페이지 토글은 session-only · 다음 진입부터 반영)"</span>
+  <span class="p">tone</span>=<span class="s">"violet"</span>
+  <span class="p">control</span>={{
+    variant: <span class="s">"segmented"</span>,
+    value: promptEnhanceMode,
+    options: [{ value: <span class="s">"fast"</span>, label: <span class="s">"빠른"</span> }, { value: <span class="s">"precise"</span>, label: <span class="s">"정밀"</span> }],
+    onChange: setPromptEnhanceMode,
+  }}
+/&gt;</pre>
+      <div class="chip-row" style="margin-top: 12px;">
+        <span class="chip pro">discriminated union → 타입 안전</span>
+        <span class="chip pro">기존 Toggle 호환 (props 매핑만)</span>
+        <span class="chip">primitives.tsx 또는 components/settings/</span>
+        <span class="chip">변경 위치: SettingsDrawer.tsx:189~280</span>
+      </div>
+    </article>
+  </section>
+
+  <!-- ═══════════════ Section 6: 작업 순서 ═══════════════ -->
+  <section class="section">
+    <div class="section-title">
+      <h2 class="display"><strong>작업 순서</strong> · 제안</h2>
+      <span class="note mono">검토 후 진행</span>
+    </div>
+    <article class="card">
+      <ol style="margin:0; padding-left: 20px; color: var(--ink-3); font-size: 12.5px; line-height: 2;">
+        <li><strong>ToggleRow 컴포넌트 신설</strong> — <span class="mono">components/settings/ToggleRow.tsx</span> (또는 primitives.tsx 확장)</li>
+        <li><strong>SettingsDrawer 의 두 row 를 ToggleRow 로 교체</strong> — <span class="mono">SettingsDrawer.tsx:189~280</span></li>
+        <li><strong>vitest 추가</strong> — switch / segmented 두 variant + 줄바꿈 회귀 가드 (한글 라벨에서 nowrap 적용 확인)</li>
+        <li><strong>기존 Toggle 컴포넌트는 그대로 유지</strong> — V5 카드 안 flat 모드 등 다른 사용처 영향 X (회귀 위험 최소)</li>
+        <li><strong>chrome 시각 검증</strong> — 설정 드로어 열어서 두 row 통일 + "빠른" 줄바꿈 fix 확인</li>
+      </ol>
+    </article>
+  </section>
+</main>
+</body>
+</html>

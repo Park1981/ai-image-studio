@@ -24,7 +24,6 @@
 "use client";
 
 import Icon from "@/components/ui/Icon";
-import { Toggle } from "@/components/ui/primitives";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useSettings } from "./SettingsContext";
 
@@ -33,6 +32,7 @@ import ProcessSection from "./ProcessSection";
 import SystemMetricsSection from "./SystemMetricsSection";
 import HistorySection from "./HistorySection";
 import ReferencePoolSection from "./ReferencePoolSection";
+import { ToggleRow } from "./ToggleRow";
 
 /* ─────────────────────────────────
    Drawer shell
@@ -186,83 +186,38 @@ function PreferencesSection() {
 
   return (
     <Section title="기본 설정" desc="기본 동작 토글 · 모든 변경 즉시 저장">
-      <Toggle
-        checked={hideAll}
-        onChange={onToggleHideAll}
-        align="right"
+      {/* 통일 ToggleRow (2026-05-14):
+       *  - 프롬프트 숨기기 (switch) 와 AI 보정 모드 (segmented) 가 같은 카드 wrapper 공유.
+       *  - 옛 raw div 인라인 ad-hoc 카드의 토큰 어긋남 + "빠른" 한글 자모 줄바꿈 회귀 해소.
+       *  - Phase 2 gemma4 보강 모드는 페이지 *마운트 시점* 의 기본값 (Codex 리뷰 Medium #2):
+       *    사용자가 페이지에서 토글한 값은 session-only — 여기서 변경해도 즉시 안 덮음.
+       *    다음 페이지 재진입 (또는 새로고침) 시점부터 반영. */}
+      <ToggleRow
         label="프롬프트 숨기기 (생성 · 수정 · 영상)"
         desc="ON: 진행 모달 프롬프트 접힘 + 생성 전 검수 모달 미노출 / OFF: 펼침 + 검수 모달 노출"
-      />
-      {/* Phase 2 (2026-05-01) — gemma4 보강 모드 default.
-       *  페이지 *마운트 시점* 의 기본값 (Codex 리뷰 Medium #2 fix).
-       *  사용자가 페이지에서 토글한 값은 session-only — 여기서 변경해도 즉시 안 덮음.
-       *  설정 변경은 다음 페이지 재진입 (또는 새로고침) 시점부터 반영. */}
-      <div
-        role="radiogroup"
-        aria-label="AI 보정 모드 기본값"
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          padding: "8px 12px",
-          marginTop: 8,
-          borderRadius: 8,
-          background: "var(--surface)",
-          border: "1px solid var(--line)",
+        control={{
+          variant: "switch",
+          checked: hideAll,
+          onChange: onToggleHideAll,
+          ariaLabel: "프롬프트 숨기기",
         }}
-      >
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)" }}>
-            🧠 AI 보정 모드 기본값
-          </div>
-          <div
-            style={{
-              fontSize: 11,
-              color: "var(--ink-3)",
-              marginTop: 2,
-            }}
-          >
-            페이지 마운트 시점의 기본 모드 (페이지 토글은 session-only · 다음 진입부터 반영)
-          </div>
-        </div>
-        <div
-          style={{
-            display: "inline-flex",
-            gap: 2,
-            padding: 2,
-            borderRadius: 6,
-            background: "var(--line)",
-          }}
-        >
-          {(["fast", "precise"] as const).map((mode) => {
-            const active = promptEnhanceMode === mode;
-            return (
-              <button
-                key={mode}
-                type="button"
-                role="radio"
-                aria-checked={active}
-                onClick={() => setPromptEnhanceMode(mode)}
-                style={{
-                  padding: "4px 10px",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  borderRadius: 4,
-                  border: "none",
-                  cursor: "pointer",
-                  color: active ? "var(--accent-ink)" : "var(--ink-3)",
-                  background: active ? "var(--surface)" : "transparent",
-                  boxShadow: active ? "0 1px 3px rgba(0,0,0,.08)" : "none",
-                  transition: "background 120ms, color 120ms",
-                }}
-              >
-                {mode === "fast" ? "빠른" : "정밀"}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+      />
+      <ToggleRow
+        marker="🧠"
+        label="AI 보정 모드 기본값"
+        desc="페이지 마운트 시점의 기본 모드 (페이지 토글은 session-only · 다음 진입부터 반영)"
+        tone="violet"
+        control={{
+          variant: "segmented",
+          value: promptEnhanceMode,
+          options: [
+            { value: "fast", label: "빠른" },
+            { value: "precise", label: "정밀" },
+          ],
+          onChange: setPromptEnhanceMode,
+          ariaLabel: "AI 보정 모드 기본값",
+        }}
+      />
     </Section>
   );
 }

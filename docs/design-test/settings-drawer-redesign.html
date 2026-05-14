@@ -1,0 +1,1579 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Image Studio · Settings Drawer Redesign · V1 vs V2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT@9..144,400..700,0..100&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.css">
+<style>
+/* ═══════════════════════════════════════════════════════════════
+ * Settings Drawer Redesign — V1 (editorial deep) vs V2 (main tokens)
+ *
+ * V1 (좌) : redesign 첫 시안 — editorial 무드 강조 위해 색 토큰을
+ *           메인보다 살짝 deep saturation + warm cream.
+ * V2 (우) : C 안 — 메인 globals.css 토큰을 그대로 적용.
+ *           anatomy / Fraunces hierarchy / ToggleRow 통일 / fix 는 보존.
+ * ═══════════════════════════════════════════════════════════════ */
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; }
+
+:root {
+  /* V1 — Editorial Deep (default) */
+  --cream: #F7F4ED;
+  --cream-2: #EFEBE1;
+  --cream-3: #E5DFD0;
+  --paper: #FFFFFF;
+  --paper-warm: #FBF8F1;
+
+  --ink: #1A1814;
+  --ink-2: #3A352D;
+  --ink-3: #6E6759;
+  --ink-4: #A09784;
+  --ink-5: #C5BEAE;
+
+  --line: #E0D9C8;
+  --line-2: #CFC6B2;
+  --line-dashed: #B8AC93;
+
+  --violet: #6D28D9;
+  --violet-deep: #4C1D95;
+  --violet-soft: #EDE5FB;
+  --blue: #2563EB;
+  --blue-deep: #1E40AF;
+  --blue-soft: #DEEAFC;
+  --cyan: #0891B2;
+  --cyan-soft: #CFFAFE;
+  --green: #15803D;
+  --green-soft: #DCFCE7;
+  --amber: #B45309;
+  --amber-soft: #FEF3C7;
+  --rose: #BE123C;
+  --rose-soft: #FFE4E6;
+
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 16px;
+  --radius-full: 999px;
+
+  --shadow-paper: 0 1px 0 rgba(26,24,20,.04), 0 6px 16px rgba(26,24,20,.06);
+  --shadow-lift: 0 2px 4px rgba(26,24,20,.06), 0 14px 32px rgba(26,24,20,.10);
+}
+
+/* V2 — globals.css 토큰 1:1 override (drawer 자식 전부에 적용) */
+.drawer-shell.v2 {
+  --cream: #FAF9F7;
+  --cream-2: #F4F2EE;
+  --cream-3: #DCD8D0;
+  --paper: #FFFFFF;
+  --paper-warm: #F4F2EE;
+
+  --ink: #1F1F1F;
+  --ink-2: #46464A;
+  --ink-3: #7A7A80;
+  --ink-4: #AEAEB3;
+  --ink-5: #C5C2BB;
+
+  --line: #E8E5DF;
+  --line-2: #DCD8D0;
+  --line-dashed: #C8C2B0;
+
+  --violet: #7C3AED;
+  --violet-deep: #5B21B6;
+  --violet-soft: #EFE5FE;
+  --blue: #4A9EFF;
+  --blue-deep: #1E7BE0;
+  --blue-soft: #EAF3FF;
+  --cyan: #06B6D4;
+  --cyan-soft: #CFFAFE;
+  --green: #52C41A;
+  --green-soft: #E8F5DE;
+  --amber: #FAAD14;
+  --amber-soft: #FFF7E6;
+  --rose: #DC2626;
+  --rose-soft: #FFE4E6;
+
+  --shadow-paper: 0 1px 2px rgba(23,20,14,.04), 0 2px 8px rgba(23,20,14,.04);
+  --shadow-lift: 0 4px 10px rgba(23,20,14,.05), 0 20px 48px rgba(23,20,14,.08);
+}
+
+body {
+  background:
+    radial-gradient(ellipse 60% 40% at 0% 0%, rgba(109,40,217,.04), transparent 60%),
+    radial-gradient(ellipse 50% 35% at 100% 100%, rgba(37,99,235,.04), transparent 55%),
+    radial-gradient(circle at 50% 30%, rgba(26,24,20,.02) 1px, transparent 1.5px) 0 0 / 28px 28px,
+    var(--cream);
+  color: var(--ink);
+  font-family: "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+  letter-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+button { font: inherit; }
+.mono { font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace; }
+.display {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
+  font-style: italic;
+}
+
+/* ═══════════════ Page shell ═══════════════ */
+.stage {
+  min-height: 100vh;
+  padding: 40px 24px 60px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.hero {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: flex-end;
+  padding: 0 0 22px;
+  border-bottom: 1px dashed var(--line-dashed);
+}
+
+.hero .eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-bottom: 10px;
+}
+
+.hero h1 {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 42px;
+  line-height: 1.05;
+  letter-spacing: -.01em;
+  margin: 0 0 8px;
+  color: var(--ink);
+}
+
+.hero h1 .ko {
+  font-family: "Pretendard Variable", sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 28px;
+  color: var(--violet);
+  margin-right: 12px;
+  vertical-align: 4px;
+}
+
+.hero .lead {
+  color: var(--ink-3);
+  font-size: 13px;
+  line-height: 1.6;
+  max-width: 720px;
+  margin: 0;
+}
+
+.hero-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-end;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .1em;
+  color: var(--ink-4);
+}
+.hero-meta b { color: var(--ink-2); font-weight: 700; }
+
+/* ═══════════════ Compare row ═══════════════ */
+.compare-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 28px;
+  align-items: start;
+}
+
+.drawer-col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.drawer-badge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 4px;
+}
+
+.drawer-badge .chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px 6px 10px;
+  border-radius: var(--radius-full);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+.drawer-badge .chip.v1 {
+  background: linear-gradient(135deg, #6D28D9, #2563EB);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(109,40,217,.30);
+}
+.drawer-badge .chip.v2 {
+  background: linear-gradient(135deg, #7C3AED, #4A9EFF);
+  color: #fff;
+  box-shadow: 0 6px 18px rgba(124,58,237,.30);
+}
+.drawer-badge .chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(255,255,255,.28);
+}
+.drawer-badge .rec {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .12em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+}
+.drawer-badge .rec.is-pick {
+  color: #15803D;
+  font-weight: 700;
+}
+
+.drawer-tokens {
+  display: flex;
+  gap: 5px;
+  padding: 6px 4px;
+}
+.drawer-tokens .sw {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(0,0,0,.08);
+  position: relative;
+}
+.drawer-tokens .label {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+  color: var(--ink-4);
+  margin-left: 6px;
+  align-self: center;
+}
+
+/* ═══════════════ Drawer shell ═══════════════ */
+.drawer-shell {
+  position: relative;
+  width: 100%;
+  border-radius: var(--radius-lg);
+  background: var(--paper);
+  border: 1px solid var(--line);
+  box-shadow:
+    0 4px 12px rgba(26,24,20,.04),
+    0 24px 72px rgba(26,24,20,.12);
+  overflow: hidden;
+}
+
+.drawer-shell.v2 {
+  /* V2 의 shadow 톤도 메인 토큰화 — 미세 차이 시각화 */
+  box-shadow:
+    0 4px 12px rgba(23,20,14,.04),
+    0 20px 48px rgba(23,20,14,.10);
+}
+
+.drawer-shell::before {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--violet) 0%, var(--blue) 50%, var(--cyan) 100%);
+  z-index: 2;
+}
+
+/* Header */
+.drawer-head {
+  position: relative;
+  padding: 26px 26px 22px;
+  border-bottom: 1px dashed var(--line-2);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  background:
+    radial-gradient(ellipse 100% 100% at 50% 0%, rgba(109,40,217,.04), transparent 60%),
+    transparent;
+}
+
+.drawer-eyebrow {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: .22em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  margin-bottom: 8px;
+}
+
+.drawer-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144, "SOFT" 50;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 32px;
+  line-height: 1;
+  letter-spacing: -.01em;
+  margin: 0;
+  color: var(--ink);
+}
+
+.drawer-title .ko {
+  font-family: "Pretendard Variable", sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 24px;
+  vertical-align: 2px;
+  margin-right: 8px;
+  color: var(--violet);
+}
+
+.drawer-close {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper-warm);
+  color: var(--ink-3);
+  cursor: pointer;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  font-weight: 600;
+  transition: all .15s ease;
+}
+.drawer-close:hover {
+  border-color: var(--ink-3);
+  color: var(--ink);
+  background: var(--paper);
+}
+
+/* Drawer body */
+.drawer-body {
+  padding: 6px 0 0;
+}
+
+/* ═══════════════ Section anatomy (shared) ═══════════════ */
+.s {
+  position: relative;
+  padding: 22px 26px 6px;
+}
+
+.s + .s {
+  margin-top: 6px;
+  padding-top: 26px;
+}
+
+.s + .s::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 26px;
+  right: 26px;
+  height: 1px;
+  background: repeating-linear-gradient(90deg,
+    var(--line-dashed) 0 4px,
+    transparent 4px 8px);
+}
+
+.s-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.s-head-main {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  min-width: 0;
+}
+
+.s-num {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  letter-spacing: .14em;
+  color: var(--violet);
+  font-weight: 700;
+  padding: 2px 6px;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  align-self: center;
+  margin-bottom: 2px;
+}
+
+.s-title {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 21px;
+  line-height: 1;
+  color: var(--ink);
+  margin: 0;
+  letter-spacing: -.005em;
+}
+
+.s-title .ko {
+  font-family: "Pretendard Variable", sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink-2);
+  margin-right: 7px;
+  vertical-align: 1px;
+}
+
+.s-meta {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  white-space: nowrap;
+}
+
+.s-desc {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin: -10px 0 14px;
+  line-height: 1.5;
+}
+
+/* ═══════════════ Local Services tiles ═══════════════ */
+.svc-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.svc {
+  position: relative;
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  transition: border-color .15s, box-shadow .15s;
+}
+.svc:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-paper);
+}
+.svc-led {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow:
+    0 0 0 3px var(--green-soft),
+    0 0 12px rgba(21,128,61,.36);
+  justify-self: center;
+  animation: led-pulse 2.4s ease-in-out infinite;
+}
+@keyframes led-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .55; }
+}
+
+.svc-id {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.svc-id .name {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 96;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 17px;
+  letter-spacing: -.005em;
+  color: var(--ink);
+  line-height: 1;
+}
+.svc-id .port {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .06em;
+  color: var(--ink-4);
+}
+.svc-id .port::before {
+  content: ":";
+  color: var(--ink-5);
+  margin-right: 1px;
+}
+
+.svc-actions {
+  display: inline-flex;
+  gap: 6px;
+}
+.svc-btn {
+  padding: 6px 10px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .04em;
+  color: var(--ink-3);
+  background: var(--paper-warm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.svc-btn:hover {
+  border-color: var(--ink-4);
+  color: var(--ink);
+  background: var(--paper);
+}
+.svc-btn.danger:hover {
+  color: var(--rose);
+  border-color: var(--rose);
+}
+
+/* ═══════════════ Resource Monitor — bars ═══════════════ */
+.res-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.6), transparent 40%),
+    var(--paper);
+}
+
+.res-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.res-line {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.res-name {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  font-weight: 600;
+}
+.res-val {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: .02em;
+}
+.res-val .unit {
+  color: var(--ink-4);
+  margin-left: 2px;
+  font-weight: 500;
+}
+
+.res-bar {
+  position: relative;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--cream-3);
+  overflow: hidden;
+}
+.res-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 3px;
+  transition: width .4s ease-out;
+}
+.res-bar-fill[data-tone="cyan"]  { background: linear-gradient(90deg, var(--cyan), #67E8F9); }
+.res-bar-fill[data-tone="green"] { background: linear-gradient(90deg, var(--green), #86EFAC); }
+.res-bar-fill[data-tone="violet"]{ background: linear-gradient(90deg, var(--violet), #C4B5FD); }
+.res-bar-fill[data-tone="amber"] { background: linear-gradient(90deg, var(--amber), #FCD34D); }
+
+.res-break {
+  margin-top: 5px;
+  padding-left: 12px;
+  border-left: 2px solid var(--line);
+}
+.res-break-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 3px 0;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  color: var(--ink-4);
+}
+.res-break-row::before {
+  content: "↳ ";
+  color: var(--ink-5);
+  margin-right: 4px;
+}
+
+/* ═══════════════ ToggleRow — UNIFIED ═══════════════ */
+.row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper-warm);
+  transition: background .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.row + .row { margin-top: 8px; }
+.row:hover {
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-paper);
+}
+.row.is-active {
+  background: var(--paper);
+  border-color: var(--violet-soft);
+  box-shadow:
+    inset 0 0 0 1px var(--violet-soft),
+    0 1px 0 rgba(26,24,20,.04),
+    0 6px 14px rgba(109,40,217,.06);
+}
+.row.is-active[data-tone="blue"] {
+  border-color: var(--blue-soft);
+  box-shadow:
+    inset 0 0 0 1px var(--blue-soft),
+    0 1px 0 rgba(26,24,20,.04),
+    0 6px 14px rgba(37,99,235,.06);
+}
+
+.row-marker {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: all .15s ease;
+}
+.row.is-active .row-marker {
+  border-color: var(--violet-soft);
+  background: var(--violet-soft);
+}
+.row.is-active[data-tone="blue"] .row-marker {
+  border-color: var(--blue-soft);
+  background: var(--blue-soft);
+}
+
+.row-label-area {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.row-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -.003em;
+  line-height: 1.3;
+}
+.row-desc {
+  font-size: 11px;
+  color: var(--ink-3);
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+
+.row-control { flex-shrink: 0; }
+
+/* control · switch (iOS) */
+.ctl-switch {
+  position: relative;
+  width: 32px;
+  height: 18px;
+  border-radius: var(--radius-full);
+  background: var(--line-2);
+  cursor: pointer;
+  transition: background .18s ease;
+  flex-shrink: 0;
+}
+.ctl-switch::after {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--paper);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.20),
+    0 0 0 1px rgba(0,0,0,.04);
+  transition: left .18s ease;
+}
+.ctl-switch.is-on { background: var(--blue); }
+.ctl-switch.is-on::after { left: 16px; }
+.ctl-switch.is-on.tone-violet { background: var(--violet); }
+
+/* control · segmented (2/3-choice) */
+.ctl-seg {
+  display: inline-flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 7px;
+  background: var(--cream-3);
+  flex-shrink: 0;
+}
+.ctl-seg .seg-btn {
+  padding: 4px 12px;
+  min-width: 44px;
+  font-family: "Pretendard Variable", sans-serif;
+  font-size: 11.5px;
+  font-weight: 600;
+  border-radius: 5px;
+  border: none;
+  cursor: pointer;
+  color: var(--ink-3);
+  background: transparent;
+  white-space: nowrap;
+  text-align: center;
+  letter-spacing: -.002em;
+  transition: color .12s, background .12s, box-shadow .12s;
+}
+.ctl-seg .seg-btn:hover { color: var(--ink-2); }
+.ctl-seg .seg-btn.is-active {
+  color: var(--violet-deep);
+  background: var(--paper);
+  box-shadow:
+    0 1px 2px rgba(0,0,0,.06),
+    0 0 0 1px rgba(109,40,217,.10);
+}
+
+/* ═══════════════ History stats ═══════════════ */
+.hist-frame {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  overflow: hidden;
+}
+.hist-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  padding: 18px 18px 14px;
+  background:
+    linear-gradient(180deg, rgba(109,40,217,.04) 0%, transparent 100%);
+  border-bottom: 1px dashed var(--line-2);
+}
+.hist-hero-num {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.hist-hero-num .big {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144;
+  font-style: italic;
+  font-size: 48px;
+  font-weight: 400;
+  line-height: .9;
+  color: var(--ink);
+  letter-spacing: -.02em;
+}
+.hist-hero-num .sub {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--ink-4);
+  text-transform: uppercase;
+}
+.hist-hero-size {
+  text-align: right;
+}
+.hist-hero-size .size {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.hist-hero-size .db {
+  display: block;
+  margin-top: 4px;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9.5px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+}
+
+.hist-modes {
+  display: grid;
+  grid-template-columns: 1fr;
+  padding: 6px 0;
+}
+.hist-mode {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 18px;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  transition: background .12s;
+}
+.hist-mode:hover { background: var(--paper-warm); }
+.hist-mode + .hist-mode { border-top: 1px dashed var(--line); }
+.hist-mode .glyph {
+  font-size: 15px;
+  text-align: center;
+}
+.hist-mode .lbl { font-weight: 500; }
+.hist-mode .count {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: right;
+}
+.hist-mode .sz {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11px;
+  color: var(--ink-4);
+  text-align: right;
+  min-width: 70px;
+}
+
+.hist-foot {
+  padding: 12px 18px;
+  border-top: 1px dashed var(--line-2);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  background: var(--paper-warm);
+}
+.btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 13px;
+  border: 1px solid rgba(190,18,60,.35);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--rose);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: all .15s ease;
+}
+.btn-danger:hover {
+  background: var(--rose-soft);
+  border-color: var(--rose);
+}
+
+/* ═══════════════ Reference cache ═══════════════ */
+.cache-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  overflow: hidden;
+}
+.cache-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  gap: 12px;
+  background: var(--paper-warm);
+  border-bottom: 1px dashed var(--line-2);
+}
+.cache-head .total {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+  color: var(--ink-2);
+  font-weight: 600;
+}
+.cache-head .total .num {
+  font-size: 14px;
+  color: var(--ink);
+  margin: 0 2px;
+}
+.cache-head .orphan-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--rose-soft);
+  border: 1px solid rgba(190,18,60,.20);
+  border-radius: var(--radius-full);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--rose);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.cache-head .orphan-chip::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--rose);
+}
+
+.cache-action { padding: 14px 16px; }
+.cache-cta {
+  width: 100%;
+  padding: 11px 14px;
+  border: 1px solid rgba(190,18,60,.30);
+  border-radius: var(--radius-sm);
+  background: var(--paper);
+  color: var(--rose);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  cursor: pointer;
+  transition: all .15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.cache-cta:hover {
+  background: var(--rose-soft);
+  border-color: var(--rose);
+}
+
+.cache-notes {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.cache-notes p {
+  margin: 0;
+  font-size: 10.5px;
+  color: var(--ink-4);
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: .02em;
+}
+.cache-notes p::before {
+  content: "※ ";
+  color: var(--ink-5);
+}
+
+/* ═══════════════ Drawer footer ═══════════════ */
+.drawer-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 26px;
+  margin-top: 18px;
+  border-top: 1px dashed var(--line-2);
+  background:
+    linear-gradient(180deg, transparent 0%, var(--paper-warm) 100%);
+}
+.drawer-foot .mark {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.drawer-foot .mark .app {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 96;
+  font-style: italic;
+  font-weight: 500;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+.drawer-foot .mark .ver {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10px;
+  letter-spacing: .08em;
+  color: var(--ink-4);
+}
+.drawer-foot .ports {
+  display: inline-flex;
+  gap: 8px;
+}
+.drawer-foot .port-tag {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 9px;
+  letter-spacing: .08em;
+  color: var(--ink-4);
+}
+.drawer-foot .port-tag b {
+  color: var(--ink-2);
+  font-weight: 700;
+}
+
+/* ═══════════════ Diff matrix below ═══════════════ */
+.diff {
+  width: 100%;
+  margin-top: 22px;
+  padding: 22px 26px;
+  border: 1px solid rgba(109,40,217,.20);
+  border-radius: var(--radius-lg);
+  background:
+    linear-gradient(135deg, rgba(109,40,217,.04), rgba(37,99,235,.03));
+}
+.diff h3 {
+  font-family: "Fraunces", Georgia, serif;
+  font-variation-settings: "opsz" 144;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 22px;
+  color: var(--ink);
+  margin: 0 0 4px;
+}
+.diff h3 .ko {
+  font-family: "Pretendard Variable", sans-serif;
+  font-style: normal;
+  font-weight: 700;
+  font-size: 14px;
+  color: var(--ink-2);
+  margin-right: 6px;
+}
+.diff p {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+table.matrix {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+table.matrix th, table.matrix td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(0,0,0,.06);
+  text-align: left;
+}
+table.matrix th {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 10.5px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--ink-4);
+  font-weight: 600;
+}
+table.matrix td:first-child { font-weight: 650; color: var(--ink-2); }
+table.matrix .mono { font-family: "JetBrains Mono", monospace; font-size: 11px; color: var(--ink-3); }
+table.matrix .sw {
+  display: inline-block;
+  width: 14px; height: 14px;
+  vertical-align: -3px;
+  border-radius: 3px;
+  border: 1px solid rgba(0,0,0,.08);
+  margin-right: 6px;
+}
+
+@media (max-width: 1180px) {
+  .compare-row { grid-template-columns: 1fr; }
+  .hero { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<main class="stage">
+
+  <!-- ═══════════════ Hero ═══════════════ -->
+  <header class="hero">
+    <div>
+      <div class="eyebrow">Settings · V1 vs V2 · Side by Side</div>
+      <h1><span class="ko">설정 드로어</span><em>Two Tones, One Anatomy</em></h1>
+      <p class="lead">동일한 anatomy / Fraunces hierarchy / ToggleRow 통일 / "빠른" 줄바꿈 fix 를 공유하면서, <strong>색 토큰만</strong> 다릅니다. <strong>V1 (좌)</strong> 은 editorial 무드 강조용 deep 톤. <strong>V2 (우)</strong> 는 <code style="font-family:'JetBrains Mono',monospace; font-size:11.5px; padding:1px 5px; background:rgba(0,0,0,.04); border-radius:3px;">app/globals.css</code> 의 메인 토큰을 1:1 적용 — 캔버스와 톤이 정확히 같음.</p>
+    </div>
+    <div class="hero-meta">
+      <span>STAGED · 7 SECTIONS</span>
+      <span>V1 · <b>EDITORIAL DEEP</b></span>
+      <span>V2 · <b>MAIN TOKENS</b> ★</span>
+    </div>
+  </header>
+
+  <!-- ═══════════════ Compare Row ═══════════════ -->
+  <div class="compare-row">
+
+    <!-- ════════════════════════════════ V1 ════════════════════════════════ -->
+    <div class="drawer-col">
+      <div class="drawer-badge">
+        <span class="chip v1">V1 · Editorial Deep</span>
+        <span class="rec">redesign 첫 시안</span>
+      </div>
+      <div class="drawer-tokens">
+        <span class="sw" style="background:#F7F4ED" title="cream"></span>
+        <span class="sw" style="background:#1A1814" title="ink"></span>
+        <span class="sw" style="background:#6D28D9" title="violet"></span>
+        <span class="sw" style="background:#2563EB" title="blue"></span>
+        <span class="sw" style="background:#0891B2" title="cyan"></span>
+        <span class="label">deep + warm</span>
+      </div>
+
+      <section class="drawer-shell">
+        <!-- shell content reused -->
+        <header class="drawer-head">
+          <div>
+            <div class="drawer-eyebrow">IMAGE STUDIO · CONFIG · v1.3.0</div>
+            <h2 class="drawer-title"><span class="ko">설정</span><em>Settings</em></h2>
+          </div>
+          <button class="drawer-close" type="button" title="닫기 (ESC)">×</button>
+        </header>
+
+        <div class="drawer-body">
+          <!-- §01 Local Services -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">01</span>
+                <h3 class="s-title"><span class="ko">로컬 서비스</span><em>Local Services</em></h3>
+              </div>
+              <span class="s-meta">RUNTIME · 2 ONLINE</span>
+            </div>
+            <p class="s-desc">AI 런타임 상태 + 등록된 모델.</p>
+            <div class="svc-grid">
+              <div class="svc">
+                <div class="svc-led"></div>
+                <div class="svc-id"><span class="name">Ollama</span><span class="port mono">11434</span></div>
+                <div class="svc-actions">
+                  <button class="svc-btn" type="button">▾ 모델</button>
+                  <button class="svc-btn danger" type="button">정지</button>
+                </div>
+              </div>
+              <div class="svc">
+                <div class="svc-led"></div>
+                <div class="svc-id"><span class="name">ComfyUI</span><span class="port mono">8000</span></div>
+                <div class="svc-actions">
+                  <button class="svc-btn" type="button">▾ 모델</button>
+                  <button class="svc-btn danger" type="button">정지</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- §02 Resources -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">02</span>
+                <h3 class="s-title"><span class="ko">리소스</span><em>Resources</em></h3>
+              </div>
+              <span class="s-meta">SYS · LIVE</span>
+            </div>
+            <div class="res-list">
+              <div class="res-row"><div class="res-line"><span class="res-name">CPU</span><span class="res-val">12.2<span class="unit">%</span></span></div><div class="res-bar"><div class="res-bar-fill" data-tone="cyan" style="width:12.2%"></div></div></div>
+              <div class="res-row"><div class="res-line"><span class="res-name">GPU</span><span class="res-val">19.0<span class="unit">%</span></span></div><div class="res-bar"><div class="res-bar-fill" data-tone="green" style="width:19%"></div></div></div>
+              <div class="res-row">
+                <div class="res-line"><span class="res-name">VRAM</span><span class="res-val">4.0 <span class="unit">/ 16 GB</span></span></div>
+                <div class="res-bar"><div class="res-bar-fill" data-tone="violet" style="width:25%"></div></div>
+                <div class="res-break"><div class="res-break-row"><span>ComfyUI · Wan 2.2 i2v</span><span>4.00 GB</span></div></div>
+              </div>
+              <div class="res-row">
+                <div class="res-line"><span class="res-name">RAM</span><span class="res-val">62.1 <span class="unit">/ 94 GB</span></span></div>
+                <div class="res-bar"><div class="res-bar-fill" data-tone="amber" style="width:66%"></div></div>
+                <div class="res-break">
+                  <div class="res-break-row"><span>Backend</span><span>0.09 GB</span></div>
+                  <div class="res-break-row"><span>Ollama</span><span>0.06 GB</span></div>
+                  <div class="res-break-row"><span>기타</span><span>62.00 GB</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- §03 Basic Settings -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">03</span>
+                <h3 class="s-title"><span class="ko">기본 설정</span><em>Defaults</em></h3>
+              </div>
+              <span class="s-meta">AUTO-SAVE</span>
+            </div>
+            <div class="row is-active" data-tone="blue">
+              <div class="row-marker">⊙</div>
+              <div class="row-label-area">
+                <div class="row-label">프롬프트 숨기기 <span style="font-weight:500; color:var(--ink-4); font-size:11px;">· 생성 · 수정 · 영상</span></div>
+                <div class="row-desc">ON · 진행 모달 접힘 + 검수 모달 미노출.</div>
+              </div>
+              <div class="row-control"><div class="ctl-switch is-on tone-blue" role="switch" aria-checked="true"></div></div>
+            </div>
+            <div class="row is-active">
+              <div class="row-marker">🧠</div>
+              <div class="row-label-area">
+                <div class="row-label">AI 보정 모드 기본값</div>
+                <div class="row-desc">페이지 마운트 시점의 기본 모드. session-only.</div>
+              </div>
+              <div class="row-control">
+                <div class="ctl-seg" role="radiogroup">
+                  <button type="button" class="seg-btn is-active">빠른</button>
+                  <button type="button" class="seg-btn">정밀</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- §04 History -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">04</span>
+                <h3 class="s-title"><span class="ko">히스토리</span><em>Archive</em></h3>
+              </div>
+              <span class="s-meta">SQLITE · v8</span>
+            </div>
+            <div class="hist-frame">
+              <div class="hist-hero">
+                <div class="hist-hero-num"><span class="big">646</span><span class="sub">total · saved</span></div>
+                <div class="hist-hero-size"><span class="size">642.8 MB</span><span class="db">DB · 2.1 MB</span></div>
+              </div>
+              <div class="hist-modes">
+                <div class="hist-mode"><span class="glyph">🖼</span><span class="lbl">이미지 생성</span><span class="count">126</span><span class="sz">132.1 MB</span></div>
+                <div class="hist-mode"><span class="glyph">✦</span><span class="lbl">이미지 수정</span><span class="count">267</span><span class="sz">293.9 MB</span></div>
+                <div class="hist-mode"><span class="glyph">▷</span><span class="lbl">영상 생성</span><span class="count">253</span><span class="sz">216.8 MB</span></div>
+              </div>
+              <div class="hist-foot"><button class="btn-danger" type="button">⌫ 모두 삭제</button></div>
+            </div>
+          </section>
+
+          <!-- §05 Refs Cache -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">05</span>
+                <h3 class="s-title"><span class="ko">참조 임시 캐시</span><em>Refs · Cache</em></h3>
+              </div>
+              <span class="s-meta">EDIT · POOL</span>
+            </div>
+            <div class="cache-card">
+              <div class="cache-head">
+                <span class="total">총 <span class="num">391</span>개 · <span class="num">8.6</span> MB</span>
+                <span class="orphan-chip">orphan 383</span>
+              </div>
+              <div class="cache-action"><button class="cache-cta" type="button">⌫ 고아 참조 383개 일괄 삭제</button></div>
+              <div class="cache-notes">
+                <p>history row 에 연결된 ref 는 절대 삭제하지 않습니다 (안전).</p>
+                <p>history 단건/전체 삭제 시 임시 풀도 자동 cascade unlink.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="drawer-foot">
+          <div class="mark"><span class="app"><em>AI Image Studio</em></span><span class="ver">LOCAL · v1.3.0</span></div>
+          <div class="ports">
+            <span class="port-tag">ComfyUI <b>8000</b></span>
+            <span class="port-tag">Ollama <b>11434</b></span>
+          </div>
+        </footer>
+      </section>
+    </div>
+
+    <!-- ════════════════════════════════ V2 ════════════════════════════════ -->
+    <div class="drawer-col">
+      <div class="drawer-badge">
+        <span class="chip v2">V2 · Main Tokens</span>
+        <span class="rec is-pick">✓ recommended (옵션 C)</span>
+      </div>
+      <div class="drawer-tokens">
+        <span class="sw" style="background:#FAF9F7" title="bg"></span>
+        <span class="sw" style="background:#1F1F1F" title="ink"></span>
+        <span class="sw" style="background:#7C3AED" title="violet"></span>
+        <span class="sw" style="background:#4A9EFF" title="accent"></span>
+        <span class="sw" style="background:#06B6D4" title="cyan"></span>
+        <span class="label">globals.css 1:1</span>
+      </div>
+
+      <section class="drawer-shell v2">
+        <header class="drawer-head">
+          <div>
+            <div class="drawer-eyebrow">IMAGE STUDIO · CONFIG · v1.3.0</div>
+            <h2 class="drawer-title"><span class="ko">설정</span><em>Settings</em></h2>
+          </div>
+          <button class="drawer-close" type="button" title="닫기 (ESC)">×</button>
+        </header>
+
+        <div class="drawer-body">
+          <!-- §01 Local Services -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">01</span>
+                <h3 class="s-title"><span class="ko">로컬 서비스</span><em>Local Services</em></h3>
+              </div>
+              <span class="s-meta">RUNTIME · 2 ONLINE</span>
+            </div>
+            <p class="s-desc">AI 런타임 상태 + 등록된 모델.</p>
+            <div class="svc-grid">
+              <div class="svc">
+                <div class="svc-led"></div>
+                <div class="svc-id"><span class="name">Ollama</span><span class="port mono">11434</span></div>
+                <div class="svc-actions">
+                  <button class="svc-btn" type="button">▾ 모델</button>
+                  <button class="svc-btn danger" type="button">정지</button>
+                </div>
+              </div>
+              <div class="svc">
+                <div class="svc-led"></div>
+                <div class="svc-id"><span class="name">ComfyUI</span><span class="port mono">8000</span></div>
+                <div class="svc-actions">
+                  <button class="svc-btn" type="button">▾ 모델</button>
+                  <button class="svc-btn danger" type="button">정지</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- §02 Resources -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">02</span>
+                <h3 class="s-title"><span class="ko">리소스</span><em>Resources</em></h3>
+              </div>
+              <span class="s-meta">SYS · LIVE</span>
+            </div>
+            <div class="res-list">
+              <div class="res-row"><div class="res-line"><span class="res-name">CPU</span><span class="res-val">12.2<span class="unit">%</span></span></div><div class="res-bar"><div class="res-bar-fill" data-tone="cyan" style="width:12.2%"></div></div></div>
+              <div class="res-row"><div class="res-line"><span class="res-name">GPU</span><span class="res-val">19.0<span class="unit">%</span></span></div><div class="res-bar"><div class="res-bar-fill" data-tone="green" style="width:19%"></div></div></div>
+              <div class="res-row">
+                <div class="res-line"><span class="res-name">VRAM</span><span class="res-val">4.0 <span class="unit">/ 16 GB</span></span></div>
+                <div class="res-bar"><div class="res-bar-fill" data-tone="violet" style="width:25%"></div></div>
+                <div class="res-break"><div class="res-break-row"><span>ComfyUI · Wan 2.2 i2v</span><span>4.00 GB</span></div></div>
+              </div>
+              <div class="res-row">
+                <div class="res-line"><span class="res-name">RAM</span><span class="res-val">62.1 <span class="unit">/ 94 GB</span></span></div>
+                <div class="res-bar"><div class="res-bar-fill" data-tone="amber" style="width:66%"></div></div>
+                <div class="res-break">
+                  <div class="res-break-row"><span>Backend</span><span>0.09 GB</span></div>
+                  <div class="res-break-row"><span>Ollama</span><span>0.06 GB</span></div>
+                  <div class="res-break-row"><span>기타</span><span>62.00 GB</span></div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- §03 Basic Settings -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">03</span>
+                <h3 class="s-title"><span class="ko">기본 설정</span><em>Defaults</em></h3>
+              </div>
+              <span class="s-meta">AUTO-SAVE</span>
+            </div>
+            <div class="row is-active" data-tone="blue">
+              <div class="row-marker">⊙</div>
+              <div class="row-label-area">
+                <div class="row-label">프롬프트 숨기기 <span style="font-weight:500; color:var(--ink-4); font-size:11px;">· 생성 · 수정 · 영상</span></div>
+                <div class="row-desc">ON · 진행 모달 접힘 + 검수 모달 미노출.</div>
+              </div>
+              <div class="row-control"><div class="ctl-switch is-on tone-blue" role="switch" aria-checked="true"></div></div>
+            </div>
+            <div class="row is-active">
+              <div class="row-marker">🧠</div>
+              <div class="row-label-area">
+                <div class="row-label">AI 보정 모드 기본값</div>
+                <div class="row-desc">페이지 마운트 시점의 기본 모드. session-only.</div>
+              </div>
+              <div class="row-control">
+                <div class="ctl-seg" role="radiogroup">
+                  <button type="button" class="seg-btn is-active">빠른</button>
+                  <button type="button" class="seg-btn">정밀</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <!-- §04 History -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">04</span>
+                <h3 class="s-title"><span class="ko">히스토리</span><em>Archive</em></h3>
+              </div>
+              <span class="s-meta">SQLITE · v8</span>
+            </div>
+            <div class="hist-frame">
+              <div class="hist-hero">
+                <div class="hist-hero-num"><span class="big">646</span><span class="sub">total · saved</span></div>
+                <div class="hist-hero-size"><span class="size">642.8 MB</span><span class="db">DB · 2.1 MB</span></div>
+              </div>
+              <div class="hist-modes">
+                <div class="hist-mode"><span class="glyph">🖼</span><span class="lbl">이미지 생성</span><span class="count">126</span><span class="sz">132.1 MB</span></div>
+                <div class="hist-mode"><span class="glyph">✦</span><span class="lbl">이미지 수정</span><span class="count">267</span><span class="sz">293.9 MB</span></div>
+                <div class="hist-mode"><span class="glyph">▷</span><span class="lbl">영상 생성</span><span class="count">253</span><span class="sz">216.8 MB</span></div>
+              </div>
+              <div class="hist-foot"><button class="btn-danger" type="button">⌫ 모두 삭제</button></div>
+            </div>
+          </section>
+
+          <!-- §05 Refs Cache -->
+          <section class="s">
+            <div class="s-head">
+              <div class="s-head-main">
+                <span class="s-num">05</span>
+                <h3 class="s-title"><span class="ko">참조 임시 캐시</span><em>Refs · Cache</em></h3>
+              </div>
+              <span class="s-meta">EDIT · POOL</span>
+            </div>
+            <div class="cache-card">
+              <div class="cache-head">
+                <span class="total">총 <span class="num">391</span>개 · <span class="num">8.6</span> MB</span>
+                <span class="orphan-chip">orphan 383</span>
+              </div>
+              <div class="cache-action"><button class="cache-cta" type="button">⌫ 고아 참조 383개 일괄 삭제</button></div>
+              <div class="cache-notes">
+                <p>history row 에 연결된 ref 는 절대 삭제하지 않습니다 (안전).</p>
+                <p>history 단건/전체 삭제 시 임시 풀도 자동 cascade unlink.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <footer class="drawer-foot">
+          <div class="mark"><span class="app"><em>AI Image Studio</em></span><span class="ver">LOCAL · v1.3.0</span></div>
+          <div class="ports">
+            <span class="port-tag">ComfyUI <b>8000</b></span>
+            <span class="port-tag">Ollama <b>11434</b></span>
+          </div>
+        </footer>
+      </section>
+    </div>
+  </div>
+
+  <!-- ═══════════════ Diff matrix ═══════════════ -->
+  <section class="diff">
+    <h3><span class="ko">색 토큰 차이</span><em>What actually changed</em></h3>
+    <p>구조 · 폰트 · anatomy · ToggleRow · "빠른" fix 는 V1 = V2. 아래 색 토큰만 다릅니다.</p>
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th>토큰</th>
+          <th>V1 · Editorial Deep</th>
+          <th>V2 · Main Tokens (globals.css)</th>
+          <th>실제 사용처</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>베이스 cream / bg</td>
+          <td><span class="sw" style="background:#F7F4ED"></span><span class="mono">#F7F4ED</span></td>
+          <td><span class="sw" style="background:#FAF9F7"></span><span class="mono">#FAF9F7</span></td>
+          <td>드로어 외곽 cream — V2 가 더 밝음</td>
+        </tr>
+        <tr>
+          <td>ink</td>
+          <td><span class="sw" style="background:#1A1814"></span><span class="mono">#1A1814</span></td>
+          <td><span class="sw" style="background:#1F1F1F"></span><span class="mono">#1F1F1F</span></td>
+          <td>본문 텍스트 — V1 warm, V2 neutral</td>
+        </tr>
+        <tr>
+          <td>violet</td>
+          <td><span class="sw" style="background:#6D28D9"></span><span class="mono">#6D28D9</span></td>
+          <td><span class="sw" style="background:#7C3AED"></span><span class="mono">#7C3AED</span></td>
+          <td>active row · section index — V2 가 살짝 밝음</td>
+        </tr>
+        <tr>
+          <td>blue / accent</td>
+          <td><span class="sw" style="background:#2563EB"></span><span class="mono">#2563EB</span></td>
+          <td><span class="sw" style="background:#4A9EFF"></span><span class="mono">#4A9EFF</span></td>
+          <td>switch ON 색 · CTA — V2 가 sky 톤</td>
+        </tr>
+        <tr>
+          <td>cyan</td>
+          <td><span class="sw" style="background:#0891B2"></span><span class="mono">#0891B2</span></td>
+          <td><span class="sw" style="background:#06B6D4"></span><span class="mono">#06B6D4</span></td>
+          <td>CPU 게이지 — V2 가 더 vivid</td>
+        </tr>
+        <tr>
+          <td>line</td>
+          <td><span class="sw" style="background:#E0D9C8"></span><span class="mono">#E0D9C8</span></td>
+          <td><span class="sw" style="background:#E8E5DF"></span><span class="mono">#E8E5DF</span></td>
+          <td>카드 border · 구분선 — V2 가 neutral</td>
+        </tr>
+        <tr>
+          <td>rose</td>
+          <td><span class="sw" style="background:#BE123C"></span><span class="mono">#BE123C</span></td>
+          <td><span class="sw" style="background:#DC2626"></span><span class="mono">#DC2626</span></td>
+          <td>위험 버튼 · orphan chip — V2 가 더 밝은 red</td>
+        </tr>
+        <tr>
+          <td>Fraunces / Pretendard / Mono</td>
+          <td colspan="2" style="text-align:center; color:#15803D; font-weight:600;">동일 · 1:1 ✓</td>
+          <td>모든 타이포</td>
+        </tr>
+        <tr>
+          <td>anatomy / ToggleRow / fix</td>
+          <td colspan="2" style="text-align:center; color:#15803D; font-weight:600;">동일 · 1:1 ✓</td>
+          <td>섹션 구조 / 카드 wrapper / 줄바꿈 가드</td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+</main>
+
+<script>
+  document.querySelectorAll('.ctl-switch').forEach((sw) => {
+    sw.addEventListener('click', () => {
+      const isOn = sw.classList.toggle('is-on');
+      const row = sw.closest('.row');
+      if (row) row.classList.toggle('is-active', isOn);
+      sw.setAttribute('aria-checked', isOn ? 'true' : 'false');
+    });
+  });
+  document.querySelectorAll('.ctl-seg').forEach((seg) => {
+    seg.querySelectorAll('.seg-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        seg.querySelectorAll('.seg-btn').forEach((b) => {
+          b.classList.remove('is-active');
+          b.setAttribute('aria-checked', 'false');
+        });
+        btn.classList.add('is-active');
+        btn.setAttribute('aria-checked', 'true');
+        const row = seg.closest('.row');
+        if (row) row.classList.add('is-active');
+      });
+    });
+  });
+</script>
+
+</body>
+</html>
