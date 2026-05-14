@@ -41,7 +41,9 @@ export type IconName =
   | "star"
   | "stars"
   | "bolt"
-  | "flame";
+  | "flame"
+  | "trash"
+  | "stop";
 
 interface IconProps {
   name: IconName;
@@ -334,6 +336,21 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
         <svg {...common}>
           <path d="M12 2c-1 3-3 5-3 8a4 4 0 0 0 8 0c0-2-2-4-2-6 0 2-1 3-2 3 0-2 0-3-1-5z" />
           <path d="M11 14a2 2 0 0 0 2 2 2 2 0 0 0 0-4c-1 1-2 1-2 2z" />
+        </svg>
+      );
+    case "trash":
+      return (
+        <svg {...common}>
+          <path d="M4 7h16" />
+          <path d="M10 11v6M14 11v6" />
+          <path d="M6 7l1 14h10l1-14" />
+          <path d="M9 7V4h6v3" />
+        </svg>
+      );
+    case "stop":
+      return (
+        <svg {...common}>
+          <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor" stroke="none" />
         </svg>
       );
     default:

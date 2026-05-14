@@ -96,8 +96,8 @@ export default function SettingsDrawer() {
           }}
         >
           <ProcessSection />
-          <SystemMetricsSection />
           <PreferencesSection />
+          <SystemMetricsSection />
           <HistorySection />
           {/* v9 (2026-04-29 · Phase D.1): 참조 임시 캐시 (cascade cleanup 수동 GC). */}
           <ReferencePoolSection />
@@ -118,8 +118,9 @@ function DrawerHeader({ onClose }: { onClose: () => void }) {
       <div className="ais-drawer-head-meta">
         <div className="ais-drawer-eyebrow">IMAGE STUDIO · CONFIG · v1.3.0</div>
         <h2 className="ais-drawer-title">
-          <span className="ais-ko">설정</span>
-          <em>Settings</em>
+          <strong>설정</strong>
+          {" · "}
+          Settings
         </h2>
       </div>
       <button
@@ -166,22 +167,22 @@ function PreferencesSection() {
 
   return (
     <Section
-      num="03"
+      num="02"
       title="기본 설정"
       titleEn="Defaults"
       meta="AUTO-SAVE"
-      desc="기본 동작 토글 · 모든 변경 즉시 저장"
+      desc="자주 바꾸는 기본값 · 모든 변경 즉시 저장"
     >
       {/* 통일 ToggleRow (2026-05-14):
        *  - 프롬프트 숨기기 (switch) 와 AI 보정 모드 (segmented) 가 같은 카드 wrapper 공유.
-       *  - 옛 raw div 인라인 ad-hoc 카드의 토큰 어긋남 + "빠른" 한글 자모 줄바꿈 회귀 해소.
+       *  - 옛 raw div 인라인 ad-hoc 카드의 토큰 어긋남 + segmented 라벨 줄바꿈 회귀 해소.
        *  - Phase 2 gemma4 보강 모드는 페이지 *마운트 시점* 의 기본값 (Codex 리뷰 Medium #2):
        *    사용자가 페이지에서 토글한 값은 session-only — 여기서 변경해도 즉시 안 덮음.
        *    다음 페이지 재진입 (또는 새로고침) 시점부터 반영. */}
       <ToggleRow
-        marker="⊙"
+        marker={<Icon name="scan-eye" size={15} stroke={1.7} />}
         label="프롬프트 숨기기 (생성 · 수정 · 영상)"
-        desc="ON: 진행 모달 프롬프트 접힘 + 생성 전 검수 모달 미노출 / OFF: 펼침 + 검수 모달 노출"
+        desc="진행/검수 모달에서 프롬프트 표시 여부"
         control={{
           variant: "switch",
           checked: hideAll,
@@ -190,16 +191,15 @@ function PreferencesSection() {
         }}
       />
       <ToggleRow
-        marker="🧠"
+        marker={<Icon name="stars" size={15} stroke={1.7} />}
         label="AI 보정 모드 기본값"
-        desc="페이지 마운트 시점의 기본 모드 (페이지 토글은 session-only · 다음 진입부터 반영)"
         tone="violet"
         control={{
           variant: "segmented",
           value: promptEnhanceMode,
           options: [
-            { value: "fast", label: "빠른" },
-            { value: "precise", label: "정밀" },
+            { value: "fast", label: "instant" },
+            { value: "precise", label: "thinking" },
           ],
           onChange: setPromptEnhanceMode,
           ariaLabel: "AI 보정 모드 기본값",

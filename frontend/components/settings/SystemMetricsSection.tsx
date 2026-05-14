@@ -25,7 +25,7 @@ export default function SystemMetricsSection() {
 
   return (
     <Section
-      num="02"
+      num="03"
       title="리소스"
       titleEn="Resources"
       meta="SYS · LIVE"

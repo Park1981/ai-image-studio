@@ -24,6 +24,7 @@
   --ink-2: #46464A;
   --ink-3: #7A7A80;
   --ink-4: #AEAEB3;
+  --ink-5: #C9C5BC;
 
   /* ── 라인/보더 ── */
   --line: #E8E5DF;
@@ -3355,7 +3356,7 @@ button {
  *
  * 의도:
  *  - 프롬프트 숨기기 (switch) + AI 보정 모드 (segmented) 같은 카드 공유.
- *  - 옛 raw div 인라인 ad-hoc 카드의 토큰 어긋남 + "빠른" 한글 자모 줄바꿈 회귀 차단.
+ *  - 옛 raw div 인라인 ad-hoc 카드의 토큰 어긋남 + segmented 라벨 줄바꿈 회귀 차단.
  *  - white-space:nowrap + min-width 44 + flex-shrink:0 3 가드로 우측 control 안 좁아짐.
  * 호환: components/settings/ToggleRow.tsx 와 1:1 매칭.
  * ═══════════════════════════════════════════════════════════════════ */
@@ -3400,16 +3401,19 @@ button {
   border-radius: var(--radius-sm);
   background: var(--surface);
   font-size: 14px;
+  color: var(--ink-3);
   flex-shrink: 0;
-  transition: background .15s ease, border-color .15s ease;
+  transition: background .15s ease, border-color .15s ease, color .15s ease;
 }
 .ais-toggle-row.is-active .ais-toggle-row-marker {
   background: var(--accent-soft);
   border-color: rgba(74,158,255,.35);
+  color: var(--accent-ink);
 }
 .ais-toggle-row.is-active[data-tone="violet"] .ais-toggle-row-marker {
   background: rgba(124,58,237,.08);
   border-color: rgba(124,58,237,.32);
+  color: var(--ais-output-violet);
 }
 
 .ais-toggle-row-labels {
@@ -3555,24 +3559,21 @@ button {
 }
 .ais-drawer-title {
   font-family: "Fraunces", Georgia, serif;
-  font-variation-settings: "opsz" 144, "SOFT" 50, "ital" 1;
+  font-variation-settings: "opsz" 144, "SOFT" 50, "WONK" 0;
   font-style: italic;
-  font-weight: 400;
-  font-size: 28px;
+  font-weight: 500;
+  font-size: 26px;
   line-height: 1;
-  letter-spacing: -.01em;
+  letter-spacing: 0;
   color: var(--ink);
   margin: 0;
 }
-.ais-drawer-title .ais-ko {
-  font-family: "Pretendard Variable", Pretendard, sans-serif;
+.ais-drawer-title strong {
+  font-family: inherit;
+  font-variation-settings: inherit;
   font-style: normal;
   font-weight: 700;
-  font-size: 20px;
   color: var(--ais-output-violet);
-  margin-right: 8px;
-  vertical-align: 2px;
-  font-variation-settings: normal;
 }
 .ais-drawer-close {
   all: unset;
@@ -3660,22 +3661,6 @@ button {
    첫 섹션 제외 · sibling 자동 적용. demo .s + .s 패턴. */
 .ais-settings-section {
   position: relative;
-}
-.ais-settings-section + .ais-settings-section {
-  padding-top: 22px;
-}
-.ais-settings-section + .ais-settings-section::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 1px;
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--line-2) 0 4px,
-    transparent 4px 8px
-  );
 }
 /* 옛 inline-use 호환 (현재 미사용) */
 .ais-section-sep {
@@ -3805,13 +3790,17 @@ button {
   gap: 6px;
   flex-shrink: 0;
 }
-/* Service tile 버튼 (▾ 모델 · 정지 · 시작) — 3 variant.
+/* Service tile 버튼 (모델 · 정지 · 시작) — 3 variant.
    2026-05-14 dogfooding fix: 비호버 base 가 회색조라 비활성화처럼 보이던
    회귀. 기본 ink-3 → ink-2 (글자 진하게) + .danger 도 비호버 rose tint
    부여 (실행 영향 있는 버튼은 항상 시각적 강조). */
 .ais-svc-btn {
   all: unset;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
   padding: 6px 12px;
   /* 한글 라벨 친화 — JetBrains Mono 한글 글리프 부재 회귀 fix. */
   font-family: "Pretendard Variable", Pretendard, sans-serif;
@@ -3845,6 +3834,11 @@ button {
   color: #B91C1C;
   background: rgba(220, 38, 38, .06);
   border-color: rgba(220, 38, 38, .28);
+}
+.ais-svc-btn.icon-only {
+  width: 34px;
+  height: 34px;
+  padding: 0;
 }
 .ais-svc-btn.danger:hover {
   color: #DC2626;
@@ -3929,18 +3923,47 @@ button {
   border-left: 2px solid var(--line);
 }
 .ais-res-break-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: baseline;
-  justify-content: space-between;
+  column-gap: 12px;
   padding: 3px 0;
   font-family: "JetBrains Mono", ui-monospace, monospace;
   font-size: 10px;
   color: var(--ink-4);
 }
-.ais-res-break-row::before {
+.ais-res-break-row span:first-child {
+  min-width: 0;
+  text-align: left;
+}
+.ais-res-break-row span:first-child::before {
   content: "↳ ";
   color: var(--ink-5);
   margin-right: 4px;
+}
+.ais-res-break-row span:last-child {
+  text-align: right;
+}
+.ais-res-break .ais-res-break-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  justify-content: normal;
+  column-gap: 12px;
+}
+.ais-res-break .ais-res-break-row::before {
+  content: none;
+}
+.ais-res-break .ais-res-break-row > span:first-child {
+  min-width: 0;
+  text-align: left;
+}
+.ais-res-break .ais-res-break-row > span:first-child::before {
+  content: "↳ ";
+  color: var(--ink-5);
+  margin-right: 4px;
+}
+.ais-res-break .ais-res-break-row > span:last-child {
+  text-align: right;
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -4019,8 +4042,10 @@ button {
 .ais-hist-mode:hover { background: var(--bg-2); }
 .ais-hist-mode + .ais-hist-mode { border-top: 1px dashed var(--line); }
 .ais-hist-mode .glyph {
-  font-size: 13px;
-  text-align: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--ink-3);
 }
 .ais-hist-mode .lbl { font-weight: 500; }
 .ais-hist-mode .count {
@@ -4126,6 +4151,10 @@ button {
 .ais-cache-cta {
   all: unset;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
   padding: 10px 14px;
   border: 1px solid rgba(220,38,38,.30);

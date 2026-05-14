@@ -143,21 +143,22 @@ function ServiceCard({
           <button
             type="button"
             onClick={onExpand}
-            title={open ? "접기" : "모델 보기"}
-            aria-label={open ? "접기" : "모델 보기"}
+            title={open ? "Hide models" : "Show models"}
+            aria-label={open ? "모델 목록 접기" : "모델 목록 보기"}
             aria-expanded={open}
             className="ais-svc-btn"
           >
-            {open ? "▴ 접기" : "▾ 모델"}
+            <Icon name={open ? "chevron-down" : "chevron-right"} size={13} />
+            {open ? "Hide" : "Models"}
           </button>
           <button
             type="button"
             onClick={onToggle}
-            title={running ? `${name} 정지` : `${name} 시작`}
+            title={running ? `${name} Stop` : `${name} Start`}
             aria-label={running ? `${name} 정지` : `${name} 시작`}
-            className={`ais-svc-btn${running ? " danger" : " is-on"}`}
+            className={`ais-svc-btn${running ? " danger icon-only" : " is-on"}`}
           >
-            {running ? "정지" : "시작"}
+            {running ? <Icon name="stop" size={13} stroke={1.8} /> : "Start"}
           </button>
         </div>
       </div>
@@ -222,7 +223,7 @@ const COMFYUI_MODEL_ROWS: {
 }[] = [
   { label: "이미지 생성", icon: "image",    accent: "#3b82f6", model: GENERATE_MODEL.displayName },
   { label: "이미지 수정", icon: "wand",     accent: "#8b5cf6", model: EDIT_MODEL.displayName },
-  { label: "영상 생성",   icon: "play",     accent: "#f43f5e", model: "LTX Video 2.3" },
+  { label: "영상 생성",   icon: "film",     accent: "#f43f5e", model: "LTX Video 2.3" },
   { label: "이미지 분석", icon: "scan-eye", accent: "#22c55e", model: "qwen2.5vl:7b" },
 ];
 

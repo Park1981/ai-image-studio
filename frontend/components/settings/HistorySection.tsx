@@ -15,6 +15,7 @@ import { useHistoryStore } from "@/stores/useHistoryStore";
 import { toast } from "@/stores/useToastStore";
 import { clearHistory as apiClearHistory, getHistoryStats } from "@/lib/api/history";
 import type { HistoryStats } from "@/lib/api/types";
+import Icon, { type IconName } from "@/components/ui/Icon";
 import Section from "./Section";
 
 /** 바이트 → 사람 친화 문자열 (KB/MB/GB). */
@@ -105,19 +106,19 @@ export default function HistorySection() {
         {stats && (
           <div className="ais-hist-modes">
             <HistoryModeRow
-              glyph="🖼"
+              icon="image"
               label="이미지 생성"
               count={stats.byMode.generate.count}
               sizeBytes={stats.byMode.generate.sizeBytes}
             />
             <HistoryModeRow
-              glyph="✦"
+              icon="edit"
               label="이미지 수정"
               count={stats.byMode.edit.count}
               sizeBytes={stats.byMode.edit.sizeBytes}
             />
             <HistoryModeRow
-              glyph="▷"
+              icon="film"
               label="영상 생성"
               count={stats.byMode.video.count}
               sizeBytes={stats.byMode.video.sizeBytes}
@@ -138,7 +139,8 @@ export default function HistorySection() {
                 : undefined
             }
           >
-            ⌫ 모두 삭제
+            <Icon name="trash" size={13} />
+            모두 삭제
           </button>
         </div>
       </div>
@@ -147,12 +149,12 @@ export default function HistorySection() {
 }
 
 function HistoryModeRow({
-  glyph,
+  icon,
   label,
   count,
   sizeBytes,
 }: {
-  glyph: string;
+  icon: IconName;
   label: string;
   count: number;
   sizeBytes: number;
@@ -162,7 +164,9 @@ function HistoryModeRow({
       className="ais-hist-mode"
       style={count === 0 ? { opacity: 0.5 } : undefined}
     >
-      <span className="glyph" aria-hidden="true">{glyph}</span>
+      <span className="glyph" aria-hidden="true">
+        <Icon name={icon} size={13} stroke={1.7} />
+      </span>
       <span className="lbl">{label}</span>
       <span className="count">{count}</span>
       <span className="sz">{fmtBytes(sizeBytes)}</span>

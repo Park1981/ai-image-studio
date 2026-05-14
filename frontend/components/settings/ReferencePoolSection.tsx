@@ -9,6 +9,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "@/stores/useToastStore";
+import Icon from "@/components/ui/Icon";
 import Section from "./Section";
 
 export default function ReferencePoolSection() {
@@ -93,7 +94,12 @@ export default function ReferencePoolSection() {
               ? "삭제 중…"
               : orphanCount === 0
                 ? "고아 참조 없음"
-                : `⌫ 고아 참조 ${orphanCount}개 일괄 삭제`}
+                : (
+                    <>
+                      <Icon name="trash" size={13} />
+                      고아 참조 {orphanCount}개 일괄 삭제
+                    </>
+                  )}
           </button>
         </div>
         <div className="ais-cache-notes">
