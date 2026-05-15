@@ -170,6 +170,19 @@ export default function MainMenuPage() {
               disabled
             />
           </CategorySection>
+
+          {/* ── 실험실 카테고리 (Lab) ── 2026-05-15 추가.
+              Plan A 완료된 Sulphur 기반 video lab 진입점.
+              향후 image-lab 등 다른 실험 모드도 이 섹션에 누적된다. */}
+          <CategorySection label="Lab">
+            <MenuCard
+              icon="flame"
+              title="Video Lab · Sulphur"
+              desc="Sulphur LoRA + LTX-2.3 distilled 조합을 실험합니다. 정식 영상 모드와 분리된 실험 워크스페이스."
+              hue="#FFEFE0"
+              onClick={() => router.push("/lab/video")}
+            />
+          </CategorySection>
         </div>
       </main>
 
