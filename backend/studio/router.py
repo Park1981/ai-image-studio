@@ -93,6 +93,7 @@ from .pipelines import (  # noqa: F401
     _OUR_COMFY_PREFIXES,
     _run_edit_pipeline,
     _run_generate_pipeline,
+    _run_video_lab_pipeline_task,
     _run_video_pipeline_task,
     _save_comfy_output,
     _save_comfy_video,

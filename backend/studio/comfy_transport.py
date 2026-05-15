@@ -128,6 +128,13 @@ class ComfyUITransport:
         data = resp.json()
         return data.get(prompt_id, {})
 
+    async def get_object_info(self) -> dict[str, Any]:
+        """GET /object_info — installed ComfyUI node schemas and enum values."""
+        http = self._require_http()
+        resp = await http.get("/object_info")
+        resp.raise_for_status()
+        return resp.json()
+
     async def download_image(
         self,
         filename: str,

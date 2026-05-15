@@ -21,6 +21,7 @@ from fastapi import APIRouter
 
 from . import (
     compare,
+    lab,
     prompt,
     prompt_favorites,
     reference_pool,
@@ -35,6 +36,7 @@ studio_router = APIRouter(prefix="/api/studio", tags=["studio"])
 # 등록 순서는 임의 — FastAPI 가 path 매칭으로 분기.
 # 다만 동일 path 충돌 방지 위해 그룹별 명시적 prefix 안 씀 (전부 /api/studio 직속).
 studio_router.include_router(streams.router)
+studio_router.include_router(lab.router)
 studio_router.include_router(prompt.router)
 studio_router.include_router(prompt_favorites.router)
 studio_router.include_router(vision.router)

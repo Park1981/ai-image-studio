@@ -531,6 +531,115 @@
         ]
       }
     },
+    "/api/studio/lab/video": {
+      "post": {
+        "description": "Create a Lab video task.",
+        "operationId": "create_lab_video_task_api_studio_lab_video_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_create_lab_video_task_api_studio_lab_video_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TaskCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create Lab Video Task",
+        "tags": [
+          "studio",
+          "lab"
+        ]
+      }
+    },
+    "/api/studio/lab/video/files": {
+      "get": {
+        "description": "Return Lab LoRA visibility according to ComfyUI /object_info.",
+        "operationId": "check_lab_video_files_api_studio_lab_video_files_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Check Lab Video Files Api Studio Lab Video Files Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Check Lab Video Files",
+        "tags": [
+          "studio",
+          "lab"
+        ]
+      }
+    },
+    "/api/studio/lab/video/stream/{task_id}": {
+      "get": {
+        "operationId": "lab_video_stream_api_studio_lab_video_stream__task_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "task_id",
+            "required": true,
+            "schema": {
+              "title": "Task Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Lab Video Stream",
+        "tags": [
+          "studio",
+          "lab"
+        ]
+      }
+    },
     "/api/studio/models": {
       "get": {
         "description": "모델 프리셋 노출 — 프론트 model-presets.ts 와 snake_case 그대로 매핑.",
@@ -1458,6 +1567,25 @@
         "meta"
       ],
       "title": "Body_create_edit_task_api_studio_edit_post",
+      "type": "object"
+    },
+    "Body_create_lab_video_task_api_studio_lab_video_post": {
+      "properties": {
+        "image": {
+          "contentMediaType": "application/octet-stream",
+          "title": "Image",
+          "type": "string"
+        },
+        "meta": {
+          "title": "Meta",
+          "type": "string"
+        }
+      },
+      "required": [
+        "image",
+        "meta"
+      ],
+      "title": "Body_create_lab_video_task_api_studio_lab_video_post",
       "type": "object"
     },
     "Body_create_template_api_studio_reference_templates_post": {

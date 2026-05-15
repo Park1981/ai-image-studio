@@ -16,17 +16,16 @@ from typing import Callable
 
 from ..presets import (
     DEFAULT_VIDEO_MODEL_ID,
-    LTX_VIDEO_PRESET,
     QUALITY_BASE_SIGMAS,
     QUALITY_UPSCALE_SIGMAS,
     VIDEO_LONGER_EDGE_DEFAULT,
     VIDEO_MODEL,  # 호환 alias (== LTX_VIDEO_PRESET) — 기존 테스트 호환용
     VideoLoraEntry,
     VideoModelId,
+    VideoModelPreset,
     WAN22_VIDEO_PRESET,
     active_video_loras,
     compute_video_resize,
-    resolve_video_unet_name,
 )
 from ._common import (
     ApiPrompt,
@@ -127,6 +126,40 @@ def build_video_from_request(
     raise ValueError(f"unknown video model_id: {model_id!r}")
 
 
+def build_ltx_from_model_preset(
+    *,
+    model_preset: VideoModelPreset,
+    prompt: str,
+    source_filename: str,
+    seed: int,
+    negative_prompt: str | None = None,
+    unet_override: str | None = None,
+    adult: bool = False,
+    source_width: int | None = None,
+    source_height: int | None = None,
+    longer_edge: int | None = None,
+    lightning: bool = True,
+) -> ApiPrompt:
+    """LTX 계열 VideoModelPreset 을 명시 주입해 workflow 를 조립한다.
+
+    Production LTX 는 build_video_from_request(model_id="ltx") 경로를 유지하고,
+    Lab 은 이 진입점을 써서 전역 VIDEO_MODEL monkeypatch 없이 LoRA 체인을 바꾼다.
+    """
+    return _build_ltx(
+        prompt=prompt,
+        source_filename=source_filename,
+        seed=seed,
+        negative_prompt=negative_prompt,
+        unet_override=unet_override,
+        adult=adult,
+        source_width=source_width,
+        source_height=source_height,
+        longer_edge=longer_edge,
+        lightning=lightning,
+        video_model=model_preset,
+    )
+
+
 def _build_ltx(
     *,
     prompt: str,
@@ -139,6 +172,7 @@ def _build_ltx(
     source_height: int | None = None,
     longer_edge: int | None = None,
     lightning: bool = True,
+    video_model: VideoModelPreset | None = None,
 ) -> ApiPrompt:
     """LTX-2.3 i2v 워크플로우 API 포맷 조립 (private — 기존 본문).
 
@@ -149,9 +183,10 @@ def _build_ltx(
     """
     api: ApiPrompt = {}
     nid = _make_id_gen()
-    s = LTX_VIDEO_PRESET.sampling
-    neg = negative_prompt or LTX_VIDEO_PRESET.negative_prompt
-    unet_name = resolve_video_unet_name(unet_override)
+    model = video_model or VIDEO_MODEL
+    s = model.sampling
+    neg = negative_prompt or model.negative_prompt
+    unet_name = unet_override or model.files.unet
 
     # ── 해상도 계산 (2026-04-24 · v9): 원본 비율 유지 + 사용자 longer_edge ──
     # 원본 dims 가 들어오면 비율 유지 리사이즈 계산 → pre_resize/longer 둘 다 정렬.
@@ -223,9 +258,9 @@ def _build_ltx(
     api[text_encoder_id] = {
         "class_type": "LTXAVTextEncoderLoader",
         "inputs": {
-            "text_encoder": VIDEO_MODEL.files.text_encoder,
+            "text_encoder": model.files.text_encoder,
             "ckpt_name": unet_name,
-            "device": VIDEO_MODEL.files.weight_dtype,  # "default" 등
+            "device": model.files.weight_dtype,  # "default" 등
         },
     }
     audio_vae_id = nid()
@@ -236,12 +271,12 @@ def _build_ltx(
     upscaler_id = nid()
     api[upscaler_id] = {
         "class_type": "LatentUpscaleModelLoader",
-        "inputs": {"model_name": VIDEO_MODEL.files.upscaler},
+        "inputs": {"model_name": model.files.upscaler},
     }
 
     # ── 5. LoRA 체인 (순차 · lightning/adult 토글 조합에 따라 0~3단) ──
     active_loras = active_video_loras(
-        VIDEO_MODEL.loras, adult=adult, lightning=lightning
+        model.loras, adult=adult, lightning=lightning
     )
     model_ref = _build_video_lora_chain(
         api, nid,

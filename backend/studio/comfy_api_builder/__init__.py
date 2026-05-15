@@ -58,7 +58,12 @@ from .generate import (  # noqa: F401 — facade re-export
 )
 from .video import (  # noqa: F401 — facade re-export
     _build_video_lora_chain,
+    build_ltx_from_model_preset,
     build_video_from_request,
+)
+from .video_lab import (  # noqa: F401 — facade re-export
+    build_ltx_lab_from_request,
+    resolve_lab_video_loras,
 )
 
 __all__ = [
@@ -87,5 +92,8 @@ __all__ = [
     "build_edit_from_request",
     # video
     "_build_video_lora_chain",
+    "build_ltx_from_model_preset",
     "build_video_from_request",
+    "build_ltx_lab_from_request",
+    "resolve_lab_video_loras",
 ]
