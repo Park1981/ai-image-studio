@@ -20,7 +20,7 @@ from ..presets import VIDEO_LONGER_EDGE_MAX, VIDEO_LONGER_EDGE_MIN
 from ..schemas import TaskCreated
 from ..storage import STUDIO_MAX_IMAGE_BYTES
 from ..tasks import TASKS, _new_task
-from ._common import _spawn, _stream_task, parse_meta_object
+from ._common import _proc_mgr, _spawn, _stream_task, parse_meta_object
 
 router = APIRouter(prefix="/lab", tags=["lab"])
 
@@ -46,14 +46,27 @@ def _enum_contains(enum_values: list[str], file_name: str) -> tuple[bool, str | 
     return False, None
 
 
+async def _fetch_lora_enum_once() -> list[str]:
+    async with ComfyUITransport() as comfy:
+        return _extract_lora_enum(await comfy.get_object_info())
+
+
 async def _fetch_lora_enum() -> list[str]:
     try:
-        async with ComfyUITransport() as comfy:
-            return _extract_lora_enum(await comfy.get_object_info())
-    except Exception as exc:
+        return await _fetch_lora_enum_once()
+    except Exception as first_exc:
+        if _proc_mgr is not None:
+            try:
+                started = await _proc_mgr.start_comfyui()
+                if started:
+                    return await _fetch_lora_enum_once()
+            except Exception as retry_exc:
+                raise HTTPException(
+                    503, f"ComfyUI object_info unavailable: {retry_exc}"
+                ) from retry_exc
         raise HTTPException(
-            503, f"ComfyUI object_info unavailable: {exc}"
-        ) from exc
+            503, f"ComfyUI object_info unavailable: {first_exc}"
+        ) from first_exc
 
 
 async def _assert_loras_available(file_names: list[str]) -> None:

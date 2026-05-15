@@ -32,6 +32,7 @@ describe("pipeline-defs · 모드 분기 (Phase 2)", () => {
     ["generate", "gemma4-upgrade"],
     ["edit", "prompt-merge"],
     ["video", "prompt-merge"],
+    ["lab_video", "prompt-merge"],
     // 2026-05-05 V4 재설계: compare.intent-refine 폐기 (compare_pipeline_v4 는
     // promptMode 무관 · spec §6.2). compare 의 pair-compare/translation 은 정적/비전 라벨.
   ] as const)(

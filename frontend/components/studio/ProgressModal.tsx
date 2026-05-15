@@ -24,6 +24,7 @@ import { toast } from "@/stores/useToastStore";
 import { useEditStore } from "@/stores/useEditStore";
 import { useGenerateStore } from "@/stores/useGenerateStore";
 import { useVideoStore } from "@/stores/useVideoStore";
+import { useVideoLabStore } from "@/stores/useVideoLabStore";
 import { useVisionStore } from "@/stores/useVisionStore";
 import { useVisionCompareStore } from "@/stores/useVisionCompareStore";
 // 2026-04-27 (C2-P1-2): 3 mode 타임라인 + TimelineRow + DetailBox 분해.
@@ -36,6 +37,7 @@ const MODE_TITLES: Record<PipelineMode, string> = {
   generate: "이미지 생성 중",
   edit: "이미지 수정 중",
   video: "영상 생성 중",
+  lab_video: "Lab 영상 생성 중",
   vision: "비전 분석 중",
   compare: "비교 분석 중",
 };
@@ -126,10 +128,14 @@ function useComfyInterruptAvailability(mode: PipelineMode): boolean {
   const videoRunning = useVideoStore((s) => s.running);
   // Phase 3 (2026-04-27): videoCurrentStep===4 → lastStage==="comfyui-sampling".
   const videoStageHistory = useVideoStore((s) => s.stageHistory);
+  const labVideoRunning = useVideoLabStore((s) => s.running);
+  const labVideoStageHistory = useVideoLabStore((s) => s.stageHistory);
 
   const lastGenStage = genStageHistory[genStageHistory.length - 1]?.type;
   const lastEditStage = editStageHistory[editStageHistory.length - 1]?.type;
   const lastVideoStage = videoStageHistory[videoStageHistory.length - 1]?.type;
+  const lastLabVideoStage =
+    labVideoStageHistory[labVideoStageHistory.length - 1]?.type;
 
   if (mode === "generate") {
     return genRunning && lastGenStage === "comfyui-sampling";
@@ -140,6 +146,9 @@ function useComfyInterruptAvailability(mode: PipelineMode): boolean {
   if (mode === "video") {
     return videoRunning && lastVideoStage === "comfyui-sampling";
   }
+  if (mode === "lab_video") {
+    return labVideoRunning && lastLabVideoStage === "comfyui-sampling";
+  }
   // Phase 6: vision/compare 는 ComfyUI 미사용 → interrupt 버튼 안 노출
   return false;
 }
@@ -148,12 +157,14 @@ function usePipelineRunning(mode: PipelineMode): boolean {
   const genRunning = useGenerateStore((s) => s.generating);
   const editRunning = useEditStore((s) => s.running);
   const videoRunning = useVideoStore((s) => s.running);
+  const labVideoRunning = useVideoLabStore((s) => s.running);
   const visionRunning = useVisionStore((s) => s.running);
   const compareRunning = useVisionCompareStore((s) => s.running);
 
   if (mode === "generate") return genRunning;
   if (mode === "edit") return editRunning;
   if (mode === "video") return videoRunning;
+  if (mode === "lab_video") return labVideoRunning;
   if (mode === "vision") return visionRunning;
   return compareRunning;
 }
@@ -186,6 +197,11 @@ function StatusBar({ mode }: { mode: PipelineMode }) {
   const videoSamplingTotal = useVideoStore((s) => s.samplingTotal);
   const videoRunning = useVideoStore((s) => s.running);
   const videoProgress = useVideoStore((s) => s.pipelineProgress);
+  const labVideoStartedAt = useVideoLabStore((s) => s.startedAt);
+  const labVideoSamplingStep = useVideoLabStore((s) => s.samplingStep);
+  const labVideoSamplingTotal = useVideoLabStore((s) => s.samplingTotal);
+  const labVideoRunning = useVideoLabStore((s) => s.running);
+  const labVideoProgress = useVideoLabStore((s) => s.pipelineProgress);
 
   // Phase 6 (2026-04-27): vision/compare — startedAt/progress 는 stageHistory 기반 추정.
   // 비전 분석은 ComfyUI 미사용 → samplingStep/Total 항상 null → "스텝 N/M" 칩 안 나옴.
@@ -210,9 +226,11 @@ function StatusBar({ mode }: { mode: PipelineMode }) {
         ? editStartedAt
         : mode === "video"
           ? videoStartedAt
-          : mode === "vision"
-            ? visionStartedAt
-            : compareStartedAt;
+          : mode === "lab_video"
+            ? labVideoStartedAt
+            : mode === "vision"
+              ? visionStartedAt
+              : compareStartedAt;
   const samplingStep =
     mode === "generate"
       ? genSamplingStep
@@ -220,7 +238,9 @@ function StatusBar({ mode }: { mode: PipelineMode }) {
         ? editSamplingStep
         : mode === "video"
           ? videoSamplingStep
-          : null; // vision/compare: ComfyUI 미사용
+          : mode === "lab_video"
+            ? labVideoSamplingStep
+            : null; // vision/compare: ComfyUI 미사용
   const samplingTotal =
     mode === "generate"
       ? genSamplingTotal
@@ -228,7 +248,9 @@ function StatusBar({ mode }: { mode: PipelineMode }) {
         ? editSamplingTotal
         : mode === "video"
           ? videoSamplingTotal
-          : null;
+          : mode === "lab_video"
+            ? labVideoSamplingTotal
+            : null;
   const running =
     mode === "generate"
       ? genRunning
@@ -236,9 +258,11 @@ function StatusBar({ mode }: { mode: PipelineMode }) {
         ? editRunning
         : mode === "video"
           ? videoRunning
-          : mode === "vision"
-            ? visionRunning
-            : compareRunning;
+          : mode === "lab_video"
+            ? labVideoRunning
+            : mode === "vision"
+              ? visionRunning
+              : compareRunning;
   const progress =
     mode === "generate"
       ? genProgress
@@ -246,9 +270,11 @@ function StatusBar({ mode }: { mode: PipelineMode }) {
         ? editProgress
         : mode === "video"
           ? videoProgress
-          : mode === "vision"
-            ? visionProgress
-            : compareProgress;
+          : mode === "lab_video"
+            ? labVideoProgress
+            : mode === "vision"
+              ? visionProgress
+              : compareProgress;
 
   // 경과 시간 500ms tick
   const [nowTick, setNowTick] = useState(() => Date.now());

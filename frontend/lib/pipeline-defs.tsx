@@ -32,7 +32,7 @@ import type { EditVisionAnalysis, HistoryMode } from "@/lib/api/types";
  *
  * 단순히 union 으로 표현 — vision/compare 는 PIPELINE_DEFS 에서만 stage 정의 가짐.
  */
-export type PipelineMode = HistoryMode | "vision" | "compare";
+export type PipelineMode = HistoryMode | "lab_video" | "vision" | "compare";
 
 /* ────────────────────────────────────────────────
  * 타입 정의
@@ -306,6 +306,69 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       type: "comfyui-sampling",
       label: "영상 생성",
       subLabel: videoModelSubLabel,
+    },
+    { type: "save-output", label: "MP4 저장", subLabel: "h264 인코딩" },
+  ],
+
+  /* ── Lab Video (backend history mode 는 video 유지 · UI 진행 모드만 분리) ── */
+  lab_video: [
+    {
+      type: "vision-analyze",
+      label: "이미지 분석",
+      subLabel: visionSubLabel,
+      renderDetail: (p, c) => {
+        if (c.hideVideoPrompts) return null;
+        const description = p.description as string | undefined;
+        return description ? (
+          <DetailBox kind="info" title="비전 설명">
+            {description}
+          </DetailBox>
+        ) : null;
+      },
+    },
+    {
+      type: "comfyui-warmup",
+      label: "ComfyUI 깨우는 중",
+      subLabel: "최대 30초",
+      enabled: (c) => c.warmupArrived === true,
+    },
+    {
+      type: "prompt-merge",
+      label: "프롬프트 통합",
+      subLabel: gemmaSubLabel,
+      renderDetail: (p, c) => {
+        if (c.hideVideoPrompts) return null;
+        const finalPrompt = p.finalPrompt as string | undefined;
+        const finalPromptKo = p.finalPromptKo as string | undefined;
+        const provider = p.provider as string | undefined;
+        return (
+          <>
+            {finalPrompt && (
+              <DetailBox
+                kind={provider?.startsWith("fallback") ? "warn" : "info"}
+                title={`Lab 프롬프트 (${provider ?? "?"})`}
+              >
+                {finalPrompt}
+              </DetailBox>
+            )}
+            {finalPromptKo && (
+              <DetailBox kind="muted" title="한국어 번역">
+                {finalPromptKo}
+              </DetailBox>
+            )}
+          </>
+        );
+      },
+    },
+    {
+      type: "workflow-dispatch",
+      label: "워크플로우 설정",
+      subLabel: "Sulphur Lab builder",
+    },
+    {
+      type: "comfyui-sampling",
+      label: "영상 생성",
+      subLabel: "ltx-2.3 + sulphur",
     },
     { type: "save-output", label: "MP4 저장", subLabel: "h264 인코딩" },
   ],

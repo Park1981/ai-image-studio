@@ -48,6 +48,8 @@ export interface SettingsState {
   visionModel: string;
   /** Phase 4 (2026-05-03) — 영상 모델 선택 (Wan 2.2 default · 사용자 선택 persist) */
   videoModel: VideoModelId;
+  /** Lab Video 마지막 선택 preset. Phase 1 은 ltx-sulphur 단일 preset. */
+  labVideoPresetId: string;
 
   /* 프리퍼런스 토글 */
   /**
@@ -105,6 +107,7 @@ export interface SettingsState {
   setOllamaModel: (v: string) => void;
   setVisionModel: (v: string) => void;
   setVideoModel: (v: VideoModelId) => void;
+  setLabVideoPresetId: (v: string) => void;
   setHideGeneratePrompts: (v: boolean) => void;
   setHideEditPrompts: (v: boolean) => void;
   setHideVideoPrompts: (v: boolean) => void;
@@ -147,6 +150,7 @@ export const useSettingsStore = create<SettingsState>()(
       visionModel: DEFAULT_OLLAMA_MODELS.vision,
       // Phase 4 (2026-05-03) — 사용자 결정 #1: default Wan 2.2.
       videoModel: DEFAULT_VIDEO_MODEL_ID,
+      labVideoPresetId: "ltx-sulphur",
 
       hideGeneratePrompts: true,
       hideEditPrompts: true,
@@ -166,6 +170,7 @@ export const useSettingsStore = create<SettingsState>()(
       setOllamaModel: (v) => set({ ollamaModel: v }),
       setVisionModel: (v) => set({ visionModel: v }),
       setVideoModel: (v) => set({ videoModel: v }),
+      setLabVideoPresetId: (v) => set({ labVideoPresetId: v }),
       setHideGeneratePrompts: (v) => set({ hideGeneratePrompts: v }),
       setHideEditPrompts: (v) => set({ hideEditPrompts: v }),
       setHideVideoPrompts: (v) => set({ hideVideoPrompts: v }),
@@ -189,7 +194,7 @@ export const useSettingsStore = create<SettingsState>()(
     {
       name: "ais:settings",
       storage: createJSONStorage(() => localStorage),
-      version: 7,
+      version: 8,
       migrate: (persisted: unknown, fromVersion: number) => {
         const obj = (persisted as Record<string, unknown>) || {};
         // v1 → v2: autoCompareAnalysis 기본 false 추가
@@ -229,6 +234,9 @@ export const useSettingsStore = create<SettingsState>()(
         if (fromVersion < 7) {
           obj.autoNsfwEnabled = false;
           obj.nsfwIntensity = 2;
+        }
+        if (fromVersion < 8) {
+          obj.labVideoPresetId = "ltx-sulphur";
         }
         return obj as unknown as SettingsState;
       },

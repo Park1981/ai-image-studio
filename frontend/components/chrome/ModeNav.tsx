@@ -34,6 +34,7 @@ const MODES: ReadonlyArray<{ href: string; label: string }> = [
   { href: "/generate", label: "Generate" },
   { href: "/edit", label: "Edit" },
   { href: "/video", label: "Video" },
+  { href: "/lab/video", label: "Lab" },
   { href: "/vision", label: "Analyze" },
   { href: "/vision/compare", label: "Compare" },
 ];
@@ -51,6 +52,7 @@ function resolveActiveHref(pathname: string): string {
   }
   // 2. /vision/{기타} sub-path → Analyze 폴백 (단 /vision/compare 는 위 1 단계에서 잡힘)
   if (pathname.startsWith("/vision/")) return "/vision";
+  if (pathname.startsWith("/lab/")) return "/lab/video";
   // 3. /prompt-flow/{mode} 도움말 페이지 → 해당 mode chip 활성 (Codex 3차 보강)
   //    PromptFlowShell 도 AppHeader 사용 — 도움말 페이지에서도 mode 정체성 유지.
   if (pathname.startsWith("/prompt-flow/generate")) return "/generate";

@@ -234,6 +234,7 @@ function shortVideoModelLabel(
   modelId: string | undefined | null,
   model: string,
 ): string {
+  if (model === "LTX 2.3 · Sulphur Lab") return "Sulphur Lab";
   if (modelId === "wan22") return "Wan 2.2";
   if (modelId === "ltx") return "LTX 2.3";
   // 옛 row fallback — display name 첫 단어 추론.

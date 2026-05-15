@@ -36,6 +36,7 @@ import {
 } from "@/stores/useGenerateStore";
 import { useSettingsStore } from "@/stores/useSettingsStore";
 import { useVideoStore } from "@/stores/useVideoStore";
+import { useVideoLabStore } from "@/stores/useVideoLabStore";
 import { useVisionStore } from "@/stores/useVisionStore";
 import { useVisionCompareStore } from "@/stores/useVisionCompareStore";
 import { TimelineRow } from "./TimelineRow";
@@ -179,6 +180,8 @@ function usePipelineRuntime(mode: PipelineMode): PipelineRuntime {
   const editRunning = useEditStore((s) => s.running);
   const videoStageHistory = useVideoStore((s) => s.stageHistory);
   const videoRunning = useVideoStore((s) => s.running);
+  const labVideoStageHistory = useVideoLabStore((s) => s.stageHistory);
+  const labVideoRunning = useVideoLabStore((s) => s.running);
   const visionStageHistory = useVisionStore((s) => s.stageHistory);
   const visionRunning = useVisionStore((s) => s.running);
   const compareStageHistory = useVisionCompareStore((s) => s.stageHistory);
@@ -192,6 +195,9 @@ function usePipelineRuntime(mode: PipelineMode): PipelineRuntime {
   }
   if (mode === "video") {
     return { stageHistory: videoStageHistory, running: videoRunning };
+  }
+  if (mode === "lab_video") {
+    return { stageHistory: labVideoStageHistory, running: labVideoRunning };
   }
   if (mode === "vision") {
     return { stageHistory: visionStageHistory, running: visionRunning };
@@ -215,6 +221,7 @@ function usePipelineCtx(
   const genPromptMode = useGenerateStore((s) => s.promptMode);
   const editPromptMode = useEditStore((s) => s.promptMode);
   const videoPromptMode = useVideoStore((s) => s.promptMode);
+  const labVideoPromptMode = useVideoLabStore((s) => s.promptMode);
   // Phase 5 follow-up (2026-05-03) — video stage 의 builder/모델 라벨 분기용.
   const videoModelId = useVideoStore((s) => s.selectedVideoModel);
   // 2026-05-04 — Vision stage 의 subLabel 동적화 (Edit/Video/Compare 의 vision-analyze).
@@ -238,6 +245,8 @@ function usePipelineCtx(
       ? editPromptMode
       : mode === "video"
       ? videoPromptMode
+      : mode === "lab_video"
+      ? labVideoPromptMode
       : mode === "compare"
       ? editPromptMode
       : undefined;
@@ -247,14 +256,19 @@ function usePipelineCtx(
     editVisionAnalysis: mode === "edit" ? editAnalysis : undefined,
     hideEditPrompts: mode === "edit" ? hideEdit : undefined,
     hideGeneratePrompts: mode === "generate" ? hideGen : undefined,
-    hideVideoPrompts: mode === "video" ? hideVideo : undefined,
+    hideVideoPrompts:
+      mode === "video" || mode === "lab_video" ? hideVideo : undefined,
     warmupArrived,
     intentRefineArrived: mode === "compare" ? intentRefineArrived : undefined,
     promptMode,
-    videoModelId: mode === "video" ? videoModelId : undefined,
+    videoModelId:
+      mode === "video" ? videoModelId : mode === "lab_video" ? "ltx" : undefined,
     // visionModel — Edit/Video/Compare 모드만 채움 (Generate 는 vision 호출 없음, Vision 자체는 별 stage 없음).
     visionModel:
-      mode === "edit" || mode === "video" || mode === "compare"
+      mode === "edit" ||
+      mode === "video" ||
+      mode === "lab_video" ||
+      mode === "compare"
         ? visionModel
         : undefined,
   };

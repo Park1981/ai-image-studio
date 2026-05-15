@@ -18,6 +18,7 @@ const ALL_MODES: PipelineMode[] = [
   "generate",
   "edit",
   "video",
+  "lab_video",
   "vision",
   "compare",
 ];
@@ -94,7 +95,12 @@ describe("PIPELINE_DEFS — 정적 일관성", () => {
   });
 
   it("핵심 stage 존재 — gen/edit/video 의 comfyui-sampling + save-output", () => {
-    const samplingModes: PipelineMode[] = ["generate", "edit", "video"];
+    const samplingModes: PipelineMode[] = [
+      "generate",
+      "edit",
+      "video",
+      "lab_video",
+    ];
     for (const mode of samplingModes) {
       const types = PIPELINE_DEFS[mode].map((s) => s.type);
       expect(types, `${mode} 에 comfyui-sampling 누락`).toContain(
@@ -137,7 +143,7 @@ describe("PIPELINE_DEFS — 정적 일관성", () => {
 
   it("ComfyUI 자동 기동 stage 는 항상 enabled 조건 있음", () => {
     // gen/edit/video 의 comfyui-warmup 은 항상 자동 기동 시만 표시 (enabled 콜백 필수)
-    for (const mode of ["generate", "edit", "video"] as const) {
+    for (const mode of ["generate", "edit", "video", "lab_video"] as const) {
       const warmup = PIPELINE_DEFS[mode].find(
         (s) => s.type === "comfyui-warmup",
       );

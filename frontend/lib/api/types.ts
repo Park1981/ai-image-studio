@@ -281,7 +281,7 @@ export interface HistoryItem {
   model: string;
   /** Phase 3 (2026-05-03 · Wan 2.2 도입) — video 모드 전용. DB persist X · 응답에만 동봉.
    *  옛 row 또는 generate/edit 결과는 undefined → 프론트가 fallback 처리 (cyan 배지 = LTX 가정). */
-  modelId?: import("@/lib/model-presets").VideoModelId;
+  modelId?: import("@/lib/model-presets").VideoModelId | "ltx-sulphur";
   createdAt: number;
   /** generate/edit 은 이미지 URL, video 는 mp4 URL */
   imageRef: string;
