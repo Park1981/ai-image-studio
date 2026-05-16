@@ -22,14 +22,15 @@ import dynamic from "next/dynamic";
 import type { RefObject } from "react";
 import { useState } from "react";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
-import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
-import ProcessingCTA from "@/components/studio/ProcessingCTA";
-import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
-import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
+import {
+  FieldHeaderActionButton,
+  StudioFieldHeader,
+} from "@/components/studio/StudioFieldHeader";
+import StudioPromptInput from "@/components/studio/StudioPromptInput";
+import StickyProcessingCTA from "@/components/studio/StickyProcessingCTA";
 import { usePromptModeInit } from "@/hooks/usePromptModeInit";
 import { usePromptTools } from "@/hooks/usePromptTools";
-import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import ReferenceLibraryDrawer from "./ReferenceLibraryDrawer";
 import ReferenceRoleSelect from "./ReferenceRoleSelect";
@@ -46,7 +47,6 @@ import {
   StudioModeHeader,
 } from "@/components/studio/StudioLayout";
 import V5MotionCard from "@/components/studio/V5MotionCard";
-import Icon from "@/components/ui/Icon";
 import { Toggle } from "@/components/ui/primitives";
 import { useEditInputs, useEditRunning } from "@/stores/useEditStore";
 import { useHistoryStore } from "@/stores/useHistoryStore";
@@ -140,45 +140,32 @@ export default function EditLeftPanel({
 
       {/* Primary CTA — sticky 상단 (Generate 와 통일 · 폼 길어져도 시야 안).
        *  Phase 1.5.3 (결정 K) — shortcut 표시 X (Edit 은 이미 표시 X 였음). 텍스트 영문 통일 (Edit). */}
-      <div className="ais-cta-sticky-top">
-        <ProcessingCTA
-          onClick={onGenerate}
-          disabled={ctaDisabled}
-          running={running}
-          progress={pipelineProgress}
-          idleLabel="Edit"
-          runningLabel="이미지 수정 중"
-          subLabel={pipelineLabel || "EDIT PIPELINE"}
-          icon="wand"
-        />
-      </div>
+      <StickyProcessingCTA
+        onClick={onGenerate}
+        disabled={ctaDisabled}
+        running={running}
+        progress={pipelineProgress}
+        idleLabel="Edit"
+        runningLabel="이미지 수정 중"
+        subLabel={pipelineLabel || "EDIT PIPELINE"}
+        icon="wand"
+      />
 
       {/* ── 원본 이미지 ── */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="blue" />
-            원본 이미지
-          </label>
-          <button
-            type="button"
-            onClick={() => setHistoryPickerOpen((v) => !v)}
-            style={{
-              all: "unset",
-              cursor: "pointer",
-              fontSize: 11,
-              color: historyPickerOpen ? "var(--accent-ink)" : "var(--ink-3)",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <Icon name="grid" size={11} /> 이미지 히스토리
-          </button>
-        </div>
+        <StudioFieldHeader
+          label="원본 이미지"
+          accent="blue"
+          action={
+            <FieldHeaderActionButton
+              icon="grid"
+              active={historyPickerOpen}
+              onClick={() => setHistoryPickerOpen((v) => !v)}
+            >
+              이미지 히스토리
+            </FieldHeaderActionButton>
+          }
+        />
 
         {/* Image history drawer — Generate/Edit 결과만 원본으로 재사용. Video 항목은 제외. */}
         <ImageHistoryPickerDrawer
@@ -213,41 +200,18 @@ export default function EditLeftPanel({
       {/* 2026-05-01 (UX 통일): Generate/Compare/Video 와 동일한 auto-grow textarea
        *  + 우하단 X 아이콘 박스 패턴. */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="blue" />
-            수정 지시
-          </label>
-        </div>
-        <div className="ais-prompt-shell">
-          <PromptHistoryPeek mode="edit" onSelect={(p) => setPrompt(p)} />
-          <textarea
-            ref={promptTextareaRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="어떻게 수정할까요? 예: 배경을 바다로 바꿔주세요"
-            rows={3}
-            className="ais-prompt-textarea"
-          />
-          {/* Phase 5 후속 (2026-05-01) — 도구 버튼 (번역/분리) textarea 안 우측. */}
-          <PromptToolsButtons tools={promptTools} />
-          {prompt.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setPrompt("")}
-              aria-label="프롬프트 비우기"
-              title="프롬프트 비우기"
-              className="ais-prompt-clear-icon"
-            >
-              <Icon name="x" size={12} />
-            </button>
-          )}
-        </div>
-        {/* 번역/분리 결과 카드 — textarea 외부 아래에 펼침. */}
-        <PromptToolsResults tools={promptTools} />
+        <StudioFieldHeader label="수정 지시" accent="blue" />
+        <StudioPromptInput
+          textareaRef={promptTextareaRef}
+          value={prompt}
+          onChange={setPrompt}
+          historyMode="edit"
+          onHistorySelect={setPrompt}
+          placeholder="어떻게 수정할까요? 예: 배경을 바다로 바꿔주세요"
+          rows={3}
+          tools={promptTools}
+          clearLabel="프롬프트 비우기"
+        />
       </div>
 
       {/* ── 카드 순서 (Phase 1.5.3 · 결정 A · 2026-05-02) ──
@@ -342,42 +306,27 @@ export default function EditLeftPanel({
 
       {useReferenceImage && (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <div className="ais-field-header">
-            <label
-              className="ais-field-label"
-              style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-            >
-              <SectionAccentBar accent="violet" />
-              참조 이미지
-              {referenceWidth && referenceHeight && (
-                <span
-                  className="mono"
-                  style={{
-                    fontSize: 11,
-                    color: "var(--ink-4)",
-                    fontWeight: 400,
-                  }}
-                >
-                  {referenceWidth}×{referenceHeight}
-                </span>
-              )}
-            </label>
-            <button
-              type="button"
-              onClick={() => setLibraryOpen(true)}
-              style={{
-                all: "unset",
-                cursor: "pointer",
-                fontSize: 11,
-                color: "var(--ink-3)",
-                display: "flex",
-                alignItems: "center",
-                gap: 4,
-              }}
-            >
-              <Icon name="grid" size={11} /> 라이브러리에서 선택
-            </button>
-          </div>
+          <StudioFieldHeader
+            label={
+              <>
+                참조 이미지
+                {referenceWidth && referenceHeight && (
+                  <span className="mono ais-field-meta">
+                    {referenceWidth}×{referenceHeight}
+                  </span>
+                )}
+              </>
+            }
+            accent="violet"
+            action={
+              <FieldHeaderActionButton
+                icon="grid"
+                onClick={() => setLibraryOpen(true)}
+              >
+                라이브러리에서 선택
+              </FieldHeaderActionButton>
+            }
+          />
           {/* v9 (2026-04-29 · Phase B.1+B.3): 옛 SourceImageCard + EditReferenceCrop +
            *  saveAsTemplate Toggle/Input 영역을 ReferenceImageBox 1개로 통합.
            *  사후 저장 (📚 라이브러리 저장) 은 결과 ActionBar 로 이전됨 (Phase C).

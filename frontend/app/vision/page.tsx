@@ -12,14 +12,16 @@ import { useState } from "react";
 import AppHeader from "@/components/chrome/AppHeader";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
-import ProcessingCTA from "@/components/studio/ProcessingCTA";
 import ProgressModal from "@/components/studio/ProgressModal";
 import { ResultBox } from "@/components/studio/ResultBox";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import StudioEmptyState from "@/components/studio/StudioEmptyState";
-import StudioResultHeader, {
-  SectionAccentBar,
-} from "@/components/studio/StudioResultHeader";
+import {
+  FieldHeaderActionButton,
+  StudioFieldHeader,
+} from "@/components/studio/StudioFieldHeader";
+import StickyProcessingCTA from "@/components/studio/StickyProcessingCTA";
+import StudioResultHeader from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -168,46 +170,31 @@ export default function VisionPage() {
           {/* Phase 1.5.6 (결정 H · 2026-05-02) — CTA 상단 sticky.
            *  StudioModeHeader 직후 공통 ProcessingCTA 사용.
            *  inline style 잔여 0 (V5 시각 대상). */}
-          <div className="ais-cta-sticky-top">
-            <ProcessingCTA
-              onClick={analyze}
-              disabled={analyzeDisabled}
-              running={analyzing}
-              progress={latestStageProgress}
-              idleLabel="Analyze"
-              runningLabel="분석 중"
-              subLabel={latestStageLabel || "VISION ANALYSIS"}
-              icon="search"
-            />
-          </div>
+          <StickyProcessingCTA
+            onClick={analyze}
+            disabled={analyzeDisabled}
+            running={analyzing}
+            progress={latestStageProgress}
+            idleLabel="Analyze"
+            runningLabel="분석 중"
+            subLabel={latestStageLabel || "VISION ANALYSIS"}
+            icon="search"
+          />
 
-          {/* ── 원본 이미지 (Edit/Video 와 통일 — .ais-field-header + SectionAccentBar) ── */}
+          {/* ── 원본 이미지 (Edit/Video 와 통일 — StudioFieldHeader + SourceImageCard) ── */}
           <div>
-            <div className="ais-field-header">
-              <label
-                className="ais-field-label"
-                style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-              >
-                <SectionAccentBar accent="blue" />
-                원본 이미지
-              </label>
-              <button
-                type="button"
-                onClick={() => setImageHistoryOpen(true)}
-                style={{
-                  all: "unset",
-                  cursor: "pointer",
-                  fontSize: 11,
-                  color: "var(--ink-3)",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 4,
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <Icon name="grid" size={11} /> 이미지 히스토리
-              </button>
-            </div>
+            <StudioFieldHeader
+              label="원본 이미지"
+              accent="blue"
+              action={
+                <FieldHeaderActionButton
+                  icon="grid"
+                  onClick={() => setImageHistoryOpen(true)}
+                >
+                  이미지 히스토리
+                </FieldHeaderActionButton>
+              }
+            />
 
             <ImageHistoryPickerDrawer
               open={imageHistoryOpen}
@@ -240,19 +227,16 @@ export default function VisionPage() {
 
           {/* ── Vision 모델 선택 (VisionModelSelector 공용 컴포넌트 · 2026-05-05) ── */}
           <div>
-            <div className="ais-field-header">
-              <label
-                className="ais-field-label"
-                style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-              >
-                <SectionAccentBar accent="violet" />
-                Vision 모델
-              </label>
-              <span className="mono ais-field-meta">
-                {VISION_MODEL_OPTIONS.find((o) => o.id === visionModel)?.label ??
-                  visionModel}
-              </span>
-            </div>
+            <StudioFieldHeader
+              label="Vision 모델"
+              accent="violet"
+              meta={
+                <span className="mono ais-field-meta">
+                  {VISION_MODEL_OPTIONS.find((o) => o.id === visionModel)?.label ??
+                    visionModel}
+                </span>
+              }
+            />
             {/* 8B / Thinking 카드 세그먼트 — vision · compare 공용 컴포넌트 */}
             <VisionModelSelector
               value={visionModel}

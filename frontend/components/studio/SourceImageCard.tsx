@@ -16,7 +16,7 @@
 import { useState } from "react";
 import Icon, { type IconName } from "@/components/ui/Icon";
 import StudioUploadSlot from "@/components/studio/StudioUploadSlot";
-import { loadImageFile } from "@/lib/image-actions";
+import { formatImageFileError, loadImageFile } from "@/lib/image-actions";
 
 interface SourceImageCardProps {
   sourceImage: string | null;
@@ -60,11 +60,7 @@ export default function SourceImageCard({
       const { dataUrl, width, height } = await loadImageFile(file);
       onChange(dataUrl, `${file.name} · ${width}×${height}`, width, height);
     } catch (e) {
-      const code = e instanceof Error ? e.message : "";
-      if (code === "not-image") onError("이미지 파일만 업로드 가능");
-      else if (code === "image-load-failed" || code === "image-decode-failed")
-        onError("이미지 로드 실패");
-      else onError("파일 읽기 실패");
+      onError(formatImageFileError(e));
     }
   };
 

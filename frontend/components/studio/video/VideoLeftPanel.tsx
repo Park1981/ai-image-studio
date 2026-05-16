@@ -19,15 +19,16 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
-import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
-import ProcessingCTA from "@/components/studio/ProcessingCTA";
-import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
-import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
+import {
+  FieldHeaderActionButton,
+  StudioFieldHeader,
+} from "@/components/studio/StudioFieldHeader";
+import StudioPromptInput from "@/components/studio/StudioPromptInput";
+import StickyProcessingCTA from "@/components/studio/StickyProcessingCTA";
 import { usePromptModeInit } from "@/hooks/usePromptModeInit";
 import { usePromptTools } from "@/hooks/usePromptTools";
-import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import {
   StudioLeftPanel,
@@ -40,7 +41,6 @@ import VideoAutoNsfwCard from "@/components/studio/video/VideoAutoNsfwCard";
 import { AnimatePresence, motion } from "framer-motion";
 import { USE_MOCK } from "@/lib/api/client";
 import { VIDEO_MODEL_PRESETS } from "@/lib/model-presets";
-import Icon from "@/components/ui/Icon";
 import { Toggle } from "@/components/ui/primitives";
 import {
   computeVideoResize,
@@ -202,46 +202,31 @@ export default function VideoLeftPanel({
       {/* Primary CTA — sticky 상단 (Generate / Edit 와 통일).
        *  Phase 1.5.4 (결정 K) — 텍스트 영문 통일 (Render). shortcut 표시 X.
        *  Phase 5 follow-up 4 (2026-05-03 fix) — ETA description 제거 (Generate/Edit 와 통일). */}
-      <div className="ais-cta-sticky-top">
-        <ProcessingCTA
-          onClick={handleCtaClick}
-          disabled={ctaDisabled}
-          running={running}
-          progress={pipelineProgress}
-          idleLabel="Render"
-          runningLabel="영상 생성 중"
-          subLabel={pipelineLabel || "VIDEO PIPELINE"}
-          icon="sparkle"
-        />
-      </div>
+      <StickyProcessingCTA
+        onClick={handleCtaClick}
+        disabled={ctaDisabled}
+        running={running}
+        progress={pipelineProgress}
+        idleLabel="Render"
+        runningLabel="영상 생성 중"
+        subLabel={pipelineLabel || "VIDEO PIPELINE"}
+        icon="sparkle"
+      />
 
       {/* ── 원본 이미지 ── */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="blue" />
-            원본 이미지
-          </label>
-          <button
-            type="button"
-            onClick={() => setImageHistoryOpen(true)}
-            style={{
-              all: "unset",
-              cursor: "pointer",
-              fontSize: 11,
-              color: "var(--ink-3)",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-              whiteSpace: "nowrap",
-            }}
-          >
-            <Icon name="grid" size={11} /> 이미지 히스토리
-          </button>
-        </div>
+        <StudioFieldHeader
+          label="원본 이미지"
+          accent="blue"
+          action={
+            <FieldHeaderActionButton
+              icon="grid"
+              onClick={() => setImageHistoryOpen(true)}
+            >
+              이미지 히스토리
+            </FieldHeaderActionButton>
+          }
+        />
         <ImageHistoryPickerDrawer
           open={imageHistoryOpen}
           items={items}
@@ -272,63 +257,36 @@ export default function VideoLeftPanel({
       {/* 2026-05-01 (UX 통일): Generate/Edit/Compare 와 동일한 auto-grow textarea
        *  + 우하단 X 아이콘 박스 패턴. */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="blue" />
-            영상 지시
-          </label>
-        </div>
-        <div className="ais-prompt-shell">
-          {!effectiveAutoNsfw && (
-            <PromptHistoryPeek mode="video" onSelect={(p) => setPrompt(p)} />
-          )}
-          <textarea
-            ref={promptTextareaRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="어떤 움직임/카메라/분위기의 영상? 예: 느린 달리 인, 창가 빛 변화..."
-            rows={3}
-            className="ais-prompt-textarea"
-            disabled={effectiveAutoNsfw}
-          />
-          {/* Phase 5 후속 (2026-05-01) — 도구 버튼 (번역/분리) textarea 안 우측. */}
-          {!effectiveAutoNsfw && <PromptToolsButtons tools={promptTools} />}
-          {prompt.length > 0 && !effectiveAutoNsfw && (
-            <button
-              type="button"
-              onClick={() => setPrompt("")}
-              aria-label="프롬프트 비우기"
-              title="프롬프트 비우기"
-              className="ais-prompt-clear-icon"
-            >
-              <Icon name="x" size={12} />
-            </button>
-          )}
-        </div>
-        {/* 번역/분리 결과 카드 — textarea 외부 아래에 펼침. */}
-        {!effectiveAutoNsfw && <PromptToolsResults tools={promptTools} />}
+        <StudioFieldHeader label="영상 지시" accent="blue" />
+        <StudioPromptInput
+          textareaRef={promptTextareaRef}
+          value={prompt}
+          onChange={setPrompt}
+          historyMode={effectiveAutoNsfw ? undefined : "video"}
+          onHistorySelect={setPrompt}
+          placeholder="어떤 움직임/카메라/분위기의 영상? 예: 느린 달리 인, 창가 빛 변화..."
+          rows={3}
+          disabled={effectiveAutoNsfw}
+          tools={effectiveAutoNsfw ? undefined : promptTools}
+          showClear={!effectiveAutoNsfw}
+          clearLabel="프롬프트 비우기"
+        />
       </div>
 
       {/* Phase 5 (2026-05-03 · spec §5.6) — 영상 모델 선택 세그먼트 (Wan 2.2 / LTX 2.3).
        *  2026-05-04: 사용자 피드백 — CTA 위 → 영상 지시 하단으로 이동 (Vision 페이지와 일관)
        *  + 헤더 ("영상 모델" + 현재 선택 모델명 meta) 추가 (Vision 카드 헤더와 통일). */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="violet" />
-            영상 모델
-          </label>
-          <span className="mono ais-field-meta">
-            {VIDEO_MODEL_PRESETS[selectedVideoModel]?.displayName ??
-              selectedVideoModel}
-          </span>
-        </div>
+        <StudioFieldHeader
+          label="영상 모델"
+          accent="violet"
+          meta={
+            <span className="mono ais-field-meta">
+              {VIDEO_MODEL_PRESETS[selectedVideoModel]?.displayName ??
+                selectedVideoModel}
+            </span>
+          }
+        />
         <VideoModelSegment
           value={selectedVideoModel}
           onChange={setSelectedVideoModel}

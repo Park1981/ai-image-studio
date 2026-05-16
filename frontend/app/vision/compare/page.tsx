@@ -43,7 +43,7 @@ import {
 } from "@/lib/api/compare";
 import { analysisHasUsableKorean } from "@/components/studio/compare/compareLanguage";
 import { useImagePasteTarget } from "@/hooks/useImagePasteTarget";
-import { loadImageFile } from "@/lib/image-actions";
+import { formatImageFileError, loadImageFile } from "@/lib/image-actions";
 import { toast } from "@/stores/useToastStore";
 import type { VisionCompareAnalysisV4 } from "@/lib/api/types";
 
@@ -60,11 +60,7 @@ async function loadCompareImageFromFile(
     const { dataUrl, width, height } = await loadImageFile(file);
     onLoad({ dataUrl, label: file.name, width, height });
   } catch (e) {
-    const code = e instanceof Error ? e.message : "";
-    if (code === "not-image") toast.error("이미지 파일만 업로드 가능합니다.");
-    else if (code === "image-load-failed" || code === "image-decode-failed")
-      toast.error("이미지 로드 실패");
-    else toast.error("파일 읽기 실패");
+    toast.error(formatImageFileError(e));
   }
 }
 

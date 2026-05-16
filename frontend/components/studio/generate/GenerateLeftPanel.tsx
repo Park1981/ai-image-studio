@@ -20,22 +20,22 @@
 "use client";
 
 import { useEffect, useState, type RefObject } from "react";
-import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
 import PromptModeRadio from "@/components/studio/PromptModeRadio";
-import PromptToolsButtons from "@/components/studio/prompt-tools/PromptToolsButtons";
-import PromptToolsResults from "@/components/studio/prompt-tools/PromptToolsResults";
-import ProcessingCTA from "@/components/studio/ProcessingCTA";
+import {
+  FieldHeaderActionButton,
+  StudioFieldHeader,
+} from "@/components/studio/StudioFieldHeader";
+import StudioPromptInput from "@/components/studio/StudioPromptInput";
+import StickyProcessingCTA from "@/components/studio/StickyProcessingCTA";
 import { usePromptModeInit } from "@/hooks/usePromptModeInit";
 import { usePromptTools } from "@/hooks/usePromptTools";
 import ResearchBanner from "@/components/studio/ResearchBanner";
 import SnippetLibraryModal from "@/components/studio/SnippetLibraryModal";
-import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
 import {
   StudioLeftPanel,
   StudioModeHeader,
 } from "@/components/studio/StudioLayout";
 import V5MotionCard from "@/components/studio/V5MotionCard";
-import Icon from "@/components/ui/Icon";
 import { Toggle } from "@/components/ui/primitives";
 import {
   hasMarker,
@@ -167,75 +167,45 @@ export default function GenerateLeftPanel({
       {/* Primary CTA — sticky 상단 (폼 길어지면 따라옴 · generate 전용 클래스).
        *  Phase 1.5.2 (결정 K) — shortcut (⇧↵) 표시 제거. 기능 미구현 유지.
        *  CSS .ais-cta-shortcut 자체는 보존 (향후 단축키 기능 살릴 때 재사용). */}
-      <div className="ais-cta-sticky-top">
-        <ProcessingCTA
-          onClick={onGenerate}
-          disabled={generating || !prompt.trim()}
-          running={generating}
-          progress={progress}
-          idleLabel="Generate"
-          runningLabel="이미지 생성 중"
-          subLabel={stage || "DIFFUSION"}
-          icon="sparkle"
-        />
-      </div>
+      <StickyProcessingCTA
+        onClick={onGenerate}
+        disabled={generating || !prompt.trim()}
+        running={generating}
+        progress={progress}
+        idleLabel="Generate"
+        runningLabel="이미지 생성 중"
+        subLabel={stage || "DIFFUSION"}
+        icon="sparkle"
+      />
 
       {/* ── 프롬프트 카드 ── */}
       {/* 2026-05-01 (UX 통일): Compare/Edit/Video 와 동일한 auto-grow textarea
        *  + 우하단 X 아이콘 박스 패턴. */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="blue" />
-            프롬프트
-          </label>
-          <button
-            type="button"
-            onClick={() => setLibraryOpen(true)}
-            style={{
-              all: "unset",
-              cursor: "pointer",
-              fontSize: 11,
-              color: "var(--ink-3)",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-            title="프롬프트 라이브러리 (등록도 모달 안에서)"
-          >
-            <Icon name="grid" size={11} /> 라이브러리에서 선택
-          </button>
-        </div>
-        <div className="ais-prompt-shell">
-          <PromptHistoryPeek mode="generate" onSelect={(p) => setPrompt(p)} />
-          <textarea
-            ref={promptTextareaRef}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."
-            rows={3}
-            className="ais-prompt-textarea"
-          />
-          {/* Phase 5 후속 (2026-05-01) — 도구 버튼 (번역/분리) textarea 안 우측.
-           *  히스토리 (top:10) 하단 + 비우기 (bottom:10) 위 영역에 세로 stack. */}
-          <PromptToolsButtons tools={promptTools} />
-          {prompt.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setPrompt("")}
-              aria-label="프롬프트 비우기"
-              title="프롬프트 비우기"
-              className="ais-prompt-clear-icon"
+        <StudioFieldHeader
+          label="프롬프트"
+          accent="blue"
+          action={
+            <FieldHeaderActionButton
+              icon="grid"
+              onClick={() => setLibraryOpen(true)}
+              title="프롬프트 라이브러리 (등록도 모달 안에서)"
             >
-              <Icon name="x" size={12} />
-            </button>
-          )}
-        </div>
-        {/* 번역/분리 결과 카드 — 도구 버튼 클릭 후 textarea 외부 아래에 펼침. */}
-        <PromptToolsResults tools={promptTools} />
+              라이브러리에서 선택
+            </FieldHeaderActionButton>
+          }
+        />
+        <StudioPromptInput
+          textareaRef={promptTextareaRef}
+          value={prompt}
+          onChange={setPrompt}
+          historyMode="generate"
+          onHistorySelect={setPrompt}
+          placeholder="자연어로 자유롭게 입력. 예: 책 읽는 고양이, 창가, 늦은 오후..."
+          rows={3}
+          tools={promptTools}
+          clearLabel="프롬프트 비우기"
+        />
       </div>
 
       {/* ── 라이브러리 모달 (Task 6/7 · 신규 등록은 모달 내부 [+ 새 등록] 으로) ── */}

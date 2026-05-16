@@ -242,9 +242,37 @@ button {
   color: var(--ink-2);
   letter-spacing: 0;
 }
+.ais-field-label-inline {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.ais-field-header-side {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
 .ais-field-meta {
   font-size: 10.5px;
   color: var(--ink-4);
+}
+.ais-field-action-btn {
+  all: unset;
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--ink-3);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.ais-field-action-btn[data-active="true"] {
+  color: var(--accent-ink);
+}
+.ais-field-action-btn:disabled {
+  cursor: not-allowed;
+  opacity: .45;
 }
 
 /* 프롬프트 입력 카드 shell (textarea + overlay controls)

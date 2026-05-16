@@ -18,9 +18,12 @@ import { useState } from "react";
 import { useAutoGrowTextarea } from "@/hooks/useAutoGrowTextarea";
 import { CompareImageSlot } from "@/components/studio/CompareImageSlot";
 import ImageHistoryPickerDrawer from "@/components/studio/ImageHistoryPickerDrawer";
-import PromptHistoryPeek from "@/components/studio/PromptHistoryPeek";
-import ProcessingCTA from "@/components/studio/ProcessingCTA";
-import { SectionAccentBar } from "@/components/studio/StudioResultHeader";
+import {
+  FieldHeaderActionButton,
+  StudioFieldHeader,
+} from "@/components/studio/StudioFieldHeader";
+import StudioPromptInput from "@/components/studio/StudioPromptInput";
+import StickyProcessingCTA from "@/components/studio/StickyProcessingCTA";
 import { StudioModeHeader } from "@/components/studio/StudioLayout";
 import VisionModelSelector, {
   VISION_MODEL_OPTIONS,
@@ -98,31 +101,31 @@ export default function CompareLeftPanel({
       {/* Phase 1.5.5 (결정 F · 2026-05-02) — CTA 상단 sticky.
        *  StudioModeHeader 직후 공통 ProcessingCTA 사용.
        *  inline style 잔여 0 (V5 시각 대상). */}
-      <div className="ais-cta-sticky-top">
-        <ProcessingCTA
-          onClick={onAnalyze}
-          disabled={!canRun}
-          running={running}
-          progress={latestStageProgress}
-          idleLabel="Compare"
-          runningLabel="비교 분석 중"
-          subLabel={latestStageLabel || "COMPARE ANALYSIS"}
-          icon="compare"
-        />
-      </div>
+      <StickyProcessingCTA
+        onClick={onAnalyze}
+        disabled={!canRun}
+        running={running}
+        progress={latestStageProgress}
+        idleLabel="Compare"
+        runningLabel="비교 분석 중"
+        subLabel={latestStageLabel || "COMPARE ANALYSIS"}
+        icon="compare"
+      />
 
       {/* 이미지 A 슬롯 */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="blue" />
-            이미지 A
-          </label>
-          <ImageHistoryButton onClick={() => pickHistoryImage("A")} />
-        </div>
+        <StudioFieldHeader
+          label="이미지 A"
+          accent="blue"
+          action={
+            <FieldHeaderActionButton
+              icon="grid"
+              onClick={() => pickHistoryImage("A")}
+            >
+              이미지 히스토리
+            </FieldHeaderActionButton>
+          }
+        />
         <CompareImageSlot
           label="이미지 A"
           badge="A"
@@ -161,16 +164,18 @@ export default function CompareLeftPanel({
 
       {/* 이미지 B 슬롯 */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="blue" />
-            이미지 B
-          </label>
-          <ImageHistoryButton onClick={() => pickHistoryImage("B")} />
-        </div>
+        <StudioFieldHeader
+          label="이미지 B"
+          accent="blue"
+          action={
+            <FieldHeaderActionButton
+              icon="grid"
+              onClick={() => pickHistoryImage("B")}
+            >
+              이미지 히스토리
+            </FieldHeaderActionButton>
+          }
+        />
         <CompareImageSlot
           label="이미지 B"
           badge="B"
@@ -202,19 +207,16 @@ export default function CompareLeftPanel({
 
       {/* Vision 모델 카드 (V4 Phase 8 추가 · vision 페이지와 공용) */}
       <div>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="violet" />
-            Vision 모델
-          </label>
-          <span className="mono ais-field-meta">
-            {VISION_MODEL_OPTIONS.find((o) => o.id === visionModel)?.label ??
-              visionModel}
-          </span>
-        </div>
+        <StudioFieldHeader
+          label="Vision 모델"
+          accent="violet"
+          meta={
+            <span className="mono ais-field-meta">
+              {VISION_MODEL_OPTIONS.find((o) => o.id === visionModel)?.label ??
+                visionModel}
+            </span>
+          }
+        />
         <VisionModelSelector
           value={visionModel}
           onChange={setVisionModel}
@@ -224,60 +226,25 @@ export default function CompareLeftPanel({
 
       {/* 비교 지시 (선택) */}
       <div style={{ marginTop: 6 }}>
-        <div className="ais-field-header">
-          <label
-            className="ais-field-label"
-            style={{ display: "inline-flex", alignItems: "baseline", gap: 8 }}
-          >
-            <SectionAccentBar accent="blue" />
-            비교 지시{" "}
-            <span style={{ color: "var(--ink-4)", fontWeight: 400 }}>(선택)</span>
-          </label>
-        </div>
-        <div className="ais-prompt-shell">
-          <PromptHistoryPeek mode="compare" onSelect={(p) => setHint(p)} />
-          <textarea
-            ref={hintTextareaRef}
-            value={hint}
-            onChange={(e) => setHint(e.target.value)}
-            placeholder="예: 의상 차이에 집중해 주세요 / 색감 변화 위주로 비교"
-            rows={3}
-            className="ais-prompt-textarea"
-          />
-          {hint.length > 0 && (
-            <button
-              type="button"
-              onClick={() => setHint("")}
-              aria-label="비교 지시 비우기"
-              title="비교 지시 비우기"
-              className="ais-prompt-clear-icon"
-            >
-              <Icon name="x" size={12} />
-            </button>
-          )}
-        </div>
+        <StudioFieldHeader
+          label={
+            <>
+              비교 지시 <span className="ais-field-meta">(선택)</span>
+            </>
+          }
+          accent="blue"
+        />
+        <StudioPromptInput
+          textareaRef={hintTextareaRef}
+          value={hint}
+          onChange={setHint}
+          historyMode="compare"
+          onHistorySelect={setHint}
+          placeholder="예: 의상 차이에 집중해 주세요 / 색감 변화 위주로 비교"
+          rows={3}
+          clearLabel="비교 지시 비우기"
+        />
       </div>
     </>
-  );
-}
-
-function ImageHistoryButton({ onClick }: { onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        all: "unset",
-        cursor: "pointer",
-        fontSize: 11,
-        color: "var(--ink-3)",
-        display: "flex",
-        alignItems: "center",
-        gap: 4,
-        whiteSpace: "nowrap",
-      }}
-    >
-      <Icon name="grid" size={11} /> 이미지 히스토리
-    </button>
   );
 }

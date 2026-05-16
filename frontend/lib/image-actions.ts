@@ -141,6 +141,15 @@ export interface LoadImageFileResult {
   height: number;
 }
 
+export function formatImageFileError(error: unknown): string {
+  const code = error instanceof Error ? error.message : "";
+  if (code === "not-image") return "이미지 파일만 업로드할 수 있습니다.";
+  if (code === "image-load-failed" || code === "image-decode-failed") {
+    return "이미지 로드 실패";
+  }
+  return "파일 읽기 실패";
+}
+
 /**
  * 로컬 File 을 dataURL + 자연 크기로 디코드.
  *

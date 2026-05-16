@@ -17,7 +17,7 @@ import type { Area, MediaSize } from "react-easy-crop";
 
 import Icon from "@/components/ui/Icon";
 import { useImagePasteTarget } from "@/hooks/useImagePasteTarget";
-import { loadImageFile } from "@/lib/image-actions";
+import { formatImageFileError, loadImageFile } from "@/lib/image-actions";
 
 // ─────────────────────────────────────────────
 // aspect preset (옛 EditReferenceCrop 흡수)
@@ -371,18 +371,12 @@ async function handleFile(
   onImage: Props["onImage"],
   onError?: (message: string) => void,
 ): Promise<void> {
-  // 2026-05-06 (Codex 후속 Plan A): lib/image-actions.ts:loadImageFile 로 dedup.
-  // 호출자 메시지 톤 보존 — not-image 는 옛 문구, 나머지는 "이미지 처리 실패: ${구체}" 패턴.
+  // 2026-05-16: SourceImageCard/CompareImageSlot 과 업로드 실패 문구 단일화.
   try {
     const { dataUrl, width, height } = await loadImageFile(file);
     const label = `${file.name} · ${width}×${height}`;
     onImage(dataUrl, label, width, height);
   } catch (e) {
-    const code = e instanceof Error ? e.message : "unknown";
-    if (code === "not-image") {
-      onError?.("이미지 파일만 업로드할 수 있습니다.");
-      return;
-    }
-    onError?.(`이미지 처리 실패: ${code}`);
+    onError?.(formatImageFileError(e));
   }
 }
