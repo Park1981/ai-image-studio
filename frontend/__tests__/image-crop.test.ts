@@ -25,6 +25,7 @@ import {
   vi,
 } from "vitest";
 import {
+  blobToDataUrl,
   cropBlobByArea,
   cropBlobIfArea,
   dataUrlToBlob,
@@ -212,6 +213,13 @@ describe("cropBlobByArea", () => {
     expect(callArgs[4]).toBe(256); // sh (round)
 
     restore();
+  });
+});
+
+describe("blobToDataUrl", () => {
+  it("Blob 을 data URL 로 변환한다", async () => {
+    const url = await blobToDataUrl(new Blob(["abc"], { type: "image/png" }));
+    expect(url).toMatch(/^data:image\/png;base64,/);
   });
 });
 

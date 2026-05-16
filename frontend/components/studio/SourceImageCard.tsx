@@ -29,6 +29,12 @@ interface SourceImageCardProps {
   onClear: () => void;
   /** 업로드 실패 시 토스트 노출용 — 부모가 레벨(error/warn) 판단 */
   onError: (message: string) => void;
+  /** 선택 이미지 crop 모달 열기 — Edit 원본 이미지에서만 사용 */
+  onCrop?: () => void;
+  /** crop 결과를 최초 원본으로 되돌림 — Edit 원본 이미지에서만 사용 */
+  onRestoreOriginal?: () => void;
+  /** 현재 표시 이미지가 crop 결과인지 여부 */
+  isCropped?: boolean;
   /** Multi-ref 등 멀티 슬롯 페이지에서 paste 충돌 방지 — 호버한 카드만 paste 수용.
    *  default false (옛 동작 유지 — 단일 슬롯 페이지 호환). */
   pasteRequireHover?: boolean;
@@ -42,6 +48,9 @@ export default function SourceImageCard({
   onChange,
   onClear,
   onError,
+  onCrop,
+  onRestoreOriginal,
+  isCropped = false,
   pasteRequireHover = false,
 }: SourceImageCardProps) {
   // StudioUploadSlot.onReady 로 받아둔 trigger — 변경 버튼 클릭 시 호출.
@@ -179,6 +188,13 @@ export default function SourceImageCard({
                 gap: 6,
               }}
             >
+              {onCrop && (
+                <RoundIconBtn
+                  title="이미지 크롭"
+                  icon="crop"
+                  onClick={onCrop}
+                />
+              )}
               <RoundIconBtn
                 title="이미지 변경"
                 icon="refresh"
@@ -190,6 +206,36 @@ export default function SourceImageCard({
                 onClick={handleClear}
               />
             </div>
+            {isCropped && onRestoreOriginal && (
+              <button
+                type="button"
+                title="원본 복원"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRestoreOriginal();
+                }}
+                className="mono"
+                style={{
+                  all: "unset",
+                  position: "absolute",
+                  top: 10,
+                  left: 10,
+                  cursor: "pointer",
+                  padding: "6px 9px",
+                  borderRadius: "var(--radius-full)",
+                  background: "rgba(0,0,0,.38)",
+                  backdropFilter: "blur(14px) saturate(180%)",
+                  WebkitBackdropFilter: "blur(14px) saturate(180%)",
+                  border: "1px solid rgba(255,255,255,.22)",
+                  color: "#fff",
+                  fontSize: 10.5,
+                  fontWeight: 700,
+                  letterSpacing: 0,
+                }}
+              >
+                CROPPED
+              </button>
+            )}
           </>
         )}
       </StudioUploadSlot>

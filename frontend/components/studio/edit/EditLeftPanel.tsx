@@ -34,6 +34,7 @@ import { usePromptTools } from "@/hooks/usePromptTools";
 import SourceImageCard from "@/components/studio/SourceImageCard";
 import ReferenceLibraryDrawer from "./ReferenceLibraryDrawer";
 import ReferenceRoleSelect from "./ReferenceRoleSelect";
+import SourceCropModal from "./SourceCropModal";
 import type { ReferenceRoleId } from "@/stores/useEditStore";
 
 // ReferenceImageBox 는 react-easy-crop (window 의존) 을 사용하므로 ssr:false 로 격리.
@@ -65,7 +66,9 @@ export default function EditLeftPanel({
   onGenerate,
 }: Props) {
   const {
-    sourceImage, sourceLabel, sourceWidth, sourceHeight, setSource,
+    sourceImage, sourceLabel, sourceWidth, sourceHeight,
+    sourceOriginal, sourceIsCropped, setSource,
+    applySourceCrop, restoreSourceOriginal,
     prompt, setPrompt,
     lightning, setLightning,
     useReferenceImage, setUseReferenceImage,
@@ -102,6 +105,7 @@ export default function EditLeftPanel({
   usePromptModeInit(setPromptMode);
 
   const [historyPickerOpen, setHistoryPickerOpen] = useState(false);
+  const [sourceCropOpen, setSourceCropOpen] = useState(false);
   // v8 라이브러리 plan: 라이브러리 Drawer open 토글.
   const [libraryOpen, setLibraryOpen] = useState(false);
 
@@ -193,6 +197,30 @@ export default function EditLeftPanel({
           onClear={handleClearSource}
           onError={(msg) => toast.error(msg)}
           pasteRequireHover={useReferenceImage}
+          onCrop={sourceImage ? () => setSourceCropOpen(true) : undefined}
+          isCropped={sourceIsCropped}
+          onRestoreOriginal={
+            sourceOriginal
+              ? () => {
+                  restoreSourceOriginal();
+                  toast.info("원본 이미지 복원");
+                }
+              : undefined
+          }
+        />
+        <SourceCropModal
+          open={sourceCropOpen}
+          image={sourceImage}
+          label={sourceLabel}
+          width={sourceWidth}
+          height={sourceHeight}
+          onCancel={() => setSourceCropOpen(false)}
+          onApply={(image, label, w, h) => {
+            applySourceCrop(image, label, w, h);
+            setSourceCropOpen(false);
+            toast.success("원본 이미지 크롭 적용", `${w}×${h}`);
+          }}
+          onError={(msg) => toast.error(msg)}
         />
       </div>
 

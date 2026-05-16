@@ -143,6 +143,21 @@ export async function compressDataUrlToWebp(
   return await blobToCompressedThumbDataUrl(blob, maxSize, quality);
 }
 
+export function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("blobToDataUrl: FileReader 실패"));
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("blobToDataUrl: data URL 결과 없음"));
+      }
+    };
+    reader.readAsDataURL(blob);
+  });
+}
+
 /* ──────────── 내부 헬퍼 ──────────── */
 
 /** Image 를 src URL 에서 비동기 로드 — onload 까지 기다림. */

@@ -23,6 +23,7 @@ export type IconName =
   | "clock"
   | "grid"
   | "zoom-in"
+  | "crop"
   | "download"
   | "refresh"
   | "cpu"
@@ -217,6 +218,14 @@ export default function Icon({ name, size = 16, stroke = 1.5, style, className }
         <svg {...common}>
           <circle cx="11" cy="11" r="7" />
           <path d="m21 21-4.3-4.3M11 8v6M8 11h6" />
+        </svg>
+      );
+    case "crop":
+      return (
+        <svg {...common}>
+          <path d="M6 2v14a2 2 0 0 0 2 2h14" />
+          <path d="M2 6h14a2 2 0 0 1 2 2v14" />
+          <path d="M10 10h4v4" />
         </svg>
       );
     case "download":

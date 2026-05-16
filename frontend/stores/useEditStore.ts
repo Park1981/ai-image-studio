@@ -38,6 +38,13 @@ export interface CropArea {
   height: number;
 }
 
+export interface SourceSnapshot {
+  image: string;
+  label: string;
+  width: number | null;
+  height: number | null;
+}
+
 // stage slice 5 필드 (stageHistory / startedAt / samplingStep / samplingTotal) 는
 // StageSliceState 에서 inherit. createStageActions 가 pushStage / setSampling 제공.
 export interface EditState extends StageSliceState {
@@ -48,6 +55,10 @@ export interface EditState extends StageSliceState {
   /** 화면 표시용 원본 사이즈 */
   sourceWidth: number | null;
   sourceHeight: number | null;
+  /** Crop & Replace 적용 전 최초 원본 snapshot */
+  sourceOriginal: SourceSnapshot | null;
+  /** 현재 sourceImage 가 crop 결과인지 표시 */
+  sourceIsCropped: boolean;
 
   prompt: string;
   lightning: boolean;
@@ -109,6 +120,13 @@ export interface EditState extends StageSliceState {
     w?: number,
     h?: number,
   ) => void;
+  applySourceCrop: (
+    image: string,
+    label: string,
+    w: number,
+    h: number,
+  ) => void;
+  restoreSourceOriginal: () => void;
   setUseReferenceImage: (v: boolean) => void;
   setReferenceImage: (
     image: string | null,
@@ -144,6 +162,8 @@ export const useEditStore = create<EditState>((set) => ({
   sourceLabel: "이미지를 업로드하거나 히스토리에서 선택",
   sourceWidth: null,
   sourceHeight: null,
+  sourceOriginal: null,
+  sourceIsCropped: false,
 
   prompt: "",
   // 2026-04-29: 기본 ON (= ⚡ 빠른 모드 · 퀄리티 모드 OFF). 옛 false 는 EditLeftPanel 주석/desc 의
@@ -183,6 +203,38 @@ export const useEditStore = create<EditState>((set) => ({
       sourceLabel: label ?? "이미지를 업로드하거나 히스토리에서 선택",
       sourceWidth: w ?? null,
       sourceHeight: h ?? null,
+      sourceOriginal: null,
+      sourceIsCropped: false,
+    }),
+  applySourceCrop: (image, label, w, h) =>
+    set((s) => ({
+      sourceOriginal:
+        s.sourceOriginal ??
+        (s.sourceImage
+          ? {
+              image: s.sourceImage,
+              label: s.sourceLabel,
+              width: s.sourceWidth,
+              height: s.sourceHeight,
+            }
+          : null),
+      sourceImage: image,
+      sourceLabel: label,
+      sourceWidth: w,
+      sourceHeight: h,
+      sourceIsCropped: true,
+    })),
+  restoreSourceOriginal: () =>
+    set((s) => {
+      if (!s.sourceOriginal) return {};
+      return {
+        sourceImage: s.sourceOriginal.image,
+        sourceLabel: s.sourceOriginal.label,
+        sourceWidth: s.sourceOriginal.width,
+        sourceHeight: s.sourceOriginal.height,
+        sourceOriginal: null,
+        sourceIsCropped: false,
+      };
     }),
   // Phase 1 (2026-04-28): 토글 OFF 시 crop 영역 자동 reset (트리거 #3)
   setUseReferenceImage: (v) =>
@@ -258,7 +310,11 @@ export const useEditInputs = () =>
       sourceLabel: s.sourceLabel,
       sourceWidth: s.sourceWidth,
       sourceHeight: s.sourceHeight,
+      sourceOriginal: s.sourceOriginal,
+      sourceIsCropped: s.sourceIsCropped,
       setSource: s.setSource,
+      applySourceCrop: s.applySourceCrop,
+      restoreSourceOriginal: s.restoreSourceOriginal,
       prompt: s.prompt,
       setPrompt: s.setPrompt,
       lightning: s.lightning,
