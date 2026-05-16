@@ -104,7 +104,7 @@ export default function EditRightPanel({
       <ResultBox
         state={resultState}
         modifier="edit"
-        loadingLabel="이미지 수정 중…"
+        loadingLabel="EDITING IMAGE"
         emptyState={
           <StudioEmptyState
             size="normal"

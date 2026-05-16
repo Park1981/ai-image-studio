@@ -18,7 +18,7 @@ function classNames(...parts: Array<string | false | null | undefined>) {
 export default function ResultLoadingCanvas({
   variant = "hero",
   modifier,
-  label = "처리 중…",
+  label = "PROCESSING",
   showLabel = true,
   className,
   ...rest
@@ -35,10 +35,20 @@ export default function ResultLoadingCanvas({
       data-result-loading-modifier={modifier ?? "none"}
       role="status"
       aria-live="polite"
+      aria-label={showLabel ? label : undefined}
       {...rest}
     >
       {showLabel && (
-        <div className="ais-result-loading-caption mono">{label}</div>
+        <div className="ais-result-loading-caption mono">
+          <span className="ais-result-loading-label">{label}</span>
+          <span
+            className="ais-result-loading-dots"
+            data-testid="result-loading-dots"
+            aria-hidden="true"
+          >
+            ...
+          </span>
+        </div>
       )}
     </div>
   );

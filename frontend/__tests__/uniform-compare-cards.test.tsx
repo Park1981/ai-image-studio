@@ -120,6 +120,6 @@ it("CompareAnalysisPanel — running 시에도 outer wrapper 에 .ais-result-her
   expect(root!.className).toContain("ais-result-hero-plain");
   expect(root).toHaveAttribute("data-result-state", "loading");
   expect(screen.getByTestId("result-box-loading-placeholder")).toBeInTheDocument();
-  expect(screen.getByText("비교 분석 중…")).toBeInTheDocument();
+  expect(screen.getByText("COMPARING IMAGES")).toBeInTheDocument();
   expect(root!.className).not.toContain("ais-compare-analysis-card");
 });

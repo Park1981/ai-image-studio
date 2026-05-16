@@ -66,7 +66,7 @@ export default function CompareAnalysisPanel({
     <ResultBox
       state={resultState}
       variant="plain"
-      loadingLabel="비교 분석 중…"
+      loadingLabel="COMPARING IMAGES"
       emptyState={<AnalysisEmpty />}
     >
       {analysis?.fallback ? (

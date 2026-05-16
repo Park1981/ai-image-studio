@@ -20,13 +20,21 @@ it("loading 상태는 빈 placeholder 와 effectOverlay slot 을 렌더한다", 
   render(
     <ResultBox
       state="loading"
-      loadingLabel="이미지 생성 중…"
+      loadingLabel="GENERATING IMAGE"
       effectOverlay={<div data-testid="effect">효과</div>}
     />,
   );
 
-  expect(screen.getByTestId("result-box-loading-placeholder")).toBeInTheDocument();
-  expect(screen.getByText("이미지 생성 중…")).toBeInTheDocument();
+  const placeholder = screen.getByTestId("result-box-loading-placeholder");
+  expect(placeholder).toBeInTheDocument();
+  expect(placeholder).toHaveAttribute("aria-label", "GENERATING IMAGE");
+  expect(screen.getByText("GENERATING IMAGE")).toHaveClass(
+    "ais-result-loading-label",
+  );
+  expect(screen.getByTestId("result-loading-dots")).toHaveAttribute(
+    "aria-hidden",
+    "true",
+  );
   expect(screen.getByTestId("effect")).toBeInTheDocument();
 });
 

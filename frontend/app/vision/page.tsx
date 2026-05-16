@@ -288,7 +288,7 @@ export default function VisionPage() {
           <ResultBox
             state={resultState}
             variant="plain"
-            loadingLabel="분석 중…"
+            loadingLabel="ANALYZING IMAGE"
             emptyState={
               <StudioEmptyState
                 size="normal"

@@ -112,7 +112,7 @@ export default function GenerateRightPanel({ onLightboxOpen }: Props) {
 
       <ResultBox
         state={resultState}
-        loadingLabel="이미지 생성 중…"
+        loadingLabel="GENERATING IMAGE"
         emptyState={
           <StudioEmptyState
             size="normal"

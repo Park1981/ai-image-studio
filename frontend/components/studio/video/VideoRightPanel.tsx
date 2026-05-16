@@ -112,7 +112,7 @@ export default function VideoRightPanel({ onLightboxOpen }: Props) {
       <ResultBox
         state={resultState}
         modifier="edit"
-        loadingLabel="영상 생성 중…"
+        loadingLabel="RENDERING VIDEO"
         emptyState={
           <StudioEmptyState
             size="normal"

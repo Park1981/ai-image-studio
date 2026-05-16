@@ -1823,14 +1823,55 @@ button {
 .ais-result-loading-caption {
   position: relative;
   z-index: 1;
-  padding: 6px 10px;
-  border: 1px solid rgba(255,255,255,.62);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 150px;
+  padding: 7px 13px;
+  border: 1px solid rgba(255,255,255,.64);
   border-radius: var(--radius-full);
-  background: rgba(255,255,255,.62);
-  box-shadow: 0 8px 24px rgba(23,20,14,.07);
-  color: var(--ink-3);
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.72), rgba(255,255,255,.46)),
+    rgba(255,255,255,.34);
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.72),
+    inset 0 -1px 0 rgba(255,255,255,.24),
+    0 10px 30px rgba(23,20,14,.08);
+  color: var(--ink-2);
   font-size: 11px;
-  letter-spacing: .04em;
+  font-weight: 650;
+  letter-spacing: 0;
+  overflow: hidden;
+}
+.ais-result-loading-caption::before {
+  content: "";
+  position: absolute;
+  inset: -1px auto -1px -45%;
+  width: 38%;
+  border-radius: inherit;
+  background: linear-gradient(
+    110deg,
+    transparent,
+    rgba(255,255,255,.7),
+    transparent
+  );
+  transform: skewX(-18deg);
+  animation: ais-result-caption-sheen 2.8s ease-in-out infinite;
+}
+.ais-result-loading-label,
+.ais-result-loading-dots {
+  position: relative;
+  z-index: 1;
+}
+.ais-result-loading-dots {
+  width: 1.35em;
+  text-align: left;
+  letter-spacing: 0;
+  color: var(--accent-ink);
+  animation: ais-result-loading-dots 1.25s steps(4, end) infinite;
 }
 @keyframes ais-result-mesh-bloom {
   0%, 100% {
@@ -1845,6 +1886,42 @@ button {
 @keyframes ais-result-mesh-sheen {
   from { background-position: 0 0, -120% 0; }
   to { background-position: 0 0, 220% 0; }
+}
+@keyframes ais-result-caption-sheen {
+  0%, 32% {
+    transform: translateX(0) skewX(-18deg);
+    opacity: 0;
+  }
+  44% {
+    opacity: .8;
+  }
+  72%, 100% {
+    transform: translateX(420%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+@keyframes ais-result-loading-dots {
+  0% {
+    clip-path: inset(0 100% 0 0);
+  }
+  25% {
+    clip-path: inset(0 66% 0 0);
+  }
+  50% {
+    clip-path: inset(0 33% 0 0);
+  }
+  75%, 100% {
+    clip-path: inset(0 0 0 0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ais-result-loading-caption::before,
+  .ais-result-loading-dots {
+    animation: none;
+  }
+  .ais-result-loading-dots {
+    clip-path: inset(0 0 0 0);
+  }
 }
 
 /* SegControl row (Edit Hero 우상단 — 슬라이더/나란히 토글) */
