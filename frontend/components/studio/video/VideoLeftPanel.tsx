@@ -30,6 +30,7 @@ import StickyProcessingCTA from "@/components/studio/StickyProcessingCTA";
 import { usePromptModeInit } from "@/hooks/usePromptModeInit";
 import { usePromptTools } from "@/hooks/usePromptTools";
 import SourceImageCard from "@/components/studio/SourceImageCard";
+import SourceCropModal from "@/components/studio/edit/SourceCropModal";
 import {
   StudioLeftPanel,
   StudioModeHeader,
@@ -66,7 +67,9 @@ export default function VideoLeftPanel({
   onGenerate,
 }: Props) {
   const {
-    sourceImage, sourceLabel, sourceWidth, sourceHeight, setSource,
+    sourceImage, sourceLabel, sourceWidth, sourceHeight,
+    sourceOriginal, sourceIsCropped, setSource,
+    applySourceCrop, restoreSourceOriginal,
     prompt, setPrompt,
     adult, setAdult,
     longerEdge, setLongerEdge,
@@ -153,6 +156,7 @@ export default function VideoLeftPanel({
   // 큰 사이즈 경고 모달 노출 state.
   const [warnOpen, setWarnOpen] = useState(false);
   const [imageHistoryOpen, setImageHistoryOpen] = useState(false);
+  const [sourceCropOpen, setSourceCropOpen] = useState(false);
 
   /**
    * Render CTA 클릭 — 사이즈 임계 충족 시 경고 모달, 미만이면 즉시 onGenerate.
@@ -249,6 +253,30 @@ export default function VideoLeftPanel({
           sourceHeight={sourceHeight}
           onChange={handleSourceChange}
           onClear={handleClearSource}
+          onError={(msg) => toast.error(msg)}
+          onCrop={sourceImage ? () => setSourceCropOpen(true) : undefined}
+          isCropped={sourceIsCropped}
+          onRestoreOriginal={
+            sourceOriginal
+              ? () => {
+                  restoreSourceOriginal();
+                  toast.info("원본 이미지 복원");
+                }
+              : undefined
+          }
+        />
+        <SourceCropModal
+          open={sourceCropOpen}
+          image={sourceImage}
+          label={sourceLabel}
+          width={sourceWidth}
+          height={sourceHeight}
+          onCancel={() => setSourceCropOpen(false)}
+          onApply={(image, label, w, h) => {
+            applySourceCrop(image, label, w, h);
+            setSourceCropOpen(false);
+            toast.success("원본 이미지 크롭 적용", `${w}×${h}`);
+          }}
           onError={(msg) => toast.error(msg)}
         />
       </div>

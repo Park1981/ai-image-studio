@@ -56,6 +56,13 @@ export function computeVideoResize(
   return { width: w, height: h };
 }
 
+export interface VideoSourceSnapshot {
+  image: string;
+  label: string;
+  width: number | null;
+  height: number | null;
+}
+
 // stage slice 5 필드 (stageHistory / startedAt / samplingStep / samplingTotal) 는
 // StageSliceState 에서 inherit. createStageActions 가 pushStage / setSampling 제공.
 export interface VideoState extends StageSliceState {
@@ -64,6 +71,10 @@ export interface VideoState extends StageSliceState {
   sourceLabel: string;
   sourceWidth: number | null;
   sourceHeight: number | null;
+  /** Crop & Replace 적용 전 최초 원본 snapshot */
+  sourceOriginal: VideoSourceSnapshot | null;
+  /** 현재 sourceImage 가 crop 결과인지 표시 */
+  sourceIsCropped: boolean;
 
   prompt: string;
   /**
@@ -127,6 +138,13 @@ export interface VideoState extends StageSliceState {
     w?: number,
     h?: number,
   ) => void;
+  applySourceCrop: (
+    image: string,
+    label: string,
+    w: number,
+    h: number,
+  ) => void;
+  restoreSourceOriginal: () => void;
   setPrompt: (v: string) => void;
   setAdult: (v: boolean) => void;
   setLongerEdge: (v: number) => void;
@@ -150,6 +168,8 @@ export const useVideoStore = create<VideoState>((set) => ({
   sourceLabel: "이미지를 업로드하거나 히스토리에서 선택",
   sourceWidth: null,
   sourceHeight: null,
+  sourceOriginal: null,
+  sourceIsCropped: false,
 
   prompt: "",
   adult: false,
@@ -180,8 +200,42 @@ export const useVideoStore = create<VideoState>((set) => ({
       sourceLabel: label ?? "이미지를 업로드하거나 히스토리에서 선택",
       sourceWidth: w ?? null,
       sourceHeight: h ?? null,
+      sourceOriginal: null,
+      sourceIsCropped: false,
       // Phase 4 (2026-05-03) — 새 source 업로드 = 새 작업 컨텍스트 → override reset
       longerEdgeUserOverride: false,
+    }),
+
+  applySourceCrop: (image, label, w, h) =>
+    set((s) => ({
+      sourceOriginal:
+        s.sourceOriginal ??
+        (s.sourceImage
+          ? {
+              image: s.sourceImage,
+              label: s.sourceLabel,
+              width: s.sourceWidth,
+              height: s.sourceHeight,
+            }
+          : null),
+      sourceImage: image,
+      sourceLabel: label,
+      sourceWidth: w,
+      sourceHeight: h,
+      sourceIsCropped: true,
+    })),
+
+  restoreSourceOriginal: () =>
+    set((s) => {
+      if (!s.sourceOriginal) return {};
+      return {
+        sourceImage: s.sourceOriginal.image,
+        sourceLabel: s.sourceOriginal.label,
+        sourceWidth: s.sourceOriginal.width,
+        sourceHeight: s.sourceOriginal.height,
+        sourceOriginal: null,
+        sourceIsCropped: false,
+      };
     }),
 
   setPrompt: (v) => set({ prompt: v }),
@@ -265,7 +319,11 @@ export const useVideoInputs = () =>
       sourceLabel: s.sourceLabel,
       sourceWidth: s.sourceWidth,
       sourceHeight: s.sourceHeight,
+      sourceOriginal: s.sourceOriginal,
+      sourceIsCropped: s.sourceIsCropped,
       setSource: s.setSource,
+      applySourceCrop: s.applySourceCrop,
+      restoreSourceOriginal: s.restoreSourceOriginal,
       prompt: s.prompt,
       setPrompt: s.setPrompt,
       adult: s.adult,
