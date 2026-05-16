@@ -115,6 +115,69 @@ async def test_create_lab_video_task_passes_selection_to_pipeline() -> None:
 
 
 @pytest.mark.asyncio
+async def test_create_lab_video_compare_task_passes_official_profile_to_pipeline() -> None:
+    from main import app  # type: ignore[import-not-found]
+
+    captured_args: tuple[Any, ...] = ()
+    captured_kwargs: dict[str, Any] = {}
+    record_calls: list[tuple[str, str]] = []
+
+    async def fake_pipeline(*args: Any, **kwargs: Any) -> None:
+        nonlocal captured_args, captured_kwargs
+        captured_args = args
+        captured_kwargs = kwargs
+
+    def fake_record(mode: str, name: str) -> None:
+        record_calls.append((mode, name))
+
+    lora_check = AsyncMock(return_value=None)
+    meta = {
+        "prompt": "slow cinematic motion",
+        "promptMode": "precise",
+        "pairMode": "shared_5beat",
+        "sulphurProfile": "official_i2v_v1",
+        "longerEdge": 512,
+    }
+
+    with (
+        patch(
+            "studio.routes.lab._run_video_lab_pair_pipeline_task",
+            new=fake_pipeline,
+        ),
+        patch("studio.routes.lab._assert_loras_available", new=lora_check),
+        patch("studio.routes.lab.dispatch_state.record", new=fake_record),
+    ):
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as ac:
+            resp = await ac.post(
+                "/api/studio/lab/video/compare",
+                files={"image": ("test.png", _tiny_png(), "image/png")},
+                data={"meta": json.dumps(meta)},
+            )
+        await asyncio.sleep(0)
+
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["stream_url"].startswith("/api/studio/lab/video/compare/stream/")
+    assert record_calls == [("video", "Wan 2.2 i2v + LTX 2.3 · Sulphur Lab")]
+
+    assert captured_args[2] == "slow cinematic motion"
+    assert captured_args[4] == "ltx-sulphur"
+    assert captured_args[7] is True
+    assert captured_args[12] == 512
+    assert captured_args[13] is True
+    assert captured_kwargs["prompt_mode"] == "precise"
+    assert captured_kwargs["pair_mode"] == "shared_5beat"
+    assert captured_kwargs["sulphur_profile"] == "official_i2v_v1"
+    lora_check.assert_awaited_once()
+    assert set(lora_check.await_args.args[0]) == {
+        "ltx-2.3-22b-distilled-lora-1.1_fro90_ceil72_condsafe.safetensors",
+        "sulphur_lora_rank_768.safetensors",
+    }
+
+
+@pytest.mark.asyncio
 async def test_create_lab_video_task_rejects_unknown_lora_id() -> None:
     from main import app  # type: ignore[import-not-found]
 

@@ -57,18 +57,6 @@ export const LAB_LTX_SULPHUR_PRESET: LabVideoPreset = {
       note: "Sulphur distill LoRA",
     },
     {
-      id: "adult_eros",
-      displayName: "Adult: Eros",
-      fileName: "ltx2310eros_beta.safetensors",
-      defaultStrength: 0.5,
-      strengthMin: 0,
-      strengthMax: 1.5,
-      strengthStep: 0.05,
-      role: "adult",
-      appliesTo: ["single"],
-      note: "production adult LoRA",
-    },
-    {
       id: "adult_sulphur",
       displayName: "Adult: Sulphur",
       fileName: "sulphur_lora_rank_768.safetensors",

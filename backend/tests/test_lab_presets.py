@@ -70,13 +70,12 @@ class TestLabVideoModelPreset:
         assert "Lab" in LAB_LTX_SULPHUR_PRESET.display_name
         assert LAB_LTX_SULPHUR_PRESET.display_name == "LTX 2.3 · Sulphur Lab"
 
-    def test_sulphur_preset_has_4_lora_options(self) -> None:
-        assert len(LAB_LTX_SULPHUR_PRESET.lora_options) == 4
+    def test_sulphur_preset_has_only_sulphur_adult_lora(self) -> None:
+        assert len(LAB_LTX_SULPHUR_PRESET.lora_options) == 3
         ids = {opt.id for opt in LAB_LTX_SULPHUR_PRESET.lora_options}
         assert ids == {
             "distill_default",
             "distill_sulphur",
-            "adult_eros",
             "adult_sulphur",
         }
 
@@ -94,7 +93,7 @@ class TestLabVideoModelPreset:
         adult_opts = [
             opt for opt in LAB_LTX_SULPHUR_PRESET.lora_options if opt.role == "adult"
         ]
-        assert len(adult_opts) == 2
+        assert len(adult_opts) == 1
         for opt in adult_opts:
             assert opt.applies_to == ("single",)
 
@@ -129,19 +128,6 @@ class TestLabVideoModelPreset:
             entry.name for entry in LTX_VIDEO_PRESET.loras if entry.role == "lightning"
         }
         assert opt.file_name in production_distill_names
-
-    def test_eros_matches_production(self) -> None:
-        from studio.presets import LTX_VIDEO_PRESET
-
-        opt = next(
-            opt
-            for opt in LAB_LTX_SULPHUR_PRESET.lora_options
-            if opt.id == "adult_eros"
-        )
-        production_adult_names = {
-            entry.name for entry in LTX_VIDEO_PRESET.loras if entry.role == "adult"
-        }
-        assert opt.file_name in production_adult_names
 
     def test_sampling_reuses_ltx_production(self) -> None:
         from studio.presets import LTX_VIDEO_PRESET

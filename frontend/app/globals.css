@@ -1304,6 +1304,92 @@ button {
   );
 }
 
+.ais-lab-pair-stack {
+  width: 100%;
+  display: grid;
+  gap: 10px;
+}
+.ais-lab-pair-syncbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+.ais-lab-pair-syncbar button {
+  all: unset;
+  cursor: pointer;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 7px;
+  border: 1px solid rgba(99,102,241,.22);
+  background: rgba(255,255,255,.78);
+  color: var(--ink-2);
+  font-size: 11px;
+  font-weight: 700;
+}
+.ais-lab-pair-syncbar button:hover {
+  border-color: rgba(99,102,241,.38);
+  background: rgba(255,255,255,.95);
+}
+.ais-lab-pair-syncbar button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.ais-lab-pair-grid {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.ais-lab-pair-card {
+  min-width: 0;
+  border-radius: 8px;
+  border: 1px solid rgba(15,23,42,.08);
+  background: rgba(255,255,255,.72);
+  overflow: hidden;
+}
+.ais-lab-pair-card-head {
+  height: 34px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: 1px solid rgba(15,23,42,.07);
+  font-size: 12px;
+}
+.ais-lab-pair-card-head span {
+  color: var(--ink-3);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.ais-lab-error-note {
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(239,68,68,.24);
+  background: rgba(254,242,242,.82);
+  color: #7f1d1d;
+}
+.ais-lab-error-note strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+.ais-lab-error-note p {
+  margin: 0;
+  max-height: 112px;
+  overflow: auto;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 860px) {
+  .ais-lab-pair-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Multi-ref 카드 (Edit 전용 · 결정 J fuchsia 분리) */
 .ais-multi-ref-card {
   --card-from: var(--ais-card-from-multi-ref);

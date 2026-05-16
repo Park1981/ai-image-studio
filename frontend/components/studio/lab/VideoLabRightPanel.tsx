@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import HistoryGallery from "@/components/studio/HistoryGallery";
 import HistorySectionHeader from "@/components/studio/HistorySectionHeader";
 import { ResultBox } from "@/components/studio/ResultBox";
@@ -22,7 +23,11 @@ interface Props {
 }
 
 export default function VideoLabRightPanel({ onLightboxOpen }: Props) {
+  const wanVideoRef = useRef<HTMLVideoElement | null>(null);
+  const sulphurVideoRef = useRef<HTMLVideoElement | null>(null);
   const lastVideoRef = useVideoLabStore((s) => s.lastVideoRef);
+  const lastPairRefs = useVideoLabStore((s) => s.lastPairRefs);
+  const lastError = useVideoLabStore((s) => s.lastError);
   const { running } = useVideoLabRunning();
   const items = useHistoryStore((s) => s.items);
   const labResults = items.filter(
@@ -35,7 +40,28 @@ export default function VideoLabRightPanel({ onLightboxOpen }: Props) {
   const playingItem = playingRef
     ? labResults.find((item) => item.imageRef === playingRef)
     : undefined;
-  const resultState = running ? "loading" : playingRef ? "done" : "idle";
+  const pairWan = lastPairRefs?.wan22
+    ? items.find((item) => item.imageRef === lastPairRefs.wan22)
+    : undefined;
+  const pairSulphur = lastPairRefs?.sulphur
+    ? items.find((item) => item.imageRef === lastPairRefs.sulphur)
+    : undefined;
+  const pairItems = [
+    pairWan ? { key: "wan22", label: "Wan 2.2", item: pairWan } : null,
+    pairSulphur
+      ? { key: "ltx-sulphur", label: "Sulphur", item: pairSulphur }
+      : null,
+  ].filter(Boolean) as Array<{
+    key: "wan22" | "ltx-sulphur";
+    label: string;
+    item: HistoryItem;
+  }>;
+  const hasPairResult = pairItems.length > 0;
+  const resultState = running
+    ? "loading"
+    : hasPairResult || playingRef
+    ? "done"
+    : "idle";
   const ext = playingItem
     ? (playingItem.imageRef.split(".").pop() || "mp4").toUpperCase()
     : "MP4";
@@ -43,7 +69,30 @@ export default function VideoLabRightPanel({ onLightboxOpen }: Props) {
   if (playingItem?.durationSec) specParts.push(`${playingItem.durationSec}s`);
   if (playingItem?.fps) specParts.push(`${playingItem.fps}fps`);
 
-  const metaPills = resultState === "done" && playingItem ? (
+  const syncPairPlay = () => {
+    const videos = [wanVideoRef.current, sulphurVideoRef.current].filter(
+      Boolean,
+    ) as HTMLVideoElement[];
+    for (const video of videos) {
+      video.currentTime = 0;
+      video.muted = true;
+      void video.play().catch(() => undefined);
+    }
+  };
+
+  const syncPairPause = () => {
+    for (const video of [wanVideoRef.current, sulphurVideoRef.current]) {
+      video?.pause();
+    }
+  };
+
+  const metaPills = resultState === "done" && hasPairResult ? (
+    <>
+      <span className="ais-result-pill ais-pill-violet mono">비교 결과</span>
+      <span className="ais-result-pill mono">Wan → Sulphur</span>
+      <span className="ais-result-pill mono">{pairItems.length}/2 완료</span>
+    </>
+  ) : resultState === "done" && playingItem ? (
     <>
       <span className="ais-result-pill ais-pill-violet mono">
         {playingItem.width} × {playingItem.height}
@@ -73,7 +122,37 @@ export default function VideoLabRightPanel({ onLightboxOpen }: Props) {
           />
         }
       >
-        {playingRef && (
+        {hasPairResult ? (
+          <div className="ais-lab-pair-stack">
+            <div className="ais-lab-pair-syncbar">
+              <button type="button" onClick={syncPairPlay}>
+                동시 재생
+              </button>
+              <button type="button" onClick={syncPairPause}>
+                동시 정지
+              </button>
+            </div>
+            <div className="ais-lab-pair-grid">
+              {pairItems.map(({ key, label, item }) => (
+                <div className="ais-lab-pair-card" key={key}>
+                  <div className="ais-lab-pair-card-head">
+                    <strong>{label}</strong>
+                    <span className="mono">
+                      {item.width}×{item.height} · {item.fps ?? "?"}fps
+                    </span>
+                  </div>
+                  <VideoContent
+                    src={item.imageRef}
+                    filename={filenameFromRef(item.imageRef, `${key}.mp4`)}
+                    videoRef={key === "wan22" ? wanVideoRef : sulphurVideoRef}
+                    muted
+                    onExpand={() => onLightboxOpen(item)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : playingRef ? (
           <VideoContent
             src={playingRef}
             filename={filenameFromRef(playingRef, "ais-lab-video.mp4")}
@@ -82,18 +161,32 @@ export default function VideoLabRightPanel({ onLightboxOpen }: Props) {
               if (hit) onLightboxOpen(hit);
             }}
           />
-        )}
+        ) : null}
       </ResultBox>
 
+      {lastError && (
+        <div className="ais-lab-error-note" role="alert">
+          <strong>최근 Lab 오류</strong>
+          <p>{lastError}</p>
+        </div>
+      )}
+
       {resultState === "done" &&
-        playingItem &&
-        (playingItem.upgradedPrompt || playingItem.prompt) && (
+        (hasPairResult ? pairSulphur || pairWan : playingItem) &&
+        ((hasPairResult ? pairSulphur || pairWan : playingItem)?.upgradedPrompt ||
+          (hasPairResult ? pairSulphur || pairWan : playingItem)?.prompt) && (
           <div className="ais-result-caption">
             <p
               className="ais-result-caption-prompt"
-              title={playingItem.upgradedPrompt || playingItem.prompt}
+              title={
+                (hasPairResult ? pairSulphur || pairWan : playingItem)
+                  ?.upgradedPrompt ||
+                (hasPairResult ? pairSulphur || pairWan : playingItem)?.prompt
+              }
             >
-              {playingItem.upgradedPrompt || playingItem.prompt}
+              {(hasPairResult ? pairSulphur || pairWan : playingItem)
+                ?.upgradedPrompt ||
+                (hasPairResult ? pairSulphur || pairWan : playingItem)?.prompt}
             </p>
           </div>
         )}

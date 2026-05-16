@@ -62,6 +62,7 @@ from .video import (  # noqa: F401 — facade re-export
     build_video_from_request,
 )
 from .video_lab import (  # noqa: F401 — facade re-export
+    SULPHUR_OFFICIAL_PROFILE_ID,
     build_ltx_lab_from_request,
     resolve_lab_video_loras,
 )
@@ -96,4 +97,5 @@ __all__ = [
     "build_video_from_request",
     "build_ltx_lab_from_request",
     "resolve_lab_video_loras",
+    "SULPHUR_OFFICIAL_PROFILE_ID",
 ]

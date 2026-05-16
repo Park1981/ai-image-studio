@@ -24,6 +24,11 @@ import {
 
 type PromptMode = "fast" | "precise";
 
+export interface VideoLabPairRefs {
+  wan22?: string | null;
+  sulphur?: string | null;
+}
+
 export interface VideoLabState extends StageSliceState {
   sourceImage: string | null;
   sourceLabel: string;
@@ -41,7 +46,9 @@ export interface VideoLabState extends StageSliceState {
   running: boolean;
   pipelineProgress: number;
   pipelineLabel: string;
+  lastError: string | null;
   lastVideoRef: string | null;
+  lastPairRefs: VideoLabPairRefs | null;
 
   setSource: (
     image: string | null,
@@ -61,7 +68,9 @@ export interface VideoLabState extends StageSliceState {
   setSampling: (step: number | null, total: number | null) => void;
   setPipelineProgress: (progress: number, label?: string) => void;
   pushStage: (evt: Omit<StageEvent, "arrivedAt">) => void;
+  setLastError: (message: string | null) => void;
   setLastVideoRef: (ref: string | null) => void;
+  setLastPairRefs: (refs: VideoLabPairRefs | null) => void;
   resetPipeline: () => void;
 }
 
@@ -106,9 +115,11 @@ export const useVideoLabStore = create<VideoLabState>((set) => ({
   running: false,
   pipelineProgress: 0,
   pipelineLabel: "",
+  lastError: null,
   ...STAGE_INITIAL_STATE,
   ...createStageActions<VideoLabState>(set),
   lastVideoRef: null,
+  lastPairRefs: null,
 
   setSource: (image, label, w, h) =>
     set({
@@ -163,6 +174,7 @@ export const useVideoLabStore = create<VideoLabState>((set) => ({
             samplingTotal: null,
             pipelineProgress: 0,
             pipelineLabel: "초기화",
+            lastError: null,
           }
         : { running },
     ),
@@ -171,7 +183,9 @@ export const useVideoLabStore = create<VideoLabState>((set) => ({
       pipelineProgress: progress,
       pipelineLabel: label ?? state.pipelineLabel,
     })),
-  setLastVideoRef: (ref) => set({ lastVideoRef: ref }),
+  setLastError: (message) => set({ lastError: message }),
+  setLastVideoRef: (ref) => set({ lastVideoRef: ref, lastPairRefs: null }),
+  setLastPairRefs: (refs) => set({ lastPairRefs: refs, lastVideoRef: null }),
   resetPipeline: () =>
     set({
       running: false,

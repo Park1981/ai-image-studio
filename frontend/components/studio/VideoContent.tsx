@@ -7,6 +7,7 @@
 
 "use client";
 
+import type { RefObject } from "react";
 import { SmallBtn } from "@/components/ui/primitives";
 import { downloadImage, copyText } from "@/lib/image-actions";
 
@@ -16,12 +17,16 @@ interface Props {
   filename?: string;
   /** 크게 보기 (라이트박스 열기). 있을 때만 버튼 노출. */
   onExpand?: () => void;
+  videoRef?: RefObject<HTMLVideoElement | null>;
+  muted?: boolean;
 }
 
 export default function VideoContent({
   src,
   filename,
   onExpand,
+  videoRef,
+  muted = false,
 }: Props) {
   // ── Mock 결과 (실 mp4 없음) ──
   if (src.startsWith("mock-seed://")) {
@@ -68,9 +73,11 @@ export default function VideoContent({
     >
       {/* video element — 매트 위 떠있는 영상 (자체 그림자 + 옅은 테두리) */}
       <video
+        ref={videoRef}
         src={src}
         controls
         loop
+        muted={muted}
         playsInline
         preload="metadata"
         style={{

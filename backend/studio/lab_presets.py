@@ -77,15 +77,6 @@ LAB_LTX_SULPHUR_PRESET = LabVideoModelPreset(
             note="Sulphur 권장 distill (Sulphur LoRA 와 세트 · 631 MB)",
         ),
         LabLoraOption(
-            id="adult_eros",
-            display_name="Adult: Eros",
-            file_name="ltx2310eros_beta.safetensors",
-            default_strength=0.5,
-            role="adult",
-            applies_to=("single",),
-            note="기존 production adult LoRA",
-        ),
-        LabLoraOption(
             id="adult_sulphur",
             display_name="Adult: Sulphur",
             file_name="sulphur_lora_rank_768.safetensors",

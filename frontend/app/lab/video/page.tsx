@@ -23,7 +23,7 @@ import {
 export default function VideoLabPage() {
   const { prompt, setPrompt } = useVideoLabInputs();
   const { running } = useVideoLabRunning();
-  const { generate } = useVideoLabPipeline();
+  const { generatePair } = useVideoLabPipeline();
   const [progressOpen, setProgressOpen] = useAutoCloseModal(running, 1400);
   const [lightboxItem, setLightboxItem] = useState<HistoryItem | null>(null);
   const promptClearedRef = useRef(false);
@@ -54,7 +54,7 @@ export default function VideoLabPage() {
       <StudioWorkspace>
         <VideoLabLeftPanel
           promptTextareaRef={promptTextareaRef}
-          onGenerate={generate}
+          onGenerate={generatePair}
         />
         <VideoLabRightPanel onLightboxOpen={setLightboxItem} />
       </StudioWorkspace>

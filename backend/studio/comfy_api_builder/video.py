@@ -12,7 +12,7 @@ Phase 4.5 단계 5 (2026-04-30) 분리 → Phase 2 (2026-05-03) 듀얼 확장.
 
 from __future__ import annotations
 
-from typing import Callable
+from typing import Any, Callable
 
 from ..presets import (
     DEFAULT_VIDEO_MODEL_ID,
@@ -139,6 +139,10 @@ def build_ltx_from_model_preset(
     source_height: int | None = None,
     longer_edge: int | None = None,
     lightning: bool = True,
+    base_loras_override: list[VideoLoraEntry] | None = None,
+    upscale_loras_override: list[VideoLoraEntry] | None = None,
+    base_scheduler_override: dict[str, Any] | None = None,
+    base_i2v_image_scale: float | None = None,
 ) -> ApiPrompt:
     """LTX 계열 VideoModelPreset 을 명시 주입해 workflow 를 조립한다.
 
@@ -157,6 +161,10 @@ def build_ltx_from_model_preset(
         longer_edge=longer_edge,
         lightning=lightning,
         video_model=model_preset,
+        base_loras_override=base_loras_override,
+        upscale_loras_override=upscale_loras_override,
+        base_scheduler_override=base_scheduler_override,
+        base_i2v_image_scale=base_i2v_image_scale,
     )
 
 
@@ -173,6 +181,10 @@ def _build_ltx(
     longer_edge: int | None = None,
     lightning: bool = True,
     video_model: VideoModelPreset | None = None,
+    base_loras_override: list[VideoLoraEntry] | None = None,
+    upscale_loras_override: list[VideoLoraEntry] | None = None,
+    base_scheduler_override: dict[str, Any] | None = None,
+    base_i2v_image_scale: float | None = None,
 ) -> ApiPrompt:
     """LTX-2.3 i2v 워크플로우 API 포맷 조립 (private — 기존 본문).
 
@@ -247,6 +259,17 @@ def _build_ltx(
             "img_compression": s.preprocess_img_compression,
         },
     }
+    base_i2v_image_ref: NodeRef = [preprocess_id, 0]
+    if base_i2v_image_scale is not None:
+        base_i2v_scale_id = nid()
+        api[base_i2v_scale_id] = {
+            "class_type": "ImageScaleDownBy",
+            "inputs": {
+                "images": [preprocess_id, 0],
+                "scale_by": float(base_i2v_image_scale),
+            },
+        }
+        base_i2v_image_ref = [base_i2v_scale_id, 0]
 
     # ── 4. 체크포인트 + 텍스트 인코더 + 오디오 VAE + 업스케일러 로더 ──
     ckpt_id = nid()
@@ -274,15 +297,29 @@ def _build_ltx(
         "inputs": {"model_name": model.files.upscaler},
     }
 
-    # ── 5. LoRA 체인 (순차 · lightning/adult 토글 조합에 따라 0~3단) ──
-    active_loras = active_video_loras(
-        model.loras, adult=adult, lightning=lightning
-    )
-    model_ref = _build_video_lora_chain(
-        api, nid,
-        base_model=[ckpt_id, 0],
-        loras=active_loras,
-    )
+    # ── 5. LoRA 체인 (기본: production 단일 체인 / Lab: stage 별 체인) ──
+    if base_loras_override is not None or upscale_loras_override is not None:
+        base_model_ref = _build_video_lora_chain(
+            api, nid,
+            base_model=[ckpt_id, 0],
+            loras=base_loras_override or [],
+        )
+        upscale_model_ref = _build_video_lora_chain(
+            api, nid,
+            base_model=[ckpt_id, 0],
+            loras=upscale_loras_override or [],
+        )
+    else:
+        active_loras = active_video_loras(
+            model.loras, adult=adult, lightning=lightning
+        )
+        model_ref = _build_video_lora_chain(
+            api, nid,
+            base_model=[ckpt_id, 0],
+            loras=active_loras,
+        )
+        base_model_ref = model_ref
+        upscale_model_ref = model_ref
 
     # ── sigmas 선택: Lightning ON 은 4-step distilled, OFF 는 30-step full ──
     base_sigmas = s.base_sigmas if lightning else QUALITY_BASE_SIGMAS
@@ -346,7 +383,7 @@ def _build_ltx(
         "class_type": "LTXVImgToVideoInplace",
         "inputs": {
             "vae": [ckpt_id, 2],  # Checkpoint 의 VAE output slot (보통 index 2)
-            "image": [preprocess_id, 0],
+            "image": base_i2v_image_ref,
             "latent": [empty_vid_id, 0],
             "strength": s.imgtovideo_first_strength,
             "bypass": s.imgtovideo_bypass,
@@ -375,15 +412,24 @@ def _build_ltx(
         "inputs": {"sampler_name": s.base_sampler},
     }
     sigmas_base_id = nid()
-    api[sigmas_base_id] = {
-        "class_type": "ManualSigmas",
-        "inputs": {"sigmas": base_sigmas},
-    }
+    if base_scheduler_override is None:
+        api[sigmas_base_id] = {
+            "class_type": "ManualSigmas",
+            "inputs": {"sigmas": base_sigmas},
+        }
+    else:
+        api[sigmas_base_id] = {
+            "class_type": "LTXVScheduler",
+            "inputs": {
+                **base_scheduler_override,
+                "latent": [concat_base_id, 0],
+            },
+        }
     guider_base_id = nid()
     api[guider_base_id] = {
         "class_type": "CFGGuider",
         "inputs": {
-            "model": model_ref,
+            "model": base_model_ref,
             "positive": [cond_id, 0],
             "negative": [cond_id, 1],
             "cfg": s.base_cfg,
@@ -474,7 +520,7 @@ def _build_ltx(
     api[guider_up_id] = {
         "class_type": "CFGGuider",
         "inputs": {
-            "model": model_ref,
+            "model": upscale_model_ref,
             "positive": [crop_id, 0],
             "negative": [crop_id, 1],
             "cfg": s.upscale_cfg,

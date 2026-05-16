@@ -63,7 +63,7 @@ export default function VideoLabLeftPanel({
   const { running, pipelineProgress, pipelineLabel } = useVideoLabRunning();
   const items = useHistoryStore((s) => s.items);
   const ollamaModelForTools = useSettingsStore((s) => s.ollamaModel);
-  const [warnOpen, setWarnOpen] = useState(false);
+  const [pendingAction, setPendingAction] = useState<"pair" | null>(null);
   const [imageHistoryOpen, setImageHistoryOpen] = useState(false);
 
   usePromptModeInit(setPromptMode);
@@ -83,13 +83,17 @@ export default function VideoLabLeftPanel({
     return computeVideoResize(sourceWidth, sourceHeight, longerEdge);
   }, [sourceWidth, sourceHeight, longerEdge]);
 
-  const handleCtaClick = () => {
+  const warnOpen = pendingAction !== null;
+
+  const runAction = () => onGenerate();
+
+  const handleRunClick = () => {
     if (running || warnOpen || ctaDisabled) return;
     if (shouldWarnVideoSize(expected.width, expected.height)) {
-      setWarnOpen(true);
+      setPendingAction("pair");
       return;
     }
-    onGenerate();
+    runAction();
   };
 
   return (
@@ -98,10 +102,11 @@ export default function VideoLabLeftPanel({
         open={warnOpen}
         width={expected.width}
         height={expected.height}
-        onCancel={() => setWarnOpen(false)}
+        onCancel={() => setPendingAction(null)}
         onConfirm={() => {
-          setWarnOpen(false);
-          onGenerate();
+          const action = pendingAction;
+          setPendingAction(null);
+          if (action) runAction();
         }}
       />
       <StudioLeftPanel>
@@ -116,14 +121,14 @@ export default function VideoLabLeftPanel({
 
         <div className="ais-cta-sticky-top">
           <ProcessingCTA
-            onClick={handleCtaClick}
+            onClick={handleRunClick}
             disabled={ctaDisabled}
             running={running}
             progress={pipelineProgress}
-            idleLabel="Render"
-            runningLabel="Lab 영상 생성 중"
+            idleLabel="Wan → Sulphur"
+            runningLabel="비교 생성 중"
             subLabel={pipelineLabel || "LAB VIDEO PIPELINE"}
-            icon="sparkle"
+            icon="compare"
           />
         </div>
 

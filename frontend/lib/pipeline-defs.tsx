@@ -78,6 +78,8 @@ export interface PipelineCtx {
   /** Compare 모드 (Edit context · 캐시 미스 시) refined_intent stage 도착 여부.
    *  Vision Compare 메뉴는 emit 안 함 → row 안 보임. Phase 6 (2026-04-27). */
   intentRefineArrived?: boolean;
+  /** Lab pair 비교 stage 가 도착했는지. 단일 Lab 생성의 기존 row 와 분리 표시한다. */
+  labPairArrived?: boolean;
   /**
    * gemma4 보강 모드 (Phase 2 · 2026-05-01).
    * 4 stage 의 subLabel 분기에 사용 — generate gemma4-upgrade / edit·video prompt-merge /
@@ -313,9 +315,45 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
   /* ── Lab Video (backend history mode 는 video 유지 · UI 진행 모드만 분리) ── */
   lab_video: [
     {
+      type: "pair-prompt",
+      label: "공유 프롬프트",
+      subLabel: "shared 5-beat",
+      enabled: (c) => c.labPairArrived === true,
+      renderDetail: (p, c) => {
+        if (c.hideVideoPrompts) return null;
+        const modelPrompts = p.modelPrompts as
+          | Record<string, string>
+          | undefined;
+        const wanPrompt = modelPrompts?.wan22;
+        const sulphurPrompt = modelPrompts?.["ltx-sulphur"];
+        const sharedPrompt = p.sharedPrompt as string | undefined;
+        return wanPrompt || sulphurPrompt || sharedPrompt ? (
+          <>
+            {wanPrompt && (
+              <DetailBox kind="info" title="Wan 프롬프트">
+                {wanPrompt}
+              </DetailBox>
+            )}
+            {(sulphurPrompt || sharedPrompt) && (
+              <DetailBox kind="info" title="Sulphur 5-beat 프롬프트">
+                {sulphurPrompt || sharedPrompt}
+              </DetailBox>
+            )}
+          </>
+        ) : null;
+      },
+    },
+    {
+      type: "pair-model-start",
+      label: "모델 순차 생성",
+      subLabel: "Wan → Sulphur",
+      enabled: (c) => c.labPairArrived === true,
+    },
+    {
       type: "vision-analyze",
       label: "이미지 분석",
       subLabel: visionSubLabel,
+      enabled: (c) => c.labPairArrived !== true,
       renderDetail: (p, c) => {
         if (c.hideVideoPrompts) return null;
         const description = p.description as string | undefined;
@@ -336,6 +374,7 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       type: "prompt-merge",
       label: "프롬프트 통합",
       subLabel: gemmaSubLabel,
+      enabled: (c) => c.labPairArrived !== true,
       renderDetail: (p, c) => {
         if (c.hideVideoPrompts) return null;
         const finalPrompt = p.finalPrompt as string | undefined;
@@ -364,13 +403,20 @@ export const PIPELINE_DEFS: Record<PipelineMode, StageDef[]> = {
       type: "workflow-dispatch",
       label: "워크플로우 설정",
       subLabel: "Sulphur Lab builder",
+      enabled: (c) => c.labPairArrived !== true,
     },
     {
       type: "comfyui-sampling",
       label: "영상 생성",
-      subLabel: "ltx-2.3 + sulphur",
+      subLabel: (c) =>
+        c.labPairArrived === true ? "wan2.2 → ltx sulphur" : "ltx-2.3 + sulphur",
     },
-    { type: "save-output", label: "MP4 저장", subLabel: "h264 인코딩" },
+    {
+      type: "save-output",
+      label: "MP4 저장",
+      subLabel: "h264 인코딩",
+      enabled: (c) => c.labPairArrived !== true,
+    },
   ],
 
   /* ── Vision Analyzer (4 stage · qwen3-vl + gemma4 합성 + gemma4 번역) — Phase 6 ── */

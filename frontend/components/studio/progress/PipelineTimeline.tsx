@@ -230,6 +230,9 @@ function usePipelineCtx(
 
   // warmup stage 가 도착했는지 — Phase 5 자동 기동 시 활성. stageHistory 안 type 검사.
   const warmupArrived = stageHistory.some((s) => s.type === "comfyui-warmup");
+  const labPairArrived = stageHistory.some(
+    (s) => s.type === "pair-prompt" || s.type === "pair-model-start",
+  );
   // Phase 6 — compare 의 intent-refine stage 도착 여부 (Edit context 캐시 미스 시만)
   const intentRefineArrived = stageHistory.some(
     (s) => s.type === "intent-refine",
@@ -259,6 +262,7 @@ function usePipelineCtx(
     hideVideoPrompts:
       mode === "video" || mode === "lab_video" ? hideVideo : undefined,
     warmupArrived,
+    labPairArrived: mode === "lab_video" ? labPairArrived : undefined,
     intentRefineArrived: mode === "compare" ? intentRefineArrived : undefined,
     promptMode,
     videoModelId:
